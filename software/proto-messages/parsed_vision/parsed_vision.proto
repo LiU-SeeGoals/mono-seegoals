@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+import "robot_action/robot_action.proto";
+
+option go_package = "github.com/LiU-SeeGoals/proto_go/parsed_vision";
+
+message Robot {
+  uint32 robot_id = 1;
+
+  Vector3D pos = 2;
+  Vector3D vel = 3;
+}
+
+message Ball {
+  Vector2D pos = 1;
+  Vector2D vel = 2;
+}
+
+message ParsedFrame {
+  repeated Robot robots = 1;
+  Ball ball = 2;
+}

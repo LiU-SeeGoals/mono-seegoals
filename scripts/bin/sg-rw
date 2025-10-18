@@ -1,0 +1,82 @@
+#!/bin/bash
+
+if [[ "$1" == "--kill" ]]; then
+    session="seegoals"
+
+    if tmux has-session -t "$session" 2>/dev/null; then
+        window_indices=($(tmux list-windows -t "$session" -F "#{window_index}"))
+
+        for idx in "${window_indices[@]}"; do
+            pane_count=$(tmux list-panes -t "$session:$idx" | wc -l)
+            for ((p=1; p<=pane_count; p++)); do
+                tmux send-keys -t "$session:$idx.$p" "exit" C-m
+            done
+        done
+
+        sleep 0.5
+
+        if tmux kill-session -t "$session" 2>/dev/null; then
+            echo "Session '$session' closed successfully"
+            exit 0
+        else
+            echo "Failed to close session '$session' - some processes may still be running"
+            exit 1
+        fi
+    else
+        echo "Session '$session' does not exist"
+        exit 1
+    fi
+fi
+
+session="seegoals"
+
+if tmux has-session -t "$session" 2>/dev/null; then
+    echo "Session '$session' already exists, attaching..."
+    tmux attach-session -t "$session"
+    exit 0
+fi
+
+tab_names=(
+    ""
+    "SG"
+    "AI"
+    "GW"
+    "BS"
+    "RB"
+)
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+tab_dirs=(
+    ""
+    "$script_dir/../../"
+    "$script_dir/../../software/controller"
+    "$script_dir/../../software/GameViewer"
+    "$script_dir/../../firmware/basestation"
+    "$script_dir/../../firmware/robot"
+)
+
+tmux new-session -d -s "$session" -n "${tab_names[1]}"
+
+for i in "${!tab_names[@]}"; do
+    if [[ $i -gt 1 ]]; then
+        tmux new-window -t "$session":"$i" -n "${tab_names[$i]}"
+    fi
+done
+
+for i in "${!tab_names[@]}"; do
+    if [[ $i -gt 0 ]]; then
+        tmux select-window -t "$session":"$i"
+        tmux send-keys "cd ${tab_dirs[$i]}" C-m
+        tmux send-keys "nvim -c 'cd ${tab_dirs[$i]}' +'Neotree toggle' +'wincmd l'" C-m
+        tmux split-window -v -p 15
+        tmux send-keys "cd ${tab_dirs[$i]}" C-m
+        if [[ "${tab_names[$i]}" == "GW" ]]; then
+            tmux split-window -h -p 50
+            tmux send-keys "cd ${tab_dirs[$i]}" C-m
+            tmux select-pane -t "$session":"$i".2
+        fi
+        tmux select-pane -t "$session":"$i".1
+    fi
+done
+
+tmux select-window -t "$session":1
+tmux attach-session -t "$session"

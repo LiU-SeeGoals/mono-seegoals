@@ -1,0 +1,64 @@
+#compdef sg-fw 
+
+# put in /usr/share/zsh/site-functions/
+
+_fetch_serial_devices() {
+    local serial_devices=()
+    if [[ -d /dev/serial/by-id ]]; then
+        for device in /dev/serial/by-id/*(N); do
+            serial_devices+=("$device")
+        done
+    fi
+    echo "${serial_devices[@]}"
+}
+
+_sg-fw() {
+    local curcontext="$curcontext" state line
+    typeset -A opt_args
+
+    _arguments \
+        '1: :->command' \
+        '2: :->secondary_option' \
+        '3: :->device'
+
+    case $state in
+        command)
+            _arguments '1:command:(serial make flash help)'
+            ;;
+        secondary_option)
+            case $line[1] in
+                make|flash)
+                    _values 'type' robot basestation
+                    ;;
+                serial)
+                    local devices
+                    devices=($(_fetch_serial_devices))
+                    if [[ ${#devices[@]} -eq 0 ]]; then
+                        print -u2 "No serial devices found"
+                        return 0
+                    fi
+                    _describe 'serial device' devices
+                    ;;
+            esac
+            ;;
+        device)
+            case $line[1] in
+                flash)
+                    local devices
+                    devices=($(_fetch_serial_devices))
+                    if [[ ${#devices[@]} -eq 0 ]]; then
+                        print -u2 "No serial devices found"
+                        return 0
+                    fi
+                    _describe 'serial device' devices
+                    ;;
+                *)
+                    _files
+                    ;;
+            esac
+            ;;
+    esac
+}
+
+_sg-fw "$@"
+

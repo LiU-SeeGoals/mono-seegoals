@@ -1,0 +1,16 @@
+{
+  "name": "HLindgren_LSM6DSL",
+  "version": "1.0.0",
+  "description": "A driver for the LSM6DSL IMU",
+  "authors":
+  [
+    {
+      "name": "Henrik Lindgren",
+      "email": "henrik@hlindgren.xyz"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "*",
+  "platforms": "*"
+}
+

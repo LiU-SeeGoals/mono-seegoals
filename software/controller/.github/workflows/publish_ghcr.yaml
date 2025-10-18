@@ -1,0 +1,17 @@
+name: Docker image for controller
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build_and_publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build and push the image
+        run: |
+          docker login --username ${{ secrets.GH_USERNAME }} --password ${{ secrets.GH_PAT }} ghcr.io
+          docker build . --tag ghcr.io/liu-seegoals/controller:latest
+          docker push ghcr.io/liu-seegoals/controller:latest

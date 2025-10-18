@@ -1,0 +1,191 @@
+#!/usr/bin/env python3
+import sys
+import getopt
+import os
+import time
+import serial
+import select
+import termios
+import tty
+import subprocess
+
+
+def print_help():
+    help_text = """
+Usage: dev_tool.py [COMMAND] [ARGUMENTS]
+
+Commands:
+  serial, -s <device>              Connect to serial device at 115200 baud
+                                   Example: dev_tool.py serial /dev/ttyUSB0
+
+  make, -m <target>                Build firmware for specified target
+                                   Use --clean flag to remove build directory first
+                                   Example: dev_tool.py make robot --clean
+
+  flash, -f <target> <device_path> Build and flash firmware to device
+                                   device_path format: *_*_<serial>-*
+                                   Example: dev_tool.py flash robot /dev/serial/by-id/usb-*_*_1234567890AB-*
+
+  help, -h                         Show this help message
+
+Targets:
+  robot        - Robot firmware (uses st-flash, flashes CM7 core)
+  basestation  - Base station firmware (uses STM32_Programmer_CLI)
+
+Notes:
+  - Serial connection supports auto-reconnect if device is disconnected
+  - Press Ctrl+C to exit serial connection
+  - Build files are located in firmware/build/
+"""
+    print(help_text)
+
+
+def main():
+    try:
+        opts, args = getopt.getopt(sys.argv[1:],
+                                   "smf",
+                                   ["serial", "make", "flash"])
+    except getopt.GetoptError as err:
+        print(str(err))
+        print_help()
+        sys.exit(1)
+    if len(args) > 0:
+        cmd = args[0]
+        if cmd in ["-s", "serial"]:
+            if len(args) < 2:
+                print("Missing device argument for connect command")
+                sys.exit(1)
+            connect(args[1])
+        elif cmd in ["-m", "make"]:
+            if len(args) < 2:
+                print("Missing device argument for make command")
+                sys.exit(1)
+            make(args[1])
+        elif cmd in ["-f", "flash"]:
+            if len(args) < 3:
+                print("Missing device argument for make command")
+                sys.exit(1)
+            make(args[1])
+            flash(args[1], args[2])
+        elif cmd in ["-h", "help"]:
+            print_help()
+            sys.exit(0)
+    else:
+        print_help()
+        sys.exit(0)
+    for opt, arg in opts:
+        if opt in ("-h", "--help"):
+            print_help()
+            sys.exit(0)
+
+
+def connect(dev):
+    """
+    Connect to a serial device with auto-reconnect capability.
+    If the device is disconnected, it will keep trying to reconnect.
+    """
+    print(f"Connecting to {dev} at 115200 baud...")
+    old_settings = termios.tcgetattr(sys.stdin.fileno())
+    is_raw_mode = False
+
+    def restore_terminal():
+        nonlocal is_raw_mode
+        if is_raw_mode:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
+            is_raw_mode = False
+            sys.stdout.write("\r\n")
+            sys.stdout.flush()
+
+    def set_raw_mode():
+        nonlocal is_raw_mode
+        tty.setraw(sys.stdin.fileno())
+        is_raw_mode = True
+
+    try:
+        while True:
+            try:
+                if not os.path.exists(dev):
+                    restore_terminal()
+                    print(f"Waiting for device {dev} to appear...")
+                    while not os.path.exists(dev):
+                        time.sleep(1)
+                    print(f"Device {dev} connected. Establishing serial connection...")
+
+                with serial.Serial(dev, 115200, timeout=1) as ser:
+                    restore_terminal()
+                    print(f"Connected to {dev}")
+                    set_raw_mode()
+                    try:
+                        while True:
+                            if ser.in_waiting > 0:
+                                data = ser.read(ser.in_waiting)
+                                sys.stdout.buffer.write(data)
+                                sys.stdout.flush()
+                            if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+                                char = sys.stdin.read(1)
+                                if ord(char) == 3:
+                                    restore_terminal()
+                                    print("\nExiting on Ctrl+C...")
+                                    return
+                                ser.write(char.encode())
+                    except (serial.SerialException, OSError):
+                        restore_terminal()
+                        print("\nConnection lost. Waiting to reconnect...")
+
+            except (serial.SerialException, OSError) as e:
+                restore_terminal()
+                print(f"Error: {e}")
+                print("Waiting to reconnect...")
+                time.sleep(2)
+    except KeyboardInterrupt:
+        restore_terminal()
+        print("\nExiting on KeyboardInterrupt...")
+    finally:
+        try:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, old_settings)
+        except:
+            pass
+
+
+def make(dev):
+    script_cwd = os.path.dirname(os.path.abspath(__file__))
+    base_path = os.path.join(script_cwd, "..", "..", "firmware")
+    build_dir = os.path.join(base_path, "build")
+
+    if "--clean" in sys.argv[1:] and os.path.exists(build_dir):
+        subprocess.run(
+            ["rm", "-rf", build_dir]
+        )
+
+    if not os.path.exists(build_dir):
+        subprocess.run(
+            ["cmake", "-B", "build"],
+            cwd=base_path
+        )
+
+    subprocess.run(
+        ["make", dev],
+        cwd=build_dir
+    )
+
+
+def flash(dev, path):
+    script_cwd = os.path.dirname(os.path.abspath(__file__))
+    base_path = os.path.join(script_cwd, "..", "..", "firmware")
+    build_dir = os.path.join(base_path, "build")
+
+    serial = path.split("_")[2].split("-")[0]
+    if dev == "robot":
+        subprocess.run(
+            ["st-flash", "--serial", serial, "--reset", "write", "robot_CM7.bin", "0x08000000"],
+            cwd=build_dir
+        )
+    else:
+        subprocess.run(
+            ["STM32_Programmer_CLI", "-c", "port=SWD", f"sn={serial}", "api=1", "-w", "basestation.bin", "0x08000000", "-rst"],
+            cwd=build_dir
+        )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,15 @@
+services:
+  sg-ai:
+    network_mode: host
+
+  sg-game-viewer:
+    network_mode: host
+
+  sg-ssl-vision-client:
+    network_mode: host
+
+  sg-ssl-game-controller:
+    network_mode: host
+
+  sg-er-sim:
+    network_mode: host

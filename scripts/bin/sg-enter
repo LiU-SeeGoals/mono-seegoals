@@ -1,0 +1,29 @@
+#!/bin/bash
+
+CONTAINERS=($(docker ps --format "{{.Names}}" | grep "^sg-" | sort))
+
+if [ -z "$CONTAINERS" ]; then
+    echo "No running containers..."
+    exit 1
+fi
+
+if [ -n "$1" ]; then
+    docker exec -it "$1" /bin/bash
+    exit 0
+fi
+
+echo -e "${ORANGE}Select a container to enter:${NC}"
+for i in "${!CONTAINERS[@]}"; do
+    echo -e "${ORANGE}[$i] ${CONTAINERS[$i]}${NC}"
+done
+
+echo -e "${ORANGE}Enter the number of the container you want to access:${NC}"
+read -r INDEX
+
+if [[ -n "${CONTAINERS[$INDEX]}" ]]; then
+    SELECTED="${CONTAINERS[$INDEX]}"
+    echo -e "${GREEN}Attaching to container '$SELECTED'...${NC}"
+    docker exec -it "$SELECTED" /bin/bash
+else
+    echo -e "${RED}Invalid selection...${NC}"
+fi

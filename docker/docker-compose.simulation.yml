@@ -1,0 +1,39 @@
+services:
+  sg-ai:
+    ports:
+      # Below is needed to receive AI on localhost, can't get networks to work...
+      - "${VITE_AI_GAME_VIEWER_SOCKET_PORT}:${VITE_AI_GAME_VIEWER_SOCKET_PORT}"
+    networks:
+      - simulation-network
+
+  sg-game-viewer:
+    ports:
+      - "${GAME_VIEWER_PORT}:${GAME_VIEWER_PORT}"
+      # Below has to be exposed to receive multicast, not sure why...
+      - "${VITE_SSL_VISION_WS_PORT}:${VITE_SSL_VISION_WS_PORT}"
+    networks:
+      - simulation-network
+
+  sg-ssl-game-controller:
+    ports:
+      - "${SSL_GAME_CONTROLLER_UI_PORT}:${SSL_GAME_CONTROLLER_UI_PORT}"
+    networks:
+      - simulation-network
+
+  sg-ssl-vision-client:
+    ports:
+      - "${SSL_VISION_CLIENT_PORT}:${SSL_VISION_CLIENT_PORT}"
+    networks:
+      - simulation-network
+
+  sg-gr-sim:
+    profiles:
+      - donotstart
+
+  sg-er-sim:
+    networks:
+      - simulation-network
+
+networks:
+  simulation-network:
+    driver: bridge

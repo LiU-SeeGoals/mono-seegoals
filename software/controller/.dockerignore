@@ -1,0 +1,14 @@
+.dockerignore
+.DS_Store
+.git
+.github
+.gitignore
+.gitlab-ci.yml
+.gitmodules
+.idea
+.data
+.vscode
+Dockerfile
+Dockerfile.archive
+docker-compose.yml
+

@@ -1,0 +1,15 @@
+BasedOnStyle: LLVM
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+PointerAlignment: Left
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterFunction: true
+  AfterControlStatement: false
+  SplitEmptyFunction: true
+  AfterEnum: true
+AlwaysBreakAfterDefinitionReturnType: None
+ColumnLimit: 200
+BinPackParameters: false
+AllowShortEnumsOnASingleLine: false

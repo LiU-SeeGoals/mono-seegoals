@@ -1,0 +1,10 @@
+#!/bin/bash
+# This also adds bin to path, but without chaning bashrc
+# Enable sourcing this file when entering the seegoals repo for convinience
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+bin_path="${SCRIPT_DIR}/bin"
+completions_path="${SCRIPT_DIR}/completions"
+export PATH=$PATH:$bin_path
+fpath=($fpath $completions_path)

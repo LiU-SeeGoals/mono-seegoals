@@ -1,0 +1,56 @@
+version: 2
+jobs:
+  build-ubuntu-2204:
+    docker:
+      - image: cimg/base:current-22.04
+    resource_class: large
+    steps:
+      - checkout
+      - run: ./InstallPackagesUbuntu.sh
+      - run: make -j 4
+  build-ubuntu-2004:
+    docker:
+      - image: cimg/base:current-20.04
+    resource_class: large
+    steps:
+      - checkout
+      - run: ./InstallPackagesUbuntu.sh
+      - run: make -j 4
+  build-ubuntu-2404:
+    docker:
+      - image: cimg/base:current-24.04
+    resource_class: large
+    steps:
+      - checkout
+      - run: ./InstallPackagesUbuntu.sh
+      - run: make -j 4
+  build-splitter:
+    docker:
+      - image: cimg/base:current-22.04
+    resource_class: large
+    steps:
+      - checkout
+      - run: ./InstallPackagesUbuntu.sh
+      - run: cmake -B build -DUSE_SPLITTER=true
+      - run: make -j 4
+  build-spinnaker:
+    docker:
+      - image: cimg/base:current-22.04
+    resource_class: large
+    steps:
+      - checkout
+      - run: ./InstallPackagesUbuntu.sh
+      - run: make install_spinnaker_sdk
+      - run: cmake -B build -DUSE_SPINNAKER=true
+      - run: make -j 4
+
+workflows:
+  version: 2
+  build_all:
+    jobs:
+      - build-ubuntu-2004
+      - build-ubuntu-2204
+      # Image 'cimg/base:current-24.04' is not yet available. Once it is, uncomment the following block.
+      #      - build-ubuntu-2404
+      - build-splitter
+      - build-spinnaker

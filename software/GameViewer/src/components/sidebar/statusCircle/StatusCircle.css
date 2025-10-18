@@ -1,0 +1,43 @@
+/* Container to hold the circle and the hover text */
+.circle-container {
+  position: relative;
+  display: inline-block;
+}
+
+.status-circle {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  transition: background-color 0.3s ease;
+  cursor: pointer;
+  margin-left: 20px
+}
+
+.status-circle.connected {
+  background-color: green;
+}
+
+.status-circle.disconnected {
+  background-color: red;
+}
+
+/* Initially hide the hover text */
+.hover-text {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(0%);
+  background-color: black;
+  color: white;
+  padding: 5px;
+  border-radius: 3px;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+/* When the status circle is hovered, show the text */
+.circle-container:hover .hover-text {
+  visibility: visible;
+  opacity: 1;
+}

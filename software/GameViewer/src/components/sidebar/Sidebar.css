@@ -1,0 +1,48 @@
+.sidebar-wrapper {
+  background-color: white;
+  min-width: auto;
+  z-index: 2;
+  display: flex;
+  flex-direction: row;
+}
+
+.sidebar-wrapper .sidebar {
+  padding: 0px;
+  box-sizing: border-box;
+  overflow: scroll;
+}
+
+.sidebar-wrapper .sidebar-resizer {
+  background-color: rgb(44, 131, 190);
+  cursor: ew-resize;
+}
+
+.sidebar-wrapper .sidebar-resizer:hover {
+  background-color: rgb(100, 150, 200);
+}
+
+.sidebar-wrapper hr {
+  margin-top: 15px;
+  margin-bottom: 15px;
+}
+
+.header-status-container {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.header-status-container > *:not(:last-child) {
+  margin-right: 10px;
+}
+
+.status-circle {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid black;
+}
+
+.sidebar-content {
+  padding: 10px;
+}

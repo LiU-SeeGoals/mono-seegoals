@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option go_package = "github.com/LiU-SeeGoals/proto_go/robot_action";
+
+// Enum for different types of actions
+enum ActionType {
+  KICK_ACTION = 0;
+  STOP_ACTION = 1;
+  MOVE_TO_ACTION = 2;
+  INIT_ACTION = 3;
+  MOVE_ACTION = 4;
+  ROTATE_ACTION = 5;
+}
+
+message Command {
+  ActionType command_id = 1;
+  int32 robot_id = 2;
+  int32 kick_speed = 3;
+  Vector3D pos = 4;
+  Vector3D dest = 5;
+  Vector2D direction = 6;
+  int32 angular_vel = 7; // Negative value rotates robot clockwise
+}
+
+// Structure for 3D vector
+message Vector3D {
+  int32 x = 1;
+  int32 y = 2;
+  float w = 3;
+}
+
+// Structure for 2D vector
+message Vector2D {
+  int32 x = 1;
+  int32 y = 2;
+}

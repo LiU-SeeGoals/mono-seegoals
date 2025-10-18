@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+
+import os
+import subprocess
+import sys
+import shutil
+
+RED = "\033[1;31m"
+GREEN = "\033[1;32m"
+CYAN = "\033[1;36m"
+NC = "\033[0m"
+
+script_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(script_dir, "..", "..", "environment.ini")
+docker_dir = os.path.join(script_dir, "..", "..", "docker")
+software_dir = os.path.join(script_dir, "..", "..", "software")
+ssl_vision_dir = os.path.join(software_dir, "ssl-vision")
+
+def read_env_ini():
+    env_vars = {}
+    with open(env_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#"):
+                key, value = line.split("=", 1)
+                env_vars[key.strip()] = value.strip().strip('"').strip("'")
+    return env_vars
+
+# Enable x forwarding for docker containers
+os.system("xhost +")
+
+envs = read_env_ini()
+
+AI = envs.get("DOCKER_NAME_AI")
+GW = envs.get("DOCKER_NAME_GAME_VIEWER")
+VISION_CLIENT = envs.get("DOCKER_NAME_SSL_VISION_CLIENT")
+GC = envs.get("DOCKER_NAME_SSL_GAME_CONTROLLER")
+SIM = envs.get("DOCKER_NAME_SIM")
+AUTOREF = envs.get("DOCKER_NAME_TIGER_AUTOREF")
+VERBOSE = False
+
+flags = {
+    "rebuild": ["--rebuild"],
+    "no-network": ["--no-network"],
+    "help": ["-h", "--help"],
+    "verbose": ["-v", "--verbose"]
+}
+
+remove_containers = [AI, GW, VISION_CLIENT, GC, SIM, AUTOREF]
+
+choices = [
+    {
+        "choice-text": "Rebuild local images.",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
+            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
+            "-p", "dev-config", "build", "--no-cache"
+        ],
+        "container_to_enter": None,
+    },
+    {
+        "choice-text": f"Local '{AI}' files, enter '{AI}' container.",
+        "pull_images": [
+            "ghcr.io/liu-seegoals/game-viewer:latest"
+        ],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
+            "-p", "controller-config",
+            "up", "-d"
+        ],
+        "container_to_enter": AI
+    },
+    {
+        "choice-text": f"Local '{GW}' files, enter '{GW}' container.",
+        "pull_images": [
+            "ghcr.io/liu-seegoals/controller:latest"
+        ],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.simulation.yml",
+            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
+            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
+            "-f", f"{docker_dir}/docker-compose.webdev.yml",
+            "-p", "gameviewer-dev-config",
+            "up", "-d"
+        ],
+        "container_to_enter": GW
+    },
+    {
+        "choice-text": f"Local '{AI}' and '{GW}' files.",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
+            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
+            "-p", "ai-dev-config", "up",
+        ],
+        "container_to_enter": None
+    },
+    {
+        "choice-text": f"Local '{AI}' and '{GW}' with ssl-vision (only on fetdatorn).",
+        "pull_images": [
+            "ghcr.io/liu-seegoals/game-viewer:latest"
+        ],
+        "pre_cmd": [ f"{ssl_vision_dir}/start.sh" ],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
+            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
+            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
+            "-p", "ssl-vision-config", "up",
+        ],
+        "container_to_enter": None
+    },
+    {
+        "choice-text": "Start for competition.",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
+            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
+            "-f", f"{docker_dir}/docker-compose.competition.yml",
+            "-p", "competition-config", "up", "-d"
+        ],
+        "container_to_enter": envs.get("DOCKER_NAME_AI")
+    },
+    {
+        "choice-text": f"RW testing...",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
+            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
+            "-f", f"{docker_dir}/docker-compose.rw-testing.yml",
+            "-p", "rw-testing-config", "up",
+        ],
+        "container_to_enter": None
+    },
+]
+
+
+def check_submodule_status():
+    result = subprocess.run(["git", "submodule", "status"],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE)
+    return b"^-" not in result.stdout
+
+
+def remove_old_containers():
+    print("Removing old containers:", file=sys.stderr)
+    for container in remove_containers:
+        print(f"\t{container}...")
+        subprocess.run(["docker", "rm", container],
+                       stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL)
+
+
+def execute_choice(choice, rebuild):
+    print(f"Starting: {choices[choice]['choice-text']}")
+
+    container_to_enter = None
+    docker_cmd = choices[choice]["docker_cmd"]
+    pre_cmd = choices[choice]["pre_cmd"]
+    container_to_enter = choices[choice]["container_to_enter"]
+
+    if rebuild:
+        docker_cmd += ["--build", "-d", "--force-recreate"]
+
+    if network:
+        for image in choices[choice]["pull_images"]:
+            subprocess.run(["docker", "pull", image])
+
+    if pre_cmd:
+        if VERBOSE:
+            print(f"Pre CMD: {' '.join(pre_cmd)}")
+        subprocess.Popen(pre_cmd)
+
+    if VERBOSE:
+        print(f"Docker CMD: {' '.join(docker_cmd)}")
+
+    subprocess.run(docker_cmd)
+
+    if choices[choice]["container_to_enter"] is not None:
+        cmd = [
+            "docker", "exec", "-it", container_to_enter,
+            "sh", "-c", "exec bash"
+        ]
+        print(f"{CYAN}Entering {container_to_enter} container...{NC}")
+        subprocess.run(cmd)
+
+
+if __name__ == "__main__":
+    choice = None
+    rebuild = False
+    network = True
+
+    docker_path = shutil.which("docker")
+    if docker_path is None:
+        print("You need to install docker...")
+        sys.exit(1)
+
+    result = subprocess.run(["docker", "ps"],
+                            stderr=subprocess.PIPE,
+                            stdout=subprocess.PIPE,
+                            text=True)
+    if result.returncode == 1:
+        print(f"Couldn't run \"docker ps\":\n{result.stderr}")
+        sys.exit(1)
+
+    result = subprocess.run(["docker", "compose", "version"],
+                            stderr=subprocess.DEVNULL,
+                            stdout=subprocess.DEVNULL)
+    if result.returncode == 1:
+        print("You need to install docker compose...")
+        sys.exit(1)
+
+    # Parse options
+    if len(sys.argv) > 1:
+        if sys.argv[1].isdigit():
+            choice = int(sys.argv[1])
+            sys.argv.pop(1)
+
+        for arg in sys.argv[1:]:
+            if arg in flags["rebuild"]:
+                print("Rebuilding containers...")
+                rebuild = True
+            if arg in flags["no-network"]:
+                network = False
+            if arg in flags["verbose"]:
+                VERBOSE = True
+            elif arg in flags["help"]:
+                print("lul")
+                sys.exit(0)
+
+    # Choose what to do
+    if choice is None:
+        print("Select Docker Compose configuration:")
+        for i, choice in enumerate(choices):
+            print(f"{i}. {choice['choice-text']}")
+
+        choice = int(input(f"Enter your choice (0-{len(choices)-1}): "))
+
+    if not (0 <= choice <= len(choices)):
+        print(f"Invalid choice {choice}...")
+        sys.exit(1)
+
+    # Update submodules
+    if check_submodule_status():
+        print("All submodules are already initialized.")
+    else:
+        print("Submodules are not initialized. Initializing now...")
+        subprocess.run(["git", "submodule", "update", "--init", "--recursive", "--no-fetch", "--remote"])
+        subprocess.run(["git", "status", "--ignore-submodules=all"])
+        print("Submodules initialized and updated.")
+
+    # Cleanup
+    print(f"{CYAN}Killing previous containers...{NC}")
+    subprocess.run([f"{script_dir}/sg-kill"], shell=True)
+    remove_old_containers()
+
+    # Execute
+    execute_choice(choice, rebuild)

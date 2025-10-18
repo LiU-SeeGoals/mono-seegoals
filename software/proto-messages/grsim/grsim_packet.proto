@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+option go_package = "github.com/LiU-SeeGoals/proto_go/grsim";
+
+import "grsim/grsim_commands.proto";
+import "grsim/grsim_replacement.proto";
+
+message grSim_Packet {
+  optional grSim_Commands commands = 1;
+  optional grSim_Replacement replacement = 2;
+}

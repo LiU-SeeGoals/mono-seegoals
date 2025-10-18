@@ -1,0 +1,79 @@
+services:
+  sg-ai:
+    platform: linux/amd64
+    image: ghcr.io/liu-seegoals/controller:latest
+    container_name: ${DOCKER_NAME_AI}
+    restart: "no"
+    volumes:
+      - ../environment.ini:/var/controller/.env
+      - /tmp/.X11-unix:/tmp/.X11-unix 
+      - ${HOME}/.cache/go-build:/root/.cache/go-build
+    environment:
+      - DISPLAY=${DISPLAY}
+
+  sg-game-viewer:
+    platform: linux/amd64
+    image: ghcr.io/liu-seegoals/game-viewer:latest
+    container_name: ${DOCKER_NAME_GAME_VIEWER}
+    restart: "no"
+    volumes:
+      - ../environment.ini:/var/GameViewer/.env
+    environment:
+      - SSL_VISION_MULTICAST_ADDR=${SSL_VISION_MULTICAST_ADDR}
+      - SSL_VISION_MULTICAST_PORT=${SSL_VISION_SIM_MAIN_PORT}
+    ports:
+      - "${GAME_VIEWER_PORT}:${GAME_VIEWER_PORT}"
+      - "${VITE_SSL_VISION_WS_PORT}:${VITE_SSL_VISION_WS_PORT}"
+    env_file: ../environment.ini
+    depends_on:
+      - ${DOCKER_NAME_AI}
+
+  sg-ssl-vision-client:
+    platform: linux/amd64
+    image: robocupssl/ssl-vision-client:1.8.3
+    container_name: ${DOCKER_NAME_SSL_VISION_CLIENT}
+    restart: "no"
+    ports:
+      - "${SSL_VISION_CLIENT_PORT}:${SSL_VISION_CLIENT_PORT}"
+    command:
+      - "-visionAddress"
+      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"
+      - "-address"
+      - ":${SSL_VISION_CLIENT_PORT}"
+
+  sg-ssl-game-controller:
+    platform: linux/amd64
+    image: robocupssl/ssl-game-controller:latest
+    container_name: ${DOCKER_NAME_SSL_GAME_CONTROLLER}
+    restart: "no"
+    volumes:
+      - ../software/GameController/config/:/config
+      - ../software/GameController/data/:/data
+    command:
+      - "-visionAddress"
+      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"
+      - "-trackerAddress"
+      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"
+      - "-publishAddress"
+      - "${SSL_GAME_CONTROLLER_PUBLISH_ADDR}:${SSL_GAME_CONTROLLER_PUBLISH_PORT}"
+      - "-address"
+      - ":${SSL_GAME_CONTROLLER_UI_PORT}"
+
+  sg-er-sim:
+    platform: linux/amd64
+    image: roboticserlangen/simulatorcli:commit-6a4e1c06533b
+    container_name: ${DOCKER_NAME_ER_SIM}
+    restart: "no"
+    environment:
+      GEOMETRY: ${SIM_GEOMETRY}
+      REALISM: ${SIM_REALISM}
+
+  sg-tiger-auto-referee:
+    image: tigersmannheim/auto-referee   # headless image
+    container_name: ${DOCKER_NAME_TIGER_AUTOREF}
+    restart: "no"
+    network_mode: "host"                 # required for multicast
+    command:
+      - "-hl"
+      - "-va"
+      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"

@@ -1,0 +1,7 @@
+# https://editorconfig.org
+
+root = true
+
+[*.{ts,js,tsx,css}]
+indent_style = space
+indent_size = 2

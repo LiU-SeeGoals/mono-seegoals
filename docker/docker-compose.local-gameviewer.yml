@@ -1,0 +1,9 @@
+services:
+  sg-game-viewer:
+    image: ""
+    build: ../software/GameViewer
+    volumes:
+      - ../environment.ini:/var/GameViewer/.env
+      - ../software/GameViewer/:/var/GameViewer
+    tty: true
+    command: tail -f /dev/null
