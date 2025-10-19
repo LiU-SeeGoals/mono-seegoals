@@ -21,8 +21,8 @@ import (
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 func RwSimScenario() {
-	presentYellow := []int{0, 1, 3}
-	presentBlue := []int{0, 1, 3}
+	presentYellow := []int{0}
+	presentBlue := []int{}
 
 	simController := simulator.NewSimControl()
 	simController.SetPresentRobots(presentYellow, presentBlue)

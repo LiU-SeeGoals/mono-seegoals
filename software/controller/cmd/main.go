@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	demos.Scenario()
+	demos.RwSimScenario()
 }

@@ -59,7 +59,7 @@ function App() {
     const connectToAI = () => {
       const ai_address = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_ADDR;
       const ai_port = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_PORT;
-      aiSocket = new WebSocket(`ws://${ai_address}:${ai_port}/ws`);
+      aiSocket = new WebSocket(`ws://localhost:${ai_port}/ws`);
 
       aiSocket.onerror = () => {
         setIsConnectedToController(false);
