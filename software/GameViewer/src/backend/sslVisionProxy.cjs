@@ -10,13 +10,11 @@ const wsPort = process.env.VITE_SSL_VISION_WS_PORT;
 const udpSocket = dgram.createSocket('udp4');
 
 const wss = new ws.WebSocketServer({
-  address: wsAddr,
   port: wsPort,
-  'Access-Control-Allow-Origin': '*',
 });
 
 wss.on('connection', (ws) => {
-  console.log(`Client connected to WebSocket`);
+  console.log(`Client connected to SSL Vision WebSocket`);
 
   ws.on('message', (message) => {
     console.log(`Received message from client: ${message}`);
@@ -28,15 +26,16 @@ wss.on('connection', (ws) => {
 });
 
 udpSocket.bind(visionPort, () => {
+  console.log(`Listening for SSL VIsion multicast on ${visionAddr}:${visionPort}`);
   udpSocket.addMembership(visionAddr);
 });
 
 udpSocket.on('message', (msg) => {
-  //console.log(`Received multicast message: ${msg}`);
-
   wss.clients.forEach((client) => {
     if (client.readyState === ws.OPEN) {
       client.send(msg);
     }
   });
 });
+
+console.log(`SSL Vision WebSocket server running on ws://${wsAddr}:${wsPort}`);
