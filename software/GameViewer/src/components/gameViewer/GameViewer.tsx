@@ -1,4 +1,5 @@
 import './GameViewer.css';
+import { SSL_GeometryFieldSize } from '../../proto/ssl_vision_geometry';
 import useResizeSidebar from '../../hooks/useResizeSidebar';
 import FootballField from './footballField/FootballField';
 import BottomBar from './bottomBar/BottomBar';
@@ -12,6 +13,7 @@ interface gameViewerProps {
   vectorSettingBlue: boolean[];
   vectorSettingYellow: boolean[];
   sidebarWidth: number;
+  fieldGeometry: SSL_GeometryFieldSize | null;
 }
 
 const GameViewer: React.FC<gameViewerProps> = ({
@@ -23,6 +25,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
   vectorSettingBlue,
   vectorSettingYellow,
   sidebarWidth,
+  fieldGeometry,
 }) => {
   const startHeightResizer = 1000;
   const resizerWidth = 5;
@@ -47,6 +50,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
         errorOverlay={errorOverlay}
         vectorSettingBlue={vectorSettingBlue}
         vectorSettingYellow={vectorSettingYellow}
+        fieldGeometry={fieldGeometry}
       />
 
       <div
