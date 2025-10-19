@@ -27,13 +27,11 @@ const COLOR_MAP: Record<string, string> = {
 
 const withAlpha = (color: string, alpha: number): string => {
   if (color.startsWith('#')) {
-    // Convert hex to RGB
     const r = parseInt(color.slice(1, 3), 16);
     const g = parseInt(color.slice(3, 5), 16);
     const b = parseInt(color.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   } else if (color.startsWith('rgb')) {
-    // Modify existing rgb/rgba
     return color.replace(/rgb(a?)\(([^)]+)\)/, (_, a, values) => {
       const rgbValues = values.split(',').map((v: string) => v.trim());
       return `rgba(${rgbValues[0]}, ${rgbValues[1]}, ${rgbValues[2]}, ${alpha})`;
@@ -71,16 +69,13 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   const [zoomLevel, setZoomLevel] = useState(1);
 
   const drawField = (context: CanvasRenderingContext2D, geometry: SSL_GeometryFieldSize) => {
-    // Draw green field background
     context.fillStyle = '#1a5f1a';
     context.fillRect(0, 0, context.canvas.width, context.canvas.height);
 
-    // Draw field lines
     geometry.fieldLines?.forEach(line => {
       drawLineSegment(context, line);
     });
 
-    // Draw circular arcs
     geometry.fieldArcs?.forEach(arc => {
       drawCircularArc(context, arc);
     });
@@ -129,7 +124,6 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     context.scale(zoomLevel, zoomLevel);
     context.translate(-context.canvas.width / 2, -context.canvas.height / 2);
 
-    // Draw field first if we have geometry data
     if (fieldGeometry) {
       drawField(context, fieldGeometry);
     }
@@ -297,7 +291,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       canvas.height = height;
       draw(canvas);
     }
-  }, [sslFieldUpdate, width, height, zoomLevel, fieldGeometry]); // Added fieldGeometry here
+  }, [sslFieldUpdate, width, height, zoomLevel, fieldGeometry]);
 
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
@@ -337,7 +331,6 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   );
 };
 
-// Returns the coordinates of where the robot is on the canvas
 function getCanvasCoordinates(
   x: number,
   y: number,
@@ -349,7 +342,6 @@ function getCanvasCoordinates(
   return { canvasX, canvasY };
 }
 
-// Returns a scaler based on the canvas current size
 function getScaler(context: CanvasRenderingContext2D) {
   const widthScale = context.canvas.width / REAL_WIDTH_FIELD;
   const heightScale = context.canvas.height / REAL_WIDTH_FIELD;
