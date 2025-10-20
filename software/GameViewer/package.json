@@ -4,8 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite & node src/backend/sslVisionServer.cjs",
-    "server": "node src/backend/sslVisionServer.cjs",
+    "dev": "vite & node src/backend/sslVisionProxy.cjs & node src/backend/gameControllerProxy.cjs",
+    "server": "node src/backend/sslVisionProxy.cjs & node src/backend/gameControllerProxy.cjs",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
