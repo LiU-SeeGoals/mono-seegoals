@@ -5,6 +5,10 @@ import GameViewer from './components/gameViewer/GameViewer';
 import { useSSLVision } from './hooks/useSSLVision';
 import { useAIController } from './hooks/useAIController';
 import { useGameController } from './hooks/useGameController.ts';
+import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
+import { parseProto } from './helper/ParseProto';
+import { parseJson } from './helper/ParseJson';
+
 import {
   getDefaultSSLFieldUpdate,
   getDefaultAIRobotUpdate,
@@ -38,7 +42,6 @@ function App() {
   const { isConnected: isConnectedToAI } = useAIController(setRobotActions);
 
   const { isConnected: isConnectedToGameController } = useGameController();
-
   useEffect(() => {
     document.title = "SeeGoals - GameViewer";
   }, []);
