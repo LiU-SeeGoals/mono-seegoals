@@ -1,0 +1,9 @@
+[submodule "Libraries/fw-shared-modules"]
+	path = Libraries/fw-shared-modules
+	url = https://github.com/LiU-SeeGoals/fw-shared-modules.git
+[submodule "Libraries/nRF24L01P-lib"]
+	path = Libraries/nRF24L01P-lib
+	url = https://github.com/LiU-SeeGoals/nRF24L01P-lib.git
+[submodule "Libraries/proto-messages"]
+	path = Libraries/proto-messages
+	url = https://github.com/LiU-SeeGoals/proto-messages.git
