@@ -1,6 +1,6 @@
 #!/bin/bash
 
-CONTAINERS=$(docker compose -p seegoals ps --format "{{.Names}}")
+CONTAINERS=($(docker compose -p seegoals ps --format "{{.Names}}"))
 
 if [ -z "$CONTAINERS" ]; then
     echo "No running containers..."
