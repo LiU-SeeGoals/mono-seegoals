@@ -57,14 +57,12 @@ choices = [
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
-            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
             "-p", project_name, "build", "--no-cache"
         ],
         "container_to_enter": None,
     },
     {
-        "choice-text": f"Local '{AI}' files, enter '{AI}' container.",
+        "choice-text": f"Develop on '{AI}' files, (auto-start '{GW}' program)",
         "pull_images": [
             "ghcr.io/liu-seegoals/game-viewer:latest"
         ],
@@ -72,45 +70,25 @@ choices = [
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
+            "-f", f"{docker_dir}/docker-compose.autostart_gameviewer.yml",
             "-p", project_name,
             "up", "-d"
         ],
         "container_to_enter": AI
     },
     {
-        "choice-text": f"Local '{GW}' files, enter '{GW}' container.",
-        "pull_images": [
-            "ghcr.io/liu-seegoals/controller:latest"
-        ],
-        "pre_cmd": [],
-        "docker_cmd": [
-            "docker", "compose",
-            "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.simulation.yml",
-            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
-            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
-            "-f", f"{docker_dir}/docker-compose.webdev.yml",
-            "-p", project_name,
-            "up", "-d"
-        ],
-        "container_to_enter": GW
-    },
-    {
-        "choice-text": f"Local '{AI}' and '{GW}' files.",
+        "choice-text": f"Manual start '{AI}' and '{GW}'.",
         "pull_images": [],
         "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
-            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
             "-p", project_name, "up",
         ],
         "container_to_enter": None
     },
     {
-        "choice-text": f"Local '{AI}' and '{GW}' with ssl-vision (only on fetdatorn).",
+        "choice-text": f"Fetdatorn configuration",
         "pull_images": [
             "ghcr.io/liu-seegoals/game-viewer:latest"
         ],
@@ -119,8 +97,6 @@ choices = [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
             "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
-            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
-            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
             "-p", project_name, "up",
         ],
         "container_to_enter": None
@@ -132,27 +108,11 @@ choices = [
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
-            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
             "-f", f"{docker_dir}/docker-compose.competition.yml",
             "-p", project_name, "up", "-d"
         ],
         "container_to_enter": envs.get("DOCKER_NAME_AI")
-    },
-    {
-        "choice-text": f"RW testing...",
-        "pull_images": [],
-        "pre_cmd": [],
-        "docker_cmd": [
-            "docker", "compose",
-            "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.local-ai.yml",
-            "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
-            "-f", f"{docker_dir}/docker-compose.rw-testing.yml",
-            "-p", project_name, "up",
-        ],
-        "container_to_enter": None
-    },
+    }
 ]
 
 

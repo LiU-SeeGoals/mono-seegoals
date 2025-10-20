@@ -1,25 +1,31 @@
 services:
   ai:
     platform: linux/amd64
-    image: ghcr.io/liu-seegoals/controller:latest
+    build: ../software/controller
     container_name: ${DOCKER_NAME_AI}
     restart: "no"
     volumes:
       - ../environment.ini:/var/controller/.env
       - /tmp/.X11-unix:/tmp/.X11-unix 
       - ${HOME}/.cache/go-build:/root/.cache/go-build
+        - ../environment.ini:/var/controller/.env
+      - ../software/controller/:/var/controller
+    working_dir: /var/controller/cmd
+    tty: true
     environment:
       - DISPLAY=${DISPLAY}
     ports:
       - "${VITE_AI_GAME_VIEWER_SOCKET_PORT}:${VITE_AI_GAME_VIEWER_SOCKET_PORT}"
+    command: tail -f /dev/null
 
   game-viewer:
     platform: linux/amd64
-    image: ghcr.io/liu-seegoals/game-viewer:latest
+    build: ../software/GameViewer
     container_name: ${DOCKER_NAME_GAME_VIEWER}
     restart: "no"
     volumes:
       - ../environment.ini:/var/GameViewer/.env
+      - ../software/GameViewer/:/var/GameViewer
     environment:
       - SSL_VISION_MULTICAST_ADDR=${SSL_VISION_MULTICAST_ADDR}
       - SSL_VISION_MULTICAST_PORT=${SSL_VISION_SIM_MAIN_PORT}
@@ -30,6 +36,8 @@ services:
       - "${VITE_SSL_VISION_WS_PORT}:${VITE_SSL_VISION_WS_PORT}"
       - "${VITE_SSL_GAME_CONTROLLER_WS_PORT}:${VITE_SSL_GAME_CONTROLLER_WS_PORT}"
     env_file: ../environment.ini
+    tty: true
+    command: tail -f /dev/null
     depends_on:
       - ${DOCKER_NAME_AI}
 

@@ -18,9 +18,9 @@ import (
 const MAX_SEND_SIZE = 2048
 
 func Scenario() {
-	// This avoid the "No position in history" error for robots
-	presentYellow := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-	presentBlue := []int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+	presentYellow := []int{0, 1, 2, 3, 4}
+	presentBlue := []int{0, 1, 2, 3, 4}
+
 	simController := simulator.NewSimControl()
 	simController.SetPresentRobots(presentYellow, presentBlue)
 
@@ -30,38 +30,24 @@ func Scenario() {
 	// Yellow team
 	slowBrainYellow := plan.NewPlanner1(info.Yellow)
 	fastBrainYellow := ai.NewActivityExecutor()
+
 	aiYellow := ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
-	simClientYellow := client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
 
-	// Blue team
-	// slowBrainBlue := plan.NewRefCommands(info.Blue, simController)
-	// fastBrainBlue := ai.NewFastBrainGO()
-	// aiBlue := ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
-	// simClientBlue := client.NewSimClient(config.GetSimBlueTeamAddress(), gameInfo)
+	basestationClient := client.NewBaseStationClient(config.GetBasestationAddress())
+	simClient := client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
+	fmt.Println("Basedstation: ", config.GetBasestationAddress())
 
-	// Some sim setup for debugging ai behaviour
-	presentYellow = []int{2, 3}
-	presentBlue = []int{0}
-	simController.SetPresentRobots(presentYellow, presentBlue)
+	basestationClient.Init()
 
-	// start_time := time.Now().UnixMilli()
 	for {
-		// playTime := time.Now().UnixMilli() - start_time
-		// fmt.Println("playTime: ", playTime)
-		ssl_receiver.UpdateState(gameInfo, time.Now().UnixMilli())
-		//fmt.Println(gameInfo)
+		playTime := time.Now().UnixMilli()
 
+		ssl_receiver.UpdateState(gameInfo, playTime)
 		yellow_actions := aiYellow.GetActions(gameInfo)
-		simClientYellow.SendActions(yellow_actions)
 
-		// blue_actions := aiBlue.GetActions(gameInfo)
-		// simClientBlue.SendActions(blue_actions)
-
-		// terminal_messages := []string{"Scenario"}
-
-		// if len(blue_actions) > 0 {
-		// 	client.UpdateWebGUI(gameInfo, blue_actions, terminal_messages)
-		// }
+		client.BroadcastActions(yellow_actions) // We broadcast actions for the GV to print 'em
+		basestationClient.SendActions(yellow_actions)
+		simClient.SendActions(yellow_actions)
 	}
 }
 

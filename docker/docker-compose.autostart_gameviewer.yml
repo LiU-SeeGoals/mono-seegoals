@@ -1,0 +1,3 @@
+services:
+  game-viewer:
+    command: bash -c "cd /var/GameViewer && pnpm install && pnpm run dev"

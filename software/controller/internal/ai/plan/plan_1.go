@@ -43,9 +43,9 @@ func (m *planner1) Init(
 func (m *planner1) run() {
 
 	way_points := []info.Position{
-		{X: 0, Y: 0, Z: 0, Angle: 0},
-		{X: 0, Y: 1000, Z: 0, Angle: 0},
-		{X: 1000, Y: 0, Z: 0, Angle: 0},
+		{X: 1000, Y: 1000, Z: 0, Angle: 0},
+		{X: -1000, Y: 1000, Z: 0, Angle: 0},
+		{X: 1000, Y: -1000, Z: 0, Angle: 0},
 	}
 	index := 0
 

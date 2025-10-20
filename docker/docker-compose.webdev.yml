@@ -1,7 +1,0 @@
-services:
-  ai:
-    command: go run main.go webdev
-
-  ssl-vision-client:
-    profiles:
-      - donotstart
