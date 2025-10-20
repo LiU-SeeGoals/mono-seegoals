@@ -47,6 +47,7 @@ flags = {
 }
 
 remove_containers = [AI, GW, VISION_CLIENT, GC, SIM, AUTOREF]
+project_name = "seegoals"
 
 choices = [
     {
@@ -58,7 +59,7 @@ choices = [
             "-f", f"{docker_dir}/docker-compose.yml",
             "-f", f"{docker_dir}/docker-compose.local-ai.yml",
             "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
-            "-p", "dev-config", "build", "--no-cache"
+            "-p", project_name, "build", "--no-cache"
         ],
         "container_to_enter": None,
     },
@@ -72,7 +73,7 @@ choices = [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
             "-f", f"{docker_dir}/docker-compose.local-ai.yml",
-            "-p", "controller-config",
+            "-p", project_name,
             "up", "-d"
         ],
         "container_to_enter": AI
@@ -90,7 +91,7 @@ choices = [
             "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
             "-f", f"{docker_dir}/docker-compose.local-ai.yml",
             "-f", f"{docker_dir}/docker-compose.webdev.yml",
-            "-p", "gameviewer-dev-config",
+            "-p", project_name,
             "up", "-d"
         ],
         "container_to_enter": GW
@@ -104,7 +105,7 @@ choices = [
             "-f", f"{docker_dir}/docker-compose.yml",
             "-f", f"{docker_dir}/docker-compose.local-ai.yml",
             "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
-            "-p", "ai-dev-config", "up",
+            "-p", project_name, "up",
         ],
         "container_to_enter": None
     },
@@ -120,7 +121,7 @@ choices = [
             "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
             "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
             "-f", f"{docker_dir}/docker-compose.local-ai.yml",
-            "-p", "ssl-vision-config", "up",
+            "-p", project_name, "up",
         ],
         "container_to_enter": None
     },
@@ -134,7 +135,7 @@ choices = [
             "-f", f"{docker_dir}/docker-compose.local-ai.yml",
             "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
             "-f", f"{docker_dir}/docker-compose.competition.yml",
-            "-p", "competition-config", "up", "-d"
+            "-p", project_name, "up", "-d"
         ],
         "container_to_enter": envs.get("DOCKER_NAME_AI")
     },
@@ -148,7 +149,7 @@ choices = [
             "-f", f"{docker_dir}/docker-compose.local-ai.yml",
             "-f", f"{docker_dir}/docker-compose.local-gameviewer.yml",
             "-f", f"{docker_dir}/docker-compose.rw-testing.yml",
-            "-p", "rw-testing-config", "up",
+            "-p", project_name, "up",
         ],
         "container_to_enter": None
     },

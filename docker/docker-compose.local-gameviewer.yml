@@ -1,5 +1,5 @@
 services:
-  sg-game-viewer:
+  game-viewer:
     image: ""
     build: ../software/GameViewer
     volumes:

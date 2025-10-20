@@ -1,7 +1,7 @@
 services:
-  sg-ai:
+  ai:
     command: go run main.go webdev
 
-  sg-ssl-vision-client:
+  ssl-vision-client:
     profiles:
       - donotstart

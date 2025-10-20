@@ -1,8 +1,8 @@
 services:
-  sg-ai:
+  ai:
     network_mode: host
 
-  sg-game-viewer:
+  game-viewer:
     environment:
       - SSL_VISION_MULTICAST_ADDR=${SSL_VISION_MULTICAST_ADDR}
       - SSL_VISION_MULTICAST_PORT=${SSL_VISION_REAL_MAIN_PORT}
@@ -10,13 +10,13 @@ services:
       - ${DOCKER_NAME_AI}
     network_mode: host
 
-  sg-ssl-vision-client:
+  ssl-vision-client:
     command:
       - "-visionAddress"
       - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_REAL_MAIN_PORT}"
     network_mode: host
 
-  sg-ssl-game-controller:
+  ssl-game-controller:
     command:
       - "-visionAddress"
       - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_REAL_MAIN_PORT}"
@@ -28,6 +28,6 @@ services:
       - ":${SSL_GAME_CONTROLLER_UI_PORT}"
     network_mode: host
 
-  sg-er-sim:
+  er-sim:
     profiles:
       - donotstart

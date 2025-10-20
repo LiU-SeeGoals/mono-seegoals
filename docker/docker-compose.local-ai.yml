@@ -1,5 +1,5 @@
 services:
-  sg-ai:
+  ai:
     image: ""
     build: ../software/controller
     volumes:

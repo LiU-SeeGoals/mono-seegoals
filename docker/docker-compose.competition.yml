@@ -1,18 +1,18 @@
 services:
-  sg-ai:
+  ai:
     network_mode: "host"
 
-  sg-game-viewer:
+  game-viewer:
     network_mode: "host"
 
-  sg-ssl-game-controller:
+  ssl-game-controller:
     profiles:
       - donotstart
 
-  sg-er-sim:
+  er-sim:
     profiles:
       - donotstart
 
-  sg-vision:
+  vision:
     profiles:
       - donotstart

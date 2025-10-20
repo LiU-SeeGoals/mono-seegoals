@@ -1,5 +1,5 @@
 services:
-  sg-ai:
+  ai:
     platform: linux/amd64
     image: ghcr.io/liu-seegoals/controller:latest
     container_name: ${DOCKER_NAME_AI}
@@ -13,7 +13,7 @@ services:
     ports:
       - "${VITE_AI_GAME_VIEWER_SOCKET_PORT}:${VITE_AI_GAME_VIEWER_SOCKET_PORT}"
 
-  sg-game-viewer:
+  game-viewer:
     platform: linux/amd64
     image: ghcr.io/liu-seegoals/game-viewer:latest
     container_name: ${DOCKER_NAME_GAME_VIEWER}
@@ -33,7 +33,7 @@ services:
     depends_on:
       - ${DOCKER_NAME_AI}
 
-  sg-ssl-vision-client:
+  ssl-vision-client:
     platform: linux/amd64
     image: robocupssl/ssl-vision-client:1.8.3
     container_name: ${DOCKER_NAME_SSL_VISION_CLIENT}
@@ -46,7 +46,7 @@ services:
       - "-address"
       - ":${SSL_VISION_CLIENT_PORT}"
 
-  sg-ssl-game-controller:
+  ssl-game-controller:
     platform: linux/amd64
     image: robocupssl/ssl-game-controller:latest
     container_name: ${DOCKER_NAME_SSL_GAME_CONTROLLER}
@@ -66,7 +66,7 @@ services:
       - "-address"
       - ":${SSL_GAME_CONTROLLER_UI_PORT}"
 
-  sg-er-sim:
+  er-sim:
     platform: linux/amd64
     image: roboticserlangen/simulatorcli:commit-6a4e1c06533b
     container_name: ${DOCKER_NAME_ER_SIM}
@@ -75,7 +75,7 @@ services:
       GEOMETRY: ${SIM_GEOMETRY}
       REALISM: ${SIM_REALISM}
 
-  sg-tiger-auto-referee:
+  tiger-auto-referee:
     image: tigersmannheim/auto-referee   # headless image
     container_name: ${DOCKER_NAME_TIGER_AUTOREF}
     restart: "no"

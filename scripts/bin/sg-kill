@@ -1,12 +1,1 @@
-#!/bin/bash
-STOP=$(docker ps --format "{{.Names}}" | grep "^sg-" | sort)
-COUNT=$(echo "$STOP" | wc -l)
-if [ -z "$STOP" ]; then
-    echo "No running SeeGoals containers to kill..."
-else
-    echo "Killing $COUNT SeeGoals containers:"
-    while IFS= read -r container; do
-        echo -e "\t$container..."
-        docker kill "$container" > /dev/null 2>&1
-    done <<< "$STOP"
-fi
+docker compose -p seegoals down
