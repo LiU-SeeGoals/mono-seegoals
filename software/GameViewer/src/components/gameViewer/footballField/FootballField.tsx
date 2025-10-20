@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './FootballField.css';
 import { AIRobot } from '../../../types/AIRobot';
 import { actionToStr } from '../../../helper/defaultValues';
+import { SSL_GeometryFieldSize } from '../../../proto/ssl_vision_geometry';
 
 const TEAM_IDS = Object.freeze({
   YELLOW: 0,
@@ -26,19 +27,17 @@ const COLOR_MAP: Record<string, string> = {
 
 const withAlpha = (color: string, alpha: number): string => {
   if (color.startsWith('#')) {
-    // Convert hex to RGB
-    const r = color.slice(1, 3).parseInt(16);
-    const g = color.slice(3, 5).parseInt(16);
-    const b = color.slice(5, 7).parseInt(16);
+    const r = parseInt(color.slice(1, 3), 16);
+    const g = parseInt(color.slice(3, 5), 16);
+    const b = parseInt(color.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   } else if (color.startsWith('rgb')) {
-    // Modify existing rgb/rgba
     return color.replace(/rgb(a?)\(([^)]+)\)/, (_, a, values) => {
       const rgbValues = values.split(',').map((v: string) => v.trim());
       return `rgba(${rgbValues[0]}, ${rgbValues[1]}, ${rgbValues[2]}, ${alpha})`;
     });
   }
-  return color; // Return as-is if not recognized
+  return color;
 };
 
 interface FootBallFieldProps {
@@ -50,6 +49,7 @@ interface FootBallFieldProps {
   errorOverlay: string;
   vectorSettingBlue: boolean[];
   vectorSettingYellow: boolean[];
+  fieldGeometry: SSL_GeometryFieldSize | null;
 }
 
 const FootballField: React.FC<FootBallFieldProps> = ({
@@ -61,26 +61,55 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   errorOverlay,
   vectorSettingBlue,
   vectorSettingYellow,
+  fieldGeometry,
 }) => {
   const minimumWidthForVertical = 810;
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
 
-  // Creats a canvas for the football field image
-  const canvasInit = (event: any) => {
-    // Check if the canvas is initialized
-    if (!canvasRef.current) {
-      return;
-    }
+  const drawField = (context: CanvasRenderingContext2D, geometry: SSL_GeometryFieldSize) => {
+    context.fillStyle = '#1a5f1a';
+    context.fillRect(0, 0, context.canvas.width, context.canvas.height);
 
-    const canvas: HTMLCanvasElement = canvasRef.current;
-    canvas.width = width;
-    canvas.height = height;
+    geometry.fieldLines?.forEach(line => {
+      drawLineSegment(context, line);
+    });
 
-    draw(canvas);
+    geometry.fieldArcs?.forEach(arc => {
+      drawCircularArc(context, arc);
+    });
   };
 
+  const drawLineSegment = (
+    context: CanvasRenderingContext2D, 
+    line: any
+  ) => {
+    const { canvasX: x1, canvasY: y1 } = getCanvasCoordinates(line.p1.x, line.p1.y, context);
+    const { canvasX: x2, canvasY: y2 } = getCanvasCoordinates(line.p2.x, line.p2.y, context);
+  
+    context.beginPath();
+    context.moveTo(x1, y1);
+    context.lineTo(x2, y2);
+    context.strokeStyle = 'white';
+    context.lineWidth = line.thickness * getScaler(context);
+    context.lineCap = 'butt';
+    context.stroke();
+  };
+
+  const drawCircularArc = (
+    context: CanvasRenderingContext2D,
+    arc: any
+  ) => {
+    const { canvasX, canvasY } = getCanvasCoordinates(arc.center.x, arc.center.y, context);
+    const radius = arc.radius * getScaler(context);
+  
+    context.beginPath();
+    context.arc(canvasX, canvasY, radius, arc.a1, arc.a2, false);
+    context.strokeStyle = 'white';
+    context.lineWidth = arc.thickness * getScaler(context);
+    context.stroke();
+  };
 
   function draw(canvas: HTMLCanvasElement) {
     const context: CanvasRenderingContext2D | null = canvas.getContext('2d');
@@ -88,13 +117,16 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       return;
     }
 
-    // Clear the canvas
     context.clearRect(0, 0, context.canvas.width, context.canvas.height);
 
     context.save();
     context.translate(context.canvas.width / 2, context.canvas.height / 2);
     context.scale(zoomLevel, zoomLevel);
     context.translate(-context.canvas.width / 2, -context.canvas.height / 2);
+
+    if (fieldGeometry) {
+      drawField(context, fieldGeometry);
+    }
 
     drawAllRobots(context);
     drawBall(context);
@@ -103,7 +135,6 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     context.restore();
   }
 
-  // Draws ball on the canvas
   const drawBall = (context: CanvasRenderingContext2D) => {
     try {
       const ball: SSLBall = sslFieldUpdate.balls[0];
@@ -126,22 +157,10 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   const drawAllRobots = (context: CanvasRenderingContext2D) => {
     sslFieldUpdate.robotsBlue.map((robot) => {
       drawRobot(context, robot, COLOR_MAP.blue, COLOR_MAP.white, 1.0);
-      // if (robot.robotId) {
-      //     if (vectorSettingBlue[robot.robotId]) {
-      //         drawArrow(context, robot, SPEED_ARROW_COLOR, SPEED_ARROW_THICKNESS);
-      //     }
-      // }
     });
 
-    // These are the robots we control
     sslFieldUpdate.robotsYellow.map((robot) => {
       drawRobot(context, robot, COLOR_MAP.yellow, COLOR_MAP.black, 1.0);
-
-      // if (robot.robotId) {
-      //     if (vectorSettingYellow[robot.robotId]) {
-      //         drawArrow(context, robot, SPEED_ARROW_COLOR, SPEED_ARROW_THICKNESS);
-      //     }
-      // }
     });
   };
 
@@ -179,7 +198,6 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     }
   };
 
-  // Draws all robots on the canvas
   const drawRobot = (
     context: CanvasRenderingContext2D,
     robot: SSLRobot,
@@ -197,22 +215,20 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     const robotOrientation =
       robot.orientation !== undefined ? robot.orientation : 0;
 
-    // Draw the "half moon" of the robot, leaving a flat front.
     context.beginPath();
     context.arc(
       canvasX,
       canvasY,
       canvasRadius,
-      -flatStartFrontAngle - robotOrientation, // Offset the start angle with the robots current orientation
+      -flatStartFrontAngle - robotOrientation,
       flatStartFrontAngle - robotOrientation,
-      true // Draw counter clockwise
+      true
     );
     context.fillStyle = withAlpha(fillColor, alpha);
     context.fill();
     context.strokeStyle = 'black';
     context.stroke();
 
-    // Draw the flat front of the robot (added 1 degree of extra )
     const flatFrontStartX =
       canvasX +
       canvasRadius * Math.cos(-flatStartFrontAngle - robotOrientation);
@@ -230,24 +246,8 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     context.stroke();
 
     drawId(context, robot, withAlpha(textColor, alpha));
-
-    //// TODO: ADD THESE
-
-    // if (robot.selected) {
-    //     drawCircle(context, robot, ROBOT_RADIUS/3, 'rgba(0, 0, 0, 1)');
-    // }
-
-    // Draw robot action over the robot
-    // context.font = "20px Arial";
-    // context.fillStyle = 'rgba(255, 0, 0, 1)';
-    // context.textAlign = "center";
-    // if (typeof robot.action === 'object' && robot.action !== null){
-    //     const action_number: string = ActionToStr(robot.action);
-    //     context.fillText(action_number, getCanvasCoordinates(robot.x, robot.y, context).canvasX, getCanvasCoordinates(robot.x, robot.y, context).canvasY - 10);
-    // }
   };
 
-  // Draw a black circle around the robot
   const drawCircle = (
     context: CanvasRenderingContext2D,
     robot: SSLRobot,
@@ -261,13 +261,12 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     );
     context.beginPath();
     context.arc(canvasX, canvasY, radius, 0, 2 * Math.PI);
-    context.strokeStyle = 'rgba(0, 0, 0, 0)'; // make the border transparent
+    context.strokeStyle = 'rgba(0, 0, 0, 0)';
     context.fillStyle = color;
     context.fill();
     context.stroke();
   };
 
-  // Draws the robots number id on the robot
   const drawId = (
     context: CanvasRenderingContext2D,
     robot: SSLRobot,
@@ -285,52 +284,6 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     context.fillText(String(robot.robotId), canvasX, canvasY);
   };
 
-  // Draws a arrow showing the direction of the robot
-  /// TODO: When AI starts sending packets again:))))
-  // const drawArrow = (context: CanvasRenderingContext2D, robot: Robot, color: string, thickness: number) => {
-  //     context.save();
-  //     const angle: number = Math.atan2(robot.VelY, robot.VelX) - Math.PI/2;
-  //     const arrowLength: number = 10 * Math.hypot(robot.VelX, robot.VelY);
-
-  //     // Don't draw the arrow if the velocity is too small
-  //     if (arrowLength < ARROW_DRAW_MIN_SPEED_THRESHOLD) {
-  //         return;
-  //     }
-  //     //const arrowLength: number = 100;
-  //     // Calculate the starting point of the arrow (on the circle)
-  //     const {canvasX: startX, canvasY: startY} = getCanvasCoordinates(robot.PosX, robot.PosY, context);
-
-  //     // Calculate the end point of the arrow
-  //     const endX: number = startX + arrowLength * Math.cos(angle);
-  //     const endY: number = startY - arrowLength * Math.sin(angle);
-
-  //     // Draw the line for the arrow
-  //     context.beginPath();
-  //     context.moveTo(startX, startY);
-  //     context.lineTo(endX, endY);
-  //     context.strokeStyle = color;
-  //     context.lineWidth = thickness;
-  //     context.stroke();
-
-  //     const angle1 = angle + Math.PI / 7;
-  //     const angle2 = angle - Math.PI / 7;
-  //     const headX = endX + ARROW_HEAD_LENGTH * Math.cos(angle);
-  //     const headY = endY - ARROW_HEAD_LENGTH * Math.sin(angle);
-
-  //     // Draw the arrow head
-  //     context.beginPath();
-  //     context.moveTo(endX, endY);
-  //     context.lineTo((headX - ARROW_HEAD_LENGTH * Math.cos(angle2)), (headY + ARROW_HEAD_LENGTH * Math.sin(angle2)));
-  //     context.lineTo(headX, headY);
-  //     context.lineTo((headX - ARROW_HEAD_LENGTH * Math.cos(angle1)), (headY + ARROW_HEAD_LENGTH * Math.sin(angle1)));
-  //     context.lineTo(endX, endY);
-  //     context.fillStyle = color;
-  //     context.fill();
-  //     context.lineWidth = thickness;
-  //     context.stroke();
-  //     context.restore(); // Used to only change the line thickness for the arrow and not for everything
-  // };
-
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -338,7 +291,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       canvas.height = height;
       draw(canvas);
     }
-  }, [sslFieldUpdate, width, height, zoomLevel]);
+  }, [sslFieldUpdate, width, height, zoomLevel, fieldGeometry]);
 
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
@@ -369,15 +322,6 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       }}
       ref={containerRef}
     >
-      <img
-        src="./src/assets/football_field.svg"
-        alt="canvas"
-        style={{
-          height: height,
-          width: width,
-        }}
-        onLoad={canvasInit}
-      />
       <canvas
         className="football-field-canvas"
         ref={canvasRef}
@@ -387,7 +331,6 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   );
 };
 
-// Returns the coordinates of where the robot is on the canvas
 function getCanvasCoordinates(
   x: number,
   y: number,
@@ -399,7 +342,6 @@ function getCanvasCoordinates(
   return { canvasX, canvasY };
 }
 
-// Returns a scaler based on the canvas current size
 function getScaler(context: CanvasRenderingContext2D) {
   const widthScale = context.canvas.width / REAL_WIDTH_FIELD;
   const heightScale = context.canvas.height / REAL_WIDTH_FIELD;
@@ -407,4 +349,3 @@ function getScaler(context: CanvasRenderingContext2D) {
 }
 
 export default FootballField;
-

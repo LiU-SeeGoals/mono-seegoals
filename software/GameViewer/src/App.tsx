@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import Sidebar from './components/sidebar/Sidebar';
 import GameViewer from './components/gameViewer/GameViewer';
+import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
 import { parseProto } from './helper/ParseProto';
 import { parseJson } from './helper/ParseJson';
 import {
@@ -33,6 +34,7 @@ function App() {
   const [errorOverlay, setErrorOverlay] = useState();
   const [isConnectedToController, setIsConnectedToController] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(320);
+  const [fieldGeometry, setFieldGeometry] = useState<SSL_GeometryFieldSize | null>(null);
 
   useEffect(() => {
     const vision_ws_addr = import.meta.env.VITE_SSL_VISION_WS_ADDR;
@@ -48,7 +50,7 @@ function App() {
           console.error('Expected ArrayBuffer, got', typeof event.data);
           return;
         }
-        parseProto(buffer, setSSLFieldUpdate, setErrorOverlay);
+        parseProto(buffer, setSSLFieldUpdate, setErrorOverlay, setFieldGeometry);
       } catch (e) {
         console.error('Error parsing message JSON', e);
       }
@@ -134,6 +136,7 @@ function App() {
         vectorSettingBlue={vectorSettingBlue}
         vectorSettingYellow={vectorSettingYellow}
         sidebarWidth={sidebarWidth}
+        fieldGeometry={fieldGeometry}
       />
     </div>
   );
