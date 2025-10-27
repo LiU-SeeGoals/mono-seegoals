@@ -22,7 +22,7 @@ func FwRealScenario() {
 	aiYellow := ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
 
 	basestationClient := client.NewBaseStationClient(config.GetBasestationAddress())
-    fmt.Println("Base(d)station: ", config.GetBasestationAddress())
+	fmt.Println("Base(d)station: ", config.GetBasestationAddress())
 
 	basestationClient.Init()
 

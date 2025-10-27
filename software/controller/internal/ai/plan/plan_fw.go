@@ -63,66 +63,69 @@ func (m *plannerFw) run() {
 
 	gameInfo := <-m.incomingGameInfo
 	fmt.Println(gameInfo.Status)
-	robot1_index := 0
+	waypoint_index := 0
 	// robot0_index := 0
 
 	way_points := []info.Position{
-		{X: 4600, Y: 0, Z: 0, Angle: 0},
-		{X: -4600, Y: 0, Z: 0, Angle: 0},
-		{X: 2000, Y: -1000, Z: 0, Angle: 0},
-		{X: -2000, Y: -1000, Z: 0, Angle: 0},
+		{X: -1000, Y: 0, Z: 0, Angle: 0},
+		{X: 1000, Y: 0, Z: 0, Angle: 0},
 	}
-	active_id := []int{0, 1, 3}
+	// active_id := []int{0, 1, 3}
 	enemy_goal := 0
 
 	for {
-		fmt.Println(gameInfo.Status)
+		//fmt.Println(gameInfo.Status)
 		// No need for slow brain to be fast
 		time.Sleep(100 * time.Millisecond)
 
-		if m.HandleRef(&gameInfo, active_id) {
-			continue
-		}
+		// if m.HandleRef(&gameInfo, active_id) {
+		// 	continue
+		// }
 
-		if gameInfo.Status.GetBlueTeamOnPositiveHalf() && m.team == info.Blue {
-			enemy_goal = 0
-		} else {
-			enemy_goal = 1
-
-		}
+		// if gameInfo.Status.GetBlueTeamOnPositiveHalf() && m.team == info.Blue {
+		// 	enemy_goal = 0
+		// } else {
+		// 	enemy_goal = 1
+		//
+		// }
+		// currPos, _ := gameInfo.State.GetTeam(m.team)[3].GetPosition()
+		// fmt.Println("At pos", currPos)
 
 		if m.activities[3] == nil {
-			fmt.Println("done with action for robot 1: ", m.team)
-			m.AddActivity(ai.NewMoveToPosition(m.team, 3, way_points[2+enemy_goal]))
-			robot1_index = (robot1_index + 1) % len(way_points)
+			fmt.Println("done with action for robot 3: ")
+			fmt.Println("Going to ", way_points[waypoint_index])
 
+			m.AddActivity(ai.NewMoveToPosition(m.team, 3, way_points[waypoint_index]))
+
+			waypoint_index = (waypoint_index + 1) % len(way_points)
+			//
 		}
 
-		if m.activities[0] == nil {
-			fmt.Println("done with action for robot 1: ", m.team)
-			m.AddActivity(ai.NewGoalie(m.team, 0))
-
-		}
+		//if m.activities[0] == nil {
+		//	fmt.Println("done with action for robot 1: ", m.team)
+		//	m.AddActivity(ai.NewGoalie(m.team, 0))
+		//
+		//}
 
 		// if m.activities[1] == nil {
 		// 	fmt.Println("done with action for robot 0: ", m.team)
 		// 	m.AddActivity(ai.NewGoalie(m.team, 1))
 		// }
 
-		if m.activities[1] == nil {
-			fmt.Println("done with action: ", m.team)
+		//if m.activities[1] == nil {
+		// fmt.Println("done with action: ", m.team)
 
-			// If we have the ball, then dribble to the enemy goal
-			possessor := gameInfo.State.GetBall().GetPossessor()
+		// If we have the ball, then dribble to the enemy goal
+		possessor := gameInfo.State.GetBall().GetPossessor()
 
-			if possessor != nil && possessor.GetID() == 1 {
-				m.AddActivity(ai.NewMoveWithBallToPosition(m.team, 1, way_points[enemy_goal]))
+		if possessor != nil && possessor.GetID() == 1 {
+			m.AddActivity(ai.NewMoveWithBallToPosition(m.team, 1, way_points[enemy_goal]))
 
-			} else {
-				m.AddActivity(ai.NewMoveToBall(m.team, 1))
-			}
-
+		} else {
+			m.AddActivity(ai.NewMoveToBall(m.team, 1))
 		}
+
+		//}
 
 		// if m.activities[1] == nil {
 		// 	fmt.Println("done with action for robot 0: ", m.team)
