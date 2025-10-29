@@ -188,9 +188,9 @@ int main(void)
     LOG_INFO("My ID is %i (%li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
     POS_Init();
 #ifdef PCB_MOTOR
-    NAV_Init(&htim12, &htim1, &htim15, &htim3, &htim2, &htim5, &htim8);
+    NAV_Init(&htim12, &htim1, &htim15);
 #else
-    NAV_Init(&htim12, &htim1, &htim15, &htim3, &htim4, &htim5, &htim8);
+    NAV_Init(&htim12, &htim1, &htim15);
 #endif
     MOTOR_Init(&htim1);
     KICKER_Init();
@@ -723,9 +723,9 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
-  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
@@ -768,6 +768,26 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BTN_USER_GPIO_Port, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : BATT1_Pin BATT2_Pin BATT3_Pin BATT4_Pin
+                           BATT5_Pin */
+  GPIO_InitStruct.Pin = BATT1_Pin|BATT2_Pin|BATT3_Pin|BATT4_Pin
+                          |BATT5_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : BATT6_Pin */
+  GPIO_InitStruct.Pin = BATT6_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(BATT6_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : MOTOR4_ENCODER_Pin MOTOR3_ENCODER_Pin MOTOR2_ENCODER_Pin */
+  GPIO_InitStruct.Pin = MOTOR4_ENCODER_Pin|MOTOR3_ENCODER_Pin|MOTOR2_ENCODER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
   /*Configure GPIO pins : IMU_CS_Pin IMU_INT1_Pin IMU_INT2_Pin IR_IN_Pin
                            IR_OUT_Pin */
   GPIO_InitStruct.Pin = IMU_CS_Pin|IMU_INT1_Pin|IMU_INT2_Pin|IR_IN_Pin
@@ -809,6 +829,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(NRF_CE_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MOTOR1_ENCODER_Pin */
+  GPIO_InitStruct.Pin = MOTOR1_ENCODER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(MOTOR1_ENCODER_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 7, 0);

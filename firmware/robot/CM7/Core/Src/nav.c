@@ -7,6 +7,7 @@
  * Private includes
  */
 #include "arm_math.h"
+#include "stm32h7xx_it.h"
 #include "log.h"
 #include "motor.h"
 #include <stdlib.h>
@@ -47,8 +48,8 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[0].breakPin = MOTOR1_BREAK_Pin;
     motors[0].reversePinPort = MOTOR1_REVERSE_GPIO_Port;
     motors[0].reversePin = MOTOR1_REVERSE_Pin;
-    motors[0].encoderPinPort = MOTOR1_ENCODER_GPIO_Port;
-    motors[0].encoderPin = MOTOR1_ENCODER_Pin;
+    // motors[0].encoderPinPort = MOTOR1_ENCODER_GPIO_Port;
+    // motors[0].encoderPin = MOTOR1_ENCODER_Pin;
     motors[0].dir = 1;
 
 #ifdef PCB_MOTOR
@@ -130,10 +131,11 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
 void NAV_update_motor_state()
 {
 
+    int* motor_ticks = ITR_GetMotorTicks();
+
     for (int i = 0; i < 4; i++) {
         int ticks_before = motors[i].prev_tick;
-        // int new_ticks = motors[i].encoder_htim->Instance->CNT;
-        int new_ticks = ITR_GetMotorTicks();
+        int new_ticks = motor_ticks[i];
         MOTOR_update_motor_ticks(&motors[i], new_ticks - ticks_before);
         motors[i].ticks = new_ticks - ticks_before;
         motors[i].prev_tick = new_ticks;

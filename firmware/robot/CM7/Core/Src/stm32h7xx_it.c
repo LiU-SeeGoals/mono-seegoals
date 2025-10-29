@@ -212,6 +212,7 @@ void SysTick_Handler(void)
 void TIM3_IRQHandler(void)
 {
   /* USER CODE BEGIN TIM3_IRQn 0 */
+  // TODO: Is this too slow to be in 1mzh interrupt?
   static GPIO_PinState motor_prev[4];
   static GPIO_PinState motor_cur[4];
   static uint8_t init = 0;
@@ -232,10 +233,10 @@ void TIM3_IRQHandler(void)
   /* USER CODE BEGIN TIM3_IRQn 1 */
 
   // Motor 1 to 4
-  motor_cur[0] = (int)HAL_GPIO_ReadPin(GPIOD, 2);
-  motor_cur[1] = (int)HAL_GPIO_ReadPin(GPIOA, 15);
-  motor_cur[2] = (int)HAL_GPIO_ReadPin(GPIOA, 4);
-  motor_cur[3] = (int)HAL_GPIO_ReadPin(GPIOA, 0);
+  motor_cur[0] = (int)HAL_GPIO_ReadPin(MOTOR1_ENCODER_GPIO_Port, MOTOR1_ENCODER_Pin);
+  motor_cur[1] = (int)HAL_GPIO_ReadPin(MOTOR2_ENCODER_GPIO_Port, MOTOR2_ENCODER_Pin);
+  motor_cur[2] = (int)HAL_GPIO_ReadPin(MOTOR3_ENCODER_GPIO_Port, MOTOR3_ENCODER_Pin);
+  motor_cur[3] = (int)HAL_GPIO_ReadPin(MOTOR4_ENCODER_GPIO_Port, MOTOR4_ENCODER_Pin);
 
   for (int i = 0; i < 4; i++)
   {
