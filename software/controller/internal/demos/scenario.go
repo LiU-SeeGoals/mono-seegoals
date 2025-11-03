@@ -33,11 +33,14 @@ func Scenario() {
 
 	aiYellow := ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
 
-	basestationClient := client.NewBaseStationClient(config.GetBasestationAddress())
-	simClient := client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
-	fmt.Println("Basedstation: ", config.GetBasestationAddress())
 
-	basestationClient.Init()
+	// Commented out basestation client due to causing issues on slower computers
+	
+	//basestationClient := client.NewBaseStationClient(config.GetBasestationAddress())
+	simClient := client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
+	//fmt.Println("Basedstation: ", config.GetBasestationAddress())
+
+	//basestationClient.Init()
 
 	for {
 		playTime := time.Now().UnixMilli()
@@ -46,7 +49,7 @@ func Scenario() {
 		yellow_actions := aiYellow.GetActions(gameInfo)
 
 		client.BroadcastActions(yellow_actions) // We broadcast actions for the GV to print 'em
-		basestationClient.SendActions(yellow_actions)
+		//basestationClient.SendActions(yellow_actions)
 		simClient.SendActions(yellow_actions)
 	}
 }
