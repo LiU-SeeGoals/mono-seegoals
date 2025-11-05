@@ -54,8 +54,8 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 	// Initialize with reasonable RRT parameters
 	rrtConfig := rrtConfiguration{
 		maxIterations:      1000,
-		stepSize:           150.0,   // mm per step (increased for more aggressive exploration)
-		goalBias:           0.01,    // 20% chance of sampling the goal directly (increased for more direct paths)
+		stepSize:           250.0,   // mm per step (increased for more aggressive exploration)
+		goalBias:           0.15,    // 20% chance of sampling the goal directly (increased for more direct paths)
 		waypointThreshold:  50.0,    // mm to consider waypoint reached
 		fieldWidth:         13400.0, // Standard SSL field width in mm
 		fieldHeight:        10400.0, // Standard SSL field height in mm
@@ -175,14 +175,27 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	currentObstacles := obstacles
 	m.CheckForSignificantChanges(currentObstacles)
 
-	// Check if we need to replan due to time, path emptiness, or significant obstacle changes
-	if time.Since(m.lastPlanningTime) >= m.planningInterval ||
-		len(m.path) == 0 ||
-		m.significantChange {
+	// 1 time plan
+	if len(m.path) == 0 {
+		fmt.Println("RRT: Planning initial path")
 		m.PlanPath(gi, myPos)
 		m.lastPlanningTime = time.Now()
 		m.previousObstacles = currentObstacles
 		m.significantChange = false
+		fmt.Println("RRT: Planned path with", len(m.path), "waypoints")
+		fmt.Println("Path:", m.path)
+	}
+	// Check if we need to replan due to time, path emptiness, or significant obstacle changes
+	if time.Since(m.lastPlanningTime) >= m.planningInterval ||
+		len(m.path) == 0 ||
+		m.significantChange {
+		// Only do a replan if the current path is no longer valid
+		if !m.IsPathStillValid(myPos, currentObstacles) {
+			m.PlanPath(gi, myPos)
+			m.lastPlanningTime = time.Now()
+			m.previousObstacles = currentObstacles
+			m.significantChange = false
+		}
 	}
 
 	// If we have a path, navigate to the next waypoint
@@ -334,10 +347,12 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 
 	// Create tree with root at start position
 	nodes := []*RRTNode{startNode}
+	fmt.Println("RRT: Starting path planning from", startPos, "to", m.final_destination)
 
 	// Run RRT algorithm
 	goalNode := m.RunRRT(nodes, obstacles)
 	if goalNode == nil {
+		fmt.Println("RRT: No path found within iteration limit")
 		// If no path found, keep the existing path or try to move directly to goal
 		if len(m.path) == 0 {
 			m.path = []info.Position{m.final_destination}
@@ -347,19 +362,23 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 
 	// Extract path from goal node back to start by following parents
 	path := []info.Position{}
+	fmt.Println("RRT: Path found, extracting waypoints")
 	current := goalNode
 	for current != nil {
 		path = append([]info.Position{current.position}, path...)
 		current = current.parent
 	}
-
+	fmt.Println("RRT: Extracted", len(path), "waypoints before simplification")
 	// Skip the start position if it's in the path
 	if len(path) > 1 {
 		path = path[1:]
 	}
 
-	// Simplify the path by removing redundant waypoints
-	m.path = m.SimplifyPath(path, obstacles)
+
+	m.path = path
+	// Simplify the path by removing redundant waypoints this is way to agressive right now 
+
+	//m.path = m.SimplifyPath(path, obstacles)
 }
 
 // RunRRT executes the RRT algorithm and returns the goal node if a path is found
@@ -594,7 +613,7 @@ func (m *MoveToPosition) SimplifyPath(path []info.Position, obstacles []info.Pos
 	}
 
 	// Make sure we have at most MAX_WAYPOINTS
-	const MAX_WAYPOINTS = 5
+	const MAX_WAYPOINTS = 10
 	if len(simplified) > MAX_WAYPOINTS {
 		// Keep first and last waypoints, and evenly sample the rest
 		result := []info.Position{simplified[0]}
@@ -637,4 +656,23 @@ func (m *MoveToPosition) String() string {
 
 func (m *MoveToPosition) GetID() info.ID {
 	return m.id
+}
+func (m *MoveToPosition) IsPathStillValid(currentPos info.Position, obstacles []info.Position) bool {
+	if len(m.path) == 0 {
+		return false
+	}
+
+	// Check path from current position to first waypoint
+	if !m.IsPathClear(currentPos, m.path[0], obstacles) {
+		return false
+	}
+
+	// Check each segment
+	for i := 0; i < len(m.path)-1; i++ {
+		if !m.IsPathClear(m.path[i], m.path[i+1], obstacles) {
+			return false
+		}
+	}
+
+	return true
 }
