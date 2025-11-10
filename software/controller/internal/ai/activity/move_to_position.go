@@ -11,7 +11,7 @@ import (
 )
 
 // RobotSafetyRadius defines the no-movement zone around each robot
-const RobotSafetyRadius = 90.0 // mm - increased for better safety margin
+const RobotSafetyRadius = 200.0 // mm - increased for better safety margin
 
 // MoveToPositionWithCollisionAvoidance handles collision avoidance using RRT
 type MoveToPosition struct {
@@ -54,12 +54,12 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 	// Initialize with reasonable RRT parameters
 	rrtConfig := rrtConfiguration{
 		maxIterations:      1000,
-		stepSize:           250.0,   // mm per step (increased for more aggressive exploration)
-		goalBias:           0.15,    // 20% chance of sampling the goal directly (increased for more direct paths)
+		stepSize:           150.0,   // mm per step (increased for more aggressive exploration)
+		goalBias:           0.30,    // 20% chance of sampling the goal directly (increased for more direct paths)
 		waypointThreshold:  50.0,    // mm to consider waypoint reached
 		fieldWidth:         13400.0, // Standard SSL field width in mm
 		fieldHeight:        10400.0, // Standard SSL field height in mm
-		completionDistance: 50.0,    // mm to consider the goal reached
+		completionDistance: 150.0,    // mm to consider the goal reached
 	}
 
 	return &MoveToPosition{
@@ -69,7 +69,7 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 		path:              []info.Position{},
 		rrtConfig:         rrtConfig,
 		lastPlanningTime:  time.Now(),
-		planningInterval:  50 * time.Millisecond, // Replan more frequently (50ms instead of 100ms)
+		planningInterval:  5 * time.Millisecond, // Replan more frequently (50ms instead of 100ms)
 		previousObstacles: []info.Position{},
 		significantChange: true, // Force initial planning
 		stuckCounter:      0,
@@ -99,13 +99,15 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 			m.stuckCounter++
 			if m.stuckCounter > m.stuckThreshold {
 				// Robot is stuck, force immediate replanning with shorter interval
-				m.planningInterval = 20 * time.Millisecond
-				m.significantChange = true
+				// m.planningInterval = 20 * time.Millisecond
+				m.path = []info.Position{} // Clear current path to force replan
+				m.stuckCounter = 0
+				// m.significantChange = true
 			}
 		} else {
 			// Robot is moving, reset stuck counter
 			m.stuckCounter = 0
-			m.planningInterval = 50 * time.Millisecond
+			// m.planningInterval = 50 * time.Millisecond
 		}
 	}
 	m.lastPosition = myPos
@@ -182,8 +184,9 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 		m.lastPlanningTime = time.Now()
 		m.previousObstacles = currentObstacles
 		m.significantChange = false
+		fmt.Println("Robot ", m.id, "at", myPos, "to", m.final_destination)
 		fmt.Println("RRT: Planned path with", len(m.path), "waypoints")
-		fmt.Println("Path:", m.path)
+		// fmt.Println("Path:", m.path)
 	}
 	// Check if we need to replan due to time, path emptiness, or significant obstacle changes
 	if time.Since(m.lastPlanningTime) >= m.planningInterval ||
@@ -355,19 +358,20 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 		// If no path found, keep the existing path or try to move directly to goal
 		if len(m.path) == 0 {
 			m.path = []info.Position{m.final_destination}
+			return
 		}
 		return
 	}
 
 	// Extract path from goal node back to start by following parents
 	path := []info.Position{}
-	fmt.Println("RRT: Path found, extracting waypoints")
+	// fmt.Println("RRT: Path found, extracting waypoints")
 	current := goalNode
 	for current != nil {
 		path = append([]info.Position{current.position}, path...)
 		current = current.parent
 	}
-	fmt.Println("RRT: Extracted", len(path), "waypoints before simplification")
+	// fmt.Println("RRT: Extracted", len(path), "waypoints before simplification")
 	// Skip the start position if it's in the path
 	if len(path) > 1 {
 		path = path[1:]
@@ -561,6 +565,9 @@ func (m *MoveToPosition) GetObstaclePositions(gi *info.GameInfo) []info.Position
 		if err != nil {
 			continue
 		}
+		if !robot.IsActive() {
+			continue
+		}
 
 		// Skip robots at exactly (0,0) as they are likely removed from the field
 		// if pos.X == 0 && pos.Y == 0 {
@@ -673,5 +680,6 @@ func (m *MoveToPosition) IsPathStillValid(currentPos info.Position, obstacles []
 		}
 	}
 
-	return true
+	return m.IsPathClear(currentPos, m.path[0], obstacles)
+
 }
