@@ -10,7 +10,7 @@ trap cleanup INT TERM EXIT
 
 cd $SCRIPT_DIR
 
-"$SCRIPT_DIR/bin/vision" -s -c 3 &
+"$SCRIPT_DIR/bin/vision" -s -c 1 &
 VISION_PID=$!
 
 "$SCRIPT_DIR/video-stream-to-file.py" 10 &

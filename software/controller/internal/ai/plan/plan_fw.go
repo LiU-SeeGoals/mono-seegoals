@@ -67,9 +67,11 @@ func (m *plannerFw) run() {
 	// robot0_index := 0
 
 	way_points := []info.Position{
-		{X: -1000, Y: 0, Z: 0, Angle: 0},
-		{X: 1000, Y: 0, Z: 0, Angle: 0},
+		{X: -1000, Y: -1000, Z: 0, Angle: 0},
+		{X: -2000, Y: -1000, Z: 0, Angle: 0},
+		{X: -1000, Y: -2000, Z: 0, Angle: 0},
 	}
+
 	// active_id := []int{0, 1, 3}
 	enemy_goal := 0
 
