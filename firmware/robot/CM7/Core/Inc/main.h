@@ -49,7 +49,7 @@ extern "C" {
 
 /* USER CODE END EM */
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim);
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
@@ -89,6 +89,8 @@ extern volatile atomic_uint main_tasks;
 #define LED_GREEN_GPIO_Port GPIOB
 #define MOTOR1_BREAK_Pin GPIO_PIN_2
 #define MOTOR1_BREAK_GPIO_Port GPIOB
+#define IR_TEST_Pin GPIO_PIN_11
+#define IR_TEST_GPIO_Port GPIOF
 #define MOTOR3_REVERSE_Pin GPIO_PIN_7
 #define MOTOR3_REVERSE_GPIO_Port GPIOE
 #define OLD_MOTOR2_REVERSE_Pin GPIO_PIN_8
@@ -124,10 +126,10 @@ extern volatile atomic_uint main_tasks;
 #define OLD_MOTOR2_BREAK_GPIO_Port GPIOD
 #define NRF_CE_Pin GPIO_PIN_6
 #define NRF_CE_GPIO_Port GPIOC
-#define IR_IN_Pin GPIO_PIN_11
-#define IR_IN_GPIO_Port GPIOA
-#define IR_OUT_Pin GPIO_PIN_12
-#define IR_OUT_GPIO_Port GPIOA
+#define IR_TEST2_Pin GPIO_PIN_8
+#define IR_TEST2_GPIO_Port GPIOA
+#define IR_ENABLE_Pin GPIO_PIN_11
+#define IR_ENABLE_GPIO_Port GPIOA
 #define MOTOR2_ENCODER_Pin GPIO_PIN_15
 #define MOTOR2_ENCODER_GPIO_Port GPIOA
 #define EXT_LED1_RED_Pin GPIO_PIN_1
