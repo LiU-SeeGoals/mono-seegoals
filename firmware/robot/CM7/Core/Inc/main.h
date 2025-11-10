@@ -49,7 +49,7 @@ extern "C" {
 
 /* USER CODE END EM */
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim);
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
@@ -124,6 +124,8 @@ extern volatile atomic_uint main_tasks;
 #define OLD_MOTOR2_BREAK_GPIO_Port GPIOD
 #define NRF_CE_Pin GPIO_PIN_6
 #define NRF_CE_GPIO_Port GPIOC
+#define LIANG_TEST_Pin GPIO_PIN_8
+#define LIANG_TEST_GPIO_Port GPIOA
 #define IR_IN_Pin GPIO_PIN_11
 #define IR_IN_GPIO_Port GPIOA
 #define IR_OUT_Pin GPIO_PIN_12
