@@ -30,6 +30,7 @@
 #include "pos_follow.h"
 #include "state_estimator.h"
 #include "stm32h7xx_hal_gpio.h"
+#include "stm32h7xx_it.h"
 #include "ui.h"
 /* USER CODE END Includes */
 
@@ -127,8 +128,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef* huart) { UI_RxCallback(); }
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-    IMU_AccelVec3 acc;
-    IMU_GyroVec3 gyr;
 
   /* USER CODE END 1 */
 /* USER CODE BEGIN Boot_Mode_Sequence_0 */
@@ -196,9 +195,10 @@ int main(void)
     KICKER_Init();
     IMU_Init(&hi2c4);
     STATE_Init();
-    STATE_calibrate_imu_gyr();
+    // STATE_calibrate_imu_gyr();
     UI_Init(&huart3);
     COM_Init(&hspi1, &NRF_AVAILABLE);
+    ITR_Init();
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
@@ -211,7 +211,25 @@ int main(void)
     uint32_t now = HAL_GetTick();
     bool on = false;
 
+    NAV_TEST_Set_robot_cmd(1,0,0);
+    // int* motor_ticks = ITR_GetMotorTicks();
+    // GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
+    // RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPAEN;
+
+    // __HAL_RCC_DBGMCU_CLK_ENABLE();
+    // HAL_DBGMCU_DisableJTAG();
+
+    // __HAL_RCC_GPIOA_CLK_ENABLE();
+    //
+
+
     while (1) {
+      int a = (int)HAL_GPIO_ReadPin(MOTOR1_ENCODER_GPIO_Port, MOTOR1_ENCODER_Pin);
+      int b = (int)HAL_GPIO_ReadPin(MOTOR2_ENCODER_GPIO_Port, MOTOR2_ENCODER_Pin);
+      int c = (int)HAL_GPIO_ReadPin(MOTOR3_ENCODER_GPIO_Port, MOTOR3_ENCODER_Pin);
+      int d = (int)HAL_GPIO_ReadPin(MOTOR4_ENCODER_GPIO_Port, MOTOR4_ENCODER_Pin);
+        // LOG_INFO("%d %d %d %d \r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
+        LOG_INFO("%d %d %d %d \r\n", a, b, c, d);
         if (HAL_GetTick() - now > 1000) {
             if (on) {
                 HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
@@ -221,7 +239,7 @@ int main(void)
             } else {
                 HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
                 HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
-                NAV_RunDribbler();
+                // NAV_RunDribbler();
             }
             on = !on;
             now = HAL_GetTick();
@@ -782,11 +800,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BATT6_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : MOTOR4_ENCODER_Pin MOTOR3_ENCODER_Pin MOTOR2_ENCODER_Pin */
-  GPIO_InitStruct.Pin = MOTOR4_ENCODER_Pin|MOTOR3_ENCODER_Pin|MOTOR2_ENCODER_Pin;
+  /*Configure GPIO pin : MOTOR4_ENCODER_Pin */
+  GPIO_InitStruct.Pin = MOTOR4_ENCODER_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(MOTOR4_ENCODER_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : IMU_CS_Pin IMU_INT1_Pin IMU_INT2_Pin IR_IN_Pin
                            IR_OUT_Pin */
@@ -796,6 +814,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MOTOR3_ENCODER_Pin */
+  GPIO_InitStruct.Pin = MOTOR3_ENCODER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(MOTOR3_ENCODER_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : LED_GREEN_Pin MOTOR1_BREAK_Pin KICKER_DISCHARGE2_Pin KICKER_CHARGE_Pin
                            KICKER_DISCHARGE1_Pin KICKER_ERR_Pin LED_RED_Pin MOTOR1_REVERSE_Pin
@@ -833,8 +857,14 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin : MOTOR1_ENCODER_Pin */
   GPIO_InitStruct.Pin = MOTOR1_ENCODER_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(MOTOR1_ENCODER_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : MOTOR2_ENCODER_Pin */
+  GPIO_InitStruct.Pin = MOTOR2_ENCODER_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(MOTOR2_ENCODER_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 7, 0);

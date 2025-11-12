@@ -140,8 +140,6 @@ extern volatile atomic_uint main_tasks;
 #define IR_IN_GPIO_Port GPIOA
 #define IR_OUT_Pin GPIO_PIN_12
 #define IR_OUT_GPIO_Port GPIOA
-#define MOTOR2_ENCODER_Pin GPIO_PIN_15
-#define MOTOR2_ENCODER_GPIO_Port GPIOA
 #define EXT_LED1_RED_Pin GPIO_PIN_1
 #define EXT_LED1_RED_GPIO_Port GPIOD
 #define MOTOR1_ENCODER_Pin GPIO_PIN_2
@@ -162,6 +160,8 @@ extern volatile atomic_uint main_tasks;
 #define MOTOR1_REVERSE_GPIO_Port GPIOB
 #define NRF_CSN_Pin GPIO_PIN_8
 #define NRF_CSN_GPIO_Port GPIOB
+#define MOTOR2_ENCODER_Pin GPIO_PIN_0
+#define MOTOR2_ENCODER_GPIO_Port GPIOE
 #define LED_YELLOW_Pin GPIO_PIN_1
 #define LED_YELLOW_GPIO_Port GPIOE
 

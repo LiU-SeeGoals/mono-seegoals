@@ -27,6 +27,7 @@
 #include "nav.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
+#include "log.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -47,6 +48,7 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
 static int motor_ticks[4];
+static LOG_Module internal_log_mod;
 
 /* USER CODE END PV */
 
@@ -292,18 +294,20 @@ void TIM8_BRK_TIM12_IRQHandler(void)
     __disable_irq();
     // This interrupt runs 1000HZ
 
-    if (STATE_is_calibrated() == 1) {
-        IMU_AccelVec3 acc = IMU_read_accel_mps2();
-        IMU_GyroVec3 gyr = IMU_read_gyro_radps();
-
-        STATE_FusionEKFIntertialUpdate(acc, gyr);
-        float x = NAV_GetNavX();
-        float y = NAV_GetNavY();
-        float w = NAV_GetNavW();
-        POS_go_to_position(x, y, w);
-    }
-
-    NAV_update_motor_state();
+    // if (STATE_is_calibrated() == 1) {
+    //     IMU_AccelVec3 acc = IMU_read_accel_mps2();
+    //     IMU_GyroVec3 gyr = IMU_read_gyro_radps();
+    //
+    //     STATE_FusionEKFIntertialUpdate(acc, gyr);
+    //     float x = NAV_GetNavX();
+    //     float y = NAV_GetNavY();
+    //     float w = NAV_GetNavW();
+    //     POS_go_to_position(x, y, w);
+    // }
+    //
+    // // NAV_steer(10,0,0);
+    // NAV_update_motor_state();
+    NAV_TEST_pwm();
     __enable_irq();
 
   /* USER CODE END TIM8_BRK_TIM12_IRQn 1 */
@@ -313,6 +317,11 @@ void TIM8_BRK_TIM12_IRQHandler(void)
 int* ITR_GetMotorTicks(void)
 {
     return motor_ticks;
+}
+
+int* ITR_Init(void)
+{
+    LOG_InitModule(&internal_log_mod, "ITR", LOG_LEVEL_DEBUG, 0);
 }
 
 /* USER CODE END 1 */

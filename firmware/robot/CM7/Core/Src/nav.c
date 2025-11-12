@@ -133,6 +133,7 @@ void NAV_update_motor_state()
 
     int* motor_ticks = ITR_GetMotorTicks();
 
+
     for (int i = 0; i < 4; i++) {
         int ticks_before = motors[i].prev_tick;
         int new_ticks = motor_ticks[i];
@@ -458,6 +459,15 @@ void NAV_TestDribbler()
     NAV_RunDribbler();
     HAL_Delay(2000);
     NAV_StopDribbler();
+}
+
+void NAV_TEST_pwm()
+{
+    float speed = 0.15;
+    MOTOR_SendPWM(&motors[0], speed);
+    MOTOR_SendPWM(&motors[1], speed);
+    MOTOR_SendPWM(&motors[2], speed);
+    MOTOR_SendPWM(&motors[3], speed);
 }
 
 void NAV_TEST_Set_robot_cmd(float x, float y, float w)

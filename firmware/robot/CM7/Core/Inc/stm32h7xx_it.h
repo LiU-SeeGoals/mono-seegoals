@@ -62,6 +62,7 @@ void TIM8_BRK_TIM12_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 
 int* ITR_GetMotorTicks(void);
+int* ITR_Init(void);
 
 /* USER CODE END EFP */
 
