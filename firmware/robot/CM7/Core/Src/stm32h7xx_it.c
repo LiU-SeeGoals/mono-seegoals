@@ -47,7 +47,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-static int motor_ticks[4];
+static int64_t motor_ticks[4];
+static int64_t motor_ticks_prev[4];
+static int64_t motor_ticks_delta[4];
+static int64_t cur_buf_idx = 0;
 static LOG_Module internal_log_mod;
 
 /* USER CODE END PV */
@@ -63,7 +66,7 @@ static LOG_Module internal_log_mod;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
-extern TIM_HandleTypeDef htim3;
+extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim12;
 extern UART_HandleTypeDef huart3;
 /* USER CODE BEGIN EV */
@@ -209,12 +212,12 @@ void SysTick_Handler(void)
 /******************************************************************************/
 
 /**
-  * @brief This function handles TIM3 global interrupt.
+  * @brief This function handles TIM4 global interrupt.
   */
-void TIM3_IRQHandler(void)
+void TIM4_IRQHandler(void)
 {
-  /* USER CODE BEGIN TIM3_IRQn 0 */
-  // TODO: Is this too slow to be in 1mzh interrupt?
+  /* USER CODE BEGIN TIM4_IRQn 0 */
+
   static GPIO_PinState motor_prev[4];
   static GPIO_PinState motor_cur[4];
   static uint8_t init = 0;
@@ -224,15 +227,16 @@ void TIM3_IRQHandler(void)
       for (int i = 0; i < 4; i ++)
       {
           motor_ticks[i] = 0;
+          motor_ticks_prev[i] = 0;
+          motor_ticks_delta[i] = 0;
           motor_cur[i] = 0;
           motor_prev[i] = 0;
       }
       init = 1;
   }
-
-  /* USER CODE END TIM3_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim3);
-  /* USER CODE BEGIN TIM3_IRQn 1 */
+  /* USER CODE END TIM4_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim4);
+  /* USER CODE BEGIN TIM4_IRQn 1 */
 
   // Motor 1 to 4
   motor_cur[0] = (int)HAL_GPIO_ReadPin(MOTOR1_ENCODER_GPIO_Port, MOTOR1_ENCODER_Pin);
@@ -240,16 +244,19 @@ void TIM3_IRQHandler(void)
   motor_cur[2] = (int)HAL_GPIO_ReadPin(MOTOR3_ENCODER_GPIO_Port, MOTOR3_ENCODER_Pin);
   motor_cur[3] = (int)HAL_GPIO_ReadPin(MOTOR4_ENCODER_GPIO_Port, MOTOR4_ENCODER_Pin);
 
+
   for (int i = 0; i < 4; i++)
   {
       if(motor_prev[i] != motor_cur[i])
       {
-          motor_ticks[i] += 1;
           motor_cur[i] = motor_prev[i];
+          motor_ticks[i] += 1;
       }
   }
-
   /* USER CODE END TIM3_IRQn 1 */
+  /* USER CODE BEGIN TIM4_IRQn 1 */
+
+  /* USER CODE END TIM4_IRQn 1 */
 }
 
 /**
@@ -291,31 +298,39 @@ void TIM8_BRK_TIM12_IRQHandler(void)
   HAL_TIM_IRQHandler(&htim12);
   /* USER CODE BEGIN TIM8_BRK_TIM12_IRQn 1 */
 
-    __disable_irq();
-    // This interrupt runs 1000HZ
-
-    // if (STATE_is_calibrated() == 1) {
-    //     IMU_AccelVec3 acc = IMU_read_accel_mps2();
-    //     IMU_GyroVec3 gyr = IMU_read_gyro_radps();
-    //
-    //     STATE_FusionEKFIntertialUpdate(acc, gyr);
-    //     float x = NAV_GetNavX();
-    //     float y = NAV_GetNavY();
-    //     float w = NAV_GetNavW();
-    //     POS_go_to_position(x, y, w);
-    // }
-    //
-    // // NAV_steer(10,0,0);
-    // NAV_update_motor_state();
-    NAV_TEST_pwm();
-    __enable_irq();
+  //   __disable_irq();
+  //   // This interrupt runs 1000HZ
+  // // hej += 1;
+  //
+  //   if (STATE_is_calibrated() == 1) {
+  //       IMU_AccelVec3 acc = IMU_read_accel_mps2();
+  //       IMU_GyroVec3 gyr = IMU_read_gyro_radps();
+  //
+  //       STATE_FusionEKFIntertialUpdate(acc, gyr);
+  //       float x = NAV_GetNavX();
+  //       float y = NAV_GetNavY();
+  //       float w = NAV_GetNavW();
+  //       POS_go_to_position(x, y, w);
+  //   }
+  //
+  //   // NAV_steer(10,0,0);
+  //   NAV_update_motor_state();
+  NAV_TEST_pwm();
+  //   __enable_irq();
 
   /* USER CODE END TIM8_BRK_TIM12_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
-int* ITR_GetMotorTicks(void)
+int64_t* ITR_GetMotorTicks(void)
 {
+
+    for (int i = 0; i < 4; i++)
+    {
+        motor_ticks_delta[i] = motor_ticks[i] - motor_ticks_prev[i];
+        motor_ticks_prev[i] = motor_ticks[i];
+    }
+
     return motor_ticks;
 }
 

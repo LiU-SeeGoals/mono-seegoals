@@ -58,7 +58,7 @@ I2C_HandleTypeDef hi2c4;
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
-TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim12;
 TIM_HandleTypeDef htim15;
 
@@ -88,10 +88,10 @@ static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
 static void MX_TIM1_Init(void);
 static void MX_SPI1_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_TIM12_Init(void);
 static void MX_TIM15_Init(void);
 static void MX_I2C4_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void I2C4_Init(void);
@@ -175,10 +175,10 @@ int main(void)
   MX_USART3_UART_Init();
   MX_TIM1_Init();
   MX_SPI1_Init();
-  MX_TIM3_Init();
   MX_TIM12_Init();
   MX_TIM15_Init();
   MX_I2C4_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
 
     // Initialise modules
@@ -191,6 +191,7 @@ int main(void)
 #else
     NAV_Init(&htim12, &htim1, &htim15);
 #endif
+    HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1);
     KICKER_Init();
     IMU_Init(&hi2c4);
@@ -211,8 +212,8 @@ int main(void)
     uint32_t now = HAL_GetTick();
     bool on = false;
 
-    NAV_TEST_Set_robot_cmd(1,0,0);
-    // int* motor_ticks = ITR_GetMotorTicks();
+    // NAV_TEST_Set_robot_cmd(100,0,0);
+    int64_t* motor_ticks = ITR_GetMotorTicks();
     // GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
     // RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPAEN;
 
@@ -228,8 +229,11 @@ int main(void)
       int b = (int)HAL_GPIO_ReadPin(MOTOR2_ENCODER_GPIO_Port, MOTOR2_ENCODER_Pin);
       int c = (int)HAL_GPIO_ReadPin(MOTOR3_ENCODER_GPIO_Port, MOTOR3_ENCODER_Pin);
       int d = (int)HAL_GPIO_ReadPin(MOTOR4_ENCODER_GPIO_Port, MOTOR4_ENCODER_Pin);
-        // LOG_INFO("%d %d %d %d \r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
-        LOG_INFO("%d %d %d %d \r\n", a, b, c, d);
+
+        LOG_INFO("%d %d %d %d\r\n", motor_ticks[0],motor_ticks[1],motor_ticks[2],motor_ticks[3]);
+        // LOG_INFO("%d %d %d %d \r\n", a, b, c, d);
+        // LOG_INFO("%d \r\n", get_hej());
+
         if (HAL_GetTick() - now > 1000) {
             if (on) {
                 HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
@@ -510,54 +514,54 @@ static void MX_TIM1_Init(void)
 }
 
 /**
-  * @brief TIM3 Initialization Function
+  * @brief TIM4 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM3_Init(void)
+static void MX_TIM4_Init(void)
 {
 
-  /* USER CODE BEGIN TIM3_Init 0 */
+  /* USER CODE BEGIN TIM4_Init 0 */
 
-  /* USER CODE END TIM3_Init 0 */
+  /* USER CODE END TIM4_Init 0 */
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_SlaveConfigTypeDef sSlaveConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE BEGIN TIM3_Init 1 */
+  /* USER CODE BEGIN TIM4_Init 1 */
 
-  /* USER CODE END TIM3_Init 1 */
-  htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 0;
-  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 199;
-  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 0;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 999;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
   {
     Error_Handler();
   }
   sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
   {
     Error_Handler();
   }
   sSlaveConfig.SlaveMode = TIM_SLAVEMODE_DISABLE;
-  sSlaveConfig.InputTrigger = TIM_TS_ITR1;
-  if (HAL_TIM_SlaveConfigSynchro(&htim3, &sSlaveConfig) != HAL_OK)
+  sSlaveConfig.InputTrigger = TIM_TS_ITR0;
+  if (HAL_TIM_SlaveConfigSynchro(&htim4, &sSlaveConfig) != HAL_OK)
   {
     Error_Handler();
   }
   sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN TIM3_Init 2 */
+  /* USER CODE BEGIN TIM4_Init 2 */
 
-  /* USER CODE END TIM3_Init 2 */
+  /* USER CODE END TIM4_Init 2 */
 
 }
 
