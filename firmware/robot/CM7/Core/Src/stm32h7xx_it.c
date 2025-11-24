@@ -47,10 +47,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-static int64_t motor_ticks[4];
-static int64_t motor_ticks_prev[4];
-static int64_t motor_ticks_delta[4];
-static int64_t cur_buf_idx = 0;
+static int motor_ticks[4];
+static int motor_ticks_prev[4];
+static int motor_ticks_delta[4];
+static int cur_buf_idx = 0;
 static LOG_Module internal_log_mod;
 
 /* USER CODE END PV */
@@ -249,7 +249,7 @@ void TIM4_IRQHandler(void)
   {
       if(motor_prev[i] != motor_cur[i])
       {
-          motor_cur[i] = motor_prev[i];
+          motor_prev[i] = motor_cur[i];
           motor_ticks[i] += 1;
       }
   }
@@ -322,14 +322,14 @@ void TIM8_BRK_TIM12_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-int64_t* ITR_GetMotorTicks(void)
+int* ITR_GetMotorTicks(void)
 {
 
-    for (int i = 0; i < 4; i++)
-    {
-        motor_ticks_delta[i] = motor_ticks[i] - motor_ticks_prev[i];
-        motor_ticks_prev[i] = motor_ticks[i];
-    }
+    // for (int i = 0; i < 4; i++)
+    // {
+    //     motor_ticks_delta[i] = motor_ticks[i] - motor_ticks_prev[i];
+    //     motor_ticks_prev[i] = motor_ticks[i];
+    // }
 
     return motor_ticks;
 }

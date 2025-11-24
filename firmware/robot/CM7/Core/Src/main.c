@@ -213,7 +213,7 @@ int main(void)
     bool on = false;
 
     // NAV_TEST_Set_robot_cmd(100,0,0);
-    int64_t* motor_ticks = ITR_GetMotorTicks();
+    int* motor_ticks = ITR_GetMotorTicks();
     // GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
     // RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPAEN;
 
@@ -230,7 +230,7 @@ int main(void)
       int c = (int)HAL_GPIO_ReadPin(MOTOR3_ENCODER_GPIO_Port, MOTOR3_ENCODER_Pin);
       int d = (int)HAL_GPIO_ReadPin(MOTOR4_ENCODER_GPIO_Port, MOTOR4_ENCODER_Pin);
 
-        LOG_INFO("%d %d %d %d\r\n", motor_ticks[0],motor_ticks[1],motor_ticks[2],motor_ticks[3]);
+        LOG_INFO("%d %d %d %d\r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
         // LOG_INFO("%d %d %d %d \r\n", a, b, c, d);
         // LOG_INFO("%d \r\n", get_hej());
 
@@ -535,7 +535,7 @@ static void MX_TIM4_Init(void)
   htim4.Instance = TIM4;
   htim4.Init.Prescaler = 0;
   htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 999;
+  htim4.Init.Period = 499;
   htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim4) != HAL_OK)

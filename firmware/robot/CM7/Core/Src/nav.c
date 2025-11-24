@@ -131,7 +131,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
 void NAV_update_motor_state()
 {
 
-    int64_t* motor_ticks = ITR_GetMotorTicks();
+    int* motor_ticks = ITR_GetMotorTicks();
 
     for (int i = 0; i < 4; i++) {
         int ticks_before = motors[i].prev_tick;
