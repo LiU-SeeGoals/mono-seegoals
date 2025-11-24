@@ -298,25 +298,25 @@ void TIM8_BRK_TIM12_IRQHandler(void)
   HAL_TIM_IRQHandler(&htim12);
   /* USER CODE BEGIN TIM8_BRK_TIM12_IRQn 1 */
 
-  //   __disable_irq();
-  //   // This interrupt runs 1000HZ
-  // // hej += 1;
-  //
-  //   if (STATE_is_calibrated() == 1) {
-  //       IMU_AccelVec3 acc = IMU_read_accel_mps2();
-  //       IMU_GyroVec3 gyr = IMU_read_gyro_radps();
-  //
-  //       STATE_FusionEKFIntertialUpdate(acc, gyr);
-  //       float x = NAV_GetNavX();
-  //       float y = NAV_GetNavY();
-  //       float w = NAV_GetNavW();
-  //       POS_go_to_position(x, y, w);
-  //   }
-  //
-  //   // NAV_steer(10,0,0);
-  //   NAV_update_motor_state();
-  NAV_TEST_pwm();
-  //   __enable_irq();
+    __disable_irq();
+    // This interrupt runs 1000HZ
+  // hej += 1;
+
+    if (STATE_is_calibrated() == 1) {
+        IMU_AccelVec3 acc = IMU_read_accel_mps2();
+        IMU_GyroVec3 gyr = IMU_read_gyro_radps();
+
+        STATE_FusionEKFIntertialUpdate(acc, gyr);
+        float x = NAV_GetNavX();
+        float y = NAV_GetNavY();
+        float w = NAV_GetNavW();
+        POS_go_to_position(x, y, w);
+    }
+
+    // NAV_steer(10,0,0);
+    NAV_update_motor_state();
+  // NAV_TEST_pwm();
+    __enable_irq();
 
   /* USER CODE END TIM8_BRK_TIM12_IRQn 1 */
 }

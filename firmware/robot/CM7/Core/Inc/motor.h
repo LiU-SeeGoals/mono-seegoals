@@ -8,9 +8,9 @@ typedef struct {
     TIM_HandleTypeDef* encoder_htim;
     TIM_HandleTypeDef* pwm_htim;
     uint32_t channel;
-    int64_t ticks;
+    int ticks;
     float speed;
-    int64_t prev_tick;
+    int prev_tick;
     GPIO_TypeDef* breakPinPort;
     uint16_t breakPin;
     GPIO_TypeDef* reversePinPort;
