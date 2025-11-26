@@ -212,17 +212,7 @@ int main(void)
     uint32_t now = HAL_GetTick();
     bool on = false;
 
-    // NAV_TEST_Set_robot_cmd(100,0,0);
     int* motor_ticks = ITR_GetMotorTicks();
-    // GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
-    // RCC->APB2ENR |= RCC_APB2ENR_AFIOEN | RCC_APB2ENR_IOPAEN;
-
-    // __HAL_RCC_DBGMCU_CLK_ENABLE();
-    // HAL_DBGMCU_DisableJTAG();
-
-    // __HAL_RCC_GPIOA_CLK_ENABLE();
-    //
-
 
     while (1) {
       int a = (int)HAL_GPIO_ReadPin(MOTOR1_ENCODER_GPIO_Port, MOTOR1_ENCODER_Pin);

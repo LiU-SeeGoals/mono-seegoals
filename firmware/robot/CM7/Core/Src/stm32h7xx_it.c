@@ -299,8 +299,6 @@ void TIM8_BRK_TIM12_IRQHandler(void)
   /* USER CODE BEGIN TIM8_BRK_TIM12_IRQn 1 */
 
     __disable_irq();
-    // This interrupt runs 1000HZ
-  // hej += 1;
 
     if (STATE_is_calibrated() == 1) {
         IMU_AccelVec3 acc = IMU_read_accel_mps2();
@@ -313,9 +311,7 @@ void TIM8_BRK_TIM12_IRQHandler(void)
         POS_go_to_position(x, y, w);
     }
 
-    // NAV_steer(10,0,0);
     NAV_update_motor_state();
-  // NAV_TEST_pwm();
     __enable_irq();
 
   /* USER CODE END TIM8_BRK_TIM12_IRQn 1 */
@@ -324,12 +320,6 @@ void TIM8_BRK_TIM12_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 int* ITR_GetMotorTicks(void)
 {
-
-    // for (int i = 0; i < 4; i++)
-    // {
-    //     motor_ticks_delta[i] = motor_ticks[i] - motor_ticks_prev[i];
-    //     motor_ticks_prev[i] = motor_ticks[i];
-    // }
 
     return motor_ticks;
 }
