@@ -17,7 +17,7 @@ func (p *Position) FacingPosition(target Position, threshold float64) bool {
 	targetDirection := p.AngleToPosition(target)
 	currentDirection := p.Angle
 
-	angleDiff := math.Abs(float64(targetDirection - currentDirection))
+	angleDiff := math.Abs(NormalizeAngleDelta(targetDirection, currentDirection))
 	if angleDiff < threshold {
 		return true
 	} else {

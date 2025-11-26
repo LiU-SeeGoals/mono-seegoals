@@ -2,10 +2,10 @@ package ai
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 type KickAtPosition struct {
@@ -15,7 +15,7 @@ type KickAtPosition struct {
 }
 
 func (k *KickAtPosition) String() string {
-	return fmt.Sprintf("(Robot %d, KickAtPosition(%d))", k.id, k.targetPosition)
+	return fmt.Sprintf("(Robot %d, KickAtPosition(%v))", k.id, k.targetPosition)
 }
 
 func NewKickAtPosition(team info.Team, id info.ID, targetPosition info.Position) *KickAtPosition {
@@ -25,61 +25,96 @@ func NewKickAtPosition(team info.Team, id info.ID, targetPosition info.Position)
 			id:   id,
 		},
 		targetPosition: targetPosition,
+		retrievingBall: true,
 	}
 }
 
 func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
+	const accuracy = 0.1 // Magic number warning
+
 	robot := gi.State.GetRobot(kp.id, kp.team)
-	robotPos, err := robot.GetPosition()
-	if err != nil {
-		Logger.Errorf("Position retrieval failed - Kicker: %v\n", err)
-		return NewStop(kp.id).GetAction(gi)
-	}
-	angleToTarget := robotPos.AngleToPosition(kp.targetPosition)
+	ball := gi.State.GetBall()
 
-	if !kp.retrievingBall { // Check if it lost the ball
-		kp.retrievingBall = gi.State.LostBall(robot)
-	}
+	ballPos, _ := ball.GetEstimatedPosition()
+	unitVector := kp.targetPosition.Sub(&ballPos).Normalize()
+	unitVector.Angle = 0
+	// We can now get a position that is behind the ball, opposite of the targetposition
+	possessor := ball.GetPossessor()
+	inPossession := possessor == robot
 
-	move := NewMoveToBall(kp.team, kp.id)
-	if kp.retrievingBall && move.Achieved(gi) { // We have achivied in retrieving the ball
-		Logger.Debug("MoveWithBallToPosition: Ball retrieved")
-		kp.retrievingBall = false
+	kp.retrievingBall = !inPossession
 
-	} else if kp.retrievingBall { // We are still working on getting the ball
-		Logger.Debug("MoveWithBallToPosition: Retrieving ball")
-		return move.GetAction(gi)
+	facingBall := robot.Facing(ballPos, accuracy*2)
+	facingTarget := robot.Facing(kp.targetPosition, accuracy*2)
 
-	}
+	if kp.retrievingBall && facingBall && facingTarget {
+		fmt.Printf("[KickAtPosition] robot %d retrieving: aligned with ball and target -> MoveToBall\n", kp.id)
+		return NewMoveToBall(kp.team, kp.id).GetAction(gi)
+	} else if kp.retrievingBall {
+		ballMargin := unitVector.Scale(350) // MagicNumber (100mm behind ball)
+		lineUpPos := ballPos.Sub(&ballMargin)
 
+		currPos, _ := robot.GetPosition()
+		targetAngle := lineUpPos.AngleToPosition(kp.targetPosition)
+		lineUpPos.Angle = currPos.Angle + info.NormalizeAngleDelta(targetAngle, currPos.Angle)
 
-	// return &action
-
-	// Face target
-	if !robot.Facing(kp.targetPosition, 0.1) {
-		Logger.Debug("Rotating to target")
-
-		angleToTarget = robotPos.AngleToPosition(kp.targetPosition)
-		robotPos.Angle = angleToTarget
-		return NewMoveWithBallToPosition(kp.team, kp.id, robotPos).GetAction(gi)
-	}
-
-	Logger.Debug("Kicking")
-
-	// Kick
-	action := action.Kick{
-		Id:        int(kp.id),
-		KickSpeed: 4,
+		move := NewMoveToPosition(kp.team, kp.id, lineUpPos)
+		move.AvoidBall(true)
+		moveAction := move.GetMoveToAction(gi)
+		fmt.Printf("[KickAtPosition] robot %d retrieving: lining up at (%.1f, %.1f) angle %.1f° (facingBall=%v facingTarget=%v)\n",
+			kp.id, lineUpPos.X, lineUpPos.Y, radToDeg(lineUpPos.Angle), facingBall, facingTarget)
+		return &moveAction
 	}
 
-	return &action
+	// Robot is in possesion of the ball, but is not facing the target
+	if inPossession && !robot.Facing(kp.targetPosition, accuracy) {
+		// Robust Turn: Command the robot to be in the shooting position.
+		// Shooting position = Robot center is ~90-100mm behind the ball, aligned with target.
+		// By commanding this position, the path planner will handle the orbiting/turning.
+
+		vecToTarget := kp.targetPosition.Sub(&ballPos).Normalize()
+		// 150mm offset: roughly robot radius (90mm) + small push margin
+		offset := vecToTarget.Scale(100)
+		shootingPos := ballPos.Sub(&offset)
+		shootingPos.Angle = ballPos.AngleToPosition(kp.targetPosition)
+
+		move := NewMoveToPosition(kp.team, kp.id, shootingPos)
+		moveAction := move.GetMoveToAction(gi)
+		moveAction.Dribble = true
+
+		// fmt.Printf("[KickAtPosition] robot %d aligning: target angle %.1f°\n", kp.id, radToDeg(shootingPos.Angle))
+		return &moveAction
+	}
+
+	// If we get here, it means we are in possession of the ball and that the robot is facing the target.
+	// So we move forward and shoot
+	runUpDistance := unitVector.Scale(100)
+	destination := ballPos.Add(&runUpDistance)
+	moveAction := action.MoveTo{
+		Id:   int(kp.id),
+		Dest: destination,
+	}
+	KickSpeed := float32(5)
+	moveAction.KickSpeed = int(KickSpeed)
+	fmt.Printf("[KickAtPosition] robot %d shooting: run-up target (%.1f, %.1f) angle %.1f° kickSpeed=%d\n",
+		kp.id, destination.X, destination.Y, radToDeg(destination.Angle), moveAction.KickSpeed)
+	return &moveAction
 }
 
-func (k *KickAtPosition) Achieved(gi *info.GameInfo) bool {
-	robot := gi.State.GetRobot(k.id, k.team)
+func (kp *KickAtPosition) Achieved(gi *info.GameInfo) bool {
+	if kp.retrievingBall {
+		return false
+	}
+
+	robot := gi.State.GetRobot(kp.id, kp.team)
 	return gi.State.LostBall(robot)
 }
 
-func (k *KickAtPosition) GetID() info.ID {
-	return k.id
+func (kp *KickAtPosition) GetID() info.ID {
+	return kp.id
+}
+
+// Helper
+func radToDeg(rad float64) float64 {
+	return rad * 180 / math.Pi
 }
