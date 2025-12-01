@@ -8,7 +8,7 @@ services:
       - ../environment.ini:/var/controller/.env
       - /tmp/.X11-unix:/tmp/.X11-unix 
       - ${HOME}/.cache/go-build:/root/.cache/go-build
-        - ../environment.ini:/var/controller/.env
+      - ../environment.ini:/var/controller/.env
       - ../software/controller/:/var/controller
     working_dir: /var/controller/cmd
     tty: true

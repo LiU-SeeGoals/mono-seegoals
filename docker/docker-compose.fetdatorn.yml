@@ -4,7 +4,6 @@ services:
 
   game-viewer:
     environment:
-      - SSL_VISION_MULTICAST_ADDR=${SSL_VISION_MULTICAST_ADDR}
       - SSL_VISION_MULTICAST_PORT=${SSL_VISION_REAL_MAIN_PORT}
     depends_on:
       - ${DOCKER_NAME_AI}
@@ -31,3 +30,13 @@ services:
   er-sim:
     profiles:
       - donotstart
+
+  tiger-auto-referee:
+    image: tigersmannheim/auto-referee   # headless image
+    container_name: ${DOCKER_NAME_TIGER_AUTOREF}
+    restart: "no"
+    network_mode: "host"                 # required for multicast
+    command:
+      - "-hl"
+      - "-va"
+      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_REAL_MAIN_PORT}"

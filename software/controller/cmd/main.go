@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	demos.KickSimScenario()
+	demos.FwRealScenario()
 }
