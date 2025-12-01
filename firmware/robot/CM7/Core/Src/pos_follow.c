@@ -63,7 +63,6 @@ void TEST_angle_control(float ref_angle)
     NAV_steer(0, 0, control_w);
 }
 
-int log_num = 0;
 void POS_go_to_position(float dest_x, float dest_y, float wantw)
 {
     // Robot to world transformation given by

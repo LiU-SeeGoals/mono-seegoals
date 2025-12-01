@@ -308,6 +308,7 @@ void TIM8_BRK_TIM12_IRQHandler(void)
         float x = NAV_GetNavX();
         float y = NAV_GetNavY();
         float w = NAV_GetNavW();
+
         POS_go_to_position(x, y, w);
     }
 

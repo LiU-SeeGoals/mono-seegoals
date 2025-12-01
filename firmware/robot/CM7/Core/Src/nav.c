@@ -289,7 +289,6 @@ void NAV_HandleCommand(Command* cmd)
     switch (cmd->command_id) {
     case ACTION_TYPE__STOP_ACTION:
         NAV_DisableMovement();
-        LOG_DEBUG("Got stop (id %d)\r\n", cmd->robot_id);
         break;
     case ACTION_TYPE__MOVE_TO_ACTION: {
         NAV_EnableMovement();
@@ -303,8 +302,6 @@ void NAV_HandleCommand(Command* cmd)
 
         NAV_EnableMovement();
 
-        LOG_DEBUG("keyboard control (x,y,speed): (%i,%i,%i)\r\n", x, y, speed);
-        LOG_DEBUG("keyboard control (x,y): (%f,%f)\r\n", 100.f * speed * x, 100.f * speed * y);
         // TODO: Should somehow know that we're in remote control mode
         if (0 <= speed && speed <= 10) {
             NAV_TEST_Set_robot_cmd(x, y, speed);
