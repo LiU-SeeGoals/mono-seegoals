@@ -293,7 +293,6 @@ void NAV_HandleCommand(Command* cmd)
         break;
     case ACTION_TYPE__MOVE_TO_ACTION: {
         NAV_EnableMovement();
-        LOG_DEBUG("Got move (id %d)\r\n", cmd->robot_id);
         NAV_GoToAction(cmd);
     } break;
 
@@ -352,11 +351,6 @@ void NAV_GoToAction(Command* cmd)
     const float f_cam_x = ((float)cam_x) / 1000.f;
     const float f_cam_y = ((float)cam_y) / 1000.f;
     const float f_cam_w = ((float)cam_w) / 1000.f;
-
-    LOG_DEBUG("move to int: %d %d %d:\r\n", nav_x, nav_y, nav_w);
-    LOG_DEBUG("Vision int: %d %d %d:\r\n", cam_x, cam_y, cam_w);
-    LOG_DEBUG("Vision data: %f %f %f:\r\n", f_cam_x, f_cam_y, f_cam_w);
-    LOG_DEBUG("Move to: %f %f %f:\r\n", f_nav_x, f_nav_y, f_nav_w);
 
     robot_cmd.x = f_nav_x;
     robot_cmd.y = f_nav_y;
