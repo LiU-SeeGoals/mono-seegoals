@@ -90,14 +90,17 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	// So we move forward and shoot
 	runUpDistance := unitVector.Scale(100)
 	destination := ballPos.Add(&runUpDistance)
+	// FIX: Set the correct facing angle toward the target
+	destination.Angle = ballPos.AngleToPosition(kp.targetPosition)
+
 	moveAction := action.MoveTo{
 		Id:   int(kp.id),
 		Dest: destination,
 	}
 	KickSpeed := float32(5)
 	moveAction.KickSpeed = int(KickSpeed)
-	fmt.Printf("[KickAtPosition] robot %d shooting: run-up target (%.1f, %.1f) angle %.1f° kickSpeed=%d\n",
-		kp.id, destination.X, destination.Y, radToDeg(destination.Angle), moveAction.KickSpeed)
+	fmt.Printf("[KickAtPosition] robot %d shooting: run-up target (%.1f, %.1f) angle %.1f° angleToTarget %.1f° kickSpeed=%d\n",
+		kp.id, destination.X, destination.Y, radToDeg(possessor.DribblerPos().Angle), radToDeg(destination.AngleToPosition(kp.targetPosition)), moveAction.KickSpeed)
 	return &moveAction
 }
 
