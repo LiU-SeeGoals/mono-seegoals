@@ -35,7 +35,7 @@ void set_params()
     params_angle.Ts = DELTA_T;
     params_angle.Ti = 1000000000000;
     params_angle.Td = 0.1;
-    params_angle.K = 10 * 1.1;
+    params_angle.K = 50 * 1.1;
 
     params_dist.umin = -100.0;
     params_dist.umax = 100.0;
