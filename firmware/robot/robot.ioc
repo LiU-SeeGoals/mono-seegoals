@@ -618,6 +618,6 @@ VP_TIM12_VS_ClockSourceITR.Mode=TriggerSource_ITR0
 VP_TIM12_VS_ClockSourceITR.Signal=TIM12_VS_ClockSourceITR
 VP_TIM4_VS_ClockSourceINT.Mode=Internal
 VP_TIM4_VS_ClockSourceINT.Signal=TIM4_VS_ClockSourceINT
-VP_TIM4_VS_ClockSourceITR.Mode=TriggerSource_ITR0
+VP_TIM4_VS_ClockSourceITR.Mode=TriggerSource_ITR1
 VP_TIM4_VS_ClockSourceITR.Signal=TIM4_VS_ClockSourceITR
 board=custom
