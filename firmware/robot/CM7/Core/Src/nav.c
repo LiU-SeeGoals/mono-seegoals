@@ -198,7 +198,7 @@ void NAV_wheelToBody(float* res)
     res[2] = w;
 }
 
-void NAV_steer(float v, float u, float w)
+void NAV_steer(float u, float v, float w)
 {
     // Ref: https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
     // wheels RF, RB, LB, LF
@@ -291,8 +291,10 @@ void NAV_HandleCommand(Command* cmd)
         NAV_DisableMovement();
         break;
     case ACTION_TYPE__MOVE_TO_ACTION: {
+
         NAV_EnableMovement();
         NAV_GoToAction(cmd);
+
     } break;
 
     case ACTION_TYPE__MOVE_ACTION: {

@@ -210,7 +210,6 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 
     uint32_t now = HAL_GetTick();
-    NAV_TEST_Set_robot_cmd(1,0,0);
     bool on = false;
 
     int* motor_ticks = ITR_GetMotorTicks();
@@ -221,9 +220,7 @@ int main(void)
       int c = (int)HAL_GPIO_ReadPin(MOTOR3_ENCODER_GPIO_Port, MOTOR3_ENCODER_Pin);
       int d = (int)HAL_GPIO_ReadPin(MOTOR4_ENCODER_GPIO_Port, MOTOR4_ENCODER_Pin);
 
-        LOG_INFO("%d %d %d %d\r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
-        // LOG_INFO("%d %d %d %d \r\n", a, b, c, d);
-        // LOG_INFO("%d \r\n", get_hej());
+        LOG_DEBUG("%d %d %d %d\r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
 
         if (HAL_GetTick() - now > 1000) {
             if (on) {
