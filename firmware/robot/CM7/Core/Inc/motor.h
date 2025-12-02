@@ -1,9 +1,8 @@
 #ifndef __MOTOR_H
 #define __MOTOR_H
-
 #include "stm32h7xx_hal.h"
 // Tick buffer of 100 with 1000hz update is 0.1 second filter on motor
-#define motor_tick_buf_size 10
+#define MOTOR_TICK_BUF_SIZE 10
 typedef struct {
     TIM_HandleTypeDef* pwm_htim;
     uint32_t channel;
@@ -15,7 +14,7 @@ typedef struct {
     GPIO_TypeDef* reversePinPort;
     uint16_t reversePin;
     uint16_t dir;
-    float motor_ticks[motor_tick_buf_size];
+    float motor_ticks[MOTOR_TICK_BUF_SIZE];
     int cur_tick_idx;
 } MotorPWM;
 
@@ -25,9 +24,9 @@ typedef struct {
 void MOTOR_Init(TIM_HandleTypeDef* htim);
 
 /**
- * Returns the average motor ticks per iteration
+ * Returns the average meter per second
  */
-float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor);
+float MOTOR_get_mps(MotorPWM* motor);
 
 /**
  * Update motor tick buffer
@@ -74,12 +73,5 @@ void MOTOR_StopBreak(MotorPWM* motor);
  * @param speed The speed to take direction from
  */
 int setDirection(MotorPWM* motor, float speed);
-
-/**
- * Returns the speed of the motor in ticks per second.
- *
- * @returns float of speed
- */
-float MOTOR_ReadSpeed(MotorPWM* motor);
 
 #endif

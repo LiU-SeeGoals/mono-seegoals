@@ -20,7 +20,7 @@ static MotorPWM motors[4];
 static robot_nav_command robot_cmd;
 static float I_prevs[4]; // PI control I-parts
 const float CLOCK_FREQ = 400000000;
-float CONTROL_FREQ; // set in init
+float CONTROL_FREQ; // Global variable used by other functions
 static int queued = 0;
 
 /* Private functions declarations */
@@ -37,6 +37,8 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     LOG_InitModule(&internal_log_mod, "NAV", LOG_LEVEL_DEBUG, 0);
     HAL_TIM_Base_Start(pwm_htim);
     HAL_TIM_Base_Start(pwm15_htim);
+
+    memset(motors, 0,sizeof(motors));
 
     motors[0].pwm_htim = pwm_htim;
     motors[0].ticks = 0;
@@ -92,7 +94,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
         motors[i].cur_tick_idx = 0;
         motors[i].cur_tick_idx = 0;
         I_prevs[i] = 0.0f;
-        for (int j = 0; j < motor_tick_buf_size; j++) {
+        for (int j = 0; j < MOTOR_TICK_BUF_SIZE; j++) {
             motors[i].motor_ticks[j] = 0;
         }
     }
@@ -143,10 +145,10 @@ void NAV_wheelToBody(float* res)
     float psi = PI * 31.f / 180.0f;
     float theta = PI * 45.f / 180.0f;
 
-    float wrf = MOTOR_get_motor_ticks_per_iteration(&motors[0]);
-    float wrb = MOTOR_get_motor_ticks_per_iteration(&motors[1]);
-    float wlb = MOTOR_get_motor_ticks_per_iteration(&motors[2]);
-    float wlf = MOTOR_get_motor_ticks_per_iteration(&motors[3]);
+    float wrf = MOTOR_get_mps(&motors[0]);
+    float wrb = MOTOR_get_mps(&motors[1]);
+    float wlb = MOTOR_get_mps(&motors[2]);
+    float wlf = MOTOR_get_mps(&motors[3]);
 
     float cos_psi = arm_cos_f32(psi);
     float cos_theta = arm_cos_f32(theta);
@@ -181,17 +183,14 @@ void NAV_steer(float u, float v, float w)
     // Ref: https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
     // wheels RF, RB, LB, LF
     // wheel direction is RF forward vector toward dribbler
-    // u forward toward dribbler
-    // v to the sides
-    // w angle from LF to LB to RB to RF
 
-    // u is x in robot frame
-    // v is y in robot frame
+    // u forward toward dribbler
+    // v to the left side
+    // w angle from LF to LB to RB to RF
 
     float psi = PI * 31.f / 180.0f;
     float theta = PI * 45.f / 180.0f;
     // r is wheel radius, R is chasis radius, currently 1 because idc and
-    // our speeds are currently not a real unit i.e. ticks/second and not meter/second
     float r = 1.f;
     float R = 1.f;
 
@@ -204,56 +203,6 @@ void NAV_steer(float u, float v, float w)
     motors[1].speed = wlf;
     motors[2].speed = wlb;
     motors[3].speed = wrb;
-}
-
-void NAV_Direction(DIRECTION dir)
-{
-    switch (dir) {
-    case UP:
-        MOTOR_PWMStart(&motors[0]);
-        break;
-    case DOWN:
-        MOTOR_PWMStart(&motors[1]);
-        break;
-    case LEFT:
-        MOTOR_PWMStart(&motors[2]);
-        break;
-    case RIGHT:
-        MOTOR_PWMStart(&motors[3]);
-        break;
-    }
-}
-
-void NAV_Stop()
-{
-    MOTOR_PWMStop(&motors[0]);
-    MOTOR_PWMStop(&motors[1]);
-    MOTOR_PWMStop(&motors[2]);
-    MOTOR_PWMStop(&motors[3]);
-}
-
-float speed = 0;
-
-void command_move(Command* cmd)
-{
-
-    LOG_INFO("got nav command %d %d %d \r\n", cmd->kick_speed, cmd->command_id, cmd->direction->x, cmd->direction->y);
-    if (cmd->command_id == ACTION_TYPE__STOP_ACTION) {
-        NAV_steer(0.f, 0.f, 0.f);
-        return;
-    }
-
-    if (cmd->command_id == ACTION_TYPE__KICK_ACTION) {
-        speed = cmd->kick_speed;
-        if (speed > 10) {
-            speed = 10;
-        }
-        return;
-    }
-
-    if (cmd->command_id == ACTION_TYPE__MOVE_ACTION) {
-        NAV_steer(100.f * speed * cmd->direction->x, 100.f * speed * cmd->direction->y, 0.f);
-    }
 }
 
 void NAV_TestMovement() { NAV_steer(1, 0, 0); }
@@ -319,7 +268,7 @@ void NAV_GoToAction(Command* cmd)
     const int32_t cam_y = cmd->pos->y;
     const int32_t cam_w = cmd->pos->w;
 
-    // Hax to cange to to float meter rep just for testing first time... hehe
+    // Change to to meter representation
     // Angle is scaled by 1000 before sent to robot.
     const float f_nav_x = ((float)nav_x) / 1000.f;
     const float f_nav_y = ((float)nav_y) / 1000.f;

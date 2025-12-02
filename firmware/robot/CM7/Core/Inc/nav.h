@@ -48,10 +48,6 @@ void NAV_update_motor_state();
 void NAV_steer(float vx, float vy, float w);
 
 void NAV_TEST_pwm();
-/**
- * Stops all movement
- */
-void NAV_Stop();
 
 /**
  * Execute command depending on type

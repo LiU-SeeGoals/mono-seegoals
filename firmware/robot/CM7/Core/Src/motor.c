@@ -12,21 +12,26 @@ extern float CONTROL_FREQ;
 */
 void MOTOR_update_motor_ticks(MotorPWM* motor, float val)
 {
-    motor->cur_tick_idx = (1 + motor->cur_tick_idx) % (motor_tick_buf_size);
+    motor->cur_tick_idx = (1 + motor->cur_tick_idx) % (MOTOR_TICK_BUF_SIZE);
     motor->motor_ticks[motor->cur_tick_idx] = val;
 }
-
 /*
- Get motor speed
+   Meter per second for one motor
 */
-float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor)
+
+float MOTOR_get_mps(MotorPWM* motor)
 {
     // Can be made faster keeping a moving average and removing the last adding the new?
     float cur = 0;
-    for (int i = 0; i < motor_tick_buf_size; i++) {
+    for (int i = 0; i < MOTOR_TICK_BUF_SIZE; i++) {
         cur += motor->motor_ticks[i];
     }
-    return cur / ((float)motor_tick_buf_size);
+    const float ticks_per_rev = 48;
+    const float wheel_size = 0.05;
+    const float ticks_per_second = (cur / ((float)MOTOR_TICK_BUF_SIZE)) * CONTROL_FREQ;
+    const float wheel_mps = ticks_per_second / ticks_per_rev * wheel_size;
+
+    return wheel_mps;
 }
 
 void MOTOR_Init(TIM_HandleTypeDef* pwm_htim)
@@ -93,7 +98,7 @@ void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
     float Ts = 1.f / CONTROL_FREQ;
     float Ti = 0.02;
     float K = 0.00015;
-    float current_speed = (float)MOTOR_ReadSpeed(motor);
+    float current_speed = (float)MOTOR_get_mps(motor);
     float error = speed - current_speed;
     float I = *I_prev + Ts / Ti * error;
     float v = K * (error + I);
@@ -138,13 +143,4 @@ void MOTOR_SendPWM(MotorPWM* motor, float pulse_width)
     int pwm_speed = motor->pwm_htim->Init.Period * scale;
 
     __HAL_TIM_SET_COMPARE(motor->pwm_htim, motor->channel, pwm_speed);
-}
-
-float MOTOR_ReadSpeed(MotorPWM* motor)
-{
-    // When I write this control freq should be 2000, each iteration is a
-    // time-step of 1/2000 so this gives the speed in ticks per second.
-    float speed_s = MOTOR_get_motor_ticks_per_iteration(motor) * CONTROL_FREQ;
-
-    return speed_s;
 }
