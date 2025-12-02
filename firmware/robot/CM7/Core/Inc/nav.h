@@ -102,7 +102,7 @@ void NAV_EnableMovement();
  *
  * @param res a 3x1 vector with layout [u, v, w]
  */
-void NAV_wheelToBody(float* res);
+float* NAV_wheelToBody();
 
 /**
  * Sets the robot_cmd to move to the desired position

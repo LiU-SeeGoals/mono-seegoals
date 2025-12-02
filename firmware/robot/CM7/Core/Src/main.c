@@ -213,11 +213,13 @@ int main(void)
     bool on = false;
 
     int* motor_ticks = ITR_GetMotorTicks();
+    float* robot_vel = NAV_wheelToBody();
 
     while (1) {
 
-        LOG_DEBUG("%d %d %d %d\r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
-        LOG_DEBUG("%d %d %d %d\r\n", NAV_motor_speed(0), NAV_motor_speed(1), NAV_motor_speed(2), NAV_motor_speed(3));
+        LOG_DEBUG("ticks %d %d %d %d\r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
+        LOG_DEBUG("motors %f %f %f %f\r\n", NAV_motor_speed(0), NAV_motor_speed(1), NAV_motor_speed(2), NAV_motor_speed(3));
+        LOG_DEBUG("robot vel %f %f %f\r\n", robot_vel[0], robot_vel[1], robot_vel[2]);
 
         if (HAL_GetTick() - now > 1000) {
             if (on) {

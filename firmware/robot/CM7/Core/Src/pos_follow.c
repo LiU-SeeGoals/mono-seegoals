@@ -6,6 +6,7 @@
 
 static control_params params_dist;
 static control_params params_angle;
+static control_params params_velocity;
 
 static float DELTA_T = 0.001;
 
@@ -26,6 +27,13 @@ void set_params()
     params_dist.Ti = 0.0015;
     params_dist.Td = 0.1;
     params_dist.K = 500.0f * 1000.50;
+
+    params_velocity.umin = -100.0;
+    params_velocity.umax = 100.0;
+    params_velocity.Ts = DELTA_T;
+    params_velocity.Ti = 0.0015;
+    params_velocity.Td = 0.1;
+    params_velocity.K = 500.0f * 1000.50;
 }
 
 void POS_Init() {
@@ -92,6 +100,17 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
     float y = distance_control_signal * ((rel_x * arm_sin_f32(-angle)) + (rel_y * arm_cos_f32(-angle)));
 
     NAV_steer(x, y, control_w);
+}
+
+void POS_velocity_control(float vel_x, float vel_y, float wantw)
+{
+    float angle = STATE_get_robot_angle();
+    float control_vx = PID_p(STATE_get_vx(), vel_x, angle_error, &params_velocity);
+    float control_vy = PID_p(STATE_get_vy(), vel_y, angle_error, &params_velocity);
+
+    float control_w = PID_p(STATE_get_robot_angle(), wantw, angle_error, &params_angle);
+
+    NAV_steer(control_vx, control_vy, control_w);
 }
 
 float PID_p(float current, float desired, float (*error_func)(float, float), control_params* param)

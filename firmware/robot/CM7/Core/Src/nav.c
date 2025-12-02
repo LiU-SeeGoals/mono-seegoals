@@ -144,8 +144,14 @@ float NAV_motor_speed(unsigned int motor_idx)
 }
 
 // res is a 3x1 vector
-void NAV_wheelToBody(float* res)
+float* NAV_wheelToBody()
 {
+    static float res[3];
+
+    for (int i = 0; i < 3; i++)
+    {
+        res[i] = 0;
+    }
 
     // wheel to body psudeo inverse https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
     // TODO: measure real wheel radius and chasis radius
@@ -156,9 +162,9 @@ void NAV_wheelToBody(float* res)
     float theta = PI * 45.f / 180.0f;
 
     float wrf = MOTOR_get_mps(&motors[0]);
-    float wrb = MOTOR_get_mps(&motors[1]);
+    float wlf = MOTOR_get_mps(&motors[1]);
     float wlb = MOTOR_get_mps(&motors[2]);
-    float wlf = MOTOR_get_mps(&motors[3]);
+    float wrb = MOTOR_get_mps(&motors[3]);
 
     float cos_psi = arm_cos_f32(psi);
     float cos_theta = arm_cos_f32(theta);
