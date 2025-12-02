@@ -141,6 +141,9 @@ float NAV_motor_speed(unsigned int motor_idx)
     {
         return MOTOR_get_mps(&motors[motor_idx]);
     }
+    LOG_ERROR("incorrect index: %d\r\n", motor_idx);
+
+    return 0;
 }
 
 // res is a 3x1 vector
