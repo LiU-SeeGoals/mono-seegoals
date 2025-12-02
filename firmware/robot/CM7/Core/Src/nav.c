@@ -7,6 +7,7 @@
  * Private includes
  */
 #include "arm_math.h"
+#include "stm32h7xx_it.h"
 #include "log.h"
 #include "motor.h"
 #include <stdlib.h>
@@ -31,32 +32,24 @@ void set_motors(float m1, float m2, float m3, float m4);
 
 void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
               TIM_HandleTypeDef* pwm_htim,
-              TIM_HandleTypeDef* pwm15_htim,
-              TIM_HandleTypeDef* encoder1_htim,
-              TIM_HandleTypeDef* encoder2_htim,
-              TIM_HandleTypeDef* encoder3_htim,
-              TIM_HandleTypeDef* encoder4_htim)
+              TIM_HandleTypeDef* pwm15_htim)
 {
     LOG_InitModule(&internal_log_mod, "NAV", LOG_LEVEL_DEBUG, 0);
     HAL_TIM_Base_Start(pwm_htim);
     HAL_TIM_Base_Start(pwm15_htim);
-    HAL_TIM_Base_Start(encoder1_htim);
-    HAL_TIM_Base_Start(encoder2_htim);
-    HAL_TIM_Base_Start(encoder3_htim);
-    HAL_TIM_Base_Start(encoder4_htim);
 
     motors[0].pwm_htim = pwm_htim;
     motors[0].ticks = 0;
     motors[0].speed = 0.f;
     motors[0].prev_tick = 0;
-    motors[0].encoder_htim = encoder1_htim;
+    // motors[0].encoder_htim = encoder1_htim;
     motors[0].channel = MOTOR1_TIM_CHANNEL;
     motors[0].breakPinPort = MOTOR1_BREAK_GPIO_Port;
     motors[0].breakPin = MOTOR1_BREAK_Pin;
     motors[0].reversePinPort = MOTOR1_REVERSE_GPIO_Port;
     motors[0].reversePin = MOTOR1_REVERSE_Pin;
-    motors[0].encoderPinPort = MOTOR1_ENCODER_GPIO_Port;
-    motors[0].encoderPin = MOTOR1_ENCODER_Pin;
+    // motors[0].encoderPinPort = MOTOR1_ENCODER_GPIO_Port;
+    // motors[0].encoderPin = MOTOR1_ENCODER_Pin;
     motors[0].dir = 1;
 
 #ifdef PCB_MOTOR
@@ -64,7 +57,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[1].ticks = 0;
     motors[1].speed = 0.f;
     motors[1].prev_tick = 0;
-    motors[1].encoder_htim = encoder2_htim;
+    // motors[1].encoder_htim = encoder2_htim;
     motors[1].channel = MOTOR2_TIM_CHANNEL;
     motors[1].breakPinPort = MOTOR2_BREAK_GPIO_Port;
     motors[1].breakPin = MOTOR2_BREAK_Pin;
@@ -76,7 +69,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[1].ticks = 0;
     motors[1].speed = 0.f;
     motors[1].prev_tick = 0;
-    motors[1].encoder_htim = encoder2_htim;
+    // motors[1].encoder_htim = encoder2_htim;
     motors[1].channel = TIM_CHANNEL_2;
     // motors[1].breakPinPort      = OLD_MOTOR2_BREAK_GPIO_Port;
     // motors[1].breakPin          = OLD_MOTOR2_BREAK_Pin;
@@ -89,7 +82,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[2].ticks = 0;
     motors[2].speed = 0.f;
     motors[2].prev_tick = 0;
-    motors[2].encoder_htim = encoder3_htim;
+    // motors[2].encoder_htim = encoder3_htim;
     motors[2].channel = MOTOR3_TIM_CHANNEL;
     motors[2].breakPinPort = MOTOR3_BREAK_GPIO_Port;
     motors[2].breakPin = MOTOR3_BREAK_Pin;
@@ -101,7 +94,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[3].ticks = 0;
     motors[3].speed = 0.f;
     motors[3].prev_tick = 0;
-    motors[3].encoder_htim = encoder4_htim;
+    // motors[3].encoder_htim = encoder4_htim;
     motors[3].channel = MOTOR4_TIM_CHANNEL;
     motors[3].breakPinPort = MOTOR4_BREAK_GPIO_Port;
     motors[3].breakPin = MOTOR4_BREAK_Pin;
@@ -138,9 +131,11 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
 void NAV_update_motor_state()
 {
 
+    int* motor_ticks = ITR_GetMotorTicks();
+
     for (int i = 0; i < 4; i++) {
         int ticks_before = motors[i].prev_tick;
-        int new_ticks = motors[i].encoder_htim->Instance->CNT;
+        int new_ticks = motor_ticks[i];
         MOTOR_update_motor_ticks(&motors[i], new_ticks - ticks_before);
         motors[i].ticks = new_ticks - ticks_before;
         motors[i].prev_tick = new_ticks;
@@ -203,7 +198,7 @@ void NAV_wheelToBody(float* res)
     res[2] = w;
 }
 
-void NAV_steer(float v, float u, float w)
+void NAV_steer(float u, float v, float w)
 {
     // Ref: https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
     // wheels RF, RB, LB, LF
@@ -228,9 +223,9 @@ void NAV_steer(float v, float u, float w)
     float wlf = 1.0 / r * (-u * arm_cos_f32(psi) + v * arm_sin_f32(psi) + w * R);
 
     motors[0].speed = wrf;
-    motors[1].speed = wrb;
+    motors[1].speed = wlf;
     motors[2].speed = wlb;
-    motors[3].speed = wlf;
+    motors[3].speed = wrb;
 }
 
 void NAV_Direction(DIRECTION dir)
@@ -294,12 +289,12 @@ void NAV_HandleCommand(Command* cmd)
     switch (cmd->command_id) {
     case ACTION_TYPE__STOP_ACTION:
         NAV_DisableMovement();
-        LOG_DEBUG("Got stop (id %d)\r\n", cmd->robot_id);
         break;
     case ACTION_TYPE__MOVE_TO_ACTION: {
+
         NAV_EnableMovement();
-        LOG_DEBUG("Got move (id %d)\r\n", cmd->robot_id);
         NAV_GoToAction(cmd);
+
     } break;
 
     case ACTION_TYPE__MOVE_ACTION: {
@@ -309,8 +304,6 @@ void NAV_HandleCommand(Command* cmd)
 
         NAV_EnableMovement();
 
-        LOG_DEBUG("keyboard control (x,y,speed): (%i,%i,%i)\r\n", x, y, speed);
-        LOG_DEBUG("keyboard control (x,y): (%f,%f)\r\n", 100.f * speed * x, 100.f * speed * y);
         // TODO: Should somehow know that we're in remote control mode
         if (0 <= speed && speed <= 10) {
             NAV_TEST_Set_robot_cmd(x, y, speed);
@@ -357,11 +350,6 @@ void NAV_GoToAction(Command* cmd)
     const float f_cam_x = ((float)cam_x) / 1000.f;
     const float f_cam_y = ((float)cam_y) / 1000.f;
     const float f_cam_w = ((float)cam_w) / 1000.f;
-
-    LOG_DEBUG("move to int: %d %d %d:\r\n", nav_x, nav_y, nav_w);
-    LOG_DEBUG("Vision int: %d %d %d:\r\n", cam_x, cam_y, cam_w);
-    LOG_DEBUG("Vision data: %f %f %f:\r\n", f_cam_x, f_cam_y, f_cam_w);
-    LOG_DEBUG("Move to: %f %f %f:\r\n", f_nav_x, f_nav_y, f_nav_w);
 
     robot_cmd.x = f_nav_x;
     robot_cmd.y = f_nav_y;
@@ -463,6 +451,15 @@ void NAV_TestDribbler()
     NAV_RunDribbler();
     HAL_Delay(2000);
     NAV_StopDribbler();
+}
+
+void NAV_TEST_pwm()
+{
+    float speed = 0.15;
+    MOTOR_SendPWM(&motors[0], speed);
+    MOTOR_SendPWM(&motors[1], speed);
+    MOTOR_SendPWM(&motors[2], speed);
+    MOTOR_SendPWM(&motors[3], speed);
 }
 
 void NAV_TEST_Set_robot_cmd(float x, float y, float w)

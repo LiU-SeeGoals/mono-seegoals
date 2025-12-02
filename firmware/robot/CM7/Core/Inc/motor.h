@@ -8,15 +8,13 @@ typedef struct {
     TIM_HandleTypeDef* encoder_htim;
     TIM_HandleTypeDef* pwm_htim;
     uint32_t channel;
-    int ticks;     // negative if overflow
-    float speed;   // negative if overflow
-    int prev_tick; // negative if overflow
+    int ticks;
+    float speed;
+    int prev_tick;
     GPIO_TypeDef* breakPinPort;
     uint16_t breakPin;
     GPIO_TypeDef* reversePinPort;
     uint16_t reversePin;
-    GPIO_TypeDef* encoderPinPort;
-    uint16_t encoderPin;
     uint16_t dir;
     float motor_ticks[motor_tick_buf_size];
     int cur_tick_idx;
