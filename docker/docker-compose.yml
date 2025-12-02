@@ -38,8 +38,6 @@ services:
     env_file: ../environment.ini
     tty: true
     command: tail -f /dev/null
-    depends_on:
-      - ${DOCKER_NAME_AI}
 
   ssl-vision-client:
     platform: linux/amd64

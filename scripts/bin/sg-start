@@ -112,6 +112,18 @@ choices = [
             "-p", project_name, "up", "-d"
         ],
         "container_to_enter": envs.get("DOCKER_NAME_AI")
+    },
+    {
+        "choice-text": f"Develop on '{GW}' files, enter on startup.",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.gameviewer.yml",
+            "-p", project_name, "up", "-d"
+        ],
+        "container_to_enter": GW
     }
 ]
 

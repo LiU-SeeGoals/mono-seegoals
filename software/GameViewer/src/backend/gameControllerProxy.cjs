@@ -34,4 +34,6 @@ udpSocket.on('message', (msg) => {
   });
 });
 
-console.log(`Game Controller WebSocket server running on ws://${wsAddr}:${wsPort}`);
+udpSocket.on("error", (err) => {
+   console.log("udpSocket error: ", err); 
+});

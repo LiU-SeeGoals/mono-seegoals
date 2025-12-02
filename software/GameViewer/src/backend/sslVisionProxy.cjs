@@ -26,8 +26,8 @@ wss.on('connection', (ws) => {
 });
 
 udpSocket.bind(visionPort, () => {
-  console.log(`Listening for SSL VIsion multicast on ${visionAddr}:${visionPort}`);
-  udpSocket.addMembership(visionAddr);
+  console.log(`Listening for SSL Vision multicast on ${visionAddr}:${visionPort}`);
+  udpSocket.addMembership(visionAddr, "192.168.1.156");
 });
 
 udpSocket.on('message', (msg) => {
@@ -38,4 +38,6 @@ udpSocket.on('message', (msg) => {
   });
 });
 
-console.log(`SSL Vision WebSocket server running on ws://${wsAddr}:${wsPort}`);
+udpSocket.on("error", (err) => {
+   console.log("udpSocket error: ", err); 
+});
