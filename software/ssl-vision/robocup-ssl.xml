@@ -2666,7 +2666,7 @@
 				false
 			</Var>
 			<Var name="thresholded" type="bool">
-				false
+				true
 			</Var>
 			<Var name="blobs" type="bool">
 				true
@@ -9307,7 +9307,7 @@
 				false
 			</Var>
 			<Var name="thresholded" type="bool">
-				false
+				true
 			</Var>
 			<Var name="blobs" type="bool">
 				true
@@ -10694,18 +10694,21 @@
 						None
 					</Var>
 					<Var name="1" type="string">
-						Read from files
+						Video
 					</Var>
 					<Var name="2" type="string">
-						Generator
+						Read from files
 					</Var>
 					<Var name="3" type="string">
-						DC 1394
+						Generator
 					</Var>
 					<Var name="4" type="string">
-						Video 4 Linux
+						DC 1394
 					</Var>
 					<Var name="5" type="string">
+						Video 4 Linux
+					</Var>
+					<Var name="6" type="string">
 						VAPIX
 					</Var>
 				</Var>
@@ -10735,6 +10738,13 @@
 					<Var name="directory" type="string">
 						test-data/rc2022/bots-center-ball-3-2
 					</Var>
+				</Var>
+			</Var>
+			<Var name="Video" type="list">
+				<Var name="file" type="string">
+				</Var>
+				<Var name="upscale" type="bool">
+					false
 				</Var>
 			</Var>
 			<Var name="Generator" type="list">
@@ -11585,6 +11595,80 @@
 		</Var>
 		<Var name="Camera Calibrator" type="list">
 			<Var name="Camera Parameters" type="list">
+				<Var name="Intrinsic Parameters" type="list">
+					<Var name="focal_length_x" type="double" minval="" maxval="">
+						1.000000
+					</Var>
+					<Var name="focal_length_y" type="double" minval="" maxval="">
+						1.000000
+					</Var>
+					<Var name="principal_point_x" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="principal_point_y" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="dist_coeff_k1" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="dist_coeff_k2" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="dist_coeff_p1" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="dist_coeff_p2" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="dist_coeff_k3" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+				</Var>
+				<Var name="Extrinsic Parameters" type="list">
+					<Var name="rvec x" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="rvec y" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="rvec z" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="tvec x" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="tvec y" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="tvec z" type="double" minval="" maxval="">
+						0.000000
+					</Var>
+					<Var name="Fix focal length" type="bool">
+						false
+					</Var>
+					<Var name="Fix principle point" type="bool">
+						false
+					</Var>
+					<Var name="Fix tangential distortion" type="bool">
+						true
+					</Var>
+					<Var name="Fix k1" type="bool">
+						false
+					</Var>
+					<Var name="Fix k2" type="bool">
+						false
+					</Var>
+					<Var name="Fix k3" type="bool">
+						false
+					</Var>
+					<Var name="Calibration point" type="trigger">
+					</Var>
+					<Var name="Calibration points" type="list">
+					</Var>
+				</Var>
+				<Var name="use openCV camera model" type="bool">
+					false
+				</Var>
 				<Var name="focal length" type="double" minval="" maxval="">
 					500.000000
 				</Var>
@@ -11727,11 +11811,66 @@
 				<Var name="Image height" type="int" minval="0" maxval="">
 					1080
 				</Var>
+				<Var name="grid height" type="int" minval="" maxval="">
+					9
+				</Var>
+				<Var name="grid width" type="int" minval="" maxval="">
+					7
+				</Var>
+				<Var name="global camera id" type="int" minval="0" maxval="7">
+					3
+				</Var>
 			</Var>
 		</Var>
 		<Var name="Color Threshold" type="list">
 			<Var name="number of threads" type="int" minval="0" maxval="32">
 				0
+			</Var>
+		</Var>
+		<Var name="Camera Intrinsic Calibration" type="list">
+			<Var name="pattern image dir" type="string">
+				test-data/intrinsic_calibration
+			</Var>
+			<Var name="reduced image width for chessboard detection" type="double" minval="" maxval="">
+				900.000000
+			</Var>
+			<Var name="chessboard capture dT" type="double" minval="" maxval="">
+				0.200000
+			</Var>
+			<Var name="corner sq_diff threshold" type="double" minval="" maxval="">
+				500.000000
+			</Var>
+			<Var name="corner sub pixel detection" type="list">
+				<Var name="window size" type="int" minval="1" maxval="">
+					5
+				</Var>
+				<Var name="max iterations" type="int" minval="1" maxval="">
+					30
+				</Var>
+				<Var name="epsilon" type="double" minval="0.000000" maxval="">
+					0.100000
+				</Var>
+			</Var>
+			<Var name="Fix focal length" type="bool">
+				false
+			</Var>
+			<Var name="Fix principle point" type="bool">
+				false
+			</Var>
+			<Var name="Fix tangential distortion" type="bool">
+				true
+			</Var>
+			<Var name="Fix k1" type="bool">
+				false
+			</Var>
+			<Var name="Fix k2" type="bool">
+				false
+			</Var>
+			<Var name="Fix k3" type="bool">
+				false
+			</Var>
+			<Var name="Use intrinsic guess" type="bool">
+				false
 			</Var>
 		</Var>
 		<Var name="Run length encode" type="list">
@@ -11742,6 +11881,9 @@
 		<Var name="Blob Finding" type="list">
 			<Var name="min_blob_area" type="int" minval="" maxval="">
 				5
+			</Var>
+			<Var name="min_blob_area ratio" type="double" minval="" maxval="">
+				0.500000
 			</Var>
 			<Var name="enable" type="bool">
 				true
@@ -11815,8 +11957,17 @@
 			<Var name="camera calibration" type="bool">
 				true
 			</Var>
+			<Var name="camera calibration markers" type="bool">
+				false
+			</Var>
 			<Var name="calibration result" type="bool">
 				true
+			</Var>
+			<Var name="calibration result pillars" type="bool">
+				false
+			</Var>
+			<Var name="calibration result pillars height" type="double" minval="" maxval="">
+				150.000000
 			</Var>
 			<Var name="detected edges" type="bool">
 				false
@@ -11826,6 +11977,9 @@
 			</Var>
 			<Var name="image mask hull" type="bool">
 				true
+			</Var>
+			<Var name="chessboard" type="bool">
+				false
 			</Var>
 		</Var>
 	</Var>

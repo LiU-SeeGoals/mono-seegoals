@@ -20,10 +20,13 @@ namespace Net{
 
 bool Address::setHost(const char *hostname,int port)
 {
-  // printf("%s %d\n",hostname,port);
+  //printf("setHost(%s, %d)\n",hostname,port);
   addrinfo *res = NULL;
   getaddrinfo(hostname,NULL,NULL,&res);
-  if(!res) return(false);
+  if(!res) {
+    perror("getaddrinfo");
+    return(false);
+  }
 
   mzero(addr);
   addr_len = res->ai_addrlen;
