@@ -215,10 +215,6 @@ int main(void)
     int* motor_ticks = ITR_GetMotorTicks();
 
     while (1) {
-      int a = (int)HAL_GPIO_ReadPin(MOTOR1_ENCODER_GPIO_Port, MOTOR1_ENCODER_Pin);
-      int b = (int)HAL_GPIO_ReadPin(MOTOR2_ENCODER_GPIO_Port, MOTOR2_ENCODER_Pin);
-      int c = (int)HAL_GPIO_ReadPin(MOTOR3_ENCODER_GPIO_Port, MOTOR3_ENCODER_Pin);
-      int d = (int)HAL_GPIO_ReadPin(MOTOR4_ENCODER_GPIO_Port, MOTOR4_ENCODER_Pin);
 
         LOG_DEBUG("%d %d %d %d\r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
 
