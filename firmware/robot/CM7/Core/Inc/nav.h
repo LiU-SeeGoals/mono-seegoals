@@ -86,15 +86,10 @@ void NAV_RunDribbler();
 void NAV_TestDribbler();
 
 /**
- * Log motor speeds in m/s
- */
-void NAV_log_speed();
-
-/**
  * Run one wheel at a time from first to last first forward in two seconds
  * then backwards for two more.
  */
-void NAV_TireTest();
+void NAV_TEST_TireTest();
 
 /**
  * Sets robot_cmd disabled

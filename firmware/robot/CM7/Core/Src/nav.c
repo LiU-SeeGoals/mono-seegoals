@@ -131,8 +131,6 @@ void NAV_update_motor_state()
     }
 }
 
-void NAV_log_speed() { LOG_INFO("Got speed m1 %f m2 %f m3 %f m4 %f\r\n", MOTOR_ReadSpeed(&motors[0]), MOTOR_ReadSpeed(&motors[1]), MOTOR_ReadSpeed(&motors[2]), MOTOR_ReadSpeed(&motors[3])); }
-
 // res is a 3x1 vector
 void NAV_wheelToBody(float* res)
 {
@@ -307,12 +305,12 @@ void NAV_HandleCommand(Command* cmd)
  * Private function implementations
  */
 
-int32_t prev_nav_x = 2147483647;
-int32_t prev_nav_y = 2147483647;
-int32_t prev_nav_w = 2147483647;
-
 void NAV_GoToAction(Command* cmd)
 {
+    static int32_t prev_nav_x = 2147483647;
+    static int32_t prev_nav_y = 2147483647;
+    static int32_t prev_nav_w = 2147483647;
+
     const int32_t nav_x = cmd->dest->x;
     const int32_t nav_y = cmd->dest->y;
     const int32_t nav_w = cmd->dest->w;
@@ -362,7 +360,7 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
     robot_cmd.w = nav_z;
 }
 
-void NAV_TireTest()
+void NAV_TEST_TireTest()
 {
     LOG_INFO("Starting tire test...\r\n");
 
@@ -406,23 +404,6 @@ void set_motors(float m1, float m2, float m3, float m4)
 }
 
 void NAV_StopDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
-
-uint8_t NAV_IsPanic() { return robot_cmd.panic; }
-
-/*
-   Someone thinks something has gone terribly wrong...
-   Disable motors and everyhting going forward
-   TODO: Actualy implement the behaviour that triggers when the program is set
-   to panic.
- */
-void NAV_SetRobotPanic() { robot_cmd.panic = 1; }
-
-/*
-  Someone solved the panic
-  TODO: Implement reset behaviour. I am leaving this as 1 untill the method
-  actualy does something.
-*/
-void NAV_ClearRobotPanic() { robot_cmd.panic = 1; }
 
 void NAV_RunDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
 

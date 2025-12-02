@@ -5,7 +5,6 @@
 // Tick buffer of 100 with 1000hz update is 0.1 second filter on motor
 #define motor_tick_buf_size 10
 typedef struct {
-    TIM_HandleTypeDef* encoder_htim;
     TIM_HandleTypeDef* pwm_htim;
     uint32_t channel;
     int ticks;
