@@ -217,6 +217,7 @@ int main(void)
     while (1) {
 
         LOG_DEBUG("%d %d %d %d\r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
+        LOG_DEBUG("%d %d %d %d\r\n", NAV_motor_speed(0), NAV_motor_speed(1), NAV_motor_speed(2), NAV_motor_speed(3));
 
         if (HAL_GetTick() - now > 1000) {
             if (on) {

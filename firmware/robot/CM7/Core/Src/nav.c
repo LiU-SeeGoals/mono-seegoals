@@ -15,13 +15,15 @@
 /*
  * Private variables
  */
+#define NUM_MOTORS 4
+
 static LOG_Module internal_log_mod;
-static MotorPWM motors[4];
+static MotorPWM motors[NUM_MOTORS];
 static robot_nav_command robot_cmd;
-static float I_prevs[4]; // PI control I-parts
-const float CLOCK_FREQ = 400000000;
+static float I_prevs[NUM_MOTORS]; // PI control I-parts
+static const float CLOCK_FREQ = 400000000;
+
 float CONTROL_FREQ; // Global variable used by other functions
-static int queued = 0;
 
 /* Private functions declarations */
 void set_motors(float m1, float m2, float m3, float m4);
@@ -130,6 +132,14 @@ void NAV_update_motor_state()
         } else {
             MOTOR_SetSpeed(&motors[i], 0, &I_prevs[i]);
         }
+    }
+}
+
+float NAV_motor_speed(unsigned int motor_idx)
+{
+    if (motor_idx < NUM_MOTORS)
+    {
+        return MOTOR_get_mps(&motors[motor_idx]);
     }
 }
 
