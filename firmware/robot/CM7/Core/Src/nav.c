@@ -42,48 +42,29 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[0].ticks = 0;
     motors[0].speed = 0.f;
     motors[0].prev_tick = 0;
-    // motors[0].encoder_htim = encoder1_htim;
-    motors[0].channel = MOTOR1_TIM_CHANNEL;
+    motors[0].channel = TIM_CHANNEL_1;
     motors[0].breakPinPort = MOTOR1_BREAK_GPIO_Port;
     motors[0].breakPin = MOTOR1_BREAK_Pin;
     motors[0].reversePinPort = MOTOR1_REVERSE_GPIO_Port;
     motors[0].reversePin = MOTOR1_REVERSE_Pin;
-    // motors[0].encoderPinPort = MOTOR1_ENCODER_GPIO_Port;
-    // motors[0].encoderPin = MOTOR1_ENCODER_Pin;
     motors[0].dir = 1;
 
-#ifdef PCB_MOTOR
-    motors[1].pwm_htim = pwm15_htim;
-    motors[1].ticks = 0;
-    motors[1].speed = 0.f;
-    motors[1].prev_tick = 0;
-    // motors[1].encoder_htim = encoder2_htim;
-    motors[1].channel = MOTOR2_TIM_CHANNEL;
-    motors[1].breakPinPort = MOTOR2_BREAK_GPIO_Port;
-    motors[1].breakPin = MOTOR2_BREAK_Pin;
-    motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
-    motors[1].reversePin = MOTOR2_REVERSE_Pin;
-    motors[1].dir = 1;
-#else
     motors[1].pwm_htim = pwm_htim;
     motors[1].ticks = 0;
     motors[1].speed = 0.f;
     motors[1].prev_tick = 0;
-    // motors[1].encoder_htim = encoder2_htim;
     motors[1].channel = TIM_CHANNEL_2;
-    // motors[1].breakPinPort      = OLD_MOTOR2_BREAK_GPIO_Port;
-    // motors[1].breakPin          = OLD_MOTOR2_BREAK_Pin;
-    motors[1].reversePinPort = OLD_MOTOR2_REVERSE_GPIO_Port;
-    motors[1].reversePin = OLD_MOTOR2_REVERSE_Pin;
+    motors[2].breakPinPort = MOTOR2_BREAK_GPIO_Port;
+    motors[2].breakPin = MOTOR2_BREAK_Pin;
+    motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
+    motors[1].reversePin = MOTOR2_REVERSE_Pin;
     motors[1].dir = 1;
-#endif
 
     motors[2].pwm_htim = pwm_htim;
     motors[2].ticks = 0;
     motors[2].speed = 0.f;
     motors[2].prev_tick = 0;
-    // motors[2].encoder_htim = encoder3_htim;
-    motors[2].channel = MOTOR3_TIM_CHANNEL;
+    motors[2].channel = TIM_CHANNEL_3;
     motors[2].breakPinPort = MOTOR3_BREAK_GPIO_Port;
     motors[2].breakPin = MOTOR3_BREAK_Pin;
     motors[2].reversePinPort = MOTOR3_REVERSE_GPIO_Port;
@@ -94,8 +75,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[3].ticks = 0;
     motors[3].speed = 0.f;
     motors[3].prev_tick = 0;
-    // motors[3].encoder_htim = encoder4_htim;
-    motors[3].channel = MOTOR4_TIM_CHANNEL;
+    motors[3].channel = TIM_CHANNEL_4;
     motors[3].breakPinPort = MOTOR4_BREAK_GPIO_Port;
     motors[3].breakPin = MOTOR4_BREAK_Pin;
     motors[3].reversePinPort = MOTOR4_REVERSE_GPIO_Port;

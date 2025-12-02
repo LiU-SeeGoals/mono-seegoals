@@ -103,12 +103,12 @@ extern volatile atomic_uint main_tasks;
 #define MOTOR1_BREAK_GPIO_Port GPIOB
 #define MOTOR3_REVERSE_Pin GPIO_PIN_7
 #define MOTOR3_REVERSE_GPIO_Port GPIOE
-#define OLD_MOTOR2_REVERSE_Pin GPIO_PIN_8
-#define OLD_MOTOR2_REVERSE_GPIO_Port GPIOE
+#define MOTOR2_REVERSEE8_Pin GPIO_PIN_8
+#define MOTOR2_REVERSEE8_GPIO_Port GPIOE
 #define MOTOR1_PWM_Pin GPIO_PIN_9
 #define MOTOR1_PWM_GPIO_Port GPIOE
-#define OLD_MOTOR2_PWM_Pin GPIO_PIN_11
-#define OLD_MOTOR2_PWM_GPIO_Port GPIOE
+#define MOTOR2_PWME11_Pin GPIO_PIN_11
+#define MOTOR2_PWME11_GPIO_Port GPIOE
 #define KICKER_CS_Pin GPIO_PIN_12
 #define KICKER_CS_GPIO_Port GPIOE
 #define MOTOR3_PWM_Pin GPIO_PIN_13
@@ -132,8 +132,8 @@ extern volatile atomic_uint main_tasks;
 #define NRF_IRQ_EXTI_IRQn EXTI15_10_IRQn
 #define MOTOR3_BREAK_Pin GPIO_PIN_12
 #define MOTOR3_BREAK_GPIO_Port GPIOD
-#define OLD_MOTOR2_BREAK_Pin GPIO_PIN_13
-#define OLD_MOTOR2_BREAK_GPIO_Port GPIOD
+#define MOTOR2_BREAKD13_Pin GPIO_PIN_13
+#define MOTOR2_BREAKD13_GPIO_Port GPIOD
 #define NRF_CE_Pin GPIO_PIN_6
 #define NRF_CE_GPIO_Port GPIOC
 #define IR_IN_Pin GPIO_PIN_11
@@ -171,10 +171,6 @@ extern volatile atomic_uint main_tasks;
 #define IMU_SCL_GPIO_Port GPIOF
 #define IMU_SDA_Pin GPIO_PIN_15
 #define IMU_SDA_GPIO_Port GPIOF
-#define MOTOR1_TIM_CHANNEL TIM_CHANNEL_1
-#define MOTOR2_TIM_CHANNEL TIM_CHANNEL_1
-#define MOTOR3_TIM_CHANNEL TIM_CHANNEL_3
-#define MOTOR4_TIM_CHANNEL TIM_CHANNEL_4
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
