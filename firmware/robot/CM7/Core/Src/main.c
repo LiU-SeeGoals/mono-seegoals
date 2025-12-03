@@ -736,7 +736,7 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, MOTOR4_BREAK_Pin|MOTOR2_REVERSE_Pin|MOTOR2_BREAK_Pin|MOTOR3_REVERSE_Pin
-                          |OLD_MOTOR2_REVERSE_Pin|KICKER_CS_Pin|MOTOR4_REVERSE_Pin, GPIO_PIN_RESET);
+                          |MOTOR2_REVERSEE8_Pin|KICKER_CS_Pin|MOTOR4_REVERSE_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOA, IMU_CS_Pin|IMU_INT1_Pin|IMU_INT2_Pin|IR_IN_Pin
@@ -750,7 +750,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOB, KICKER_DISCHARGE2_Pin|KICKER_DISCHARGE1_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOD, MOTOR3_BREAK_Pin|OLD_MOTOR2_BREAK_Pin|EXT_LED1_RED_Pin|EXT_LED4_BLUE_Pin
+  HAL_GPIO_WritePin(GPIOD, MOTOR3_BREAK_Pin|MOTOR2_BREAKD13_Pin|EXT_LED1_RED_Pin|EXT_LED4_BLUE_Pin
                           |EXT_LED2_BLUE_Pin|DRIBBLER_Pin|EXT_LED3_WHITE_Pin|BUZZER_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
@@ -760,9 +760,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
 
   /*Configure GPIO pins : MOTOR4_BREAK_Pin MOTOR2_REVERSE_Pin MOTOR2_BREAK_Pin MOTOR3_REVERSE_Pin
-                           OLD_MOTOR2_REVERSE_Pin KICKER_CS_Pin MOTOR4_REVERSE_Pin LED_YELLOW_Pin */
+                           MOTOR2_REVERSEE8_Pin KICKER_CS_Pin MOTOR4_REVERSE_Pin LED_YELLOW_Pin */
   GPIO_InitStruct.Pin = MOTOR4_BREAK_Pin|MOTOR2_REVERSE_Pin|MOTOR2_BREAK_Pin|MOTOR3_REVERSE_Pin
-                          |OLD_MOTOR2_REVERSE_Pin|KICKER_CS_Pin|MOTOR4_REVERSE_Pin|LED_YELLOW_Pin;
+                          |MOTOR2_REVERSEE8_Pin|KICKER_CS_Pin|MOTOR4_REVERSE_Pin|LED_YELLOW_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -826,9 +826,9 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(NRF_IRQ_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : MOTOR3_BREAK_Pin OLD_MOTOR2_BREAK_Pin EXT_LED1_RED_Pin EXT_LED4_BLUE_Pin
+  /*Configure GPIO pins : MOTOR3_BREAK_Pin MOTOR2_BREAKD13_Pin EXT_LED1_RED_Pin EXT_LED4_BLUE_Pin
                            EXT_LED2_BLUE_Pin DRIBBLER_Pin EXT_LED3_WHITE_Pin BUZZER_Pin */
-  GPIO_InitStruct.Pin = MOTOR3_BREAK_Pin|OLD_MOTOR2_BREAK_Pin|EXT_LED1_RED_Pin|EXT_LED4_BLUE_Pin
+  GPIO_InitStruct.Pin = MOTOR3_BREAK_Pin|MOTOR2_BREAKD13_Pin|EXT_LED1_RED_Pin|EXT_LED4_BLUE_Pin
                           |EXT_LED2_BLUE_Pin|DRIBBLER_Pin|EXT_LED3_WHITE_Pin|BUZZER_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;

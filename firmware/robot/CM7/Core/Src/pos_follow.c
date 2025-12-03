@@ -4,36 +4,19 @@
 #include "nav.h"
 #include "state_estimator.h"
 
-// Each state has an integration part in the pid controller
-float dist_I = 0.01;
-float angle_I = 0.01;
+static control_params params_dist;
+static control_params params_angle;
 
-control_params params_dist;
-control_params params_angle;
-
-static robot_nav_command robot_nav;
-
-const float DELTA_T = 0.001;
+static float DELTA_T = 0.001;
 
 static LOG_Module internal_log_mod;
-
-void POS_Init() { LOG_InitModule(&internal_log_mod, "POS", LOG_LEVEL_ERROR, 0); }
-
-float angle_error(float angle, float desired)
-{
-    // TODO make sure returned sign is correct for the desired direction
-
-    return desired - angle;
-}
-
-float standard_error(float current, float desired) { return desired - current; }
 
 void set_params()
 {
     params_angle.umin = -100.0;
     params_angle.umax = 100.0;
     params_angle.Ts = DELTA_T;
-    params_angle.Ti = 1000000000000;
+    params_angle.Ti = 100000000;
     params_angle.Td = 0.1;
     params_angle.K = 50 * 1.1;
 
@@ -44,6 +27,21 @@ void set_params()
     params_dist.Td = 0.1;
     params_dist.K = 500.0f * 1000.50;
 }
+
+void POS_Init() {
+    set_params();
+    LOG_InitModule(&internal_log_mod, "POS", LOG_LEVEL_ERROR, 0);
+}
+
+float angle_error(float angle, float desired)
+{
+    // TODO make sure returned sign is correct for the desired direction
+
+    return desired - angle;
+}
+
+float standard_error(float current, float desired) { return desired - current; }
+
 
 void TEST_vy(float ref_angle, float speed)
 {
@@ -98,8 +96,6 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
 
 float PID_p(float current, float desired, float (*error_func)(float, float), control_params* param)
 {
-    set_params(); // TODO: Do we need to set this every time?
-
     float error = error_func(current, desired);
 
     float v = param->K * (error);
@@ -122,8 +118,6 @@ float PID_p(float current, float desired, float (*error_func)(float, float), con
 
 float PID_pi(float current, float desired, float* I_prev, float (*error_func)(float, float), control_params* param)
 {
-    set_params(); // TODO: Do we need to set this every time
-
     float error = error_func(current, desired);
     float I = *I_prev + (param->Ts / param->Ti) * error;
 

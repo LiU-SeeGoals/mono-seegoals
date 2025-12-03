@@ -42,48 +42,29 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[0].ticks = 0;
     motors[0].speed = 0.f;
     motors[0].prev_tick = 0;
-    // motors[0].encoder_htim = encoder1_htim;
-    motors[0].channel = MOTOR1_TIM_CHANNEL;
+    motors[0].channel = TIM_CHANNEL_1;
     motors[0].breakPinPort = MOTOR1_BREAK_GPIO_Port;
     motors[0].breakPin = MOTOR1_BREAK_Pin;
     motors[0].reversePinPort = MOTOR1_REVERSE_GPIO_Port;
     motors[0].reversePin = MOTOR1_REVERSE_Pin;
-    // motors[0].encoderPinPort = MOTOR1_ENCODER_GPIO_Port;
-    // motors[0].encoderPin = MOTOR1_ENCODER_Pin;
     motors[0].dir = 1;
 
-#ifdef PCB_MOTOR
-    motors[1].pwm_htim = pwm15_htim;
-    motors[1].ticks = 0;
-    motors[1].speed = 0.f;
-    motors[1].prev_tick = 0;
-    // motors[1].encoder_htim = encoder2_htim;
-    motors[1].channel = MOTOR2_TIM_CHANNEL;
-    motors[1].breakPinPort = MOTOR2_BREAK_GPIO_Port;
-    motors[1].breakPin = MOTOR2_BREAK_Pin;
-    motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
-    motors[1].reversePin = MOTOR2_REVERSE_Pin;
-    motors[1].dir = 1;
-#else
     motors[1].pwm_htim = pwm_htim;
     motors[1].ticks = 0;
     motors[1].speed = 0.f;
     motors[1].prev_tick = 0;
-    // motors[1].encoder_htim = encoder2_htim;
     motors[1].channel = TIM_CHANNEL_2;
-    // motors[1].breakPinPort      = OLD_MOTOR2_BREAK_GPIO_Port;
-    // motors[1].breakPin          = OLD_MOTOR2_BREAK_Pin;
-    motors[1].reversePinPort = OLD_MOTOR2_REVERSE_GPIO_Port;
-    motors[1].reversePin = OLD_MOTOR2_REVERSE_Pin;
+    motors[2].breakPinPort = MOTOR2_BREAK_GPIO_Port;
+    motors[2].breakPin = MOTOR2_BREAK_Pin;
+    motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
+    motors[1].reversePin = MOTOR2_REVERSE_Pin;
     motors[1].dir = 1;
-#endif
 
     motors[2].pwm_htim = pwm_htim;
     motors[2].ticks = 0;
     motors[2].speed = 0.f;
     motors[2].prev_tick = 0;
-    // motors[2].encoder_htim = encoder3_htim;
-    motors[2].channel = MOTOR3_TIM_CHANNEL;
+    motors[2].channel = TIM_CHANNEL_3;
     motors[2].breakPinPort = MOTOR3_BREAK_GPIO_Port;
     motors[2].breakPin = MOTOR3_BREAK_Pin;
     motors[2].reversePinPort = MOTOR3_REVERSE_GPIO_Port;
@@ -94,8 +75,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[3].ticks = 0;
     motors[3].speed = 0.f;
     motors[3].prev_tick = 0;
-    // motors[3].encoder_htim = encoder4_htim;
-    motors[3].channel = MOTOR4_TIM_CHANNEL;
+    motors[3].channel = TIM_CHANNEL_4;
     motors[3].breakPinPort = MOTOR4_BREAK_GPIO_Port;
     motors[3].breakPin = MOTOR4_BREAK_Pin;
     motors[3].reversePinPort = MOTOR4_REVERSE_GPIO_Port;
@@ -150,8 +130,6 @@ void NAV_update_motor_state()
         }
     }
 }
-
-void NAV_log_speed() { LOG_INFO("Got speed m1 %f m2 %f m3 %f m4 %f\r\n", MOTOR_ReadSpeed(&motors[0]), MOTOR_ReadSpeed(&motors[1]), MOTOR_ReadSpeed(&motors[2]), MOTOR_ReadSpeed(&motors[3])); }
 
 // res is a 3x1 vector
 void NAV_wheelToBody(float* res)
@@ -223,9 +201,9 @@ void NAV_steer(float u, float v, float w)
     float wlf = 1.0 / r * (-u * arm_cos_f32(psi) + v * arm_sin_f32(psi) + w * R);
 
     motors[0].speed = wrf;
-    motors[1].speed = wlf;
+    motors[1].speed = wrb;
     motors[2].speed = wlb;
-    motors[3].speed = wrb;
+    motors[3].speed = wlf;
 }
 
 void NAV_Direction(DIRECTION dir)
@@ -327,12 +305,12 @@ void NAV_HandleCommand(Command* cmd)
  * Private function implementations
  */
 
-int32_t prev_nav_x = 2147483647;
-int32_t prev_nav_y = 2147483647;
-int32_t prev_nav_w = 2147483647;
-
 void NAV_GoToAction(Command* cmd)
 {
+    static int32_t prev_nav_x = 2147483647;
+    static int32_t prev_nav_y = 2147483647;
+    static int32_t prev_nav_w = 2147483647;
+
     const int32_t nav_x = cmd->dest->x;
     const int32_t nav_y = cmd->dest->y;
     const int32_t nav_w = cmd->dest->w;
@@ -382,7 +360,7 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
     robot_cmd.w = nav_z;
 }
 
-void NAV_TireTest()
+void NAV_TEST_TireTest()
 {
     LOG_INFO("Starting tire test...\r\n");
 
@@ -426,23 +404,6 @@ void set_motors(float m1, float m2, float m3, float m4)
 }
 
 void NAV_StopDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
-
-uint8_t NAV_IsPanic() { return robot_cmd.panic; }
-
-/*
-   Someone thinks something has gone terribly wrong...
-   Disable motors and everyhting going forward
-   TODO: Actualy implement the behaviour that triggers when the program is set
-   to panic.
- */
-void NAV_SetRobotPanic() { robot_cmd.panic = 1; }
-
-/*
-  Someone solved the panic
-  TODO: Implement reset behaviour. I am leaving this as 1 untill the method
-  actualy does something.
-*/
-void NAV_ClearRobotPanic() { robot_cmd.panic = 1; }
 
 void NAV_RunDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
 
