@@ -294,6 +294,10 @@ void NAV_HandleCommand(Command* cmd)
 
         NAV_EnableMovement();
         NAV_GoToAction(cmd);
+        if(cmd->kick_speed == 10)
+        {
+            KICKER_Kick();
+        }
 
     } break;
 
