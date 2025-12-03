@@ -5,8 +5,7 @@ services:
   game-viewer:
     environment:
       - SSL_VISION_MULTICAST_PORT=${SSL_VISION_REAL_MAIN_PORT}
-    depends_on:
-      - ${DOCKER_NAME_AI}
+      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=0.0.0.0
     network_mode: host
 
   ssl-vision-client:
@@ -32,10 +31,10 @@ services:
       - donotstart
 
   tiger-auto-referee:
-    image: tigersmannheim/auto-referee   # headless image
+    image: tigersmannheim/auto-referee
     container_name: ${DOCKER_NAME_TIGER_AUTOREF}
     restart: "no"
-    network_mode: "host"                 # required for multicast
+    network_mode: "host"
     command:
       - "-hl"
       - "-va"

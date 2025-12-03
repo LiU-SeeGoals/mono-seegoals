@@ -17,8 +17,9 @@ export const useAIController = (
         aiSocket = null;
       }
 
+      const ai_address = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_ADDR;
       const ai_port = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_PORT;
-      aiSocket = new WebSocket(`ws://localhost:${ai_port}/ws`);
+      aiSocket = new WebSocket(`ws://${ai_address}:${ai_port}/ws`);
 
       aiSocket.onerror = () => {
         if (!isMounted) return;
@@ -28,7 +29,7 @@ export const useAIController = (
       aiSocket.onopen = () => {
         if (!isMounted) return;
         setIsConnected(true);
-        console.log("Connected to AI WebSocket!");
+        console.log(`Connected to AI WebSocket (${ai_address}:${ai_port})!`);
         if (retryTimeout) {
           clearTimeout(retryTimeout);
           retryTimeout = null;
@@ -38,7 +39,7 @@ export const useAIController = (
       aiSocket.onclose = () => {
         if (!isMounted) return;
         setIsConnected(false);
-        console.log("AI WebSocket closed, retrying in 100 ms...");
+        console.log(`AI WebSocket (${ai_address}:${ai_port}) closed , retrying in 100 ms...`);
 
         if (!retryTimeout) {
           retryTimeout = setTimeout(() => {
