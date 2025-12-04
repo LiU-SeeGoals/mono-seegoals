@@ -1,5 +1,9 @@
 #!/bin/sh
 
+if pgrep vision > /dev/null; then
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cleanup() {
