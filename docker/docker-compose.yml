@@ -82,10 +82,10 @@ services:
       REALISM: ${SIM_REALISM}
 
   tiger-auto-referee:
-    image: tigersmannheim/auto-referee   # headless image
+    image: tigersmannheim/auto-referee
     container_name: ${DOCKER_NAME_TIGER_AUTOREF}
     restart: "no"
-    network_mode: "host"                 # required for multicast
+    network_mode: "host"
     command:
       - "-hl"
       - "-va"

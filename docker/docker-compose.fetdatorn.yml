@@ -30,15 +30,3 @@ services:
   er-sim:
     profiles:
       - donotstart
-
-  tiger-auto-referee:
-    profiles:
-      - donotstart
-    #image: tigersmannheim/auto-referee
-    #container_name: ${DOCKER_NAME_TIGER_AUTOREF}
-    #restart: "no"
-    #network_mode: "host"
-    #command:
-    #  - "-hl"
-    #  - "-va"
-    #  - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_REAL_MAIN_PORT}"
