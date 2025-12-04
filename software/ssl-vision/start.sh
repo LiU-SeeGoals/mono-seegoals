@@ -1,6 +1,7 @@
 #!/bin/sh
 
 if pgrep vision > /dev/null; then
+  echo "Already started ssl-vision"
   exit 1
 fi
 
