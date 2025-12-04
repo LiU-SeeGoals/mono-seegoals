@@ -185,6 +185,7 @@ func (mt *MoveTo) TranslateReal() *robot_action.Command {
 			Y: int32(mt.Dest.Y + 10000),
 			W: float32(mt.Dest.Angle * 1000),
 		},
+		KickSpeed: int32(mt.KickSpeed),
 	}
 	return command_move
 }

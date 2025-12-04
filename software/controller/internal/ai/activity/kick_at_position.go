@@ -48,7 +48,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	facingTarget := robot.Facing(kp.targetPosition, accuracy*2)
 
 	if kp.retrievingBall && facingBall && facingTarget {
-		fmt.Printf("[KickAtPosition] robot %d retrieving: aligned with ball and target -> MoveToBall\n", kp.id)
+		//fmt.Printf("[KickAtPosition] robot %d retrieving: aligned with ball and target -> MoveToBall\n", kp.id)
 		return NewMoveToBall(kp.team, kp.id).GetAction(gi)
 	} else if kp.retrievingBall {
 		ballMargin := unitVector.Scale(350) // MagicNumber (100mm behind ball)
@@ -61,8 +61,8 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		move := NewMoveToPosition(kp.team, kp.id, lineUpPos)
 		move.AvoidBall(true)
 		moveAction := move.GetMoveToAction(gi)
-		fmt.Printf("[KickAtPosition] robot %d retrieving: lining up at (%.1f, %.1f) angle %.1f° (facingBall=%v facingTarget=%v)\n",
-			kp.id, lineUpPos.X, lineUpPos.Y, radToDeg(lineUpPos.Angle), facingBall, facingTarget)
+		//fmt.Printf("[KickAtPosition] robot %d retrieving: lining up at (%.1f, %.1f) angle %.1f° position: (%.1f, %.1f) (facingBall=%v facingTarget=%v)\n",
+		//	kp.id, lineUpPos.X, lineUpPos.Y, radToDeg(lineUpPos.Angle), currPos.X, currPos.Y, facingBall, facingTarget)
 		return &moveAction
 	}
 
@@ -97,7 +97,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		Id:   int(kp.id),
 		Dest: destination,
 	}
-	KickSpeed := float32(5)
+	KickSpeed := float32(10)
 	moveAction.KickSpeed = int(KickSpeed)
 	fmt.Printf("[KickAtPosition] robot %d shooting: run-up target (%.1f, %.1f) angle %.1f° angleToTarget %.1f° kickSpeed=%d\n",
 		kp.id, destination.X, destination.Y, radToDeg(possessor.DribblerPos().Angle), radToDeg(destination.AngleToPosition(kp.targetPosition)), moveAction.KickSpeed)

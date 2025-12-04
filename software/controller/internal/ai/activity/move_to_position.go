@@ -127,7 +127,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	// 		dy := myPos.Y - obstacle.Y
 
 	// 		// Normalize (avoid division by zero)
-	// 		if dist > 0.001 {
+	// 		if dist > 0.001 {targetPos
 	// 			dx /= dist
 	// 			dy /= dist
 	// 		} else {
@@ -150,7 +150,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	// 	// Normalize the repulsive vector
 	// 	magnitude := math.Sqrt(repulsiveX*repulsiveX + repulsiveY*repulsiveY)
 	// 	if magnitude > 0 {
-	// 		repulsiveX /= magnitude
+	// 		repulsiveX /connected= magnitude
 	// 		repulsiveY /= magnitude
 	// 	}
 
@@ -235,8 +235,9 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	act.Id = int(m.id)
 	act.Team = m.team
 	act.Pos = myPos
-	act.Dest = targetPos
-	act.Dest.Angle = targetPos.Angle
+	// act.Dest = targetPos
+	// act.Dest.Angle = targetPos.Angle
+	act.Dest = m.final_destination
 	act.Dribble = false
 	return act
 }

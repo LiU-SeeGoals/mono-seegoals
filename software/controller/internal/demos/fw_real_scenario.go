@@ -16,7 +16,7 @@ func FwRealScenario() {
 	ssl_receiver := client.NewSSLClient(config.GetSSLClientAddressReal())
 
 	// Yellow team
-	slowBrainYellow := plan.NewPlannerFw(info.Yellow)
+	slowBrainYellow := plan.NewTestKick(info.Yellow)
 	fastBrainYellow := ai.NewActivityExecutor()
 
 	aiYellow := ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
@@ -32,6 +32,7 @@ func FwRealScenario() {
 		ssl_receiver.UpdateState(gameInfo, playTime)
 		yellow_actions := aiYellow.GetActions(gameInfo)
 
+		client.BroadcastActions(yellow_actions)
 		basestationClient.SendActions(yellow_actions)
 	}
 }
