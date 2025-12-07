@@ -49,7 +49,7 @@ extern "C" {
 
 /* USER CODE END EM */
 
-void HAL_TIM_MspPostInit(TIM_HandleTypeDef* htim);
+void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim);
 
 /* Exported functions prototypes ---------------------------------------------*/
 void Error_Handler(void);
@@ -71,6 +71,18 @@ extern volatile atomic_uint main_tasks;
 #define BTN_USER_Pin GPIO_PIN_13
 #define BTN_USER_GPIO_Port GPIOC
 #define BTN_USER_EXTI_IRQn EXTI15_10_IRQn
+#define BATT1_Pin GPIO_PIN_6
+#define BATT1_GPIO_Port GPIOF
+#define BATT2_Pin GPIO_PIN_7
+#define BATT2_GPIO_Port GPIOF
+#define BATT3_Pin GPIO_PIN_8
+#define BATT3_GPIO_Port GPIOF
+#define BATT4_Pin GPIO_PIN_9
+#define BATT4_GPIO_Port GPIOF
+#define BATT5_Pin GPIO_PIN_10
+#define BATT5_GPIO_Port GPIOF
+#define BATT6_Pin GPIO_PIN_0
+#define BATT6_GPIO_Port GPIOC
 #define MOTOR4_ENCODER_Pin GPIO_PIN_0
 #define MOTOR4_ENCODER_GPIO_Port GPIOA
 #define IMU_CS_Pin GPIO_PIN_1
@@ -91,12 +103,12 @@ extern volatile atomic_uint main_tasks;
 #define MOTOR1_BREAK_GPIO_Port GPIOB
 #define MOTOR3_REVERSE_Pin GPIO_PIN_7
 #define MOTOR3_REVERSE_GPIO_Port GPIOE
-#define OLD_MOTOR2_REVERSE_Pin GPIO_PIN_8
-#define OLD_MOTOR2_REVERSE_GPIO_Port GPIOE
+#define MOTOR2_REVERSEE8_Pin GPIO_PIN_8
+#define MOTOR2_REVERSEE8_GPIO_Port GPIOE
 #define MOTOR1_PWM_Pin GPIO_PIN_9
 #define MOTOR1_PWM_GPIO_Port GPIOE
-#define OLD_MOTOR2_PWM_Pin GPIO_PIN_11
-#define OLD_MOTOR2_PWM_GPIO_Port GPIOE
+#define MOTOR2_PWME11_Pin GPIO_PIN_11
+#define MOTOR2_PWME11_GPIO_Port GPIOE
 #define KICKER_CS_Pin GPIO_PIN_12
 #define KICKER_CS_GPIO_Port GPIOE
 #define MOTOR3_PWM_Pin GPIO_PIN_13
@@ -120,16 +132,14 @@ extern volatile atomic_uint main_tasks;
 #define NRF_IRQ_EXTI_IRQn EXTI15_10_IRQn
 #define MOTOR3_BREAK_Pin GPIO_PIN_12
 #define MOTOR3_BREAK_GPIO_Port GPIOD
-#define OLD_MOTOR2_BREAK_Pin GPIO_PIN_13
-#define OLD_MOTOR2_BREAK_GPIO_Port GPIOD
+#define MOTOR2_BREAKD13_Pin GPIO_PIN_13
+#define MOTOR2_BREAKD13_GPIO_Port GPIOD
 #define NRF_CE_Pin GPIO_PIN_6
 #define NRF_CE_GPIO_Port GPIOC
 #define IR_IN_Pin GPIO_PIN_11
 #define IR_IN_GPIO_Port GPIOA
 #define IR_OUT_Pin GPIO_PIN_12
 #define IR_OUT_GPIO_Port GPIOA
-#define MOTOR2_ENCODER_Pin GPIO_PIN_15
-#define MOTOR2_ENCODER_GPIO_Port GPIOA
 #define EXT_LED1_RED_Pin GPIO_PIN_1
 #define EXT_LED1_RED_GPIO_Port GPIOD
 #define MOTOR1_ENCODER_Pin GPIO_PIN_2
@@ -150,8 +160,8 @@ extern volatile atomic_uint main_tasks;
 #define MOTOR1_REVERSE_GPIO_Port GPIOB
 #define NRF_CSN_Pin GPIO_PIN_8
 #define NRF_CSN_GPIO_Port GPIOB
-#define OLD_MOTOR2_ENCODER_Pin GPIO_PIN_0
-#define OLD_MOTOR2_ENCODER_GPIO_Port GPIOE
+#define MOTOR2_ENCODER_Pin GPIO_PIN_0
+#define MOTOR2_ENCODER_GPIO_Port GPIOE
 #define LED_YELLOW_Pin GPIO_PIN_1
 #define LED_YELLOW_GPIO_Port GPIOE
 
@@ -161,10 +171,6 @@ extern volatile atomic_uint main_tasks;
 #define IMU_SCL_GPIO_Port GPIOF
 #define IMU_SDA_Pin GPIO_PIN_15
 #define IMU_SDA_GPIO_Port GPIOF
-#define MOTOR1_TIM_CHANNEL TIM_CHANNEL_1
-#define MOTOR2_TIM_CHANNEL TIM_CHANNEL_1
-#define MOTOR3_TIM_CHANNEL TIM_CHANNEL_3
-#define MOTOR4_TIM_CHANNEL TIM_CHANNEL_4
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
