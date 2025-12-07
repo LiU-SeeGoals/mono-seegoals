@@ -94,19 +94,11 @@ func (gs *GameState) Update() {
 	if gs.Ball.GetAge() < 50 { // Have a new ball measurement,  WARN: Magic number
 		// fmt.Println("New ball measurement")
 		gs.Ball.SetEstimatedPosition(latestBallPos)
-
-		if latestPossessor != nil {
-			if gs.LostBall(latestPossessor) { // We have a new measurement, so we can check if possessor has lost the ball
-				gs.Ball.SetPossessor(nil)
-			}
-		}
-
-		// If we have a new possessor (and either didn't have one before, or just lost it), update it.
-		// Note: This allows instant "stealing" logic if we wanted, but primarily handles the case where latestPossessor was nil.
-		if gs.Ball.GetPossessor() == nil && newPossessor != nil {
+		if gs.LostBall(latestPossessor) { // We have a new measurement, so we can check if possessor has lost the ball
+			gs.Ball.SetPossessor(nil)
+		} else if newPossessor != nil { // We have a new measurement, so we can check if a new robot has the ball
 			gs.Ball.SetPossessor(newPossessor)
 		}
-
 	} else if latestPossessor != nil { // No new ball measurement, so we have to rely on the latest possessor
 
 		// fmt.Println("No new ball measurement but we have a possessor")
@@ -132,17 +124,23 @@ func (gs *GameState) FindBallPossessor() *Robot {
 	}
 
 	// Get the robot closest to the ball
-	closestToBall, _ := gs.ClosestRobot(ballPos)
+	closestToBall, ballDistance := gs.ClosestRobot(ballPos)
 
-	// Threshold for possession.
-	const possessionThreshold = 30.0
+	var facingBall bool
+	if ballDistance > math.Inf(1) { // ballDistance will be inf if there is no robot on the field
+		facingBall = false
+	} else {
+		facingBall = closestToBall.Facing(ballPos, 0.5) // WARN: Magic number
+	}
 
-	if closestToBall != nil {
-		dist := ballPos.Distance(closestToBall.DribblerPos())
-		// fmt.Printf("[DEBUG] Robot %d dist to ball dribbler: %.2f (threshold: %.2f)\n", closestToBall.ID(), dist, possessionThreshold)
-		if dist < possessionThreshold {
-			return closestToBall
-		}
+	// If a robot is both facing the ball and in distance
+	// consider it the possessor of the ball
+	// TODO: Check matching velocities
+	// fmt.Println("Ball pos: ", ballPos)
+	// est, _ := gs.Ball.GetEstimatedPosition()
+	// fmt.Println("Est. Ball pos:", est)
+	if ballDistance <= 50 && facingBall { // WARN: Magic number, mm
+		return closestToBall
 	}
 	return nil
 }
@@ -152,6 +150,11 @@ func (gs *GameState) LostBall(robot *Robot) bool {
 		Logger.Errorf("No robot")
 		return true
 	}
+	robotPos, err := robot.GetPosition()
+	if err != nil {
+		Logger.Errorf("Robot position retrieval failed: %v", err)
+		return true
+	}
 
 	ballPos, err := gs.Ball.GetPosition()
 	if err != nil {
@@ -159,7 +162,7 @@ func (gs *GameState) LostBall(robot *Robot) bool {
 		return true
 	}
 
-	farAway := ballPos.Distance(robot.DribblerPos()) > 50 // WARN: Magic number, mm
+	farAway := robotPos.Distance(ballPos) > 200 // WARN: Magic number, mm
 
 	// If the robot is not facing the ball
 	// it has lost the ball

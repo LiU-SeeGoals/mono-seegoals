@@ -16,13 +16,13 @@ func FwRealScenario() {
 	ssl_receiver := client.NewSSLClient(config.GetSSLClientAddressReal())
 
 	// Yellow team
-	slowBrainYellow := plan.NewTestKick(info.Yellow)
+	slowBrainYellow := plan.NewPlannerFw(info.Yellow)
 	fastBrainYellow := ai.NewActivityExecutor()
 
 	aiYellow := ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
 
 	basestationClient := client.NewBaseStationClient(config.GetBasestationAddress())
-	fmt.Println("Base(d)station: ", config.GetBasestationAddress())
+    fmt.Println("Base(d)station: ", config.GetBasestationAddress())
 
 	basestationClient.Init()
 
@@ -32,7 +32,6 @@ func FwRealScenario() {
 		ssl_receiver.UpdateState(gameInfo, playTime)
 		yellow_actions := aiYellow.GetActions(gameInfo)
 
-		client.BroadcastActions(yellow_actions)
 		basestationClient.SendActions(yellow_actions)
 	}
 }
