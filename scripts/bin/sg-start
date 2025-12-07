@@ -77,7 +77,19 @@ choices = [
         "container_to_enter": AI
     },
     {
-        "choice-text": f"Manual start '{AI}' and '{GW}'.",
+        "choice-text": f"Develop on '{GW}' files (auto-start '{AI}' program).",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.autostart_ai.yml",
+            "-p", project_name, "up", "-d"
+        ],
+        "container_to_enter": GW
+    },
+    {
+        "choice-text": f"Develop on `{AI}` and '{GW}' files (auto-start nothing).",
         "pull_images": [],
         "pre_cmd": [],
         "docker_cmd": [
@@ -233,7 +245,7 @@ if __name__ == "__main__":
             if arg in flags["verbose"]:
                 VERBOSE = True
             elif arg in flags["help"]:
-                print("lul")
+                print("as if...")
                 sys.exit(0)
 
     # Choose what to do
