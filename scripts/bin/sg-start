@@ -83,7 +83,7 @@ choices = [
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-            "-p", project_name, "up",
+            "-p", project_name, "up", "-d"
         ],
         "container_to_enter": None
     },
