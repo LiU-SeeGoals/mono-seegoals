@@ -8,11 +8,17 @@ if [ -z "$CONTAINERS" ]; then
 fi
 
 if [ -n "$1" ]; then
-    docker exec -it "$1" /bin/bash
+    if [[ -n "${CONTAINERS[$1]}" ]]; then
+        docker exec -it "${CONTAINERS[$1]}" /bin/bash
+    else
+        echo -e "${RED}Invalid container index: $1${NC}"
+        exit 1
+    fi
     exit 0
 fi
 
 echo -e "${ORANGE}Select a container to enter:${NC}"
+
 for i in "${!CONTAINERS[@]}"; do
     echo -e "${ORANGE}[$i] ${CONTAINERS[$i]}${NC}"
 done

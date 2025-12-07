@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import './RobotTable.css';
 import LensIcon from '@mui/icons-material/Lens';
 import InfoIcon from '@mui/icons-material/Info';
@@ -16,6 +16,27 @@ const RobotTable: React.FC<RobotTableProps> = ({
   visibleRobots,
   sslFieldUpdate,
 }) => {
+  const [yellowRobots, setYellowRobots] = useState<Map<number, any>>(new Map());
+  const [blueRobots, setBlueRobots] = useState<Map<number, any>>(new Map());
+
+  useEffect(() => {
+    setYellowRobots(prev => {
+      const updated = new Map(prev);
+      sslFieldUpdate.robotsYellow.forEach(robot => {
+        updated.set(robot.robotId, robot);
+      });
+      return updated;
+    });
+
+    setBlueRobots(prev => {
+      const updated = new Map(prev);
+      sslFieldUpdate.robotsBlue.forEach(robot => {
+        updated.set(robot.robotId, robot);
+      });
+      return updated;
+    });
+  }, [sslFieldUpdate]);
+
   const tip = 'This only shows if the SSL vision can currenty see the robot';
 
   return (
@@ -29,7 +50,7 @@ const RobotTable: React.FC<RobotTableProps> = ({
           <p>y</p>
           <p>Angle</p>
         </div>
-        {sslFieldUpdate.robotsYellow.map((robot, index) => (
+        {Array.from(yellowRobots.values()).map((robot, index) => (
         <div className="robotItem" key={index}>
           <p>{robot.robotId}</p>
           <p>{robot.x.toFixed(1)}</p>
@@ -47,7 +68,7 @@ const RobotTable: React.FC<RobotTableProps> = ({
           <p>y</p>
           <p>Angle</p>
         </div>
-        {sslFieldUpdate.robotsBlue.map((robot, index) => (
+        {Array.from(blueRobots.values()).map((robot, index) => (
         <div className="robotItem" key={index}>
           <p>{robot.robotId}</p>
           <p>{robot.x.toFixed(1)}</p>

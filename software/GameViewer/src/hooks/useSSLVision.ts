@@ -13,23 +13,27 @@ export const useSSLVision = (
   useEffect(() => {
     const vision_ws_addr = import.meta.env.VITE_SSL_VISION_WS_ADDR;
     const vision_ws_port = import.meta.env.VITE_SSL_VISION_WS_PORT;
-    const ssl_vision_socket = new WebSocket(`ws://${vision_ws_addr}:${vision_ws_port}/`);
-    ssl_vision_socket.binaryType = 'arraybuffer';
+    console.log(`[useSSLVision.ts] connecting to ws://${vision_ws_addr}:${vision_ws_port}`);
 
-    ssl_vision_socket.onopen = () => {
+    const ws = new WebSocket(`ws://${vision_ws_addr}:${vision_ws_port}/`);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
       setIsConnected(true);
-      console.log("Connected to SSL Vision!");
+      console.log(`[useSSLVision.ts] connected on ${ws.url}`);
+
     };
 
-    ssl_vision_socket.onerror = () => {
+    ws.onerror = (err) => {
+      setIsConnected(false);
+      console.error(`[useSSLVision.ts] error: ${err}`)
+    };
+
+    ws.onclose = () => {
       setIsConnected(false);
     };
 
-    ssl_vision_socket.onclose = () => {
-      setIsConnected(false);
-    };
-
-    ssl_vision_socket.onmessage = (event) => {
+    ws.onmessage = (event) => {
       try {
         if (!event.data) return;
         const buffer = new Uint8Array(event.data);
@@ -44,7 +48,7 @@ export const useSSLVision = (
     };
 
     return () => {
-      ssl_vision_socket.close();
+      ws.close();
     };
   }, [setSSLFieldUpdate, setErrorOverlay, setFieldGeometry]);
 
