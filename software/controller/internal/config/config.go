@@ -32,8 +32,6 @@ type Config struct {
 	GC ConfigGameController
 
     GW ConfigGameViewer
-
-    DockerNames ConfigDockerNames
 }
 
 // Config struct for SSL Vision.
@@ -61,10 +59,6 @@ type ConfigReal struct {
 type ConfigGameViewer struct {
     Address string `env:"VITE_AI_GAME_VIEWER_SOCKET_ADDR,required"`
     Port string `env:"VITE_AI_GAME_VIEWER_SOCKET_PORT,required"`
-}
-
-type ConfigDockerNames struct {
-    Sim string `env:"DOCKER_NAME_SIM,required"`
 }
 
 // Config struct for sim
@@ -169,29 +163,17 @@ func GetSSLClientAddress() string {
 // Get SimAddress returns the Sim address from the config.
 func GetSimControlAddress() string {
 	cfg := GetInstance()
-    if (cfg.Env == "simulation") {
-	    return fmt.Sprintf("%s:%s", cfg.DockerNames.Sim, cfg.Sim.SimControllerPort)
-    } else {
-	    return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.SimControllerPort)
-    }
+	return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.SimControllerPort)
 }
 
 func GetSimBlueTeamAddress() string {
 	cfg := GetInstance()
-    if (cfg.Env == "simulation") {
-	    return fmt.Sprintf("%s:%s", cfg.DockerNames.Sim, cfg.Sim.BlueControllerPort)
-    } else {
-	    return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.BlueControllerPort)
-    }
+	return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.BlueControllerPort)
 }
 
 func GetSimYellowTeamAddress() string {
 	cfg := GetInstance()
-    if (cfg.Env == "simulation") {
-	    return fmt.Sprintf("%s:%s", cfg.DockerNames.Sim, cfg.Sim.YellowControllerPort)
-    } else {
-	    return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.YellowControllerPort)
-    }
+	return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.YellowControllerPort)
 }
 
 func GetBasestationAddress() string {
