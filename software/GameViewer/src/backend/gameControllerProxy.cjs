@@ -20,12 +20,12 @@ udpSocket.bind(gcPort, () => {
   });
 
   wss.on('connection', (ws) => {
-    console.log(`Client connected to Game Controller WebSocket`);
+    console.log(`[gameControllerProxy.cjs] Frontend client connected to backend`);
     ws.on('message', (message) => {
       console.log(`Received message from client: ${message}`);
     });
     ws.on('close', () => {
-      console.log(`[gameControllerProxy.cjs] Client disconnected`);
+      console.log(`[gameControllerProxy.cjs] Frontend client disconnected from backend`);
     });
   });
 

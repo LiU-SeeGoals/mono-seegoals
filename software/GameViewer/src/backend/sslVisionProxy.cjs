@@ -21,16 +21,16 @@ udpSocket.bind(visionPort, () => {
   wss = new ws.WebSocketServer({
     port: wsPort,
   });
-  
+
   wss.on('connection', (ws) => {
-    console.log(`[sslVisionProxy.cjs] Client connected to SSL Vision WebSocket`);
-  
+    console.log(`[sslVisionProxy.cjs] Frontend client connected to backend`);
+
     ws.on('message', (message) => {
       console.log(`[sslVisionProxy.cjs] Received message from client: ${message}`);
     });
-  
+
     ws.on('close', () => {
-      console.log(`[sslVisionProxy.cjs] Client disconnected`);
+      console.log(`[sslVisionProxy.cjs] Frontend client disconnected from backend`);
     });
   });
 
