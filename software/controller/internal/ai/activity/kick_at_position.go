@@ -82,8 +82,8 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		direction := math.Copysign(1.0, angleDelta)
 		// Positive direction: Turn left
 		// Negative direction: Turn right
-		stepSize := 90.0 // millimeters
-		radius := 100.0  // WARNING MAGIC NUMBER
+		stepSize := 150.0 // millimeters
+		radius := 115.0   // WARNING MAGIC NUMBER
 
 		vecBallToRobot := robotPos.Sub(&ballPos)
 		angleFromBall := vecBallToRobot.Angle
