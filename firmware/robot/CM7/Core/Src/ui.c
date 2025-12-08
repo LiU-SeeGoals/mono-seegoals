@@ -443,25 +443,25 @@ void parse_key()
     } else if (current_state == state_motors_steer) {
         switch (key) {
         case 'W':
-            NAV_SetCommandPosition(0, 1, 0);
-            if (!moving)
-                NAV_EnableMovement();
-            moving = 1;
-            break;
-        case 'A':
             NAV_SetCommandPosition(1, 0, 0);
             if (!moving)
                 NAV_EnableMovement();
             moving = 1;
             break;
+        case 'A':
+            NAV_SetCommandPosition(0, 1, 0);
+            if (!moving)
+                NAV_EnableMovement();
+            moving = 1;
+            break;
         case 'S':
-            NAV_SetCommandPosition(0, -1, 0);
+            NAV_SetCommandPosition(-1, 0, 0);
             if (!moving)
                 NAV_EnableMovement();
             moving = 1;
             break;
         case 'D':
-            NAV_SetCommandPosition(-1, 0, 0);
+            NAV_SetCommandPosition(0, -1, 0);
             if (!moving)
                 NAV_EnableMovement();
             moving = 1;
