@@ -48,7 +48,7 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
 	// dy := mv.Pos.Y - mv.Dest.Y
 	dx := mv.Dest.X - mv.Pos.X
 	dy := mv.Dest.Y - mv.Pos.Y
-	angleDiff := mv.Dest.Angle - mv.Pos.Angle
+	angleDiff := info.NormalizeAngleDelta(mv.Dest.Angle, mv.Pos.Angle)
 
 	distance := math.Sqrt(dx*dx + dy*dy)
 	maxSpeed := float64(0.5)
@@ -165,12 +165,13 @@ func (mv *MoveTo) TranslateSim() *simulation.RobotCommand {
 }
 
 func (mt *MoveTo) TranslateReal() *robot_action.Command {
-	// var dribble int32
-	// if mt.Dribble {
-	// 	dribble = 1
-	// } else {
-	// 	dribble = 0
-	// }
+	// Robots only take binary commands for kick and dribblespeed.
+	// Either 0 or 1.
+	kickSpeedReal := min(1, mt.KickSpeed)
+	dribbleSpeedReal := 0
+	if mt.Dribble {
+		dribbleSpeedReal = 1
+	}
 
 	command_move := &robot_action.Command{
 		CommandId: robot_action.ActionType_MOVE_TO_ACTION,
@@ -185,6 +186,8 @@ func (mt *MoveTo) TranslateReal() *robot_action.Command {
 			Y: int32(mt.Dest.Y + 10000),
 			W: float32(mt.Dest.Angle * 1000),
 		},
+		KickSpeed:  int32(kickSpeedReal),
+		AngularVel: int32(dribbleSpeedReal),
 	}
 	return command_move
 }
