@@ -1,8 +1,6 @@
 package info
 
-import (
-	"fmt"
-)
+import "fmt"
 
 // import "gonum.org/v1/gonum/mat"
 

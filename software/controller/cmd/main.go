@@ -5,5 +5,5 @@ import (
 )
 
 func main() {
-	demos.GameViewerDemo()
+	demos.FwRealScenario()
 }
