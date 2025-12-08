@@ -11,7 +11,7 @@ import (
 )
 
 // RobotSafetyRadius defines the no-movement zone around each robot
-const RobotSafetyRadius = 90.0 // mm - increased for better safety margin
+const RobotSafetyRadius = 250.0 // mm - increased for better safety margin
 
 // MoveToPositionWithCollisionAvoidance handles collision avoidance using RRT
 type MoveToPosition struct {
@@ -236,6 +236,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	act.Team = m.team
 	act.Pos = myPos
 	act.Dest = targetPos
+	act.Dest.Angle = targetPos.Angle
 	act.Dribble = false
 	return act
 }
