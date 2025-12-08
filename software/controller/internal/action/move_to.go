@@ -165,12 +165,11 @@ func (mv *MoveTo) TranslateSim() *simulation.RobotCommand {
 }
 
 func (mt *MoveTo) TranslateReal() *robot_action.Command {
-	// var dribble int32
-	// if mt.Dribble {
-	// 	dribble = 1
-	// } else {
-	// 	dribble = 0
-	// }
+	kickSpeedReal := min(1, mt.KickSpeed)
+	dribbleSpeedReal := 0
+	if mt.Dribble {
+		dribbleSpeedReal = 1
+	}
 
 	command_move := &robot_action.Command{
 		CommandId: robot_action.ActionType_MOVE_TO_ACTION,
@@ -185,6 +184,8 @@ func (mt *MoveTo) TranslateReal() *robot_action.Command {
 			Y: int32(mt.Dest.Y + 10000),
 			W: float32(mt.Dest.Angle * 1000),
 		},
+		KickSpeed:  int32(kickSpeedReal),
+		AngularVel: int32(dribbleSpeedReal),
 	}
 	return command_move
 }
