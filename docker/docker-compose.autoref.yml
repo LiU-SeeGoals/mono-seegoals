@@ -1,0 +1,17 @@
+services:
+  tiger-auto-referee:
+    image: tigersmannheim/auto-referee
+    container_name: ${DOCKER_NAME_TIGER_AUTOREF}
+    restart: "no"
+    network_mode: "host"
+    command:
+      - "-hl"
+      - "-va"
+      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"
+
+  game-viewer:
+    environment:
+      - SSL_VISION_MULTICAST_PORT=${SSL_VISION_REAL_MAIN_PORT}
+      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=192.168.1.1
+    command: bash -c "cd /var/GameViewer && pnpm install && pnpm run dev"
+    network_mode: host

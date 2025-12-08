@@ -4,10 +4,9 @@ services:
 
   game-viewer:
     environment:
-      - SSL_VISION_MULTICAST_ADDR=${SSL_VISION_MULTICAST_ADDR}
       - SSL_VISION_MULTICAST_PORT=${SSL_VISION_REAL_MAIN_PORT}
-    depends_on:
-      - ${DOCKER_NAME_AI}
+      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=192.168.1.1
+    command: bash -c "cd /var/GameViewer && pnpm install && pnpm run dev"
     network_mode: host
 
   ssl-vision-client:

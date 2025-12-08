@@ -101,7 +101,7 @@ PluginLegacySSLNetworkOutputSettings::PluginLegacySSLNetworkOutputSettings()
   settings->addChild(ds_multicast_port_old =
       new VarInt("Legacy Double-Size Field Multicast Port",10005,1,65535));
   settings->addChild(
-      multicast_interface = new VarString("Multicast Interface",""));
+      multicast_interface = new VarString("Multicast Interface","enp4s0"));
 }
 
 VarList * PluginLegacySSLNetworkOutputSettings::getSettings()

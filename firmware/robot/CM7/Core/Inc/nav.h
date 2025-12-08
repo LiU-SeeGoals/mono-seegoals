@@ -32,11 +32,7 @@ typedef enum
  */
 void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
               TIM_HandleTypeDef* pwm_htim,
-              TIM_HandleTypeDef* pwm15_htim,
-              TIM_HandleTypeDef* encoder1_htim,
-              TIM_HandleTypeDef* encoder2_htim,
-              TIM_HandleTypeDef* encoder3_htim,
-              TIM_HandleTypeDef* encoder4_htim);
+              TIM_HandleTypeDef* pwm15_htim);
 
 /**
  * Updates the encoder count, and motor control for all four motors.
@@ -51,6 +47,7 @@ void NAV_update_motor_state();
  */
 void NAV_steer(float vx, float vy, float w);
 
+void NAV_TEST_pwm();
 /**
  * Stops all movement
  */
@@ -89,15 +86,10 @@ void NAV_RunDribbler();
 void NAV_TestDribbler();
 
 /**
- * Log motor speeds in m/s
- */
-void NAV_log_speed();
-
-/**
  * Run one wheel at a time from first to last first forward in two seconds
  * then backwards for two more.
  */
-void NAV_TireTest();
+void NAV_TEST_TireTest();
 
 /**
  * Sets robot_cmd disabled

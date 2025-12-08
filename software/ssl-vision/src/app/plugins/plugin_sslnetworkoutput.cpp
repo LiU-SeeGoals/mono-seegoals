@@ -66,7 +66,7 @@ PluginSSLNetworkOutputSettings::PluginSSLNetworkOutputSettings()
   settings->addChild(multicast_address = new VarString("Multicast Address","224.5.23.2"));
   settings->addChild(multicast_port =
       new VarInt("Multicast Port",10006,1,65535));
-  settings->addChild(multicast_interface = new VarString("Multicast Interface",""));
+  settings->addChild(multicast_interface = new VarString("Multicast Interface","enp4s0"));
 }
 
 VarList * PluginSSLNetworkOutputSettings::getSettings()
