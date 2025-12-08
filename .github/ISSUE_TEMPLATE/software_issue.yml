@@ -5,12 +5,13 @@ labels: ["bug", "triage"]
 projects: ["octo-org/1", "octo-org/44"]
 assignees:
   - octocat
-type: bug
+
 body:
   - type: markdown
     attributes:
       value: |
-        Thanks for taking the time to fill out this bug report!
+        Thanks for taking the time to fill out this issue report!
+
   - type: input
     id: contact
     attributes:
@@ -19,15 +20,17 @@ body:
       placeholder: please provide your discord ID
     validations:
       required: true
+
   - type: textarea
     id: structure
     attributes:
-      label: Describe the issue:
-      description: Also tell us, what did you expect to happen?
-      placeholder: Tell us what you see!
-      value: "A bug happened!"
+      label: Describe the issue
+      description: Also tell us, what exactly needs to be done?
+      placeholder: Tell us what you want!
+      value: "robots should be able to twerk"
     validations:
       required: true
+
   - type: dropdown
     id: time
     attributes:
