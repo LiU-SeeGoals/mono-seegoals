@@ -165,6 +165,8 @@ func (mv *MoveTo) TranslateSim() *simulation.RobotCommand {
 }
 
 func (mt *MoveTo) TranslateReal() *robot_action.Command {
+	// Robots only take binary commands for kick and dribblespeed.
+	// Either 0 or 1.
 	kickSpeedReal := min(1, mt.KickSpeed)
 	dribbleSpeedReal := 0
 	if mt.Dribble {
