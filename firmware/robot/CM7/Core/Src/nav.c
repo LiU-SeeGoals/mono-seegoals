@@ -272,6 +272,19 @@ void NAV_HandleCommand(Command* cmd)
 
         NAV_EnableMovement();
         NAV_GoToAction(cmd);
+        if(cmd->kick_speed == 1)
+        {
+            KICKER_Kick();
+        }
+
+        if(cmd->angular_vel == 1)
+        {
+            NAV_RunDribbler();
+        }
+        else
+        {
+            NAV_StopDribbler();
+        }
 
     } break;
 
