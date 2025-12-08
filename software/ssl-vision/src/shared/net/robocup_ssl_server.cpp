@@ -50,11 +50,12 @@ bool RoboCupSSLServer::open() {
 
   Net::Address multiaddr,interface;
   multiaddr.setHost(_net_address.c_str(),_port);
-  if(_net_interface.length() > 0){
-    interface.setHost(_net_interface.c_str(),_port);
-  }else{
-    interface.setAny();
-  }
+  interface.setHost("192.168.1.1",_port);
+  //if(_net_interface.length() > 0){
+  //  interface.setHost(_net_interface.c_str(),_port);
+  //}else{
+  //  interface.setAny();
+  //}
 
   if(!mc.addMulticast(multiaddr,interface)) {
     fprintf(stderr,"Unable to setup UDP multicast\n");

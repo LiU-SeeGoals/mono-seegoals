@@ -77,13 +77,25 @@ choices = [
         "container_to_enter": AI
     },
     {
-        "choice-text": f"Manual start '{AI}' and '{GW}'.",
+        "choice-text": f"Develop on '{GW}' files (auto-start '{AI}' program).",
         "pull_images": [],
         "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-            "-p", project_name, "up",
+            "-f", f"{docker_dir}/docker-compose.autostart_ai.yml",
+            "-p", project_name, "up", "-d"
+        ],
+        "container_to_enter": GW
+    },
+    {
+        "choice-text": f"Develop on `{AI}` and '{GW}' files (auto-start nothing).",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-p", project_name, "up", "-d"
         ],
         "container_to_enter": None
     },
@@ -97,9 +109,24 @@ choices = [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
             "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
-            "-p", project_name, "up",
+            "-p", project_name, "up", "-d"
         ],
-        "container_to_enter": None
+        "container_to_enter": AI
+    },
+    {
+        "choice-text": f"Fetdatorn configuration (+ autoref)",
+        "pull_images": [
+            "ghcr.io/liu-seegoals/game-viewer:latest"
+        ],
+        "pre_cmd": [ f"{ssl_vision_dir}/start.sh" ],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
+            "-f", f"{docker_dir}/docker-compose.autoref.yml",
+            "-p", project_name, "up", "-d"
+        ],
+        "container_to_enter": AI
     },
     {
         "choice-text": "Start for competition.",
@@ -112,6 +139,18 @@ choices = [
             "-p", project_name, "up", "-d"
         ],
         "container_to_enter": envs.get("DOCKER_NAME_AI")
+    },
+    {
+        "choice-text": f"Develop on '{GW}' files, enter on startup.",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.gameviewer.yml",
+            "-p", project_name, "up", "-d"
+        ],
+        "container_to_enter": GW
     }
 ]
 
@@ -206,7 +245,7 @@ if __name__ == "__main__":
             if arg in flags["verbose"]:
                 VERBOSE = True
             elif arg in flags["help"]:
-                print("lul")
+                print("as if...")
                 sys.exit(0)
 
     # Choose what to do
