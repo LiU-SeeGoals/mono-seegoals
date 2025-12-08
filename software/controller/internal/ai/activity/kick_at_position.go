@@ -47,6 +47,8 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	facingBall := robot.Facing(ballPos, accuracy*2)
 	facingTarget := robot.Facing(kp.targetPosition, accuracy*2)
 
+	fmt.Printf("[KickAtPosition] robot %d: inPossession=%v, retrievingBall=%v, facingBall=%v, facingTarget=%v\n",
+		kp.id, inPossession, kp.retrievingBall, facingBall, facingTarget)
 	if kp.retrievingBall && facingBall && facingTarget {
 		fmt.Printf("[KickAtPosition] robot %d retrieving: aligned with ball and target -> MoveToBall\n", kp.id)
 		return NewMoveToBall(kp.team, kp.id).GetAction(gi)
@@ -68,22 +70,43 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 
 	// Robot is in possesion of the ball, but is not facing the target
 	if inPossession && !robot.Facing(kp.targetPosition, accuracy) {
-		// Robust Turn: Command the robot to be in the shooting position.
-		// Shooting position = Robot center is ~90-100mm behind the ball, aligned with target.
-		// By commanding this position, the path planner will handle the orbiting/turning.
+		// Since we cannot move and rotate with the ball reliably,
+		// we need to move around the ball, while also rotating towards the ball at the same time
+		// until we are lined up with the target, aswell as the ball.
 
-		vecToTarget := kp.targetPosition.Sub(&ballPos).Normalize()
-		// 150mm offset: roughly robot radius (90mm) + small push margin
-		offset := vecToTarget.Scale(100)
-		shootingPos := ballPos.Sub(&offset)
-		shootingPos.Angle = ballPos.AngleToPosition(kp.targetPosition)
+		// We assume possesion means that the ball in proximity to the dribbler
+		robotPos, _ := robot.GetPosition()
 
-		move := NewMoveToPosition(kp.team, kp.id, shootingPos)
-		moveAction := move.GetMoveToAction(gi)
-		moveAction.Dribble = true
+		angleDelta := info.NormalizeAngleDelta(robotPos.Angle, ballPos.AngleToPosition(kp.targetPosition))
 
-		// fmt.Printf("[KickAtPosition] robot %d aligning: target angle %.1f°\n", kp.id, radToDeg(shootingPos.Angle))
+		direction := math.Copysign(1.0, angleDelta)
+		// Positive direction: Turn left
+		// Negative direction: Turn right
+		stepSize := 90.0 // millimeters
+		radius := 100.0  // WARNING MAGIC NUMBER
+
+		vecBallToRobot := robotPos.Sub(&ballPos)
+		angleFromBall := vecBallToRobot.Angle
+
+		tangentAngle := angleFromBall + (direction * math.Pi / 2)
+
+		tangentPoint := robotPos.OnRadius(stepSize, tangentAngle)
+		vecBallToNextPos := tangentPoint.Sub(&ballPos).Normalize().Scale(radius)
+		nextPosition := ballPos.Add(&vecBallToNextPos)
+		nextPosition.Angle = nextPosition.AngleToPosition(ballPos)
+
+		fmt.Printf("Rotating around ball by stepping to robot %d (%.1f, %.1f) nextangle %.1f° (angleDelta=%.2f°)\n",
+			kp.id, nextPosition.X, nextPosition.Y, radToDeg(nextPosition.Angle), radToDeg(angleDelta))
+		// Create move action to the current target
+		moveAction := action.MoveTo{
+			Id:      int(kp.id),
+			Team:    kp.team,
+			Dest:    nextPosition,
+			Dribble: false,
+		}
+		moveAction.Dest.Angle = nextPosition.Angle
 		return &moveAction
+
 	}
 
 	// If we get here, it means we are in possession of the ball and that the robot is facing the target.
@@ -93,6 +116,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	moveAction := action.MoveTo{
 		Id:   int(kp.id),
 		Dest: destination,
+		Team: kp.team,
 	}
 	KickSpeed := float32(5)
 	moveAction.KickSpeed = int(KickSpeed)

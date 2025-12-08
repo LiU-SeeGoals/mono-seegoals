@@ -11,7 +11,7 @@ import (
 )
 
 // RobotSafetyRadius defines the no-movement zone around each robot
-const RobotSafetyRadius = 150.0 // mm - increased for better safety margin
+const RobotSafetyRadius = 250.0 // mm - increased for better safety margin
 
 // MoveToPositionWithCollisionAvoidance handles collision avoidance using RRT
 type MoveToPosition struct {

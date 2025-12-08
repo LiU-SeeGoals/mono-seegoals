@@ -48,7 +48,7 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
 	// dy := mv.Pos.Y - mv.Dest.Y
 	dx := mv.Dest.X - mv.Pos.X
 	dy := mv.Dest.Y - mv.Pos.Y
-	angleDiff := mv.Dest.Angle - mv.Pos.Angle
+	angleDiff := info.NormalizeAngleDelta(mv.Dest.Angle, mv.Pos.Angle)
 
 	distance := math.Sqrt(dx*dx + dy*dy)
 	maxSpeed := float64(0.5)
