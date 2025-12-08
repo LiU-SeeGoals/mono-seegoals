@@ -47,10 +47,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	facingBall := robot.Facing(ballPos, accuracy*2)
 	facingTarget := robot.Facing(kp.targetPosition, accuracy*2)
 
-	fmt.Printf("[KickAtPosition] robot %d: inPossession=%v, retrievingBall=%v, facingBall=%v, facingTarget=%v\n",
-		kp.id, inPossession, kp.retrievingBall, facingBall, facingTarget)
 	if kp.retrievingBall && facingBall && facingTarget {
-		fmt.Printf("[KickAtPosition] robot %d retrieving: aligned with ball and target -> MoveToBall\n", kp.id)
 		return NewMoveToBall(kp.team, kp.id).GetAction(gi)
 	} else if kp.retrievingBall {
 		ballMargin := unitVector.Scale(350) // MagicNumber (100mm behind ball)
@@ -63,8 +60,6 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		move := NewMoveToPosition(kp.team, kp.id, lineUpPos)
 		move.AvoidBall(true)
 		moveAction := move.GetMoveToAction(gi)
-		fmt.Printf("[KickAtPosition] robot %d retrieving: lining up at (%.1f, %.1f) angle %.1f° (facingBall=%v facingTarget=%v)\n",
-			kp.id, lineUpPos.X, lineUpPos.Y, radToDeg(lineUpPos.Angle), facingBall, facingTarget)
 		return &moveAction
 	}
 
@@ -95,8 +90,6 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		nextPosition := ballPos.Add(&vecBallToNextPos)
 		nextPosition.Angle = nextPosition.AngleToPosition(ballPos)
 
-		fmt.Printf("Rotating around ball by stepping to robot %d (%.1f, %.1f) nextangle %.1f° (angleDelta=%.2f°)\n",
-			kp.id, nextPosition.X, nextPosition.Y, radToDeg(nextPosition.Angle), radToDeg(angleDelta))
 		// Create move action to the current target
 		moveAction := action.MoveTo{
 			Id:      int(kp.id),
@@ -120,8 +113,6 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	}
 	KickSpeed := float32(5)
 	moveAction.KickSpeed = int(KickSpeed)
-	fmt.Printf("[KickAtPosition] robot %d shooting: run-up target (%.1f, %.1f) angle %.1f° kickSpeed=%d\n",
-		kp.id, destination.X, destination.Y, radToDeg(destination.Angle), moveAction.KickSpeed)
 	return &moveAction
 }
 
@@ -136,9 +127,4 @@ func (kp *KickAtPosition) Achieved(gi *info.GameInfo) bool {
 
 func (kp *KickAtPosition) GetID() info.ID {
 	return kp.id
-}
-
-// Helper
-func radToDeg(rad float64) float64 {
-	return rad * 180 / math.Pi
 }
