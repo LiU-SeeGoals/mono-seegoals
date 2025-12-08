@@ -1,30 +1,24 @@
-# React + TypeScript + Vite
+# Game Viewer
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Speaking with SSL software
+In SSL we've got different surrounding software that we want to listen to, currently it's `Game Controller` and `SSL Vision`
 
-Currently, two official plugins are available:
+The frontend can't subscribe to multicasts, at least that's not how it was implemented when I took this over, so now that's not how we do it (potential improvement!).
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Currently the backend (i.e. node.js) subscribes to the multicasts and then resends them unto a websocket as follows.
 
-## Expanding the ESLint configuration
+```
+./src/backend/gameControllerProxy.cjs
+Bind UDP socket to SSL_GAME_CONTROLLER_PUBLISH_ADDR:SSL_GAME_CONTROLLER_PUBLISH_PORT
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+Create websocket server to VITE_SSL_GAME_CONTROLLER_WS_ADDR:VITE_SSL_GAME_CONTROLLER_WS_PORT
 
-- Configure the top-level `parserOptions` property like this:
-
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
-};
+When UDP socket receives message, send to websocket.
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+Then in the frontend we open a new websocket and subscribe to `VITE_SSL_GAME_CONTROLLER_WS_ADDR:VITE_SSL_GAME_CONTROLLER_WS_PORT` which we created above. This happens in `./src/hooks/useGameController.ts`.
+
+The `./src/backend/sslVisionProxy.cjs` works in the same way.
+
+## Speaking with AI controller
+Our own *AI* controller doesn't multicast, it creates a websocket on `VITE_AI_GAME_VIEWER_SOCKET_ADDR:VITE_AI_GAME_VIEWER_SOCKET_PORT` for us, so here we can simply connect to that. We do this in `./src/hooks/useAIController.ts`.
