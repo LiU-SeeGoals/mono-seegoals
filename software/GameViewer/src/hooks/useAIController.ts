@@ -7,8 +7,8 @@ export const useAIController = (
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const ai_address = "127.0.0.1";
-    const ai_port = "3002";
+    const ai_address = import.meta.env.VITE_AI_CONTROLLER_WS_ADDR;
+    const ai_port = import.meta.env.VITE_AI_CONTROLLER_WS_PORT;
     console.log(`[useAIController.ts] connecting to ws://${ai_address}:${ai_port}`);
 
     const ws = new WebSocket(`ws://${ai_address}:${ai_port}`);

@@ -10,6 +10,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/config"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/gorilla/websocket"
 )
@@ -50,8 +51,10 @@ func getInstance() *WebServer {
 
 // Constructor for the WebServer class
 func startWebServer() {
-	multicastIP := "239.0.0.1"
-	multicastPort := 9999
+	// multicastIP := "239.0.0.1"
+	// multicastPort := 9999
+	multicastIP := config.GetGameViewerAdress();
+	multicastPort := config.GetGameViewerPort();
 
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", multicastIP, multicastPort))
 	if err != nil {

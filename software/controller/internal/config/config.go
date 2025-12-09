@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sync"
+	"strconv"
 
 	"github.com/caarlos0/env/v10"
 	"github.com/joho/godotenv"
@@ -57,8 +58,8 @@ type ConfigReal struct {
 }
 
 type ConfigGameViewer struct {
-    Address string `env:"VITE_AI_GAME_VIEWER_SOCKET_ADDR,required"`
-    Port string `env:"VITE_AI_GAME_VIEWER_SOCKET_PORT,required"`
+    Address string `env:"AI_ACTIONS_MULTICAST_ADDR,required"`
+    Port string `env:"AI_ACTIONS_MULTICAST_PORT,required"`
 }
 
 // Config struct for sim
@@ -189,5 +190,14 @@ func GetSSLClientAddressReal() string {
 
 func GetGameViewerAdress() string {
     cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.GW.Address, cfg.GW.Port)
+	return fmt.Sprintf("%s", cfg.GW.Address)
+}
+
+func GetGameViewerPort() int {
+    cfg := GetInstance()
+	num, err := strconv.Atoi(cfg.GW.Port)
+	if err != nil {
+		panic(err)
+	}
+	return num
 }

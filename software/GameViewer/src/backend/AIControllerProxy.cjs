@@ -1,11 +1,10 @@
 const dgram = require('dgram');
 const ws = require('ws');
 
-const env = process.env.ENVIRONMENT;
-const aiAddr = "239.0.0.1";
-const aiPort = "9999";
-const wsAddr = "127.0.0.1";
-const wsPort = "3002";
+const aiAddr = process.env.AI_ACTIONS_MULTICAST_ADDR;
+const aiPort = parseInt(process.env.AI_ACTIONS_MULTICAST_PORT);
+const wsAddr = process.env.VITE_AI_CONTROLLER_WS_ADDR;
+const wsPort = parseInt(process.env.VITE_AI_CONTROLLER_WS_PORT);
 
 const udpSocket = dgram.createSocket({type: "udp4", reuseAddr: true });
 let wss;
