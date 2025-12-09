@@ -17,6 +17,23 @@ To build the Go code, run the following script from the root of this directory:
 ### For C
 To build the C code, run the following script from the root of this directory:
 
+First we need to build proto-c locally
+Download from their release page: https://github.com/protobuf-c/protobuf-c
+
+Install
+
+```
+sudo apt install libprotobuf-dev libprotoc-dev protobuf-compiler
+```
+
+then build proto c with
+
+```
+./configure && make && sudo make install
+```
+
+Now you can build proto c files
+
 ```bash
 ./build_c.sh
 ```
