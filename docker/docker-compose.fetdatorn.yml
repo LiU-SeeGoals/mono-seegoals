@@ -1,5 +1,7 @@
 services:
   ai:
+    environment:
+      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=192.168.1.1
     network_mode: host
 
   game-viewer:

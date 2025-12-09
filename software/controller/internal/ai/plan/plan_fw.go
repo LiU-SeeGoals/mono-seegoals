@@ -42,12 +42,11 @@ func (m *plannerFw) Init(
 func (m *plannerFw) run() {
 	way_points := []info.Position{
 		// Triangle
-		{X: 1000, Y: 1000, Z: 0, Angle: 0},
-		{X: -1000, Y: 1000, Z: 0, Angle: 0},
-		{X: 1000, Y: -1000, Z: 0, Angle: 0},
+		{X: 0, Y: 0, Z: 0, Angle: 0},
+		{X: -1000, Y: 0, Z: 0, Angle: 0},
+		{X: -1000, Y: -1000, Z: 0, Angle: 0},
 	}
 	index := 0
-	robots := []int{0}
 
 	gameInfo := <-m.incomingGameInfo
 	fmt.Println(gameInfo.Status)
@@ -55,11 +54,10 @@ func (m *plannerFw) run() {
 	for {
 		time.Sleep(100 * time.Millisecond)
 
-		robot := robots[0]
-		if m.activities[robot] == nil {
+		if m.activities[3] == nil {
 			//fmt.Println(fmt.Sprintf("done with (%d) action (%s)", robot, m.team))
 			//fmt.Println("next action: ", way_points[index])
-			m.AddActivity(ai.NewMoveToPosition(m.team, info.ID(robot), way_points[index]))
+			m.AddActivity(ai.NewMoveToPosition(m.team, info.ID(3), way_points[index]))
 			index = (index + 1) % len(way_points)
 		}
 	}
