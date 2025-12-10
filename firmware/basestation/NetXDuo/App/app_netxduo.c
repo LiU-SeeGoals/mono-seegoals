@@ -22,6 +22,7 @@
 #include "app_netxduo.h"
 
 /* Private includes ----------------------------------------------------------*/
+#include "nx_api.h"
 #include "nxd_dhcp_client.h"
 /* USER CODE BEGIN Includes */
 #include "main.h"
@@ -347,29 +348,39 @@ static VOID nx_udp_thread_entry(ULONG thread_input)
 {
     UINT ret = NX_SUCCESS;
 
-    ret = nx_udp_socket_create(&NetXDuoEthIpInstance, &visionSocket, "UDP Client Socket", NX_IP_NORMAL, NX_FRAGMENT_OKAY, NX_IP_TIME_TO_LIVE, QUEUE_MAX_SIZE);
+    // ret = nx_udp_socket_create(&NetXDuoEthIpInstance, &visionSocket, "UDP Client Socket", NX_IP_NORMAL, NX_FRAGMENT_OKAY, NX_IP_TIME_TO_LIVE, QUEUE_MAX_SIZE);
+    // if (ret != NX_SUCCESS) {
+    //     Error_Handler();
+    // }
+    //
+    // ret = nx_udp_socket_bind(&visionSocket, VISION_PORT, TX_WAIT_FOREVER);
+    // if (ret != NX_SUCCESS) {
+    //     Error_Handler();
+    // }
+    //
+    // ret = nx_udp_socket_receive_notify(&visionSocket, udp_socket_receive_vision);
+    // if (ret != NX_SUCCESS) {
+    //     Error_Handler();
+    // }
+    //
+    // LOG_INFO("Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
+
+    ret = nx_igmp_enable(&NetXDuoEthIpInstance);
     if (ret != NX_SUCCESS) {
         Error_Handler();
     }
-
-    ret = nx_udp_socket_bind(&visionSocket, VISION_PORT, TX_WAIT_FOREVER);
-    if (ret != NX_SUCCESS) {
-        Error_Handler();
-    }
-
-    ret = nx_udp_socket_receive_notify(&visionSocket, udp_socket_receive_vision);
-    if (ret != NX_SUCCESS) {
-        Error_Handler();
-    }
-
-    LOG_INFO("Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
 
     ret = nx_udp_socket_create(&NetXDuoEthIpInstance, &controllerSocket, "UDP Client Socket", NX_IP_NORMAL, NX_FRAGMENT_OKAY, NX_IP_TIME_TO_LIVE, QUEUE_MAX_SIZE);
     if (ret != NX_SUCCESS) {
         Error_Handler();
     }
 
-    ret = nx_udp_socket_bind(&controllerSocket, CONTROLLER_PORT, TX_WAIT_FOREVER);
+    ret = nx_igmp_multicast_join(&NetXDuoEthIpInstance, IP_ADDRESS(239, 0, 0, 2));
+    if (ret != NX_SUCCESS) {
+        Error_Handler();
+    }
+
+    ret = nx_udp_socket_bind(&controllerSocket, 9999, TX_WAIT_FOREVER);
     if (ret != NX_SUCCESS) {
         Error_Handler();
     }
@@ -383,22 +394,23 @@ static VOID nx_udp_thread_entry(ULONG thread_input)
     tx_thread_relinquish();
 }
 
-static VOID udp_socket_receive_vision(NX_UDP_SOCKET* socket_ptr)
-{
-    UINT ret = NX_SUCCESS;
-    NX_PACKET* data_packet;
-
-    ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
-    if (ret == NX_SUCCESS) {
-        COM_ParsePacket(data_packet, SSL_WRAPPER);
-        nx_packet_release(data_packet);
-    }
-}
+// static VOID udp_socket_receive_vision(NX_UDP_SOCKET* socket_ptr)
+// {
+//     UINT ret = NX_SUCCESS;
+//     NX_PACKET* data_packet;
+//
+//     ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
+//     if (ret == NX_SUCCESS) {
+//         COM_ParsePacket(data_packet, SSL_WRAPPER);
+//         nx_packet_release(data_packet);
+//     }
+// }
 
 static VOID udp_socket_receive_controller(NX_UDP_SOCKET* socket_ptr)
 {
     UINT ret = NX_SUCCESS;
     NX_PACKET* data_packet;
+    LOG_INFO("got packet\r\n");
 
     ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
     if (ret == NX_SUCCESS) {
