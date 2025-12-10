@@ -2,6 +2,7 @@
 #include "arm_mat_util_f32.h"
 #include "arm_math.h"
 #include "imu.h"
+#include "kicker.h"
 #include "lag_element.h"
 
 #include "log.h"
@@ -550,6 +551,7 @@ void STATE_calibrate_imu_gyr()
     IMU_GyroVec3 gyr;
     for (int i = 0; i < calib_size; i++) {
         // Assume imu can handle 1khz update
+
         HAL_Delay(1);
 
         gyr = IMU_read_gyro_radps();
@@ -575,6 +577,7 @@ void STATE_calibrate_imu_gyr()
 
     fusionEKF.bias.is_calibrated = 1;
     LOG_INFO("Done calibrating\r\n");
+
 }
 
 uint16_t STATE_is_calibrated() { return fusionEKF.bias.is_calibrated; }

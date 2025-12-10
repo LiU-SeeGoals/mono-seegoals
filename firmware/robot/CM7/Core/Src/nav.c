@@ -285,6 +285,7 @@ void NAV_HandleCommand(Command* cmd)
         NAV_GoToAction(cmd);
         if(cmd->kick_speed == 1)
         {
+            KICKER_Charge();
             KICKER_Kick();
         }
 
