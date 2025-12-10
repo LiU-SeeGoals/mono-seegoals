@@ -5,8 +5,8 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
-	"sync"
 	"strconv"
+	"sync"
 
 	"github.com/caarlos0/env/v10"
 	"github.com/joho/godotenv"
@@ -32,7 +32,11 @@ type Config struct {
 	// Game controller config
 	GC ConfigGameController
 
-    GW ConfigGameViewer
+	GW ConfigGameViewer
+
+	BS ConfigBasestation
+
+	FT ConfigFetdatorn
 }
 
 // Config struct for SSL Vision.
@@ -58,8 +62,17 @@ type ConfigReal struct {
 }
 
 type ConfigGameViewer struct {
-    Address string `env:"AI_ACTIONS_MULTICAST_ADDR,required"`
-    Port string `env:"AI_ACTIONS_MULTICAST_PORT,required"`
+	Address string `env:"AI_ACTIONS_MULTICAST_ADDR,required"`
+	Port    string `env:"AI_ACTIONS_MULTICAST_PORT,required"`
+}
+
+type ConfigBasestation struct {
+	Address string `env:"AI_ACTIONS_BASESTATION_MULTICAST_ADDR,required"`
+	Port    string `env:"AI_ACTIONS_BASESTATION_MULTICAST_PORT,required"`
+}
+
+type ConfigFetdatorn struct {
+	Interface string `env:"FETDATORN_MULTICAST_INTERFACE,required"`
 }
 
 // Config struct for sim
@@ -188,16 +201,31 @@ func GetSSLClientAddressReal() string {
 	return fmt.Sprintf("%s:%s", cfg.SSLVision.Address, cfg.SSLVision.Port_real)
 }
 
+func GetFetdatornInterface() string {
+	cfg := GetInstance()
+	return cfg.FT.Interface
+}
+
 func GetGameViewerAdress() string {
-    cfg := GetInstance()
-	return fmt.Sprintf("%s", cfg.GW.Address)
+	cfg := GetInstance()
+	return cfg.GW.Address
 }
 
 func GetGameViewerPort() int {
-    cfg := GetInstance()
+	cfg := GetInstance()
 	num, err := strconv.Atoi(cfg.GW.Port)
 	if err != nil {
 		panic(err)
 	}
 	return num
+}
+
+func GetBasestationAdress() string {
+	cfg := GetInstance()
+	return cfg.BS.Address
+}
+
+func GetBasestationPort() string {
+	cfg := GetInstance()
+	return cfg.BS.Port
 }

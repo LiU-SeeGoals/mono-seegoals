@@ -1,11 +1,14 @@
 package client
+
 import (
 	"errors"
 	"fmt"
 	"net"
 	"sync"
 	"time"
+
 	"github.com/LiU-SeeGoals/controller/internal/action"
+	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,24 +29,24 @@ type BaseStationClient struct {
 }
 
 func NewBaseStationClient(address string) *BaseStationClient {
-	multicastIP := "239.0.0.2"
-	multicastPort := 9999
-	
-	remoteAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", multicastIP, multicastPort))
+	multicastIP := config.GetBasestationAdress()
+	multicastPort := config.GetBasestationPort()
+
+	remoteAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", multicastIP, multicastPort))
 	if err != nil {
 		panic(err)
 	}
-	
-	iface, err := net.InterfaceByName("eth0")
+
+	iface, err := net.InterfaceByName(config.GetFetdatornInterface())
 	if err != nil {
 		panic(err)
 	}
-	
+
 	addrs, err := iface.Addrs()
 	if err != nil {
 		panic(err)
 	}
-	
+
 	var localIP net.IP
 	for _, addr := range addrs {
 		if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
@@ -51,22 +54,20 @@ func NewBaseStationClient(address string) *BaseStationClient {
 			break
 		}
 	}
-	
+
 	if localIP == nil {
 		panic("no IPv4 address found on interface")
 	}
-	
+
 	localAddr := &net.UDPAddr{IP: localIP, Port: 0}
-	
+
 	connection, err := net.DialUDP("udp", localAddr, remoteAddr)
 	if err != nil {
 		panic(err)
 	}
-	
-	connection.SetMulticastTTL(2)
-	
-	fmt.Printf("Multicast from %s via %s to %s:%d\n", localIP, iface.Name, multicastIP, multicastPort)
-	
+
+	fmt.Printf("Multicast from %s via %s to %s:%s (basedstation)\n", localIP, iface.Name, multicastIP, multicastPort)
+
 	return &BaseStationClient{
 		connection:    connection,
 		address:       address,
@@ -88,11 +89,11 @@ func (b *BaseStationClient) sendCommands() {
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
-		
+
 		cmd := b.queue[0]
 		b.queue = b.queue[1:]
 		b.queueMutex.Unlock()
-		
+
 		serializedCmd, _ := proto.Marshal(cmd)
 		b.sendMessage(serializedCmd)
 	}
@@ -103,7 +104,7 @@ func (b *BaseStationClient) SendActions(actions []action.Action) {
 		fmt.Println("\033[0m Base station client has not been inited\033[33m")
 		return
 	}
-	
+
 	b.queueMutex.Lock()
 	for _, action := range actions {
 		b.queue = append(b.queue, action.TranslateReal())

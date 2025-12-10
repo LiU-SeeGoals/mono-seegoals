@@ -51,8 +51,6 @@ func getInstance() *WebServer {
 
 // Constructor for the WebServer class
 func startWebServer() {
-	// multicastIP := "239.0.0.1"
-	// multicastPort := 9999
 	multicastIP := config.GetGameViewerAdress()
 	multicastPort := config.GetGameViewerPort()
 
@@ -61,10 +59,36 @@ func startWebServer() {
 		panic(err)
 	}
 
+	//iface, err := net.InterfaceByName(config.GetFetdatornInterface())
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//addrs, err := iface.Addrs()
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//var localIP net.IP
+	//for _, addr := range addrs {
+	//	if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+	//		localIP = ipnet.IP
+	//		break
+	//	}
+	//}
+	//
+	//if localIP == nil {
+	//	panic("no IPv4 address found on interface")
+	//}
+	//
+	//localAddr := &net.UDPAddr{IP: localIP, Port: 0}
+
 	conn, err := net.DialUDP("udp", nil, addr)
 	if err != nil {
 		panic(err)
 	}
+
+	//fmt.Printf("Multicast from %s via %s to %s:%d (GameViewer)\n", localIP, iface.Name, multicastIP, multicastPort)
 
 	webserverInstance = &WebServer{
 		multicastConn:        conn,
@@ -75,9 +99,6 @@ func startWebServer() {
 
 	go webserverInstance.sendGameState()
 	// go webserverInstance.sendLog()
-
-	fmt.Println("Multicast server online at", multicastIP, multicastPort)
-	Logger.Info("Multicast server online at", multicastIP, multicastPort)
 
 	// webserverInstance = &WebServer{
 	// 	gameStatePacketQueue: make([]([]byte), 0),
