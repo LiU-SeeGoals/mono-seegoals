@@ -1,5 +1,6 @@
-const dgram = require('dgram');
-const ws = require('ws');
+const dgram = require("dgram");
+const ws = require("ws");
+const os = require("os");
 
 const aiAddr = process.env.AI_ACTIONS_MULTICAST_ADDR;
 const aiPort = parseInt(process.env.AI_ACTIONS_MULTICAST_PORT);
@@ -11,8 +12,21 @@ let wss;
 
 console.log(`[AIControllerProxy.cjs] Subscribing to ${aiAddr}:${aiPort} and passing on to ${wsAddr}:${wsPort}`);
 
-udpSocket.bind(aiPort, () => {
-  udpSocket.addMembership(aiAddr);
+udpSocket.bind(aiPort, "0.0.0.0", () => {
+  const interfaces = os.networkInterfaces();
+
+  for (const name in interfaces) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === "IPv4" && !iface.internal) {
+        try {
+          udpSocket.addMembership(aiAddr, iface.address);
+          console.log(`[AIControllerProxy.cjs] Joined multicast group on ${iface.address}`);
+        } catch (err) {
+          console.log(`[AIControllerProxy.cjs] Failed to join on ${iface.address}: ${err.message}`);
+        }
+      }
+    }
+  }
 
   console.log(`[AIControllerProxy.cjs] Listening to ${aiAddr}:${aiPort} on ${udpSocket.address().address}:${udpSocket.address().port} (${udpSocket.address().family})`);
 
@@ -32,7 +46,12 @@ udpSocket.bind(aiPort, () => {
     });
   });
 
-  console.log(`[AIControllerProxy.cjs] Websocket created on ${wss.address().address}:${wss.address().port} (${wss.address().family})`)
+  const addr = wss.address();
+  if (addr) {
+    console.log`[AIControllerProxy.cjs] Websocket created on ${addr.address}:${addr.port} (${addr.family})`;
+  } else {
+    console.log`[AIControllerProxy.cjs] Websocket created on port ${wsPort}`;
+  }
 });
 
 udpSocket.on('message', (msg) => {
