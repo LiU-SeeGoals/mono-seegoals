@@ -386,7 +386,7 @@ void wait2(uint64_t us)
 void NAV_TEST_TireTest()
 {
 
-    const int us_to_sec = 10000;
+    const int us_to_sec = 50000;
     LOG_INFO("First motor\r\n");
     MOTOR_SendPWM(&motors[0], 0.2);
     wait2(us_to_sec);
