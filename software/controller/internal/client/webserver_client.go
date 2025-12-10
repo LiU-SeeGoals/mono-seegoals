@@ -59,36 +59,36 @@ func startWebServer() {
 		panic(err)
 	}
 
-	//iface, err := net.InterfaceByName(config.GetFetdatornInterface())
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//addrs, err := iface.Addrs()
-	//if err != nil {
-	//	panic(err)
-	//}
-	//
-	//var localIP net.IP
-	//for _, addr := range addrs {
-	//	if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
-	//		localIP = ipnet.IP
-	//		break
-	//	}
-	//}
-	//
-	//if localIP == nil {
-	//	panic("no IPv4 address found on interface")
-	//}
-	//
-	//localAddr := &net.UDPAddr{IP: localIP, Port: 0}
-
-	conn, err := net.DialUDP("udp", nil, addr)
+	iface, err := net.InterfaceByName(config.GetFetdatornInterface())
 	if err != nil {
 		panic(err)
 	}
 
-	//fmt.Printf("Multicast from %s via %s to %s:%d (GameViewer)\n", localIP, iface.Name, multicastIP, multicastPort)
+	addrs, err := iface.Addrs()
+	if err != nil {
+		panic(err)
+	}
+
+	var localIP net.IP
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+			localIP = ipnet.IP
+			break
+		}
+	}
+
+	if localIP == nil {
+		panic("no IPv4 address found on interface")
+	}
+
+	localAddr := &net.UDPAddr{IP: localIP, Port: 0}
+
+	conn, err := net.DialUDP("udp", localAddr, addr)
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Printf("Multicast from %s via %s to %s:%d (GameViewer)\n", localIP, iface.Name, multicastIP, multicastPort)
 
 	webserverInstance = &WebServer{
 		multicastConn:        conn,

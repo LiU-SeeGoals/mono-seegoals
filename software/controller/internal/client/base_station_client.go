@@ -70,7 +70,7 @@ func NewBaseStationClient(address string) *BaseStationClient {
 
 	return &BaseStationClient{
 		connection:    connection,
-		address:       address,
+		address:       "",
 		queue:         make([]*robot_action.Command, 0),
 		hasBeenInited: false,
 	}

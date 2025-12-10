@@ -45,10 +45,10 @@ func wait(ms time.Duration) {
 func (g *TestKick) run() {
 	for {
 		wait(100 * time.Millisecond)
-		if g.activities[0] == nil {
-			queue := ai.NewActivityQueue(0, []ai.Activity{
-				ai.NewMoveToBall(g.team, 0),
-				ai.NewKickAtPosition(g.team, 0, info.Position{X: 2900, Y: 100}),
+		if g.activities[3] == nil {
+			queue := ai.NewActivityQueue(3, []ai.Activity{
+				ai.NewMoveToBall(g.team, 3),
+				ai.NewKickAtPosition(g.team, 3, info.Position{X: 2900, Y: 100}),
 			})
 			g.AddActivity(queue)
 		}
