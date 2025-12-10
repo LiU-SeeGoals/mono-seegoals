@@ -5,6 +5,7 @@
 #include "kicker.h"
 #include "log.h"
 #include "nav.h"
+#include "state_estimator.h"
 #include "pos_follow.h"
 #include <stdlib.h>
 #include <string.h>
@@ -89,11 +90,12 @@ CommandInfo rf_commands[2] = {
 
 CommandInfo motors_commands[2] = {{'S', "teer"}, {'T', "oggle movement"}};
 
-CommandInfo motors_steer_commands[4] = {
+CommandInfo motors_steer_commands[5] = {
     {'W', ""},
     {'A', ""},
     {'S', ""},
     {'D', ""},
+    {'G', ""},
 };
 //!@}
 
@@ -465,6 +467,10 @@ void parse_key()
             if (!moving)
                 NAV_EnableMovement();
             moving = 1;
+            break;
+        case 'G':
+            STATE_disable_calibration();
+            NAV_TEST_TireTest();
             break;
         }
     }

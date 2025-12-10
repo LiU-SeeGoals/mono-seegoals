@@ -373,39 +373,40 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
     robot_cmd.w = nav_z;
 }
 
+void wait2(uint64_t us)
+{
+    const int CPU_Freq = HAL_RCC_GetSysClockFreq();
+    uint32_t volatile cycles = CPU_Freq * us / 1000000;
+    uint32_t volatile current = 0;
+    while (current <= cycles) {
+        current++;
+    }
+}
+
 void NAV_TEST_TireTest()
 {
-    LOG_INFO("Starting tire test...\r\n");
 
-    LOG_INFO("First motor forward...\r\n");
-    set_motors(1, 0, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("First motor backwards...\r\n");
-    set_motors(-1, 0, 0, 0);
-    HAL_Delay(2000);
+    const int us_to_sec = 10000;
+    LOG_INFO("First motor\r\n");
+    MOTOR_SendPWM(&motors[0], 0.2);
+    wait2(us_to_sec);
+    MOTOR_SendPWM(&motors[0], 0);
 
-    LOG_INFO("Second motor forward...\r\n");
-    set_motors(0, 1, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Second motor backwards...\r\n");
-    set_motors(0, -1, 0, 0);
-    HAL_Delay(2000);
+    LOG_INFO("second motor forward...\r\n");
+    MOTOR_SendPWM(&motors[1], 0.2);
+    wait2(us_to_sec);
+    MOTOR_SendPWM(&motors[1], 0);
 
-    LOG_INFO("Third motor forward...\r\n");
-    set_motors(0, 0, 1, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Third motor backwards...\r\n");
-    set_motors(0, 0, -1, 0);
-    HAL_Delay(2000);
+    LOG_INFO("third motor forward...\r\n");
+    MOTOR_SendPWM(&motors[2], 0.2);
+    wait2(us_to_sec);
+    MOTOR_SendPWM(&motors[2], 0.0);
 
-    LOG_INFO("Fourth motor forward...\r\n");
-    set_motors(0, 0, 0, 1);
-    HAL_Delay(2000);
-    LOG_INFO("Fourth motor Backwards...\r\n");
-    set_motors(0, 0, 0, -1);
-    HAL_Delay(2000);
+    LOG_INFO("fourth motor forward...\r\n");
+    MOTOR_SendPWM(&motors[3], 0.2);
+    wait2(us_to_sec);
+    MOTOR_SendPWM(&motors[3], 0.0);
 
-    LOG_INFO("Finished tire test...\r\n");
 }
 
 void set_motors(float m1, float m2, float m3, float m4)

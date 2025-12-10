@@ -196,8 +196,8 @@ int main(void)
     KICKER_Init();
     IMU_Init(&hi2c4);
     STATE_Init();
-    STATE_calibrate_imu_gyr();
     UI_Init(&huart3);
+    STATE_calibrate_imu_gyr();
     COM_Init(&hspi1, &NRF_AVAILABLE);
     ITR_Init();
 
