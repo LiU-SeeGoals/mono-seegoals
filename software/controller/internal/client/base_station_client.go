@@ -34,25 +34,38 @@ func NewBaseStationClient(address string) *BaseStationClient {
 		panic(err)
 	}
 	
-	connection, err := net.DialUDP("udp", nil, remoteAddr)
+	iface, err := net.InterfaceByName("eth0")
 	if err != nil {
 		panic(err)
 	}
 	
-	iface, err := net.InterfaceByName("enp4s0")
+	addrs, err := iface.Addrs()
 	if err != nil {
 		panic(err)
 	}
 	
-	p := ipv4.NewPacketConn(connection)
-	if err := p.SetMulticastInterface(iface); err != nil {
-		panic(err)
+	var localIP net.IP
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
+			localIP = ipnet.IP
+			break
+		}
 	}
-	if err := p.SetMulticastTTL(2); err != nil {
+	
+	if localIP == nil {
+		panic("no IPv4 address found on interface")
+	}
+	
+	localAddr := &net.UDPAddr{IP: localIP, Port: 0}
+	
+	connection, err := net.DialUDP("udp", localAddr, remoteAddr)
+	if err != nil {
 		panic(err)
 	}
 	
-	fmt.Printf("Multicast via %s to %s:%d\n", iface.Name, multicastIP, multicastPort)
+	connection.SetMulticastTTL(2)
+	
+	fmt.Printf("Multicast from %s via %s to %s:%d\n", localIP, iface.Name, multicastIP, multicastPort)
 	
 	return &BaseStationClient{
 		connection:    connection,
