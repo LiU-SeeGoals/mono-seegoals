@@ -71,6 +71,7 @@ static VOID nx_link_thread_entry(ULONG thread_input);
 static VOID nx_udp_thread_entry(ULONG thread_input);
 static VOID udp_socket_receive_vision(NX_UDP_SOCKET* socket_ptr);
 static VOID udp_socket_receive_controller(NX_UDP_SOCKET* socket_ptr);
+static int packets_rx = 0;
 /* USER CODE END PFP */
 
 /**
@@ -381,7 +382,17 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET* socket_ptr)
     UINT ret = NX_SUCCESS;
     NX_PACKET* data_packet;
 
-    LOG_INFO("gotmsg");
+    packets_rx++;
+    if (packets_rx == 1)
+    {
+      LOG_INFO("receiving packets from AI controller\r\n");
+    }
+
+    if (packets_rx == 2000)
+    {
+      packets_rx = 0;
+    }
+
     ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
     if (ret == NX_SUCCESS) {
         COM_ParsePacket(data_packet, ROBOT_COMMAND);
