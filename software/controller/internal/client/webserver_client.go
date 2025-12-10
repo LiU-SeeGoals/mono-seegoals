@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
-	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/config"
+	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/gorilla/websocket"
 )
@@ -26,7 +26,7 @@ type WebServer struct {
 	// websocketupgrader *websocket.Upgrader
 
 	multicastConn *net.UDPConn
-    multicastAddr *net.UDPAddr
+	multicastAddr *net.UDPAddr
 
 	logPacketQueue []([]byte)
 	logQueueMutex  sync.Mutex
@@ -53,8 +53,8 @@ func getInstance() *WebServer {
 func startWebServer() {
 	// multicastIP := "239.0.0.1"
 	// multicastPort := 9999
-	multicastIP := config.GetGameViewerAdress();
-	multicastPort := config.GetGameViewerPort();
+	multicastIP := config.GetGameViewerAdress()
+	multicastPort := config.GetGameViewerPort()
 
 	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", multicastIP, multicastPort))
 	if err != nil {
