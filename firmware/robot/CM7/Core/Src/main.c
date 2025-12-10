@@ -197,7 +197,6 @@ int main(void)
     IMU_Init(&hi2c4);
     STATE_Init();
     UI_Init(&huart3);
-    COM_Init(&hspi1, &NRF_AVAILABLE);
     ITR_Init();
     LOG_INFO("Discharging kicker\r\n");
     const int DISCHARGE_AMNT = 50;
@@ -209,9 +208,12 @@ int main(void)
     }
     STATE_calibrate_imu_gyr();
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-    if (NRF_AVAILABLE) {
+
+    if(NRF_AVAILABLE){
         HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
     }
+
+    COM_Init(&hspi1, &NRF_AVAILABLE);
     LOG_INFO("Startup done\r\n");
   /* USER CODE END 2 */
 

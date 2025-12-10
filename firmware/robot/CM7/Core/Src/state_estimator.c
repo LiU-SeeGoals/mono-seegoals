@@ -537,6 +537,7 @@ void STATE_log_states() { LOG_DEBUG("px: %f py: %f pw: %f vx: %f vy: %f\r\n", ST
 
 void STATE_calibrate_imu_gyr()
 {
+    LOG_INFO("Calibrating imu and gyro\r\n");
     const int calib_size = 5000;
 
     float acc_bias_x = 0;
