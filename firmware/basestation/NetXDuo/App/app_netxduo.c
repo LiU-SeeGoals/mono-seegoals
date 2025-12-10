@@ -59,8 +59,7 @@ TX_THREAD NxUDPThread;
 TX_THREAD NxLinkThread;
 NX_UDP_SOCKET visionSocket;
 NX_UDP_SOCKET controllerSocket;
-ULONG VISION_PORT = 10006;
-ULONG CONTROLLER_PORT = 6001;
+ULONG CONTROLLER_PORT = 9999;
 ULONG QUEUE_MAX_SIZE = 512;
 /* USER CODE END PV */
 
@@ -348,23 +347,6 @@ static VOID nx_udp_thread_entry(ULONG thread_input)
 {
     UINT ret = NX_SUCCESS;
 
-    // ret = nx_udp_socket_create(&NetXDuoEthIpInstance, &visionSocket, "UDP Client Socket", NX_IP_NORMAL, NX_FRAGMENT_OKAY, NX_IP_TIME_TO_LIVE, QUEUE_MAX_SIZE);
-    // if (ret != NX_SUCCESS) {
-    //     Error_Handler();
-    // }
-    //
-    // ret = nx_udp_socket_bind(&visionSocket, VISION_PORT, TX_WAIT_FOREVER);
-    // if (ret != NX_SUCCESS) {
-    //     Error_Handler();
-    // }
-    //
-    // ret = nx_udp_socket_receive_notify(&visionSocket, udp_socket_receive_vision);
-    // if (ret != NX_SUCCESS) {
-    //     Error_Handler();
-    // }
-    //
-    // LOG_INFO("Waiting for Proto packets on port %lu...\r\n", VISION_PORT);
-
     ret = nx_igmp_enable(&NetXDuoEthIpInstance);
     if (ret != NX_SUCCESS) {
         Error_Handler();
@@ -389,28 +371,15 @@ static VOID nx_udp_thread_entry(ULONG thread_input)
     if (ret != NX_SUCCESS) {
         Error_Handler();
     }
-    LOG_INFO("Waiting for robot actions on port %lu...\r\n", CONTROLLER_PORT);
+    LOG_INFO("Waiting for multicast on %s:%d\r\n", "239.0.0.2", CONTROLLER_PORT);
 
     tx_thread_relinquish();
 }
-
-// static VOID udp_socket_receive_vision(NX_UDP_SOCKET* socket_ptr)
-// {
-//     UINT ret = NX_SUCCESS;
-//     NX_PACKET* data_packet;
-//
-//     ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
-//     if (ret == NX_SUCCESS) {
-//         COM_ParsePacket(data_packet, SSL_WRAPPER);
-//         nx_packet_release(data_packet);
-//     }
-// }
 
 static VOID udp_socket_receive_controller(NX_UDP_SOCKET* socket_ptr)
 {
     UINT ret = NX_SUCCESS;
     NX_PACKET* data_packet;
-    LOG_INFO("got packet\r\n");
 
     ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
     if (ret == NX_SUCCESS) {
