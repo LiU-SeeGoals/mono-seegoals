@@ -63,9 +63,7 @@ choices = [
     },
     {
         "choice-text": f"Develop on '{AI}' files, (auto-start '{GW}' program)",
-        "pull_images": [
-            "ghcr.io/liu-seegoals/game-viewer:latest"
-        ],
+        "pull_images": [],
         "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",

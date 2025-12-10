@@ -169,6 +169,10 @@ const FootballField: React.FC<FootBallFieldProps> = ({
 
     if (robotActions && robotActions.length > 0) {
       for (const action of robotActions) {
+        if (action.Dest && action.Dest.X === undefined && action.Dest.Y === undefined) {
+          return;
+        }
+
         const { canvasX, canvasY } = getCanvasCoordinates(
           action.Dest.X,
           action.Dest.Y,
