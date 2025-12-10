@@ -29,17 +29,30 @@ func NewBaseStationClient(address string) *BaseStationClient {
 	multicastIP := "239.0.0.2"
 	multicastPort := 9999
 	
-	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", multicastIP, multicastPort))
+	remoteAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", multicastIP, multicastPort))
 	if err != nil {
 		panic(err)
 	}
 	
-	connection, err := net.DialUDP("udp", nil, addr)
+	connection, err := net.DialUDP("udp", nil, remoteAddr)
 	if err != nil {
 		panic(err)
 	}
 	
-	fmt.Println("Multicast server (basestation) at", multicastIP, multicastPort)
+	iface, err := net.InterfaceByName("enp4s0")
+	if err != nil {
+		panic(err)
+	}
+	
+	p := ipv4.NewPacketConn(connection)
+	if err := p.SetMulticastInterface(iface); err != nil {
+		panic(err)
+	}
+	if err := p.SetMulticastTTL(2); err != nil {
+		panic(err)
+	}
+	
+	fmt.Printf("Multicast via %s to %s:%d\n", iface.Name, multicastIP, multicastPort)
 	
 	return &BaseStationClient{
 		connection:    connection,
