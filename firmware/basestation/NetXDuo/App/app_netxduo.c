@@ -381,6 +381,7 @@ static VOID udp_socket_receive_controller(NX_UDP_SOCKET* socket_ptr)
     UINT ret = NX_SUCCESS;
     NX_PACKET* data_packet;
 
+    LOG_INFO("gotmsg");
     ret = nx_udp_socket_receive(socket_ptr, &data_packet, NX_APP_DEFAULT_TIMEOUT);
     if (ret == NX_SUCCESS) {
         COM_ParsePacket(data_packet, ROBOT_COMMAND);

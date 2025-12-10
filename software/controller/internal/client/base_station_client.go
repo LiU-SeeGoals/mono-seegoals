@@ -21,7 +21,7 @@ type Connection interface {
 }
 
 type BaseStationClient struct {
-	connection    Connection
+	connections   []Connection
 	address       string
 	queueMutex    sync.Mutex
 	queue         []*robot_action.Command
@@ -31,45 +31,51 @@ type BaseStationClient struct {
 func NewBaseStationClient(address string) *BaseStationClient {
 	multicastIP := config.GetBasestationAdress()
 	multicastPort := config.GetBasestationPort()
-
 	remoteAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", multicastIP, multicastPort))
 	if err != nil {
 		panic(err)
 	}
 
-	iface, err := net.InterfaceByName(config.GetFetdatornInterface())
+	ifaces, err := net.Interfaces()
 	if err != nil {
 		panic(err)
 	}
 
-	addrs, err := iface.Addrs()
-	if err != nil {
-		panic(err)
-	}
+	var connections []Connection
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagMulticast == 0 {
+			continue
+		}
 
-	var localIP net.IP
-	for _, addr := range addrs {
-		if ipnet, ok := addr.(*net.IPNet); ok && ipnet.IP.To4() != nil {
-			localIP = ipnet.IP
-			break
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, ifaceAddr := range addrs {
+			ipnet, ok := ifaceAddr.(*net.IPNet)
+			if !ok || ipnet.IP.To4() == nil {
+				continue
+			}
+
+			localAddr := &net.UDPAddr{IP: ipnet.IP, Port: 0}
+			connection, err := net.DialUDP("udp", localAddr, remoteAddr)
+			if err != nil {
+				continue
+			}
+
+			fmt.Printf("Multicast from %s via %s to %s:%s (basedstation)\n",
+				ipnet.IP, iface.Name, multicastIP, multicastPort)
+			connections = append(connections, connection)
 		}
 	}
 
-	if localIP == nil {
-		panic("no IPv4 address found on interface")
+	if len(connections) == 0 {
+		panic("no suitable interfaces found")
 	}
-
-	localAddr := &net.UDPAddr{IP: localIP, Port: 0}
-
-	connection, err := net.DialUDP("udp", localAddr, remoteAddr)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("Multicast from %s via %s to %s:%s (basedstation)\n", localIP, iface.Name, multicastIP, multicastPort)
 
 	return &BaseStationClient{
-		connection:    connection,
+		connections:   connections,
 		address:       "",
 		queue:         make([]*robot_action.Command, 0),
 		hasBeenInited: false,
@@ -89,7 +95,6 @@ func (b *BaseStationClient) sendCommands() {
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
-
 		cmd := b.queue[0]
 		b.queue = b.queue[1:]
 		b.queueMutex.Unlock()
@@ -117,14 +122,19 @@ func (b *BaseStationClient) sendMessage(input []byte) error {
 		fmt.Print("to big to send (if sent = Rasmus mad 😡)")
 		return errors.New("too long message")
 	}
-	_, err := b.connection.Write(input)
-	if err != nil {
-		fmt.Printf("Some error %v\n", err)
-		return err
+
+	for _, conn := range b.connections {
+		_, err := conn.Write(input)
+		if err != nil {
+			fmt.Printf("Some error %v\n", err)
+		}
 	}
+
 	return nil
 }
 
 func (b *BaseStationClient) CloseConnection() {
-	b.connection.Close()
+	for _, conn := range b.connections {
+		conn.Close()
+	}
 }
