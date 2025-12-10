@@ -29,11 +29,24 @@ type BaseStationClient struct {
 
 func NewBaseStationClient(address string) *BaseStationClient {
 	var err error = nil
-	connection, _ := net.Dial("udp", address)
+	multicastIP := "239.0.0.2"
+	multicastPort := 9999
+
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", multicastIP, multicastPort))
 	if err != nil {
-		fmt.Printf("Some error %v\n", err)
+		panic(err)
 	}
 
+	connection, err := net.DialUDP("udp", nil, addr)
+	if err != nil {
+		panic(err)
+	}
+	//connection, _ := net.Dial("udp", address)
+	//if err != nil {
+	//	fmt.Printf("Some error %v\n", err)
+	//}
+
+	fmt.Println("Multicast server (basedstation) at ", multicastIP, multicastPort)
 	return &BaseStationClient{
 		connection:    connection,
 		address:       address,
