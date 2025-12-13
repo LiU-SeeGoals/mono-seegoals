@@ -375,37 +375,25 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
 
 void NAV_TEST_TireTest()
 {
-    LOG_INFO("Starting tire test...\r\n");
+    const int us_to_sec = 200000;
 
-    LOG_INFO("First motor forward...\r\n");
-    set_motors(1, 0, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("First motor backwards...\r\n");
-    set_motors(-1, 0, 0, 0);
-    HAL_Delay(2000);
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d forward...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], 80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        wait2(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 
-    LOG_INFO("Second motor forward...\r\n");
-    set_motors(0, 1, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Second motor backwards...\r\n");
-    set_motors(0, -1, 0, 0);
-    HAL_Delay(2000);
-
-    LOG_INFO("Third motor forward...\r\n");
-    set_motors(0, 0, 1, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Third motor backwards...\r\n");
-    set_motors(0, 0, -1, 0);
-    HAL_Delay(2000);
-
-    LOG_INFO("Fourth motor forward...\r\n");
-    set_motors(0, 0, 0, 1);
-    HAL_Delay(2000);
-    LOG_INFO("Fourth motor Backwards...\r\n");
-    set_motors(0, 0, 0, -1);
-    HAL_Delay(2000);
-
-    LOG_INFO("Finished tire test...\r\n");
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d backwards...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], -80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        wait2(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 }
 
 void set_motors(float m1, float m2, float m3, float m4)

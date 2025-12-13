@@ -197,9 +197,9 @@ int main(void)
     IMU_Init(&hi2c4);
     STATE_Init();
     STATE_calibrate_imu_gyr();
-    UI_Init(&huart3);
     COM_Init(&hspi1, &NRF_AVAILABLE);
-    ITR_Init();
+    // ITR_Init();
+    UI_Init(&huart3);
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
