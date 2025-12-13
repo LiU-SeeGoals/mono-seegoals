@@ -137,7 +137,7 @@ int main(void)
     /* USER CODE BEGIN 1 */
     IMU_AccelVec3 acc;
     IMU_GyroVec3 gyr;
-
+    HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
     /* USER CODE END 1 */
     /* USER CODE BEGIN Boot_Mode_Sequence_0 */
 
@@ -213,7 +213,9 @@ int main(void)
     COM_Init(&hspi1, &NRF_AVAILABLE);
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
+    if(NRF_AVAILABLE){
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    }
     LOG_INFO("Startup done\r\n");
     /* USER CODE END 2 */
 
@@ -224,20 +226,7 @@ int main(void)
     bool on = false;
 
     while (1) {
-        if (HAL_GetTick() - now > 1000) {
-            if (on) {
-                HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-                HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
-                NAV_StopDribbler();
 
-            } else {
-                HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
-                HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
-                NAV_RunDribbler();
-            }
-            on = !on;
-            now = HAL_GetTick();
-        }
         /* USER CODE END WHILE */
 
         /* USER CODE BEGIN 3 */
