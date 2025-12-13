@@ -10,7 +10,7 @@
 
 /* Private variables */
 static LOG_Module internal_log_mod;
-static KICKER_Settings settings = {.max_charges_per_kick = 6, .charge_wait_us = 200000, .discharge_wait_us = 230, .charges_since_last_kick = 0};
+static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=25, .charge_wait_us = 200000, .discharge_wait_us = 230, .charges_since_last_kick = 0};
 static volatile bool charging = false;
 static volatile bool kicking = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
@@ -57,6 +57,7 @@ void KICKER_ChargeStart()
     __HAL_TIM_CLEAR_FLAG(htim_kicker_charge, TIM_FLAG_UPDATE);
 
     HAL_TIM_Base_Start_IT(htim_kicker_charge);
+    settings.charges_since_last_kick++;
 }
 
 void KICKER_ChargeStop()
@@ -97,6 +98,15 @@ void KICKER_KickStop()
     LOG_DEBUG("Kicking stop\r\n");
     HAL_TIM_Base_Stop_IT(htim_kicker_kick);
     kicking = false;
+}
+
+void KICKER_KickSafe()
+{
+    // Kicks on low
+    HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
+    COMMON_Wait(settings.safe_discharge_wait_us);
+    HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_SET);
+    settings.charges_since_last_kick = 0;
 }
 
 KICKER_Settings* KICKER_GetSettings() { return &settings; }
