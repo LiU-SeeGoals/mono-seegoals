@@ -77,7 +77,7 @@ void LOG_Printf(LOG_Module* mod, LOG_Level msg_level, const char* format, ...)
         }
 
         // Log to basestation (through RF)
-        if (msg_level >= backends[BACKEND_BASESTATION].min_output_level && !backends[BACKEND_BASESTATION].muted) {
+        if ((msg_level >= backends[BACKEND_BASESTATION].min_output_level && !backends[BACKEND_BASESTATION].muted) && (msg_level != LOG_LEVEL_BUFFER)) {
 #ifdef IS_ROBOT
             uint8_t len = strlen(msg_buffer);
             if (len > 32) {
@@ -100,12 +100,12 @@ void LOG_Printf(LOG_Module* mod, LOG_Level msg_level, const char* format, ...)
         }
 
         // Log to UART
-        if (msg_level >= backends[BACKEND_UART].min_output_level && !backends[BACKEND_UART].muted) {
+        if ((msg_level >= backends[BACKEND_UART].min_output_level && !backends[BACKEND_UART].muted) && (msg_level != LOG_LEVEL_BUFFER)) {
             HAL_UART_Transmit(huart, (uint8_t*)msg_buffer, strlen(msg_buffer), HAL_MAX_DELAY);
         }
 
         // Log to buffer
-        if (msg_level >= backends[BACKEND_BUFFER].min_output_level && !backends[BACKEND_BUFFER].muted) {
+        if ((msg_level >= backends[BACKEND_BUFFER].min_output_level && !backends[BACKEND_BUFFER].muted) || (msg_level == LOG_LEVEL_BUFFER)){
             if (cycled_logs) {
                 memset(log_buffer[log_buffer_pointer], 0, LOG_MSG_SIZE);
             }
@@ -114,6 +114,13 @@ void LOG_Printf(LOG_Module* mod, LOG_Level msg_level, const char* format, ...)
             cycled_logs = cycled_logs || log_buffer_pointer == 0;
         }
     }
+}
+void LOG_PrintLogBuffer(int start, int end)
+{
+    for(int i=start;i<end;++i){
+        LOG_INFO("%s",log_buffer[i]);
+    }
+
 }
 
 LOG_Module** LOG_GetModules(int* len)

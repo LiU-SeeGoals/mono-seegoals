@@ -20,6 +20,7 @@
 #define LOG_WARNING(fmt, ...) LOG_Printf(&internal_log_mod, LOG_LEVEL_WARNING, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) LOG_Printf(&internal_log_mod, LOG_LEVEL_ERROR, fmt, ##__VA_ARGS__)
 #define LOG_BASESTATION(fmt, ...) LOG_Printf(&internal_log_mod, LOG_LEVEL_BASESTATION, fmt, ##__VA_ARGS__)
+#define LOG_BUFFER(fmt, ...) LOG_Printf(&internal_log_mod, LOG_LEVEL_BUFFER, fmt, ##__VA_ARGS__)
 
 /* Public enums */
 
@@ -86,6 +87,9 @@ typedef enum
      * Logs to basestation. Since it's costly, it's the highest level.
      */
     LOG_LEVEL_BASESTATION,
+
+    /*Logs to the buffer*/
+    LOG_LEVEL_BUFFER,
 } LOG_Level;
 
 /* Public structs */
@@ -96,7 +100,7 @@ typedef struct {
 } LOG_Level_Info;
 
 /* Public variables */
-static LOG_Level_Info LOG_LEVEL[LOG_LEVEL_BASESTATION + 1] = {{
+static LOG_Level_Info LOG_LEVEL[LOG_LEVEL_BUFFER + 1] = {{
                                                                   .level = LOG_LEVEL_UI,
                                                                   .name = "User Interface",
                                                                   .short_name = "UI",
@@ -130,7 +134,13 @@ static LOG_Level_Info LOG_LEVEL[LOG_LEVEL_BASESTATION + 1] = {{
                                                                   .level = LOG_LEVEL_BASESTATION,
                                                                   .name = "Basestation",
                                                                   .short_name = "B",
-                                                              }};
+                                                              },
+                                                                {
+                                                                  .level = LOG_LEVEL_BUFFER,
+                                                                  .name = "Buffer",
+                                                                  .short_name = "Bu",
+                                                              },
+                                                            };
 
 /**
  * Every submodule of the project should have a LOG_Module which give us finer
