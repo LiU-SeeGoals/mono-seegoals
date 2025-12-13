@@ -1,4 +1,5 @@
 #include "nav.h"
+#include "common.h"
 #include "kicker.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
@@ -25,17 +26,6 @@ static int queued = 0;
 
 /* Private functions declarations */
 void set_motors(float m1, float m2, float m3, float m4);
-
-static void wait2(uint64_t us)
-{
-    const int CPU_Freq = HAL_RCC_GetSysClockFreq();
-    uint32_t volatile cycles = CPU_Freq * us / 1000000;
-    uint32_t volatile current = 0;
-
-    while (current <= cycles) {
-        current++;
-    }
-}
 
 /*
  * Public function implementations
@@ -285,8 +275,7 @@ void NAV_HandleCommand(Command* cmd)
         NAV_GoToAction(cmd);
         if(cmd->kick_speed == 1)
         {
-            KICKER_Charge();
-            KICKER_Kick();
+            KICKER_KickStart();
         }
 
         if(cmd->angular_vel == 1)
@@ -315,10 +304,7 @@ void NAV_HandleCommand(Command* cmd)
     case ACTION_TYPE__ROTATE_ACTION:
         break;
     case ACTION_TYPE__KICK_ACTION:
-        KICKER_Charge();
-        KICKER_Charge();
-        KICKER_Charge();
-        KICKER_Kick();
+        KICKER_ChargeStart();
         break;
     default:
         LOG_ERROR("Not known command: %i\r\n", cmd->command_id);
@@ -387,14 +373,14 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
 
 void NAV_TEST_TireTest()
 {
-    const int us_to_sec = 100000;
+    const int us_to_sec = 50000;
 
     for (int i = 0; i < 4; i++) {
         LOG_INFO("Motor %d clockwise (forward)...\r\n", i);
         float zero = 0;
         setDirection(&motors[i], 80);
         MOTOR_SendPWM(&motors[i], 0.2);
-        wait2(us_to_sec);
+        COMMON_Wait(us_to_sec);
         MOTOR_SendPWM(&motors[i], 0);
     }
 
@@ -403,7 +389,7 @@ void NAV_TEST_TireTest()
         float zero = 0;
         setDirection(&motors[i], -80);
         MOTOR_SendPWM(&motors[i], 0.2);
-        wait2(us_to_sec);
+        COMMON_Wait(us_to_sec);
         MOTOR_SendPWM(&motors[i], 0);
     }
 }
