@@ -26,6 +26,17 @@ static int queued = 0;
 /* Private functions declarations */
 void set_motors(float m1, float m2, float m3, float m4);
 
+static void wait2(uint64_t us)
+{
+    const int CPU_Freq = HAL_RCC_GetSysClockFreq();
+    uint32_t volatile cycles = CPU_Freq * us / 1000000;
+    uint32_t volatile current = 0;
+
+    while (current <= cycles) {
+        current++;
+    }
+}
+
 /*
  * Public function implementations
  */
@@ -375,37 +386,25 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
 
 void NAV_TEST_TireTest()
 {
-    LOG_INFO("Starting tire test...\r\n");
+    const int us_to_sec = 100000;
 
-    LOG_INFO("First motor forward...\r\n");
-    set_motors(1, 0, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("First motor backwards...\r\n");
-    set_motors(-1, 0, 0, 0);
-    HAL_Delay(2000);
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d clockwise (forward)...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], 80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        wait2(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 
-    LOG_INFO("Second motor forward...\r\n");
-    set_motors(0, 1, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Second motor backwards...\r\n");
-    set_motors(0, -1, 0, 0);
-    HAL_Delay(2000);
-
-    LOG_INFO("Third motor forward...\r\n");
-    set_motors(0, 0, 1, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Third motor backwards...\r\n");
-    set_motors(0, 0, -1, 0);
-    HAL_Delay(2000);
-
-    LOG_INFO("Fourth motor forward...\r\n");
-    set_motors(0, 0, 0, 1);
-    HAL_Delay(2000);
-    LOG_INFO("Fourth motor Backwards...\r\n");
-    set_motors(0, 0, 0, -1);
-    HAL_Delay(2000);
-
-    LOG_INFO("Finished tire test...\r\n");
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d counterclockwise (backwards)...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], -80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        wait2(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 }
 
 void set_motors(float m1, float m2, float m3, float m4)
@@ -448,3 +447,4 @@ float NAV_GetNavX() { return robot_cmd.x; }
 float NAV_GetNavY() { return robot_cmd.y; }
 
 float NAV_GetNavW() { return robot_cmd.w; }
+
