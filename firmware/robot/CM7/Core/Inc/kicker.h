@@ -7,6 +7,7 @@ typedef struct {
     int max_charges_per_kick;
     int charge_wait_us;
     int discharge_wait_us;
+    int safe_discharge_wait_us;
     int charges_since_last_kick;
 } KICKER_Settings;
 
@@ -27,6 +28,8 @@ void KICKER_Charge();
  * Activates the kicker.
  */
 void KICKER_Kick();
+
+void KICKER_KickSafe();
 
 /**
  * Returns a reference to the current kicker settings.
