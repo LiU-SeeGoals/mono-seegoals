@@ -199,7 +199,7 @@ int main(void)
     STATE_calibrate_imu_gyr();
     UI_Init(&huart3);
     COM_Init(&hspi1, &NRF_AVAILABLE);
-    //ITR_Init();
+    ITR_Init();
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
     if (NRF_AVAILABLE) {
