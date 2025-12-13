@@ -77,7 +77,6 @@ int setDirection(MotorPWM* motor, float speed)
 */
 void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
 {
-
     setDirection(motor, speed);
     /*if (setDirection(motor, speed) == HAL_BUSY) {*/
     /*  MOTOR_SendPWM(motor, 0);*/

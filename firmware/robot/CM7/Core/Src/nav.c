@@ -385,28 +385,25 @@ void wait2(uint64_t us)
 
 void NAV_TEST_TireTest()
 {
+    const int us_to_sec = 200000;
 
-    const int us_to_sec = 50000;
-    LOG_INFO("First motor\r\n");
-    MOTOR_SendPWM(&motors[0], 0.2);
-    wait2(us_to_sec);
-    MOTOR_SendPWM(&motors[0], 0);
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d forward...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], 80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        wait2(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 
-    LOG_INFO("second motor forward...\r\n");
-    MOTOR_SendPWM(&motors[1], 0.2);
-    wait2(us_to_sec);
-    MOTOR_SendPWM(&motors[1], 0);
-
-    LOG_INFO("third motor forward...\r\n");
-    MOTOR_SendPWM(&motors[2], 0.2);
-    wait2(us_to_sec);
-    MOTOR_SendPWM(&motors[2], 0.0);
-
-    LOG_INFO("fourth motor forward...\r\n");
-    MOTOR_SendPWM(&motors[3], 0.2);
-    wait2(us_to_sec);
-    MOTOR_SendPWM(&motors[3], 0.0);
-
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d backwards...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], -80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        wait2(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 }
 
 void set_motors(float m1, float m2, float m3, float m4)

@@ -310,8 +310,9 @@ void TIM8_BRK_TIM12_IRQHandler(void)
         float w = NAV_GetNavW();
 
         POS_go_to_position(x, y, w);
-        NAV_update_motor_state();
     }
+
+    NAV_update_motor_state();
 
     __enable_irq();
 
