@@ -13,6 +13,7 @@ console.log(`[gameControllerProxy.cjs] Subscribing to ${gcAddr}:${gcPort} and pa
 
 udpSocket.bind(gcPort, () => {
   udpSocket.addMembership(gcAddr);
+
   console.log(`[gameControllerProxy.cjs] Listening to ${gcAddr}:${gcPort} on ${udpSocket.address().address}:${udpSocket.address().port} (${udpSocket.address().family})`);
 
   wss = new ws.WebSocketServer({
