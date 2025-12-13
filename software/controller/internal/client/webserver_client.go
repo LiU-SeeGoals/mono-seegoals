@@ -3,7 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -15,16 +15,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-//----------------------------------------------------------------------------------------------
-// Start of WebServer class
-//----------------------------------------------------------------------------------------------
-
-// Define the WebServer class
 type WebServer struct {
-	websocketConnections      []*websocket.Conn
-	websocketConnectionsMutex sync.Mutex
-
-	websocketupgrader *websocket.Upgrader
+	multicastConns []*net.UDPConn
+	multicastAddr  *net.UDPAddr
 
 	logPacketQueue []([]byte)
 	logQueueMutex  sync.Mutex
@@ -32,8 +25,7 @@ type WebServer struct {
 	gameStatePacketQueue []([]byte)
 	incomingActions      []action.ActionDTO
 	gameStateQueueMutex  sync.Mutex
-	// broadcastThreadMutex sync.Mutex
-	receivedDataMutex sync.Mutex
+	receivedDataMutex    sync.Mutex
 }
 
 var (
@@ -41,27 +33,74 @@ var (
 	Once              sync.Once
 )
 
-// Method to get the singleton instance of the WebServer class
 func getInstance() *WebServer {
 	Once.Do(startWebServer)
 	return webserverInstance
 }
 
-// Constructor for the WebServer class
 func startWebServer() {
-	webserverInstance = &WebServer{
-		gameStatePacketQueue: make([]([]byte), 0),
+	multicastIP := config.GetGameViewerAdress()
+	multicastPort := config.GetGameViewerPort()
+
+	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", multicastIP, multicastPort))
+	if err != nil {
+		panic(err)
 	}
 
-	webserverInstance.websocketupgrader = webserverInstance.getUpgrader()
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		panic(err)
+	}
 
-	http.HandleFunc("/ws", webserverInstance.handleGameStateRequest)
-	go http.ListenAndServe(config.GetGameViewerAdress(), nil)
+	foundInterface := false;
+
+	var connections []*net.UDPConn
+	for _, iface := range ifaces {
+		if config.GetAIMulticastInterface() != "" && config.GetAIMulticastInterface() != iface.Name {
+			continue
+		}
+
+		foundInterface = true;
+
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagMulticast == 0 {
+			continue
+		}
+
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, ifaceAddr := range addrs {
+			ipnet, ok := ifaceAddr.(*net.IPNet)
+			if !ok || ipnet.IP.To4() == nil {
+				continue
+			}
+
+			localAddr := &net.UDPAddr{IP: ipnet.IP, Port: 0}
+			conn, err := net.DialUDP("udp", localAddr, addr)
+			if err != nil {
+				continue
+			}
+
+			fmt.Printf("Multicast from %s via %s to %s:%d (GameViewer)\n",
+				ipnet.IP, iface.Name, multicastIP, multicastPort)
+			connections = append(connections, conn)
+		}
+	}
+
+	if len(connections) == 0 || foundInterface == false {
+		panic("no suitable interfaces found")
+	}
+
+	webserverInstance = &WebServer{
+		multicastConns:       connections,
+		multicastAddr:        addr,
+		gameStatePacketQueue: make([][]byte, 0),
+		logPacketQueue:       make([][]byte, 0),
+	}
+
 	go webserverInstance.sendGameState()
-	go webserverInstance.sendLog()
-	go webserverInstance.receiveData()
-	fmt.Println("Webserver online at", config.GetGameViewerAdress())
-	Logger.Info("Webserver online at", config.GetGameViewerAdress())
 }
 
 func (server *WebServer) getUpgrader() *websocket.Upgrader {
@@ -72,153 +111,23 @@ func (server *WebServer) getUpgrader() *websocket.Upgrader {
 	}
 }
 
-// Method to handle connections
-func (server *WebServer) handleGameStateRequest(w http.ResponseWriter, r *http.Request) {
-	// Upgrade initial GET request to a WebSocket
-	ws, err := server.websocketupgrader.Upgrade(w, r, nil)
-	if err != nil {
-		panic(err)
-	}
-
-	server.websocketConnectionsMutex.Lock()
-	defer server.websocketConnectionsMutex.Unlock() // unlock after function returns
-	server.websocketConnections = append(server.websocketConnections, ws)
-	// fmt.Println("making a connection")
-	// fmt.Println(len(server.websocketConnections))
-	// fmt.Print("done serving client")
-    fmt.Println("Client connected")
-	Logger.Info("Client connected")
-}
-
-// Method to send the game state to all connected clients
-func (server *WebServer) sendLog() {
-	var logJSON []byte
-	for {
-		if len(server.logPacketQueue) == 0 {
-			time.Sleep(time.Millisecond * 10) // Sleep for a short period
-			continue
-		}
-
-		server.logQueueMutex.Lock()
-		logJSON = server.logPacketQueue[0]
-		server.logPacketQueue = server.logPacketQueue[1:]
-		server.logQueueMutex.Unlock()
-
-		// Creating a copy of the connections. This prevents locking other threads if the connection takes too long
-		server.websocketConnectionsMutex.Lock()
-		connectionsCopy := make([]*websocket.Conn, len(server.websocketConnections))
-		copy(connectionsCopy, server.websocketConnections)
-		server.websocketConnectionsMutex.Unlock()
-
-		for _, ws := range connectionsCopy {
-			ws.WriteMessage(websocket.TextMessage, logJSON)
-			// fmt.Println("written msg")
-		}
-	}
-}
-
-// Method to send the game state to all connected clients
 func (server *WebServer) sendGameState() {
-	var gameStateJSON []byte
 	for {
 		if len(server.gameStatePacketQueue) == 0 {
-			time.Sleep(time.Millisecond * 10) // Sleep for a short period
+			time.Sleep(time.Millisecond * 10)
 			continue
 		}
 
 		server.gameStateQueueMutex.Lock()
-		gameStateJSON = server.gameStatePacketQueue[0]
+		gameStateJSON := server.gameStatePacketQueue[0]
 		server.gameStatePacketQueue = server.gameStatePacketQueue[1:]
 		server.gameStateQueueMutex.Unlock()
 
-		// Creating a copy of the connections. This prevents locking other threads if the connection takes too long
-		server.websocketConnectionsMutex.Lock()
-		connectionsCopy := make([]*websocket.Conn, len(server.websocketConnections))
-		copy(connectionsCopy, server.websocketConnections)
-		server.websocketConnectionsMutex.Unlock()
-
-		for _, ws := range connectionsCopy {
-			ws.WriteMessage(websocket.TextMessage, gameStateJSON)
-			// fmt.Println("written msg")
+		for _, conn := range server.multicastConns {
+			conn.Write(gameStateJSON)
 		}
 	}
 }
-
-func (server *WebServer) sendActions() {
-	var gameStateJSON []byte
-	for {
-        fmt.Println("Went into sendActions")
-		if len(server.gameStatePacketQueue) == 0 {
-			time.Sleep(time.Millisecond * 10) // Sleep for a short period
-            break
-		}
-		server.gameStateQueueMutex.Lock()
-		gameStateJSON = server.gameStatePacketQueue[0]
-		server.gameStatePacketQueue = server.gameStatePacketQueue[1:]
-		server.gameStateQueueMutex.Unlock()
-
-		// Creating a copy of the connections. This prevents locking other threads if the connection takes too long
-		server.websocketConnectionsMutex.Lock()
-		connectionsCopy := make([]*websocket.Conn, len(server.websocketConnections))
-        fmt.Println("websockets", len(server.websocketConnections))
-		copy(connectionsCopy, server.websocketConnections)
-		server.websocketConnectionsMutex.Unlock()
-
-		for _, ws := range connectionsCopy {
-			ws.WriteMessage(websocket.TextMessage, gameStateJSON)
-			// fmt.Println("written msg")
-		}
-	}
-}
-
-// Method to receive data from all connected clients
-func (server *WebServer) receiveData() {
-	var validConnections []*websocket.Conn
-	for {
-		validConnections = validConnections[:0] // reset list
-
-		// Creating a copy of the connections. This prevents locking other threads if the connection takes too long
-		server.websocketConnectionsMutex.Lock()
-		connectionsCopy := make([]*websocket.Conn, len(server.websocketConnections))
-		copy(connectionsCopy, server.websocketConnections)
-		server.websocketConnectionsMutex.Unlock()
-
-		for _, ws := range connectionsCopy {
-			_, message, err := ws.ReadMessage()
-			if err != nil {
-				ws.Close()
-				continue
-			}
-
-			var receivedData action.ActionDTO
-			err_unmarshal := json.Unmarshal(message, &receivedData)
-			if err_unmarshal != nil {
-				log.Println("Error unmarshalling message:", err_unmarshal)
-				continue
-			} else {
-				server.receivedDataMutex.Lock()
-				log.Println("Received data:", receivedData)
-				server.incomingActions = append(server.incomingActions, receivedData)
-				server.receivedDataMutex.Unlock()
-			}
-			validConnections = append(validConnections, ws)
-		}
-
-		server.websocketConnectionsMutex.Lock()
-		// Remove invalid connections
-		server.websocketConnections = validConnections
-		server.websocketConnectionsMutex.Unlock()
-	}
-}
-
-//----------------------------------------------------------------------------------------------
-// End of WebServer class
-//----------------------------------------------------------------------------------------------
-
-// How to use the WebServer class:
-// Only use the functions under this comment to interact with the WebServer class
-// The WebServer class is a singleton class, so you can only have one instance of it,
-// and the functions under handles all of it so multiple instances are not created
 
 type WebsiteDTO struct {
 	RobotPositions [2 * info.TEAM_SIZE]info.RobotDTO
@@ -230,7 +139,6 @@ type WebsiteDTO struct {
 func toJson(input WebsiteDTO) []byte {
 	output, err := json.Marshal(input)
 	if err != nil {
-		// fmt.Println("The WebsiteDTO packet could not be marshalled to JSON.")
 		Logger.Error("The WebsiteDTO packet could not be marshalled to JSON.")
 	}
 	return output
@@ -239,35 +147,29 @@ func toJson(input WebsiteDTO) []byte {
 func actionsToJson(actions []action.Action) []byte {
 	output, err := json.Marshal(actions)
 	if err != nil {
-		// fmt.Println("The WebsiteDTO packet could not be marshalled to JSON.")
 		Logger.Error("The WebsiteDTO packet could not be marshalled to JSON.")
 	}
 	return output
 }
 
-// Returns a list of all new incoming actions
 func GetIncoming() []action.ActionDTO {
 	webserver := getInstance()
 	webserver.receivedDataMutex.Lock()
 	defer webserver.receivedDataMutex.Unlock()
-	// Return a copy of the incomingActions slice
 	actionsCopy := make([]action.ActionDTO, len(webserver.incomingActions))
 	copy(actionsCopy, webserver.incomingActions)
-	webserver.incomingActions = nil // Empty the incomingActions slice
+	webserver.incomingActions = nil
 	return actionsCopy
 }
 
 func UpdateWebLog(logs []byte) {
-	// fmt.Println("Updating web log")
 	Logger.Info("Updating web log")
 	webserver := getInstance()
 	webserver.logQueueMutex.Lock()
 	webserver.logPacketQueue = append(webserver.logPacketQueue, []byte(logs))
 	webserver.logQueueMutex.Unlock()
-
 }
 
-// Broadcasts the game state to all connected clients
 func BroadcastGameState(message WebsiteDTO) {
 	gameStateJson := toJson(message)
 	webserver := getInstance()
@@ -277,8 +179,8 @@ func BroadcastGameState(message WebsiteDTO) {
 }
 
 func BroadcastActions(actions []action.Action) {
-    actionsJson := actionsToJson(actions)
-    webserver := getInstance()
+	actionsJson := actionsToJson(actions)
+	webserver := getInstance()
 	webserver.gameStateQueueMutex.Lock()
 	webserver.gameStatePacketQueue = append(webserver.gameStatePacketQueue, actionsJson)
 	webserver.gameStateQueueMutex.Unlock()
