@@ -2,7 +2,6 @@
 #include "arm_mat_util_f32.h"
 #include "arm_math.h"
 #include "imu.h"
-#include "kicker.h"
 #include "lag_element.h"
 
 #include "log.h"
