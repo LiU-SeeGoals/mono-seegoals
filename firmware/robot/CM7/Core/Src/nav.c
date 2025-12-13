@@ -402,9 +402,13 @@ void set_motors(float m1, float m2, float m3, float m4)
     motors[3].speed = m4 * 100.f;
 }
 
-void NAV_StopDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
+void NAV_StopDribbler() {
+    // LOG_DEBUG("stop dirbling\r\n");
+    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
 
-void NAV_RunDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
+void NAV_RunDribbler() {
+    // LOG_DEBUG("dirbling\r\n");
+    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
 
 void NAV_TestDribbler()
 {

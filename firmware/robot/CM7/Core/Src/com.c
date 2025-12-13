@@ -257,6 +257,12 @@ uint8_t COM_Get_ID()
     if (w0 == 2359363 && w1 == 842223884 && w2 == 859256630) {
         return 3;
     }
+
+    if (w0 == 3080240 && w1 == 842223876 && w2 == 842544439)
+    {
+        return 3;
+    }
+
     LOG_ERROR("Failed ID lookup for robot ID: %d %d %d\r\n", w0, w1, w2);
     return 255;
 }
