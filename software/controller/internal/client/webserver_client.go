@@ -52,8 +52,16 @@ func startWebServer() {
 		panic(err)
 	}
 
+	foundInterface := false;
+
 	var conns []*net.UDPConn
 	for _, iface := range ifaces {
+		if config.GetFetdatornInterface() != "" && config.GetFetdatornInterface() != iface.Name {
+			continue
+		}
+
+		foundInterface = true;
+
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagMulticast == 0 {
 			continue
 		}
@@ -81,7 +89,7 @@ func startWebServer() {
 		}
 	}
 
-	if len(conns) == 0 {
+	if len(conns) == 0 || foundInterface == false {
 		panic("no suitable interfaces found")
 	}
 
