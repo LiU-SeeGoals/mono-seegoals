@@ -375,10 +375,10 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
 
 void NAV_TEST_TireTest()
 {
-    const int us_to_sec = 200000;
+    const int us_to_sec = 100000;
 
     for (int i = 0; i < 4; i++) {
-        LOG_INFO("Motor %d forward...\r\n", i);
+        LOG_INFO("Motor %d clockwise (forward)...\r\n", i);
         float zero = 0;
         setDirection(&motors[i], 80);
         MOTOR_SendPWM(&motors[i], 0.2);
@@ -387,7 +387,7 @@ void NAV_TEST_TireTest()
     }
 
     for (int i = 0; i < 4; i++) {
-        LOG_INFO("Motor %d backwards...\r\n", i);
+        LOG_INFO("Motor %d counterclockwise (backwards)...\r\n", i);
         float zero = 0;
         setDirection(&motors[i], -80);
         MOTOR_SendPWM(&motors[i], 0.2);
