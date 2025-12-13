@@ -313,6 +313,7 @@ void TIM8_BRK_TIM12_IRQHandler(void)
     }
 
     NAV_update_motor_state();
+
     __enable_irq();
 
   /* USER CODE END TIM8_BRK_TIM12_IRQn 1 */

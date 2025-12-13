@@ -75,6 +75,7 @@ int setDirection(MotorPWM* motor, float speed)
   Updates I_prev with the previous integrator value
 
 */
+
 void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
 {
 

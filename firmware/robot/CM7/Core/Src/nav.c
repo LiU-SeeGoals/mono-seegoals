@@ -201,9 +201,9 @@ void NAV_steer(float u, float v, float w)
     float wlf = 1.0 / r * (-u * arm_cos_f32(psi) + v * arm_sin_f32(psi) + w * R);
 
     motors[0].speed = wrf;
-    motors[1].speed = wrb;
+    motors[1].speed = wlf;
     motors[2].speed = wlb;
-    motors[3].speed = wlf;
+    motors[3].speed = wrb;
 }
 
 void NAV_Direction(DIRECTION dir)
