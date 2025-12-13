@@ -82,7 +82,7 @@ extern UART_HandleTypeDef huart3;
 void NMI_Handler(void)
 {
   /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "NMI_Handler\n\r");
+    LOG_INFO("NMI_Handler\r\n");
 
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
@@ -97,7 +97,7 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "HardFault_Handler\n\r");
+    LOG_INFO("HardFault_Handler\r\n");
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
@@ -112,7 +112,7 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "MemManage_Handler\n\r");
+    LOG_INFO("MemManage_Handler\r\n");
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
   {
@@ -127,7 +127,7 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "BusFault_Handler\n\r");
+    LOG_INFO("BusFault_Handler\r\n");
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
   {
@@ -142,7 +142,7 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "UsageFault_Handler\n\r");
+    LOG_INFO("UsageFault_Handler\r\n");
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)
   {
@@ -326,7 +326,7 @@ int* ITR_GetMotorTicks(void)
     return motor_ticks;
 }
 
-int* ITR_Init(void)
+void ITR_Init(void)
 {
     LOG_InitModule(&internal_log_mod, "ITR", LOG_LEVEL_DEBUG, 0);
 }

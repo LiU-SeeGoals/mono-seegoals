@@ -184,13 +184,13 @@ int main(void)
     // Initialise modules
     LOG_Init(&huart3);
     LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO, 0);
-    LOG_INFO("My ID is %i (%li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+    if (COM_Get_ID() == 255) {
+        LOG_INFO("ID is unknown (%i, serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+    } else {
+        LOG_INFO("ID is %i (serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+    }
     POS_Init();
-#ifdef PCB_MOTOR
     NAV_Init(&htim12, &htim1, &htim15);
-#else
-    NAV_Init(&htim12, &htim1, &htim15);
-#endif
     HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1);
     KICKER_Init();
@@ -202,8 +202,8 @@ int main(void)
     ITR_Init();
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-    if(NRF_AVAILABLE){
-    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    if (NRF_AVAILABLE) {
+        HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
     }
     LOG_INFO("Startup done\r\n");
   /* USER CODE END 2 */

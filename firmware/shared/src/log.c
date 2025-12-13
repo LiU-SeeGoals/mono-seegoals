@@ -8,7 +8,7 @@
 
 /* Private defines */
 #define LOG_BACKENDS_AVAIL 3
-#define LOG_MODULES_AVAIL 10
+#define LOG_MODULES_AVAIL 20
 #define MODULE_NAME log
 
 /* Private variables */
@@ -47,6 +47,11 @@ void LOG_Init(UART_HandleTypeDef* handle)
 
 void LOG_InitModule(LOG_Module* mod, const char* name, LOG_Level min_out_level, uint8_t muted)
 {
+    if (modules_pointer >= LOG_MODULES_AVAIL) {
+        LOG_ERROR("To many log modules, can't add %s, increase LOG_MODULES_AVAIL\r\n", name);
+        return;
+    }
+
     mod->min_output_level = min_out_level;
     mod->name = name;
     mod->muted = muted;
