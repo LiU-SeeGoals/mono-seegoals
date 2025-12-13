@@ -305,7 +305,6 @@ void NAV_HandleCommand(Command* cmd)
         break;
     case ACTION_TYPE__KICK_ACTION:
         KICKER_ChargeStart();
-        KICKER_KickStart();
         break;
     default:
         LOG_ERROR("Not known command: %i\r\n", cmd->command_id);
