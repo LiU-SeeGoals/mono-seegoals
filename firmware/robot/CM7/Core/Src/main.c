@@ -141,7 +141,7 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-
+  HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -202,7 +202,9 @@ int main(void)
     ITR_Init();
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
+    if(NRF_AVAILABLE){
     HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    }
     LOG_INFO("Startup done\r\n");
   /* USER CODE END 2 */
 
