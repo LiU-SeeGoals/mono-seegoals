@@ -54,9 +54,9 @@ func startWebServer() {
 
 	foundInterface := false;
 
-	var conns []*net.UDPConn
+	var connections []*net.UDPConn
 	for _, iface := range ifaces {
-		if config.GetFetdatornInterface() != "" && config.GetFetdatornInterface() != iface.Name {
+		if config.GetAIMulticastInterface() != "" && config.GetAIMulticastInterface() != iface.Name {
 			continue
 		}
 
@@ -85,16 +85,16 @@ func startWebServer() {
 
 			fmt.Printf("Multicast from %s via %s to %s:%d (GameViewer)\n",
 				ipnet.IP, iface.Name, multicastIP, multicastPort)
-			conns = append(conns, conn)
+			connections = append(connections, conn)
 		}
 	}
 
-	if len(conns) == 0 || foundInterface == false {
+	if len(connections) == 0 || foundInterface == false {
 		panic("no suitable interfaces found")
 	}
 
 	webserverInstance = &WebServer{
-		multicastConns:       conns,
+		multicastConns:       connections,
 		multicastAddr:        addr,
 		gameStatePacketQueue: make([][]byte, 0),
 		logPacketQueue:       make([][]byte, 0),

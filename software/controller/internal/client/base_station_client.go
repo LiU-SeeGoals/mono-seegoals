@@ -45,7 +45,7 @@ func NewBaseStationClient(address string) *BaseStationClient {
 
 	var connections []Connection
 	for _, iface := range ifaces {
-		if config.GetFetdatornInterface() != "" && config.GetFetdatornInterface() != iface.Name {
+		if config.GetAIMulticastInterface() != "" && config.GetAIMulticastInterface() != iface.Name {
 			continue
 		}
 

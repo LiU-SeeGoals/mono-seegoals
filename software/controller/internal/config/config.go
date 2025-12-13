@@ -36,7 +36,7 @@ type Config struct {
 
 	BS ConfigBasestation
 
-	FT ConfigFetdatorn
+	AI ConfigAI
 }
 
 // Config struct for SSL Vision.
@@ -71,8 +71,8 @@ type ConfigBasestation struct {
 	Port    string `env:"AI_ACTIONS_BASESTATION_MULTICAST_PORT,required"`
 }
 
-type ConfigFetdatorn struct {
-	Interface string `env:"FETDATORN_MULTICAST_INTERFACE,required"`
+type ConfigAI struct {
+	Interface string `env:"AI_MULTICAST_INTERFACE,required"`
 }
 
 // Config struct for sim
@@ -201,9 +201,9 @@ func GetSSLClientAddressReal() string {
 	return fmt.Sprintf("%s:%s", cfg.SSLVision.Address, cfg.SSLVision.Port_real)
 }
 
-func GetFetdatornInterface() string {
+func GetAIMulticastInterface() string {
 	cfg := GetInstance()
-	return cfg.FT.Interface
+	return cfg.AI.Interface
 }
 
 func GetGameViewerAdress() string {

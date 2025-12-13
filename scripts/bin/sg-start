@@ -99,9 +99,7 @@ choices = [
     },
     {
         "choice-text": f"Fetdatorn configuration",
-        "pull_images": [
-            "ghcr.io/liu-seegoals/game-viewer:latest"
-        ],
+        "pull_images": [],
         "pre_cmd": [ f"{ssl_vision_dir}/start.sh" ],
         "docker_cmd": [
             "docker", "compose",
@@ -113,9 +111,7 @@ choices = [
     },
     {
         "choice-text": f"Fetdatorn configuration (+ autoref)",
-        "pull_images": [
-            "ghcr.io/liu-seegoals/game-viewer:latest"
-        ],
+        "pull_images": [],
         "pre_cmd": [ f"{ssl_vision_dir}/start.sh" ],
         "docker_cmd": [
             "docker", "compose",
