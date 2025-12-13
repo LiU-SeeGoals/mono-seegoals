@@ -90,10 +90,11 @@ CommandInfo rf_commands[2] = {
     {'R', "eset"},
 };
 
-CommandInfo motors_commands[3] = {
+CommandInfo motors_commands[4] = {
     {'S', "teer"},
     {'T', "oggle movement"},
-    {'G', "o tire test"}
+    {'G', "o tire test"},
+    {'D', "o dribble test"}
 };
 
 CommandInfo motors_steer_commands[4] = {
@@ -437,6 +438,8 @@ void parse_key()
         } break;
         }
     } else if (current_state == state_motors) {
+        static int dribble_cur = 0;
+
         switch (key) {
         case 'S': // Steer
             current_state = state_motors_steer;
@@ -455,6 +458,19 @@ void parse_key()
         case 'G': // Go tire test
             STATE_disable_calibration();
             NAV_TEST_TireTest();
+            break;
+        case 'D': // Go tire test
+            if (dribble_cur == 0)
+            {
+                NAV_RunDribbler();
+                dribble_cur = 1;
+            }
+            else
+            {
+                NAV_StopDribbler();
+                dribble_cur = 0;
+            }
+
             break;
         }
     } else if (current_state == state_motors_steer) {
