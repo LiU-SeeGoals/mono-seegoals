@@ -2,6 +2,7 @@
 
 /* Private includes */
 #include "com.h"
+#include "common.h"
 #include "kicker.h"
 #include "log.h"
 #include "nav.h"
@@ -58,11 +59,12 @@ typedef enum
 //!@{
 CommandInfo default_commands[4] = {{'R', "F"}, {'K', "icker"}, {'L', "ogs"}, {'M', "otors"}};
 
-CommandInfo kicker_commands[4] = {
+CommandInfo kicker_commands[5] = {
     {'C', "harge"},
     {'K', "ick"},
     {'P', "rint vars"},
     {'E', "dit vars"},
+    {'T', "est while driving"}
 };
 
 CommandInfo kicker_edit_commands[3] = {
@@ -91,7 +93,7 @@ CommandInfo rf_commands[2] = {
 CommandInfo motors_commands[3] = {
     {'S', "teer"},
     {'T', "oggle movement"},
-    {'G', "go tire test"}
+    {'G', "o tire test"}
 };
 
 CommandInfo motors_steer_commands[4] = {
@@ -328,10 +330,12 @@ void parse_key()
     } else if (current_state == state_kicker) {
         switch (key) {
         case 'C': // Charge
-            KICKER_Charge();
+            LOG_UI("Charging\r\n");
+            KICKER_ChargeStart();
             break;
         case 'K': // Kick
-            KICKER_Kick();
+            LOG_UI("Kicking\r\n");
+            KICKER_KickStart();
             break;
         case 'P': // Print vars
         {
@@ -340,6 +344,10 @@ void parse_key()
         } break;
         case 'E': // Edit vars
             current_state = state_kicker_edit;
+            print_help();
+            break;
+        case 'T': // Test while driving
+            NAV_SetCommandPosition(0.5, 0, 0);
             print_help();
             break;
         }

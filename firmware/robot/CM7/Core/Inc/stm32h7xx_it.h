@@ -55,10 +55,12 @@ void SVC_Handler(void);
 void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
+void TIM3_IRQHandler(void);
 void TIM4_IRQHandler(void);
 void USART3_IRQHandler(void);
 void EXTI15_10_IRQHandler(void);
 void TIM8_BRK_TIM12_IRQHandler(void);
+void TIM5_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 int* ITR_GetMotorTicks(void);
 void ITR_Init(void);

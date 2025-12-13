@@ -1,57 +1,102 @@
 #include "kicker.h"
 
 /* Private includes */
+#include "common.h"
 #include "log.h"
+#include <stdbool.h>
 
 /* Private defines */
 // ...
 
 /* Private variables */
 static LOG_Module internal_log_mod;
-static KICKER_Settings settings = {.max_charges_per_kick = 6, .charge_wait_us = 25000, .discharge_wait_us = 130, .charges_since_last_kick = 0};
-
-/* Private functions declarations */
-static void wait(uint64_t us);
+static KICKER_Settings settings = {.max_charges_per_kick = 6, .charge_wait_us = 200000, .discharge_wait_us = 230, .charges_since_last_kick = 0};
+static volatile bool charging = false;
+static volatile bool kicking = false;
+static TIM_HandleTypeDef* htim_kicker_charge;
+static TIM_HandleTypeDef* htim_kicker_kick;
 
 /*
  * Public functions implementations
  */
-void KICKER_Init() { LOG_InitModule(&internal_log_mod, "KICKER", LOG_LEVEL_DEBUG, 0); }
+void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick)
+{
+    LOG_InitModule(&internal_log_mod, "KICKER", LOG_LEVEL_INFO, 0);
+    htim_kicker_charge = htim_charge;
+    htim_kicker_kick = htim_kick;
 
-void KICKER_Charge()
+    htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
+    htim_kicker_charge->Instance->EGR = TIM_EGR_UG;
+
+    __HAL_TIM_SET_AUTORELOAD(htim_kicker_charge, settings.charge_wait_us);
+    __HAL_TIM_SET_COUNTER(htim_kicker_charge, 0);
+    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us);
+    __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
+}
+
+void KICKER_ChargeStart()
 {
     if (settings.charges_since_last_kick >= settings.max_charges_per_kick) {
-        LOG_INFO("Max charges per kick reached.\r\n");
+        LOG_DEBUG("Max charges per kick reached.\r\n");
+        return;
+    }
+
+    LOG_DEBUG("Charging start\r\n");
+
+    if (charging) {
+        LOG_DEBUG("Already charging\r\n");
         return;
     }
 
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_SET);
-    wait(settings.charge_wait_us); // TODO replace with hardware timer
-    HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
-    settings.charges_since_last_kick++;
-    LOG_DEBUG("Charged %d times...\r\n", settings.charges_since_last_kick);
+    charging = true;
+
+    __HAL_TIM_SET_AUTORELOAD(htim_kicker_charge, settings.charge_wait_us);
+    __HAL_TIM_SET_COUNTER(htim_kicker_charge, 0);
+    htim_kicker_charge->Instance->EGR = TIM_EGR_UG;
+    __HAL_TIM_CLEAR_FLAG(htim_kicker_charge, TIM_FLAG_UPDATE);
+
+    HAL_TIM_Base_Start_IT(htim_kicker_charge);
 }
 
-void KICKER_Kick()
+void KICKER_ChargeStop()
 {
+    HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
+    settings.charges_since_last_kick++;
+    LOG_DEBUG("Charging stopped, charged %d times...\r\n", settings.charges_since_last_kick);
+    HAL_TIM_Base_Stop_IT(htim_kicker_charge);
+    charging = false;
+}
+
+void KICKER_KickStart()
+{
+    if (kicking) {
+        LOG_DEBUG("Already kicking\r\n");
+        return;
+    }
+
+    LOG_DEBUG("Kicking start\r\n");
+
     // Kicks on low
     HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
-    wait(settings.discharge_wait_us); // TODO replace with hardware timer
+    kicking = true;
+
+    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us);
+    __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
+    htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
+    __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
+
+    HAL_TIM_Base_Start_IT(htim_kicker_kick);
+}
+
+void KICKER_KickStop()
+{
+    // Stop kick on high
     HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_SET);
     settings.charges_since_last_kick = 0;
-    LOG_DEBUG("Kicking!\r\n");
+    LOG_DEBUG("Kicking stop\r\n");
+    HAL_TIM_Base_Stop_IT(htim_kicker_kick);
+    kicking = false;
 }
 
 KICKER_Settings* KICKER_GetSettings() { return &settings; }
-
-/*
- * Private functions implementations
- */
-void wait(uint64_t us)
-{
-    uint32_t volatile cycles = HAL_RCC_GetSysClockFreq() * us / 1000000;
-    uint32_t volatile current = 0;
-    while (current <= cycles) {
-        current++;
-    }
-}
