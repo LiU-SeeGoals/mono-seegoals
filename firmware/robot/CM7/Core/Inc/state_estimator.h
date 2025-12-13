@@ -210,6 +210,8 @@ void STATE_calibrate_imu_gyr();
  */
 uint16_t STATE_is_calibrated();
 
+void STATE_disable_calibration();
+
 /**
  * Gets the estimated robot angle relative to the field
  */

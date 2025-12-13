@@ -7,9 +7,9 @@
  * Private includes
  */
 #include "arm_math.h"
-#include "stm32h7xx_it.h"
 #include "log.h"
 #include "motor.h"
+#include "stm32h7xx_it.h"
 #include <stdlib.h>
 
 /*
@@ -26,13 +26,21 @@ static int queued = 0;
 /* Private functions declarations */
 void set_motors(float m1, float m2, float m3, float m4);
 
+static void wait2(uint64_t us)
+{
+    const int CPU_Freq = HAL_RCC_GetSysClockFreq();
+    uint32_t volatile cycles = CPU_Freq * us / 1000000;
+    uint32_t volatile current = 0;
+    while (current <= cycles) {
+        current++;
+    }
+}
+
 /*
  * Public function implementations
  */
 
-void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
-              TIM_HandleTypeDef* pwm_htim,
-              TIM_HandleTypeDef* pwm15_htim)
+void NAV_Init(TIM_HandleTypeDef* motor_tick_itr, TIM_HandleTypeDef* pwm_htim, TIM_HandleTypeDef* pwm15_htim)
 {
     LOG_InitModule(&internal_log_mod, "NAV", LOG_LEVEL_DEBUG, 0);
     HAL_TIM_Base_Start(pwm_htim);
@@ -272,17 +280,13 @@ void NAV_HandleCommand(Command* cmd)
 
         NAV_EnableMovement();
         NAV_GoToAction(cmd);
-        if(cmd->kick_speed == 1)
-        {
+        if (cmd->kick_speed == 1) {
             KICKER_Kick();
         }
 
-        if(cmd->angular_vel == 1)
-        {
+        if (cmd->angular_vel == 1) {
             NAV_RunDribbler();
-        }
-        else
-        {
+        } else {
             NAV_StopDribbler();
         }
 
