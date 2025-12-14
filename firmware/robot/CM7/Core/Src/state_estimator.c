@@ -536,6 +536,7 @@ void STATE_log_states() { LOG_DEBUG("px: %f py: %f pw: %f vx: %f vy: %f\r\n", ST
 
 void STATE_calibrate_imu_gyr()
 {
+    LOG_INFO("Calibrating imu and gyro\r\n");
     const int calib_size = 5000;
 
     float acc_bias_x = 0;
@@ -550,6 +551,7 @@ void STATE_calibrate_imu_gyr()
     IMU_GyroVec3 gyr;
     for (int i = 0; i < calib_size; i++) {
         // Assume imu can handle 1khz update
+
         HAL_Delay(1);
 
         gyr = IMU_read_gyro_radps();
@@ -575,6 +577,9 @@ void STATE_calibrate_imu_gyr()
 
     fusionEKF.bias.is_calibrated = 1;
     LOG_INFO("Done calibrating\r\n");
+
 }
 
 uint16_t STATE_is_calibrated() { return fusionEKF.bias.is_calibrated; }
+
+void STATE_disable_calibration() { fusionEKF.bias.is_calibrated = 0; }

@@ -1,4 +1,5 @@
 #include "nav.h"
+#include "common.h"
 #include "kicker.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
@@ -274,7 +275,7 @@ void NAV_HandleCommand(Command* cmd)
         NAV_GoToAction(cmd);
         if(cmd->kick_speed == 1)
         {
-            KICKER_Kick();
+            KICKER_KickStart();
         }
 
         if(cmd->angular_vel == 1)
@@ -303,10 +304,7 @@ void NAV_HandleCommand(Command* cmd)
     case ACTION_TYPE__ROTATE_ACTION:
         break;
     case ACTION_TYPE__KICK_ACTION:
-        KICKER_Charge();
-        KICKER_Charge();
-        KICKER_Charge();
-        KICKER_Kick();
+        KICKER_ChargeStart();
         break;
     default:
         LOG_ERROR("Not known command: %i\r\n", cmd->command_id);
@@ -375,37 +373,25 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
 
 void NAV_TEST_TireTest()
 {
-    LOG_INFO("Starting tire test...\r\n");
+    const int us_to_sec = 50000;
 
-    LOG_INFO("First motor forward...\r\n");
-    set_motors(1, 0, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("First motor backwards...\r\n");
-    set_motors(-1, 0, 0, 0);
-    HAL_Delay(2000);
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d clockwise (forward)...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], 80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        COMMON_Wait(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 
-    LOG_INFO("Second motor forward...\r\n");
-    set_motors(0, 1, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Second motor backwards...\r\n");
-    set_motors(0, -1, 0, 0);
-    HAL_Delay(2000);
-
-    LOG_INFO("Third motor forward...\r\n");
-    set_motors(0, 0, 1, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Third motor backwards...\r\n");
-    set_motors(0, 0, -1, 0);
-    HAL_Delay(2000);
-
-    LOG_INFO("Fourth motor forward...\r\n");
-    set_motors(0, 0, 0, 1);
-    HAL_Delay(2000);
-    LOG_INFO("Fourth motor Backwards...\r\n");
-    set_motors(0, 0, 0, -1);
-    HAL_Delay(2000);
-
-    LOG_INFO("Finished tire test...\r\n");
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d counterclockwise (backwards)...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], -80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        COMMON_Wait(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 }
 
 void set_motors(float m1, float m2, float m3, float m4)
@@ -416,9 +402,13 @@ void set_motors(float m1, float m2, float m3, float m4)
     motors[3].speed = m4 * 100.f;
 }
 
-void NAV_StopDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
+void NAV_StopDribbler() {
+    // LOG_DEBUG("stop dirbling\r\n");
+    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
 
-void NAV_RunDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
+void NAV_RunDribbler() {
+    // LOG_DEBUG("dirbling\r\n");
+    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
 
 void NAV_TestDribbler()
 {
@@ -448,3 +438,4 @@ float NAV_GetNavX() { return robot_cmd.x; }
 float NAV_GetNavY() { return robot_cmd.y; }
 
 float NAV_GetNavW() { return robot_cmd.w; }
+

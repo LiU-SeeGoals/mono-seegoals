@@ -66,7 +66,9 @@ static LOG_Module internal_log_mod;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
+extern TIM_HandleTypeDef htim5;
 extern TIM_HandleTypeDef htim12;
 extern UART_HandleTypeDef huart3;
 /* USER CODE BEGIN EV */
@@ -82,7 +84,7 @@ extern UART_HandleTypeDef huart3;
 void NMI_Handler(void)
 {
   /* USER CODE BEGIN NonMaskableInt_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "NMI_Handler\n\r");
+    LOG_INFO("NMI_Handler\r\n");
 
   /* USER CODE END NonMaskableInt_IRQn 0 */
   /* USER CODE BEGIN NonMaskableInt_IRQn 1 */
@@ -97,7 +99,7 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "HardFault_Handler\n\r");
+    LOG_INFO("HardFault_Handler\r\n");
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
@@ -112,7 +114,7 @@ void HardFault_Handler(void)
 void MemManage_Handler(void)
 {
   /* USER CODE BEGIN MemoryManagement_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "MemManage_Handler\n\r");
+    LOG_INFO("MemManage_Handler\r\n");
   /* USER CODE END MemoryManagement_IRQn 0 */
   while (1)
   {
@@ -127,7 +129,7 @@ void MemManage_Handler(void)
 void BusFault_Handler(void)
 {
   /* USER CODE BEGIN BusFault_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "BusFault_Handler\n\r");
+    LOG_INFO("BusFault_Handler\r\n");
   /* USER CODE END BusFault_IRQn 0 */
   while (1)
   {
@@ -142,7 +144,7 @@ void BusFault_Handler(void)
 void UsageFault_Handler(void)
 {
   /* USER CODE BEGIN UsageFault_IRQn 0 */
-    LOG_Printf(LOG_GetModule(0), LOG_LEVEL_INFO, "UsageFault_Handler\n\r");
+    LOG_INFO("UsageFault_Handler\r\n");
   /* USER CODE END UsageFault_IRQn 0 */
   while (1)
   {
@@ -210,6 +212,20 @@ void SysTick_Handler(void)
 /* For the available peripheral interrupt handler names,                      */
 /* please refer to the startup file (startup_stm32h7xx.s).                    */
 /******************************************************************************/
+
+/**
+  * @brief This function handles TIM3 global interrupt.
+  */
+void TIM3_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM3_IRQn 0 */
+
+  /* USER CODE END TIM3_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim3);
+  /* USER CODE BEGIN TIM3_IRQn 1 */
+
+  /* USER CODE END TIM3_IRQn 1 */
+}
 
 /**
   * @brief This function handles TIM4 global interrupt.
@@ -319,6 +335,20 @@ void TIM8_BRK_TIM12_IRQHandler(void)
   /* USER CODE END TIM8_BRK_TIM12_IRQn 1 */
 }
 
+/**
+  * @brief This function handles TIM5 global interrupt.
+  */
+void TIM5_IRQHandler(void)
+{
+  /* USER CODE BEGIN TIM5_IRQn 0 */
+
+  /* USER CODE END TIM5_IRQn 0 */
+  HAL_TIM_IRQHandler(&htim5);
+  /* USER CODE BEGIN TIM5_IRQn 1 */
+
+  /* USER CODE END TIM5_IRQn 1 */
+}
+
 /* USER CODE BEGIN 1 */
 int* ITR_GetMotorTicks(void)
 {
@@ -326,7 +356,7 @@ int* ITR_GetMotorTicks(void)
     return motor_ticks;
 }
 
-int* ITR_Init(void)
+void ITR_Init(void)
 {
     LOG_InitModule(&internal_log_mod, "ITR", LOG_LEVEL_DEBUG, 0);
 }

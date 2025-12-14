@@ -58,7 +58,9 @@ I2C_HandleTypeDef hi2c4;
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim12;
 TIM_HandleTypeDef htim15;
 
@@ -92,6 +94,8 @@ static void MX_TIM12_Init(void);
 static void MX_TIM15_Init(void);
 static void MX_I2C4_Init(void);
 static void MX_TIM4_Init(void);
+static void MX_TIM5_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void I2C4_Init(void);
@@ -118,6 +122,24 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     __enable_irq();
 }
 
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
+{
+    /* USER CODE BEGIN Callback 0 */
+
+    /* USER CODE END Callback 0 */
+    if (htim->Instance == TIM5) {
+        KICKER_ChargeStop();
+        KICKER_KickStart();
+    }
+
+    if (htim->Instance == TIM3) {
+        KICKER_KickStop();
+    }
+    /* USER CODE BEGIN Callback 1 */
+
+    /* USER CODE END Callback 1 */
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef* huart) { UI_RxCallback(); }
 /* USER CODE END 0 */
 
@@ -141,7 +163,7 @@ int main(void)
 
   /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
   HAL_Init();
-  HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
+
   /* USER CODE BEGIN Init */
 
   /* USER CODE END Init */
@@ -179,32 +201,43 @@ int main(void)
   MX_TIM15_Init();
   MX_I2C4_Init();
   MX_TIM4_Init();
+  MX_TIM5_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
     // Initialise modules
     LOG_Init(&huart3);
     LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO, 0);
-    LOG_INFO("My ID is %i (%li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+    if (COM_Get_ID() == 255) {
+        LOG_INFO("ID is unknown (%i, serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+    } else {
+        LOG_INFO("ID is %i (serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+    }
     POS_Init();
-#ifdef PCB_MOTOR
     NAV_Init(&htim12, &htim1, &htim15);
-#else
-    NAV_Init(&htim12, &htim1, &htim15);
-#endif
     HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1);
-    KICKER_Init();
+    KICKER_Init(&htim5, &htim3);
     IMU_Init(&hi2c4);
     STATE_Init();
-    STATE_calibrate_imu_gyr();
     UI_Init(&huart3);
-    COM_Init(&hspi1, &NRF_AVAILABLE);
     ITR_Init();
-
-    HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-    if(NRF_AVAILABLE){
-    HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    LOG_INFO("Discharging kicker\r\n");
+    const int DISCHARGE_AMNT = 50;
+    for (int i = 0; i < DISCHARGE_AMNT; i++)
+    {
+        LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
+        KICKER_KickSafe();
+        HAL_Delay(60);
     }
+    STATE_calibrate_imu_gyr();
+    HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
+
+    if(NRF_AVAILABLE){
+        HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
+    }
+
+    COM_Init(&hspi1, &NRF_AVAILABLE);
     LOG_INFO("Startup done\r\n");
   /* USER CODE END 2 */
 
@@ -500,6 +533,58 @@ static void MX_TIM1_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 9999;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 65535;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_DISABLE;
+  sSlaveConfig.InputTrigger = TIM_TS_ITR2;
+  if (HAL_TIM_SlaveConfigSynchro(&htim3, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief TIM4 Initialization Function
   * @param None
   * @retval None
@@ -548,6 +633,58 @@ static void MX_TIM4_Init(void)
   /* USER CODE BEGIN TIM4_Init 2 */
 
   /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
+  * @brief TIM5 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM5_Init(void)
+{
+
+  /* USER CODE BEGIN TIM5_Init 0 */
+
+  /* USER CODE END TIM5_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM5_Init 1 */
+
+  /* USER CODE END TIM5_Init 1 */
+  htim5.Instance = TIM5;
+  htim5.Init.Prescaler = 399;
+  htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim5.Init.Period = 4294967295;
+  htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim5, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_DISABLE;
+  sSlaveConfig.InputTrigger = TIM_TS_ITR2;
+  if (HAL_TIM_SlaveConfigSynchro(&htim5, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim5, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM5_Init 2 */
+
+  /* USER CODE END TIM5_Init 2 */
 
 }
 
