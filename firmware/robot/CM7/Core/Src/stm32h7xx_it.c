@@ -358,7 +358,7 @@ int* ITR_GetMotorTicks(void)
 
 void ITR_Init(void)
 {
-    LOG_InitModule(&internal_log_mod, "ITR", LOG_LEVEL_DEBUG, 0);
+    LOG_InitModule(&internal_log_mod, "ITR", LOG_LEVEL_INFO, 0);
 }
 
 /* USER CODE END 1 */

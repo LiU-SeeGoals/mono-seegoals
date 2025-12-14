@@ -35,7 +35,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
               TIM_HandleTypeDef* pwm_htim,
               TIM_HandleTypeDef* pwm15_htim)
 {
-    LOG_InitModule(&internal_log_mod, "NAV", LOG_LEVEL_DEBUG, 0);
+    LOG_InitModule(&internal_log_mod, "NAV", LOG_LEVEL_INFO, 0);
     HAL_TIM_Base_Start(pwm_htim);
     HAL_TIM_Base_Start(pwm15_htim);
 
@@ -235,28 +235,6 @@ void NAV_Stop()
 
 float speed = 0;
 
-void command_move(Command* cmd)
-{
-
-    LOG_INFO("got nav command %d %d %d \r\n", cmd->kick_speed, cmd->command_id, cmd->direction->x, cmd->direction->y);
-    if (cmd->command_id == ACTION_TYPE__STOP_ACTION) {
-        NAV_steer(0.f, 0.f, 0.f);
-        return;
-    }
-
-    if (cmd->command_id == ACTION_TYPE__KICK_ACTION) {
-        speed = cmd->kick_speed;
-        if (speed > 10) {
-            speed = 10;
-        }
-        return;
-    }
-
-    if (cmd->command_id == ACTION_TYPE__MOVE_ACTION) {
-        NAV_steer(100.f * speed * cmd->direction->x, 100.f * speed * cmd->direction->y, 0.f);
-    }
-}
-
 void NAV_TestMovement() { NAV_steer(1, 0, 0); }
 
 void NAV_DisableMovement() { robot_cmd.movement_enabled = 0; }
@@ -265,6 +243,8 @@ void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
 void NAV_HandleCommand(Command* cmd)
 {
+    static int kicks_since_last_kick = 0;
+
     switch (cmd->command_id) {
     case ACTION_TYPE__STOP_ACTION:
         NAV_DisableMovement();
@@ -273,10 +253,6 @@ void NAV_HandleCommand(Command* cmd)
 
         NAV_EnableMovement();
         NAV_GoToAction(cmd);
-        if(cmd->kick_speed == 1)
-        {
-            KICKER_KickStart();
-        }
 
         if(cmd->angular_vel == 1)
         {
@@ -304,11 +280,23 @@ void NAV_HandleCommand(Command* cmd)
     case ACTION_TYPE__ROTATE_ACTION:
         break;
     case ACTION_TYPE__KICK_ACTION:
+        NAV_EnableMovement();
+
         KICKER_ChargeStart();
+        NAV_GoToAction(cmd);
+
         break;
     default:
         LOG_ERROR("Not known command: %i\r\n", cmd->command_id);
         break;
+    }
+    if (cmd->command_id == ACTION_TYPE__KICK_ACTION)
+    {
+        kicks_since_last_kick++;
+    }
+    else
+    {
+        kicks_since_last_kick = 0;
     }
 }
 
