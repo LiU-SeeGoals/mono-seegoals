@@ -94,7 +94,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
         motors[i].cur_tick_idx = 0;
         motors[i].cur_tick_idx = 0;
         I_prevs[i] = 0.0f;
-        for (int j = 0; j < motor_tick_buf_size; j++) {
+        for (int j = 0; j < MOTOR_TICK_BUF_SIZE; j++) {
             motors[i].motor_ticks[j] = 0;
         }
     }

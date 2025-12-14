@@ -70,7 +70,6 @@ extern TIM_HandleTypeDef htim3;
 extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim5;
 extern TIM_HandleTypeDef htim7;
-extern TIM_HandleTypeDef htim12;
 extern UART_HandleTypeDef huart3;
 /* USER CODE BEGIN EV */
 
@@ -306,35 +305,6 @@ void EXTI15_10_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles TIM8 break interrupt and TIM12 global interrupt.
-  */
-void TIM8_BRK_TIM12_IRQHandler(void)
-{
-  /* USER CODE BEGIN TIM8_BRK_TIM12_IRQn 0 */
-  /* USER CODE END TIM8_BRK_TIM12_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim12);
-  /* USER CODE BEGIN TIM8_BRK_TIM12_IRQn 1 */
-
-    __disable_irq();
-
-    if (STATE_is_calibrated() == 1) {
-        IMU_AccelVec3 acc = IMU_read_accel_mps2();
-        IMU_GyroVec3 gyr = IMU_read_gyro_radps();
-
-        STATE_FusionEKFIntertialUpdate(acc, gyr);
-        float x = NAV_GetNavX();
-        float y = NAV_GetNavY();
-        float w = NAV_GetNavW();
-
-        POS_go_to_position(x, y, w);
-    }
-
-    __enable_irq();
-
-  /* USER CODE END TIM8_BRK_TIM12_IRQn 1 */
-}
-
-/**
   * @brief This function handles TIM5 global interrupt.
   */
 void TIM5_IRQHandler(void)
@@ -358,8 +328,6 @@ void TIM7_IRQHandler(void)
   /* USER CODE END TIM7_IRQn 0 */
   HAL_TIM_IRQHandler(&htim7);
   /* USER CODE BEGIN TIM7_IRQn 1 */
-
-  NAV_update_motor_state();
 
   /* USER CODE END TIM7_IRQn 1 */
 }

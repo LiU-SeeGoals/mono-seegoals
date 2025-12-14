@@ -138,6 +138,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     if (htim->Instance == TIM3) {
         KICKER_KickStop();
     }
+    if (htim->Instance == TIM7) {
+        NAV_update_motor_state();
+    }
+
+
+    if (htim->Instance == TIM12 && STATE_is_calibrated() == 1) {
+        IMU_AccelVec3 acc = IMU_read_accel_mps2();
+        IMU_GyroVec3 gyr = IMU_read_gyro_radps();
+
+        STATE_FusionEKFIntertialUpdate(acc, gyr);
+        float x = NAV_GetNavX();
+        float y = NAV_GetNavY();
+        float w = NAV_GetNavW();
+
+        POS_go_to_position(x, y, w);
+    }
+
     /* USER CODE BEGIN Callback 1 */
 
     /* USER CODE END Callback 1 */
@@ -242,6 +259,7 @@ int main(void)
     }
 
     STATE_calibrate_imu_gyr();
+    HAL_TIM_Base_Start_IT(&htim12);
 
     COM_Init(&hspi1, &NRF_AVAILABLE);
 
@@ -734,7 +752,6 @@ static void MX_TIM12_Init(void)
 
   /* USER CODE END TIM12_Init 0 */
 
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_SlaveConfigTypeDef sSlaveConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
 
@@ -748,11 +765,6 @@ static void MX_TIM12_Init(void)
   htim12.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim12.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim12) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim12, &sClockSourceConfig) != HAL_OK)
   {
     Error_Handler();
   }
