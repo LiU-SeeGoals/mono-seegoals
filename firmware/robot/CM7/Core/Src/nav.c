@@ -341,11 +341,17 @@ void NAV_GoToAction(Command* cmd)
         return;
     }
 
-    STATE_FusionEKFVisionUpdate(f_cam_x, f_cam_y, f_cam_w);
 
     prev_nav_x = f_cam_x;
     prev_nav_y = f_cam_y;
     prev_nav_w = f_cam_w;
+
+    if (abs(prev_nav_w - nav_w) > (PI * 1000.0 / 6.0) == 0) {
+        // Reject >30 degree angle diffs
+        return;
+    }
+
+    STATE_FusionEKFVisionUpdate(f_cam_x, f_cam_y, f_cam_w);
 }
 
 /*
