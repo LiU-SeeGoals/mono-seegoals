@@ -28,6 +28,7 @@
 #include "motor.h"
 #include "nav.h"
 #include "pos_follow.h"
+#include "common.h"
 #include "state_estimator.h"
 #include "stm32h7xx_hal_gpio.h"
 #include "stm32h7xx_it.h"
@@ -224,21 +225,31 @@ int main(void)
     ITR_Init();
     LOG_INFO("Discharging kicker\r\n");
     const int DISCHARGE_AMNT = 50;
+    COMMON_buzzer_warning_with_delay();
+
     for (int i = 0; i < DISCHARGE_AMNT; i++)
     {
-        LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
+        if (i % 20 == 0)
+        {
+            LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
+        }
+
         KICKER_KickSafe();
         HAL_Delay(60);
     }
+
     STATE_calibrate_imu_gyr();
-    HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
+
+    COM_Init(&hspi1, &NRF_AVAILABLE);
 
     if(NRF_AVAILABLE){
         HAL_GPIO_WritePin(LED_GREEN_GPIO_Port, LED_GREEN_Pin, GPIO_PIN_SET);
     }
 
-    COM_Init(&hspi1, &NRF_AVAILABLE);
+    HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
+
     LOG_INFO("Startup done\r\n");
+    COMMON_buzzer_done();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -247,26 +258,8 @@ int main(void)
     uint32_t now = HAL_GetTick();
     bool on = false;
 
-    int* motor_ticks = ITR_GetMotorTicks();
-
+    NAV_StopDribbler();
     while (1) {
-
-        LOG_DEBUG("%d %d %d %d\r\n", motor_ticks[0], motor_ticks[1], motor_ticks[2], motor_ticks[3]);
-
-        if (HAL_GetTick() - now > 1000) {
-            if (on) {
-                HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
-                HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_RESET);
-                NAV_StopDribbler();
-
-            } else {
-                HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_SET);
-                HAL_GPIO_WritePin(BUZZER_GPIO_Port, BUZZER_Pin, GPIO_PIN_SET);
-                // NAV_RunDribbler();
-            }
-            on = !on;
-            now = HAL_GetTick();
-        }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

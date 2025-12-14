@@ -249,7 +249,7 @@ uint8_t COM_Get_ID()
         return 6;
     }
     if (w0 == 3801132 && w1 == 892490001 && w2 == 842217265) {
-        return 3;
+        return 1;
     }
     if (w0 == 2293800 && w1 == 858935561 && w2 == 808727605) {
         return 8;
@@ -260,9 +260,8 @@ uint8_t COM_Get_ID()
 
     if (w0 == 3080240 && w1 == 842223876 && w2 == 842544439)
     {
-        return 3;
+        return 0;
     }
-
     LOG_ERROR("Failed ID lookup for robot ID: %d %d %d\r\n", w0, w1, w2);
     return 255;
 }
@@ -277,7 +276,7 @@ static void parse_controller_packet(uint8_t* payload, uint8_t len)
     cmd = command__unpack(NULL, len, payload);
 
     if (!cmd) {
-        LOG_WARNING("Decoding PB failed\r\n");
+        LOG_DEBUG("Decoding PB failed\r\n");
     } else {
         NAV_HandleCommand(cmd);
     }
