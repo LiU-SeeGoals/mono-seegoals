@@ -27,18 +27,10 @@
 		</Var>
 		<Var name="" type="list">
 			<Var name="x" type="int" minval="" maxval="">
-				1706
+				1750
 			</Var>
 			<Var name="y" type="int" minval="" maxval="">
-				103
-			</Var>
-		</Var>
-		<Var name="" type="list">
-			<Var name="x" type="int" minval="" maxval="">
-				1721
-			</Var>
-			<Var name="y" type="int" minval="" maxval="">
-				194
+				16
 			</Var>
 		</Var>
 		<Var name="" type="list">
@@ -59,34 +51,18 @@
 		</Var>
 		<Var name="" type="list">
 			<Var name="x" type="int" minval="" maxval="">
-				1581
+				1614
 			</Var>
 			<Var name="y" type="int" minval="" maxval="">
-				1010
+				883
 			</Var>
 		</Var>
 		<Var name="" type="list">
 			<Var name="x" type="int" minval="" maxval="">
-				1554
+				459
 			</Var>
 			<Var name="y" type="int" minval="" maxval="">
-				1074
-			</Var>
-		</Var>
-		<Var name="" type="list">
-			<Var name="x" type="int" minval="" maxval="">
-				682
-			</Var>
-			<Var name="y" type="int" minval="" maxval="">
-				1076
-			</Var>
-		</Var>
-		<Var name="" type="list">
-			<Var name="x" type="int" minval="" maxval="">
-				492
-			</Var>
-			<Var name="y" type="int" minval="" maxval="">
-				1073
+				907
 			</Var>
 		</Var>
 		<Var name="" type="list">
@@ -99,10 +75,18 @@
 		</Var>
 		<Var name="" type="list">
 			<Var name="x" type="int" minval="" maxval="">
-				1750
+				486
 			</Var>
 			<Var name="y" type="int" minval="" maxval="">
-				16
+				951
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1609
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				932
 			</Var>
 		</Var>
 	</Var>
