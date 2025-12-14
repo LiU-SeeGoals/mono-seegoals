@@ -121,6 +121,7 @@ NVIC1.TIM3_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
 NVIC1.TIM4_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
 NVIC1.TIM5_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
 NVIC1.TIM7_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
+NVIC1.TIM8_BRK_TIM12_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
 NVIC1.USART3_IRQn=true\:0\:0\:false\:false\:true\:true\:true\:true
 NVIC1.UsageFault_IRQn=true\:0\:0\:false\:false\:true\:false\:false\:false
 NVIC2.BusFault_IRQn=true\:0\:0\:false\:false\:true\:false\:false\:false
