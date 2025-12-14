@@ -21,6 +21,7 @@ static MotorPWM motors[4];
 static robot_nav_command robot_cmd;
 static float I_prevs[4]; // PI control I-parts
 const float CLOCK_FREQ = 400000000;
+const float CONTROL_TIM_FREQ = 200000000;
 float CONTROL_FREQ; // set in init
 static int queued = 0;
 
@@ -105,7 +106,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     NAV_EnableMovement();
     float control_clock_prescaler = motor_tick_itr->Init.Prescaler + 1;
     float control_clock_period = motor_tick_itr->Init.Period + 1;
-    CONTROL_FREQ = CLOCK_FREQ / (control_clock_prescaler * control_clock_period);
+    CONTROL_FREQ = CONTROL_TIM_FREQ / (control_clock_prescaler * control_clock_period);
     HAL_TIM_Base_Start_IT(motor_tick_itr);
 }
 
