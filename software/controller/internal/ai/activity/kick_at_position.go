@@ -39,8 +39,21 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	unitVector := kp.targetPosition.Sub(&ballPos).Normalize()
 	unitVector.Angle = 0
 	// We can now get a position that is behind the ball, opposite of the targetposition
-	possessor := ball.GetPossessor()
-	inPossession := possessor == robot
+	// possessor := ball.GetPossessor()
+	// inPossession := possessor == robot
+
+	robotpos, err := robot.GetPosition()
+
+	if err != nil {
+	}
+
+	balldist := math.Sqrt(math.Pow(robotpos.X-ballPos.X, 2) + math.Pow(robotpos.Y-ballPos.Y, 2))
+	inPossession := false
+
+	if balldist < 90 {
+		inPossession = true
+	}
+	fmt.Println(balldist)
 
 	kp.retrievingBall = !inPossession
 
@@ -64,52 +77,54 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	}
 
 	// Robot is in possesion of the ball, but is not facing the target
-	if inPossession && !robot.Facing(kp.targetPosition, accuracy) {
-		// Since we cannot move and rotate with the ball reliably,
-		// we need to move around the ball, while also rotating towards the ball at the same time
-		// until we are lined up with the target, aswell as the ball.
-
-		// We assume possesion means that the ball in proximity to the dribbler
-		robotPos, _ := robot.GetPosition()
-
-		angleDelta := info.NormalizeAngleDelta(robotPos.Angle, ballPos.AngleToPosition(kp.targetPosition))
-
-		direction := math.Copysign(1.0, angleDelta)
-		// Positive direction: Turn left
-		// Negative direction: Turn right
-		stepSize := 150.0 // millimeters
-		radius := 115.0   // WARNING MAGIC NUMBER
-
-		vecBallToRobot := robotPos.Sub(&ballPos)
-		angleFromBall := vecBallToRobot.Angle
-
-		tangentAngle := angleFromBall + (direction * math.Pi / 2)
-
-		tangentPoint := robotPos.OnRadius(stepSize, tangentAngle)
-		vecBallToNextPos := tangentPoint.Sub(&ballPos).Normalize().Scale(radius)
-		nextPosition := ballPos.Add(&vecBallToNextPos)
-		nextPosition.Angle = nextPosition.AngleToPosition(ballPos)
-
-		// Create move action to the current target
-		moveAction := action.MoveTo{
-			Id:      int(kp.id),
-			Team:    kp.team,
-			Dest:    nextPosition,
-			Dribble: false,
-		}
-		moveAction.Dest.Angle = nextPosition.Angle
-		return &moveAction
-
-	}
+	//	if inPossession && !robot.Facing(kp.targetPosition, accuracy) {
+	//		// Since we cannot move and rotate with the ball reliably,
+	//		// we need to move around the ball, while also rotating towards the ball at the same time
+	//		// until we are lined up with the target, aswell as the ball.
+	//
+	//		// We assume possesion means that the ball in proximity to the dribbler
+	//		robotPos, _ := robot.GetPosition()
+	//
+	//		angleDelta := info.NormalizeAngleDelta(robotPos.Angle, ballPos.AngleToPosition(kp.targetPosition))
+	//
+	//		direction := math.Copysign(1.0, angleDelta)
+	//		// Positive direction: Turn left
+	//		// Negative direction: Turn right
+	//		stepSize := 150.0 // millimeters
+	//		radius := 115.0   // WARNING MAGIC NUMBER
+	//
+	//		vecBallToRobot := robotPos.Sub(&ballPos)
+	//		angleFromBall := vecBallToRobot.Angle
+	//
+	//		tangentAngle := angleFromBall + (direction * math.Pi / 2)
+	//
+	//		tangentPoint := robotPos.OnRadius(stepSize, tangentAngle)
+	//		vecBallToNextPos := tangentPoint.Sub(&ballPos).Normalize().Scale(radius)
+	//		nextPosition := ballPos.Add(&vecBallToNextPos)
+	//		nextPosition.Angle = nextPosition.AngleToPosition(ballPos)
+	//
+	//		// Create move action to the current target
+	//		moveAction := action.MoveTo{
+	//			Id:      int(kp.id),
+	//			Team:    kp.team,
+	//			Dest:    nextPosition,
+	//			Dribble: false,
+	//		}
+	//		moveAction.Dest.Angle = nextPosition.Angle
+	//		return &moveAction
+	//
+	//	}
 
 	// If we get here, it means we are in possession of the ball and that the robot is facing the target.
 	// So we move forward and shoot
+
 	runUpDistance := unitVector.Scale(100)
 	destination := ballPos.Add(&runUpDistance)
 	moveAction := action.MoveTo{
-		Id:   int(kp.id),
-		Dest: destination,
-		Team: kp.team,
+		Id:      int(kp.id),
+		Dest:    destination,
+		Team:    kp.team,
+		Dribble: true,
 	}
 	KickSpeed := float32(5)
 	moveAction.KickSpeed = int(KickSpeed)

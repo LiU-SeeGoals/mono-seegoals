@@ -41,28 +41,50 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 
 	angleToBall := robotPos.AngleToPosition(ballPos)
 
-	dribble := false
-	if ballPos.Distance(robotPos) < 120 {
-		dribble = true
-	}
+	var act action.MoveTo
 
+	dribble := false
+	kick := 0
 	target := info.Position{X: ballPos.X, Y: ballPos.Y, Z: 0, Angle: angleToBall}
 	moveAction := NewMoveToPosition(m.team, m.id, target).GetMoveToAction(gi)
 	moveAction.Dest.Angle = angleToBall
-	act := action.MoveTo{
-		Id:   int(m.id),
-		Team: m.team,
-		Pos:  robotPos,
-		Dest: moveAction.Dest,
 
-		Dribble: dribble,
+	if ballPos.Distance(robotPos) < 1500 {
+		dribble = true
+		if ballPos.Distance(robotPos) < 100 {
+			kick = 100
+		}
+
+		act = action.MoveTo{
+			Id:        int(m.id),
+			Team:      m.team,
+			Pos:       robotPos,
+			Dest:      moveAction.Dest,
+			Dribble:   dribble,
+			KickSpeed: kick,
+		}
+
+	} else {
+
+		fmt.Println(ballPos.Distance(robotPos))
+
+		act = action.MoveTo{
+			Id:        int(m.id),
+			Team:      m.team,
+			Pos:       robotPos,
+			Dest:      robotPos,
+			Dribble:   dribble,
+			KickSpeed: kick,
+		}
+
 	}
 
 	return &act
 }
 
 func (m *MoveToBall) Achieved(gi *info.GameInfo) bool {
-	return gi.State.GetBall().GetPossessor() == gi.State.GetRobot(m.id, m.team)
+	//return gi.State.GetBall().GetPossessor() == gi.State.GetRobot(m.id, m.team)
+	return false
 }
 
 func (m *MoveToBall) GetID() info.ID {

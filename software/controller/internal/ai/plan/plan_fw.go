@@ -54,11 +54,11 @@ func (m *plannerFw) run() {
 	for {
 		time.Sleep(100 * time.Millisecond)
 
-		if m.activities[3] == nil {
-			//fmt.Println(fmt.Sprintf("done with (%d) action (%s)", robot, m.team))
-			//fmt.Println("next action: ", way_points[index])
-			m.AddActivity(ai.NewMoveToPosition(m.team, info.ID(3), way_points[index]))
-			index = (index + 1) % len(way_points)
-		}
+		// if m.activities[3] == nil {
+		//fmt.Println(fmt.Sprintf("done with (%d) action (%s)", robot, m.team))
+		//fmt.Println("next action: ", way_points[index])
+		m.AddActivity(ai.NewMoveToPosition(m.team, info.ID(3), way_points[index]))
+		// index = (index + 1) % len(way_points)
+		// }
 	}
 }

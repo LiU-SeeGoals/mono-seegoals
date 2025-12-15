@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const MAX_SEND_SIZE = 2048
+const MAX_SEND_SIZE = 32
 
 type Connection interface {
 	Write(b []byte) (n int, err error)
@@ -41,7 +41,7 @@ func NewBaseStationClient(address string) *BaseStationClient {
 		panic(err)
 	}
 
-	foundInterface := false;
+	foundInterface := false
 
 	var connections []Connection
 	for _, iface := range ifaces {
@@ -49,7 +49,7 @@ func NewBaseStationClient(address string) *BaseStationClient {
 			continue
 		}
 
-		foundInterface = true;
+		foundInterface = true
 
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagMulticast == 0 {
 			continue
@@ -121,6 +121,7 @@ func (b *BaseStationClient) SendActions(actions []action.Action) {
 	b.queueMutex.Lock()
 	for _, action := range actions {
 		b.queue = append(b.queue, action.TranslateReal())
+		fmt.Println("Queue length", len(b.queue))
 	}
 	b.queueMutex.Unlock()
 }

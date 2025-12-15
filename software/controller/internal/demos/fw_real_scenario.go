@@ -1,6 +1,7 @@
 package demos
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/ai"
@@ -8,14 +9,18 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/client"
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 func FwRealScenario() {
 	gameInfo := info.NewGameInfo(10)
 	ssl_receiver := client.NewSSLClient(config.GetSSLClientAddressReal())
+	logger.Logger.Debug("starting")
+	fmt.Printf("asdfasdfasdf\n")
+	fmt.Println("asdfasdasdfasdfasdfdasdfdasfadsf")
 
 	// Yellow team
-	// slowBrainYellow := plan.NewPlannerFw(info.Yellow)
+	//slowBrainYellow := plan.NewPlannerFw(info.Yellow)
 	slowBrainYellow := plan.NewTestKick(info.Yellow)
 
 	fastBrainYellow := ai.NewActivityExecutor()
