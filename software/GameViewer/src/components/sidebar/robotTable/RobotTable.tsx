@@ -50,7 +50,9 @@ const RobotTable: React.FC<RobotTableProps> = ({
           <p>y</p>
           <p>Angle</p>
         </div>
-        {Array.from(yellowRobots.values()).map((robot, index) => (
+        {Array.from(yellowRobots.values())
+          .sort((a, b) => a.robotId - b.robotId)
+          .map((robot, index) => (
         <div className="robotItem" key={index}>
           <p>{robot.robotId}</p>
           <p>{robot.x.toFixed(1)}</p>
@@ -68,7 +70,9 @@ const RobotTable: React.FC<RobotTableProps> = ({
           <p>y</p>
           <p>Angle</p>
         </div>
-        {Array.from(blueRobots.values()).map((robot, index) => (
+        {Array.from(blueRobots.values())
+          .sort((a, b) => a.robotId - b.robotId)
+          .map((robot, index) => (
         <div className="robotItem" key={index}>
           <p>{robot.robotId}</p>
           <p>{robot.x.toFixed(1)}</p>

@@ -13,12 +13,12 @@ static LOG_Module internal_log_mod;
 
 void set_params()
 {
-    params_angle.umin = -100.0;
-    params_angle.umax = 100.0;
+    params_angle.umin = -400.0;
+    params_angle.umax = 400.0;
     params_angle.Ts = DELTA_T;
     params_angle.Ti = 100000000;
     params_angle.Td = 0.1;
-    params_angle.K = 50 * 1.1;
+    params_angle.K = 80 * 1.1;
 
     params_dist.umin = -100.0;
     params_dist.umax = 100.0;
@@ -84,7 +84,7 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
     float euclidian_distance = sqrt(rel_x * rel_x + rel_y * rel_y);
 
     // Control on global frame coordinates
-    float distance_control_signal = 300.f;
+    float distance_control_signal = 600.f;
     float control_w = PID_p(STATE_get_robot_angle(), wantw, angle_error, &params_angle);
 
     // Rotate from world to robot frame (inverse the robot angle)
