@@ -57,6 +57,17 @@ func (r *Robot) At(pos Position, threshold float64) bool {
 	return robotPos.Distance(pos) < threshold
 }
 
+// Opponent returns the opposing team for t. UNKNOWN returns UNKNOWN.
+func (t Team) Opponent() Team {
+	switch t {
+	case Yellow:
+		return Blue
+	case Blue:
+		return Yellow
+	default:
+		return UNKNOWN
+	}
+}
 
 func (r *Robot) DribblerPos() Position {
 
@@ -66,13 +77,12 @@ func (r *Robot) DribblerPos() Position {
 	return robotPos
 }
 
-
 func (r *Robot) Facing(target Position, threshold float64) bool {
 	pos, err := r.GetPosition()
 	if err != nil {
 		return false
 	}
-	return pos.FacingPosition(target, threshold) 
+	return pos.FacingPosition(target, threshold)
 }
 
 func (r *Robot) GetVelocity() Position {
