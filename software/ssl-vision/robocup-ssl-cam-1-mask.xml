@@ -1,0 +1,85 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<VarXML>
+	<Var name="Convex Hull Points" type="list">
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				297
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				553
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				428
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				7
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				551
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				4
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1500
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				19
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1675
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				301
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1726
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				765
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1711
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				1067
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				385
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				1064
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				305
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				1022
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1576
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				11
+			</Var>
+		</Var>
+	</Var>
+</VarXML>

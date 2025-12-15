@@ -2,10 +2,12 @@
 
 /* Private includes */
 #include "com.h"
+#include "common.h"
 #include "kicker.h"
 #include "log.h"
 #include "nav.h"
 #include "pos_follow.h"
+#include "state_estimator.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -57,11 +59,12 @@ typedef enum
 //!@{
 CommandInfo default_commands[4] = {{'R', "F"}, {'K', "icker"}, {'L', "ogs"}, {'M', "otors"}};
 
-CommandInfo kicker_commands[4] = {
+CommandInfo kicker_commands[5] = {
     {'C', "harge"},
     {'K', "ick"},
     {'P', "rint vars"},
     {'E', "dit vars"},
+    {'T', "est while driving"}
 };
 
 CommandInfo kicker_edit_commands[3] = {
@@ -87,7 +90,12 @@ CommandInfo rf_commands[2] = {
     {'R', "eset"},
 };
 
-CommandInfo motors_commands[2] = {{'S', "teer"}, {'T', "oggle movement"}};
+CommandInfo motors_commands[4] = {
+    {'S', "teer"},
+    {'T', "oggle movement"},
+    {'G', "o tire test"},
+    {'D', "o dribble test"}
+};
 
 CommandInfo motors_steer_commands[4] = {
     {'W', ""},
@@ -323,10 +331,12 @@ void parse_key()
     } else if (current_state == state_kicker) {
         switch (key) {
         case 'C': // Charge
-            KICKER_Charge();
+            LOG_UI("Charging\r\n");
+            KICKER_ChargeStart();
             break;
         case 'K': // Kick
-            KICKER_Kick();
+            LOG_UI("Kicking\r\n");
+            KICKER_KickStart();
             break;
         case 'P': // Print vars
         {
@@ -335,6 +345,10 @@ void parse_key()
         } break;
         case 'E': // Edit vars
             current_state = state_kicker_edit;
+            print_help();
+            break;
+        case 'T': // Test while driving
+            NAV_SetCommandPosition(0.5, 0, 0);
             print_help();
             break;
         }
@@ -424,6 +438,8 @@ void parse_key()
         } break;
         }
     } else if (current_state == state_motors) {
+        static int dribble_cur = 0;
+
         switch (key) {
         case 'S': // Steer
             current_state = state_motors_steer;
@@ -439,29 +455,46 @@ void parse_key()
                 moving = 1;
             }
             break;
+        case 'G': // Go tire test
+            STATE_disable_calibration();
+            NAV_TEST_TireTest();
+            break;
+        case 'D': // Go tire test
+            if (dribble_cur == 0)
+            {
+                NAV_RunDribbler();
+                dribble_cur = 1;
+            }
+            else
+            {
+                NAV_StopDribbler();
+                dribble_cur = 0;
+            }
+
+            break;
         }
     } else if (current_state == state_motors_steer) {
         switch (key) {
         case 'W':
-            NAV_SetCommandPosition(0, 1, 0);
+            NAV_SetCommandPosition(0.5, 0, 0);
             if (!moving)
                 NAV_EnableMovement();
             moving = 1;
             break;
         case 'A':
-            NAV_SetCommandPosition(1, 0, 0);
+            NAV_SetCommandPosition(0, 0.5, 0);
             if (!moving)
                 NAV_EnableMovement();
             moving = 1;
             break;
         case 'S':
-            NAV_SetCommandPosition(0, -1, 0);
+            NAV_SetCommandPosition(-0.5, 0, 0);
             if (!moving)
                 NAV_EnableMovement();
             moving = 1;
             break;
         case 'D':
-            NAV_SetCommandPosition(-1, 0, 0);
+            NAV_SetCommandPosition(0, -0.5, 0);
             if (!moving)
                 NAV_EnableMovement();
             moving = 1;

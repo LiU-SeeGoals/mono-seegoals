@@ -1,0 +1,3 @@
+services:
+  ai:
+    command: bash -c "go run main.go"

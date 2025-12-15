@@ -7,28 +7,26 @@ export const useGameController = (
   useEffect(() => {
     const gc_addr = import.meta.env.VITE_SSL_GAME_CONTROLLER_WS_ADDR;
     const gc_port = import.meta.env.VITE_SSL_GAME_CONTROLLER_WS_PORT;
-    const game_controller_socket = new WebSocket(`ws://${gc_addr}:${gc_port}/`);
-    game_controller_socket.binaryType = 'arraybuffer';
+    console.log(`[useGameController.ts] connecting to ws://${gc_addr}:${gc_port}`);
 
-        const wsUrl = `ws://${gc_addr}:${gc_port}/`;
-    console.log('Attempting to connect to Game Controller:', wsUrl);
+    const ws = new WebSocket(`ws://${gc_addr}:${gc_port}/`);
+    ws.binaryType = 'arraybuffer';
 
-    game_controller_socket.onopen = () => {
+    ws.onopen = () => {
       setIsConnected(true);
-      console.log("Connected to Game Controller!");
+      console.log(`[useGameController.ts] connected on ${ws.url}`);
     };
 
-    game_controller_socket.onerror = (error) => {
-      console.error('Game Controller WebSocket error:', error);
+    ws.onerror = (err) => {
+      setIsConnected(false);
+      console.error(`[useGameController.ts] error: ${err}`);
+    };
+
+    ws.onclose = () => {
       setIsConnected(false);
     };
 
-    game_controller_socket.onclose = () => {
-      console.log('Game Controller WebSocket closed:', event.code, event.reason);
-      setIsConnected(false);
-    };
-
-    game_controller_socket.onmessage = (event) => {
+    ws.onmessage = (event) => {
       try {
         if (!event.data) return;
         const buffer = new Uint8Array(event.data);
@@ -42,7 +40,7 @@ export const useGameController = (
     };
 
     return () => {
-      game_controller_socket.close();
+      ws.close();
     };
   }, []);
 

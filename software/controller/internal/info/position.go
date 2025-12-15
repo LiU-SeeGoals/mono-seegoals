@@ -17,7 +17,7 @@ func (p *Position) FacingPosition(target Position, threshold float64) bool {
 	targetDirection := p.AngleToPosition(target)
 	currentDirection := p.Angle
 
-	angleDiff := math.Abs(float64(targetDirection - currentDirection))
+	angleDiff := math.Abs(NormalizeAngleDelta(targetDirection, currentDirection))
 	if angleDiff < threshold {
 		return true
 	} else {
@@ -25,17 +25,22 @@ func (p *Position) FacingPosition(target Position, threshold float64) bool {
 	}
 }
 
+func NormalizeAngleDelta(target, current float64) float64 {
+	delta := target - current
+	return math.Atan2(math.Sin(delta), math.Cos(delta))
+}
+
 // Rotate position (vector) around origin (around z axis)
 func (p Position) Rotate(rads float64) Position {
 
-	x := p.X * math.Cos(rads) - p.Y * math.Sin(rads)
-	y := p.X * math.Sin(rads) + p.Y * math.Cos(rads)
+	x := p.X*math.Cos(rads) - p.Y*math.Sin(rads)
+	y := p.X*math.Sin(rads) + p.Y*math.Cos(rads)
 	angle := p.Angle + rads
 
 	return Position{
-		X: x,
-		Y: y,
-		Z: 0,
+		X:     x,
+		Y:     y,
+		Z:     0,
 		Angle: angle,
 	}
 }
@@ -43,9 +48,9 @@ func (p Position) Rotate(rads float64) Position {
 // TranslatePolar moves a point by a given distance in a given direction
 func (p Position) OnRadius(distance float64, angle float64) Position {
 	return Position{
-		X: p.X + distance*math.Cos(angle),
-		Y: p.Y + distance*math.Sin(angle),
-		Z: p.Z,
+		X:     p.X + distance*math.Cos(angle),
+		Y:     p.Y + distance*math.Sin(angle),
+		Z:     p.Z,
 		Angle: p.Angle,
 	}
 }

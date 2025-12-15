@@ -7,6 +7,7 @@ typedef struct {
     int max_charges_per_kick;
     int charge_wait_us;
     int discharge_wait_us;
+    int safe_discharge_wait_us;
     int charges_since_last_kick;
 } KICKER_Settings;
 
@@ -14,19 +15,29 @@ typedef struct {
  * Initalize the kicker subsystem.
  * Curently initializes the log module
  */
-void KICKER_Init();
+void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick);
 
 /**
- * Charges the kicker caps.
- * Curently this is For the time specified in the private settings variable,
- * and frezzes the rest of the program.
+ *
  */
-void KICKER_Charge();
+void KICKER_ChargeStart();
 
 /**
- * Activates the kicker.
+ *
  */
-void KICKER_Kick();
+void KICKER_ChargeStop();
+
+/**
+ *
+ */
+void KICKER_KickStart();
+
+/**
+ *
+ */
+void KICKER_KickStop();
+
+void KICKER_KickSafe();
 
 /**
  * Returns a reference to the current kicker settings.

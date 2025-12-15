@@ -1,0 +1,26 @@
+services:
+  ai:
+    profiles:
+      - donotstart
+
+  game-viewer:
+    environment:
+      - SSL_VISION_MULTICAST_ADDR=${SSL_VISION_MULTICAST_ADDR}
+      - SSL_VISION_MULTICAST_PORT=${SSL_VISION_REAL_MAIN_PORT}
+    network_mode: host
+
+  ssl-vision-client:
+    profiles:
+      - donotstart
+
+  ssl-game-controller:
+    profiles:
+      - donotstart
+
+  er-sim:
+    profiles:
+      - donotstart
+
+  tiger-auto-referee:
+    profiles:
+      - donotstart

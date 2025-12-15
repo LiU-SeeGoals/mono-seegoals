@@ -54,7 +54,11 @@ public:
       string buffer;
       packet.SerializeToString(&buffer);
       Net::Address multiaddr;
-      multiaddr.setHost(_net_address.c_str(),_port);
+      if (!multiaddr.setHost(_net_address.c_str(),_port))
+      {
+        fprintf(stderr, "Couldn't set host\n");
+        return false;
+      }
       bool result;
       result=mc.send(buffer.c_str(),buffer.length(),multiaddr);
       if (result==false) {

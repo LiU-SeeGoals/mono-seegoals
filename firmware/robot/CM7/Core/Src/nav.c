@@ -1,4 +1,5 @@
 #include "nav.h"
+#include "common.h"
 #include "kicker.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
@@ -7,6 +8,7 @@
  * Private includes
  */
 #include "arm_math.h"
+#include "stm32h7xx_it.h"
 #include "log.h"
 #include "motor.h"
 #include <stdlib.h>
@@ -31,66 +33,39 @@ void set_motors(float m1, float m2, float m3, float m4);
 
 void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
               TIM_HandleTypeDef* pwm_htim,
-              TIM_HandleTypeDef* pwm15_htim,
-              TIM_HandleTypeDef* encoder1_htim,
-              TIM_HandleTypeDef* encoder2_htim,
-              TIM_HandleTypeDef* encoder3_htim,
-              TIM_HandleTypeDef* encoder4_htim)
+              TIM_HandleTypeDef* pwm15_htim)
 {
-    LOG_InitModule(&internal_log_mod, "NAV", LOG_LEVEL_DEBUG, 0);
+    LOG_InitModule(&internal_log_mod, "NAV", LOG_LEVEL_INFO, 0);
     HAL_TIM_Base_Start(pwm_htim);
     HAL_TIM_Base_Start(pwm15_htim);
-    HAL_TIM_Base_Start(encoder1_htim);
-    HAL_TIM_Base_Start(encoder2_htim);
-    HAL_TIM_Base_Start(encoder3_htim);
-    HAL_TIM_Base_Start(encoder4_htim);
 
     motors[0].pwm_htim = pwm_htim;
     motors[0].ticks = 0;
     motors[0].speed = 0.f;
     motors[0].prev_tick = 0;
-    motors[0].encoder_htim = encoder1_htim;
-    motors[0].channel = MOTOR1_TIM_CHANNEL;
+    motors[0].channel = TIM_CHANNEL_1;
     motors[0].breakPinPort = MOTOR1_BREAK_GPIO_Port;
     motors[0].breakPin = MOTOR1_BREAK_Pin;
     motors[0].reversePinPort = MOTOR1_REVERSE_GPIO_Port;
     motors[0].reversePin = MOTOR1_REVERSE_Pin;
-    motors[0].encoderPinPort = MOTOR1_ENCODER_GPIO_Port;
-    motors[0].encoderPin = MOTOR1_ENCODER_Pin;
     motors[0].dir = 1;
 
-#ifdef PCB_MOTOR
-    motors[1].pwm_htim = pwm15_htim;
-    motors[1].ticks = 0;
-    motors[1].speed = 0.f;
-    motors[1].prev_tick = 0;
-    motors[1].encoder_htim = encoder2_htim;
-    motors[1].channel = MOTOR2_TIM_CHANNEL;
-    motors[1].breakPinPort = MOTOR2_BREAK_GPIO_Port;
-    motors[1].breakPin = MOTOR2_BREAK_Pin;
-    motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
-    motors[1].reversePin = MOTOR2_REVERSE_Pin;
-    motors[1].dir = 1;
-#else
     motors[1].pwm_htim = pwm_htim;
     motors[1].ticks = 0;
     motors[1].speed = 0.f;
     motors[1].prev_tick = 0;
-    motors[1].encoder_htim = encoder2_htim;
     motors[1].channel = TIM_CHANNEL_2;
-    // motors[1].breakPinPort      = OLD_MOTOR2_BREAK_GPIO_Port;
-    // motors[1].breakPin          = OLD_MOTOR2_BREAK_Pin;
-    motors[1].reversePinPort = OLD_MOTOR2_REVERSE_GPIO_Port;
-    motors[1].reversePin = OLD_MOTOR2_REVERSE_Pin;
+    motors[2].breakPinPort = MOTOR2_BREAK_GPIO_Port;
+    motors[2].breakPin = MOTOR2_BREAK_Pin;
+    motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
+    motors[1].reversePin = MOTOR2_REVERSE_Pin;
     motors[1].dir = 1;
-#endif
 
     motors[2].pwm_htim = pwm_htim;
     motors[2].ticks = 0;
     motors[2].speed = 0.f;
     motors[2].prev_tick = 0;
-    motors[2].encoder_htim = encoder3_htim;
-    motors[2].channel = MOTOR3_TIM_CHANNEL;
+    motors[2].channel = TIM_CHANNEL_3;
     motors[2].breakPinPort = MOTOR3_BREAK_GPIO_Port;
     motors[2].breakPin = MOTOR3_BREAK_Pin;
     motors[2].reversePinPort = MOTOR3_REVERSE_GPIO_Port;
@@ -101,8 +76,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[3].ticks = 0;
     motors[3].speed = 0.f;
     motors[3].prev_tick = 0;
-    motors[3].encoder_htim = encoder4_htim;
-    motors[3].channel = MOTOR4_TIM_CHANNEL;
+    motors[3].channel = TIM_CHANNEL_4;
     motors[3].breakPinPort = MOTOR4_BREAK_GPIO_Port;
     motors[3].breakPin = MOTOR4_BREAK_Pin;
     motors[3].reversePinPort = MOTOR4_REVERSE_GPIO_Port;
@@ -138,9 +112,11 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
 void NAV_update_motor_state()
 {
 
+    int* motor_ticks = ITR_GetMotorTicks();
+
     for (int i = 0; i < 4; i++) {
         int ticks_before = motors[i].prev_tick;
-        int new_ticks = motors[i].encoder_htim->Instance->CNT;
+        int new_ticks = motor_ticks[i];
         MOTOR_update_motor_ticks(&motors[i], new_ticks - ticks_before);
         motors[i].ticks = new_ticks - ticks_before;
         motors[i].prev_tick = new_ticks;
@@ -155,8 +131,6 @@ void NAV_update_motor_state()
         }
     }
 }
-
-void NAV_log_speed() { LOG_INFO("Got speed m1 %f m2 %f m3 %f m4 %f\r\n", MOTOR_ReadSpeed(&motors[0]), MOTOR_ReadSpeed(&motors[1]), MOTOR_ReadSpeed(&motors[2]), MOTOR_ReadSpeed(&motors[3])); }
 
 // res is a 3x1 vector
 void NAV_wheelToBody(float* res)
@@ -203,7 +177,7 @@ void NAV_wheelToBody(float* res)
     res[2] = w;
 }
 
-void NAV_steer(float v, float u, float w)
+void NAV_steer(float u, float v, float w)
 {
     // Ref: https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
     // wheels RF, RB, LB, LF
@@ -228,9 +202,9 @@ void NAV_steer(float v, float u, float w)
     float wlf = 1.0 / r * (-u * arm_cos_f32(psi) + v * arm_sin_f32(psi) + w * R);
 
     motors[0].speed = wrf;
-    motors[1].speed = wrb;
+    motors[1].speed = wlf;
     motors[2].speed = wlb;
-    motors[3].speed = wlf;
+    motors[3].speed = wrb;
 }
 
 void NAV_Direction(DIRECTION dir)
@@ -261,28 +235,6 @@ void NAV_Stop()
 
 float speed = 0;
 
-void command_move(Command* cmd)
-{
-
-    LOG_INFO("got nav command %d %d %d \r\n", cmd->kick_speed, cmd->command_id, cmd->direction->x, cmd->direction->y);
-    if (cmd->command_id == ACTION_TYPE__STOP_ACTION) {
-        NAV_steer(0.f, 0.f, 0.f);
-        return;
-    }
-
-    if (cmd->command_id == ACTION_TYPE__KICK_ACTION) {
-        speed = cmd->kick_speed;
-        if (speed > 10) {
-            speed = 10;
-        }
-        return;
-    }
-
-    if (cmd->command_id == ACTION_TYPE__MOVE_ACTION) {
-        NAV_steer(100.f * speed * cmd->direction->x, 100.f * speed * cmd->direction->y, 0.f);
-    }
-}
-
 void NAV_TestMovement() { NAV_steer(1, 0, 0); }
 
 void NAV_DisableMovement() { robot_cmd.movement_enabled = 0; }
@@ -291,15 +243,26 @@ void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
 void NAV_HandleCommand(Command* cmd)
 {
+    static int kicks_since_last_kick = 0;
+
     switch (cmd->command_id) {
     case ACTION_TYPE__STOP_ACTION:
         NAV_DisableMovement();
-        LOG_DEBUG("Got stop (id %d)\r\n", cmd->robot_id);
         break;
     case ACTION_TYPE__MOVE_TO_ACTION: {
+
         NAV_EnableMovement();
-        LOG_DEBUG("Got move (id %d)\r\n", cmd->robot_id);
         NAV_GoToAction(cmd);
+
+        if(cmd->angular_vel == 1)
+        {
+            NAV_RunDribbler();
+        }
+        else
+        {
+            NAV_StopDribbler();
+        }
+
     } break;
 
     case ACTION_TYPE__MOVE_ACTION: {
@@ -309,8 +272,6 @@ void NAV_HandleCommand(Command* cmd)
 
         NAV_EnableMovement();
 
-        LOG_DEBUG("keyboard control (x,y,speed): (%i,%i,%i)\r\n", x, y, speed);
-        LOG_DEBUG("keyboard control (x,y): (%f,%f)\r\n", 100.f * speed * x, 100.f * speed * y);
         // TODO: Should somehow know that we're in remote control mode
         if (0 <= speed && speed <= 10) {
             NAV_TEST_Set_robot_cmd(x, y, speed);
@@ -319,14 +280,23 @@ void NAV_HandleCommand(Command* cmd)
     case ACTION_TYPE__ROTATE_ACTION:
         break;
     case ACTION_TYPE__KICK_ACTION:
-        KICKER_Charge();
-        KICKER_Charge();
-        KICKER_Charge();
-        KICKER_Kick();
+        NAV_EnableMovement();
+
+        KICKER_ChargeStart();
+        NAV_GoToAction(cmd);
+
         break;
     default:
         LOG_ERROR("Not known command: %i\r\n", cmd->command_id);
         break;
+    }
+    if (cmd->command_id == ACTION_TYPE__KICK_ACTION)
+    {
+        kicks_since_last_kick++;
+    }
+    else
+    {
+        kicks_since_last_kick = 0;
     }
 }
 
@@ -334,12 +304,12 @@ void NAV_HandleCommand(Command* cmd)
  * Private function implementations
  */
 
-int32_t prev_nav_x = 2147483647;
-int32_t prev_nav_y = 2147483647;
-int32_t prev_nav_w = 2147483647;
-
 void NAV_GoToAction(Command* cmd)
 {
+    static int32_t prev_nav_x = 2147483647;
+    static int32_t prev_nav_y = 2147483647;
+    static int32_t prev_nav_w = 2147483647;
+
     const int32_t nav_x = cmd->dest->x;
     const int32_t nav_y = cmd->dest->y;
     const int32_t nav_w = cmd->dest->w;
@@ -357,11 +327,6 @@ void NAV_GoToAction(Command* cmd)
     const float f_cam_x = ((float)cam_x) / 1000.f;
     const float f_cam_y = ((float)cam_y) / 1000.f;
     const float f_cam_w = ((float)cam_w) / 1000.f;
-
-    LOG_DEBUG("move to int: %d %d %d:\r\n", nav_x, nav_y, nav_w);
-    LOG_DEBUG("Vision int: %d %d %d:\r\n", cam_x, cam_y, cam_w);
-    LOG_DEBUG("Vision data: %f %f %f:\r\n", f_cam_x, f_cam_y, f_cam_w);
-    LOG_DEBUG("Move to: %f %f %f:\r\n", f_nav_x, f_nav_y, f_nav_w);
 
     robot_cmd.x = f_nav_x;
     robot_cmd.y = f_nav_y;
@@ -394,39 +359,27 @@ void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z)
     robot_cmd.w = nav_z;
 }
 
-void NAV_TireTest()
+void NAV_TEST_TireTest()
 {
-    LOG_INFO("Starting tire test...\r\n");
+    const int us_to_sec = 50000;
 
-    LOG_INFO("First motor forward...\r\n");
-    set_motors(1, 0, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("First motor backwards...\r\n");
-    set_motors(-1, 0, 0, 0);
-    HAL_Delay(2000);
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d clockwise (forward)...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], 80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        COMMON_Wait(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 
-    LOG_INFO("Second motor forward...\r\n");
-    set_motors(0, 1, 0, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Second motor backwards...\r\n");
-    set_motors(0, -1, 0, 0);
-    HAL_Delay(2000);
-
-    LOG_INFO("Third motor forward...\r\n");
-    set_motors(0, 0, 1, 0);
-    HAL_Delay(2000);
-    LOG_INFO("Third motor backwards...\r\n");
-    set_motors(0, 0, -1, 0);
-    HAL_Delay(2000);
-
-    LOG_INFO("Fourth motor forward...\r\n");
-    set_motors(0, 0, 0, 1);
-    HAL_Delay(2000);
-    LOG_INFO("Fourth motor Backwards...\r\n");
-    set_motors(0, 0, 0, -1);
-    HAL_Delay(2000);
-
-    LOG_INFO("Finished tire test...\r\n");
+    for (int i = 0; i < 4; i++) {
+        LOG_INFO("Motor %d counterclockwise (backwards)...\r\n", i);
+        float zero = 0;
+        setDirection(&motors[i], -80);
+        MOTOR_SendPWM(&motors[i], 0.2);
+        COMMON_Wait(us_to_sec);
+        MOTOR_SendPWM(&motors[i], 0);
+    }
 }
 
 void set_motors(float m1, float m2, float m3, float m4)
@@ -437,32 +390,28 @@ void set_motors(float m1, float m2, float m3, float m4)
     motors[3].speed = m4 * 100.f;
 }
 
-void NAV_StopDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
+void NAV_StopDribbler() {
+    // LOG_DEBUG("stop dirbling\r\n");
+    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
 
-uint8_t NAV_IsPanic() { return robot_cmd.panic; }
-
-/*
-   Someone thinks something has gone terribly wrong...
-   Disable motors and everyhting going forward
-   TODO: Actualy implement the behaviour that triggers when the program is set
-   to panic.
- */
-void NAV_SetRobotPanic() { robot_cmd.panic = 1; }
-
-/*
-  Someone solved the panic
-  TODO: Implement reset behaviour. I am leaving this as 1 untill the method
-  actualy does something.
-*/
-void NAV_ClearRobotPanic() { robot_cmd.panic = 1; }
-
-void NAV_RunDribbler() { HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
+void NAV_RunDribbler() {
+    // LOG_DEBUG("dirbling\r\n");
+    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
 
 void NAV_TestDribbler()
 {
     NAV_RunDribbler();
     HAL_Delay(2000);
     NAV_StopDribbler();
+}
+
+void NAV_TEST_pwm()
+{
+    float speed = 0.15;
+    MOTOR_SendPWM(&motors[0], speed);
+    MOTOR_SendPWM(&motors[1], speed);
+    MOTOR_SendPWM(&motors[2], speed);
+    MOTOR_SendPWM(&motors[3], speed);
 }
 
 void NAV_TEST_Set_robot_cmd(float x, float y, float w)
@@ -477,3 +426,4 @@ float NAV_GetNavX() { return robot_cmd.x; }
 float NAV_GetNavY() { return robot_cmd.y; }
 
 float NAV_GetNavW() { return robot_cmd.w; }
+
