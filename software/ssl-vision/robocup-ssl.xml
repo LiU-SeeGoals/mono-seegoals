@@ -2387,34 +2387,34 @@
 					false
 				</Var>
 				<Var name="focal length" type="double" minval="" maxval="">
-					773.709360
+					829.414963
 				</Var>
 				<Var name="principal point x" type="double" minval="" maxval="">
-					1006.543189
+					977.850796
 				</Var>
 				<Var name="principal point y" type="double" minval="" maxval="">
-					504.961532
+					532.533356
 				</Var>
 				<Var name="distortion" type="double" minval="-1.000000" maxval="2.000000">
-					0.380000
+					0.460000
 				</Var>
 				<Var name="q0" type="double" minval="" maxval="">
-					-0.713164
+					-0.713593
 				</Var>
 				<Var name="q1" type="double" minval="" maxval="">
-					-0.692064
+					-0.696232
 				</Var>
 				<Var name="q2" type="double" minval="" maxval="">
-					-0.083014
+					-0.049687
 				</Var>
 				<Var name="q3" type="double" minval="" maxval="">
-					0.074525
+					0.059802
 				</Var>
 				<Var name="tx" type="double" minval="" maxval="">
-					161.882688
+					273.825171
 				</Var>
 				<Var name="ty" type="double" minval="" maxval="">
-					1865.346122
+					2130.658538
 				</Var>
 				<Var name="tz" type="double" minval="0.000000" maxval="6500.000000">
 					2604.000000
@@ -2426,10 +2426,10 @@
 						CP 0
 					</Var>
 					<Var name="Control point 0 image x" type="double" minval="" maxval="">
-						373.000000
+						386.000000
 					</Var>
 					<Var name="Control point 0 image y" type="double" minval="" maxval="">
-						193.000000
+						282.000000
 					</Var>
 					<Var name="Control point 0 field x" type="double" minval="" maxval="">
 						-3050.000000
@@ -2443,10 +2443,10 @@
 						CP 1
 					</Var>
 					<Var name="Control point 1 image x" type="double" minval="" maxval="">
-						1658.000000
+						1653.000000
 					</Var>
 					<Var name="Control point 1 image y" type="double" minval="" maxval="">
-						176.000000
+						268.000000
 					</Var>
 					<Var name="Control point 1 field x" type="double" minval="" maxval="">
 						-3050.000000
@@ -2460,10 +2460,10 @@
 						CP 2
 					</Var>
 					<Var name="Control point 2 image x" type="double" minval="" maxval="">
-						1535.000000
+						1545.000000
 					</Var>
 					<Var name="Control point 2 image y" type="double" minval="" maxval="">
-						922.000000
+						1024.000000
 					</Var>
 					<Var name="Control point 2 field x" type="double" minval="" maxval="">
 						0.000000
@@ -2477,10 +2477,10 @@
 						CP 3
 					</Var>
 					<Var name="Control point 3 image x" type="double" minval="" maxval="">
-						535.000000
+						532.000000
 					</Var>
 					<Var name="Control point 3 image y" type="double" minval="" maxval="">
-						957.000000
+						1056.000000
 					</Var>
 					<Var name="Control point 3 field x" type="double" minval="" maxval="">
 						0.000000
@@ -2496,7 +2496,7 @@
 					1.000000
 				</Var>
 				<Var name="line search corridor width" type="double" minval="" maxval="">
-					80.000000
+					60.000000
 				</Var>
 				<Var name="Image boundary for edge detection" type="double" minval="" maxval="">
 					10.000000
@@ -3708,34 +3708,34 @@
 					false
 				</Var>
 				<Var name="focal length" type="double" minval="" maxval="">
-					848.831940
+					974.039838
 				</Var>
 				<Var name="principal point x" type="double" minval="" maxval="">
-					998.763101
+					914.547924
 				</Var>
 				<Var name="principal point y" type="double" minval="" maxval="">
-					553.882142
+					564.966102
 				</Var>
 				<Var name="distortion" type="double" minval="-1.000000" maxval="2.000000">
-					0.470000
+					0.650000
 				</Var>
 				<Var name="q0" type="double" minval="" maxval="">
-					-0.699022
+					-0.703263
 				</Var>
 				<Var name="q1" type="double" minval="" maxval="">
-					-0.710208
+					-0.710449
 				</Var>
 				<Var name="q2" type="double" minval="" maxval="">
-					0.052080
+					0.016721
 				</Var>
 				<Var name="q3" type="double" minval="" maxval="">
-					-0.065269
+					0.020096
 				</Var>
 				<Var name="tx" type="double" minval="" maxval="">
-					130.518501
+					404.956911
 				</Var>
 				<Var name="ty" type="double" minval="" maxval="">
-					-1582.413106
+					-2153.063583
 				</Var>
 				<Var name="tz" type="double" minval="0.000000" maxval="6500.000000">
 					2600.000000
@@ -3747,10 +3747,10 @@
 						CP 0
 					</Var>
 					<Var name="Control point 0 image x" type="double" minval="" maxval="">
-						478.000000
+						453.000000
 					</Var>
 					<Var name="Control point 0 image y" type="double" minval="" maxval="">
-						140.000000
+						0.000000
 					</Var>
 					<Var name="Control point 0 field x" type="double" minval="" maxval="">
 						0.000000
@@ -3764,10 +3764,10 @@
 						CP 1
 					</Var>
 					<Var name="Control point 1 image x" type="double" minval="" maxval="">
-						1560.000000
+						1575.000000
 					</Var>
 					<Var name="Control point 1 image y" type="double" minval="" maxval="">
-						174.000000
+						22.000000
 					</Var>
 					<Var name="Control point 1 field x" type="double" minval="" maxval="">
 						0.000000
@@ -3781,10 +3781,10 @@
 						CP 2
 					</Var>
 					<Var name="Control point 2 image x" type="double" minval="" maxval="">
-						1630.000000
+						1622.000000
 					</Var>
 					<Var name="Control point 2 image y" type="double" minval="" maxval="">
-						973.000000
+						814.000000
 					</Var>
 					<Var name="Control point 2 field x" type="double" minval="" maxval="">
 						3050.000000
@@ -3798,10 +3798,10 @@
 						CP 3
 					</Var>
 					<Var name="Control point 3 image x" type="double" minval="" maxval="">
-						373.000000
+						398.000000
 					</Var>
 					<Var name="Control point 3 image y" type="double" minval="" maxval="">
-						968.000000
+						819.000000
 					</Var>
 					<Var name="Control point 3 field x" type="double" minval="" maxval="">
 						3050.000000
@@ -3817,7 +3817,7 @@
 					1.000000
 				</Var>
 				<Var name="line search corridor width" type="double" minval="" maxval="">
-					69.000000
+					50.000000
 				</Var>
 				<Var name="Image boundary for edge detection" type="double" minval="" maxval="">
 					10.000000
