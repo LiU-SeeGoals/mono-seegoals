@@ -11,11 +11,7 @@ import (
 )
 
 // RobotSafetyRadius defines the no-movement zone around each robot
-<<<<<<< HEAD
-const RobotSafetyRadius = 250.0 // mm - increased for better safety margin
-=======
 const RobotSafetyRadius = 200.0 // mm - increased for better safety margin
->>>>>>> 8918264 (Demo to test if obstecal_avoidence works)
 
 // MoveToPositionWithCollisionAvoidance handles collision avoidance using RRT
 type MoveToPosition struct {
@@ -63,7 +59,7 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 		waypointThreshold:  50.0,    // mm to consider waypoint reached
 		fieldWidth:         13400.0, // Standard SSL field width in mm
 		fieldHeight:        10400.0, // Standard SSL field height in mm
-		completionDistance: 150.0,    // mm to consider the goal reached
+		completionDistance: 150.0,   // mm to consider the goal reached
 	}
 
 	return &MoveToPosition{
@@ -382,9 +378,8 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 		path = path[1:]
 	}
 
-
 	m.path = path
-	// Simplify the path by removing redundant waypoints this is way to agressive right now 
+	// Simplify the path by removing redundant waypoints this is way to agressive right now
 
 	//m.path = m.SimplifyPath(path, obstacles)
 }
