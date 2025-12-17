@@ -2,7 +2,7 @@ import React from 'react';
 import './BottomBar.css';
 
 interface BottomBarProps {
-  style,
+  style: React.CSSProperties,
   terminalLog: string[];
 }
 

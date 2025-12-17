@@ -7,6 +7,7 @@
     "dev": "vite & node src/backend/sslVisionProxy.cjs & node src/backend/gameControllerProxy.cjs & node src/backend/AIControllerProxy.cjs",
     "server": "node src/backend/sslVisionProxy.cjs & node src/backend/gameControllerProxy.cjs & node src/backend/AIControllerProxy.cjs",
     "build": "tsc && vite build",
+    "start": "serve -s dist -l 5173 & node src/backend/sslVisionProxy.cjs & node src/backend/gameControllerProxy.cjs & node src/backend/AIControllerProxy.cjs",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
@@ -20,6 +21,7 @@
     "protobufjs": "^7.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "serve": "^14.2.5",
     "ws": "^8.18.0"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@ import LensIcon from '@mui/icons-material/Lens';
 import InfoIcon from '@mui/icons-material/Info';
 import { Action } from '../../../types/Action';
 import { actionToStr } from '../../../helper/defaultValues';
+import { SSLFieldUpdate } from '../../../types/SSLFieldUpdate';
 
 interface RobotTableProps {
   robotActions: Action[];
@@ -23,15 +24,21 @@ const RobotTable: React.FC<RobotTableProps> = ({
     setYellowRobots(prev => {
       const updated = new Map(prev);
       sslFieldUpdate.robotsYellow.forEach(robot => {
-        updated.set(robot.robotId, robot);
+        if (robot.robotId !== undefined) {
+          updated.set(robot.robotId, robot);
+        }
       });
       return updated;
     });
+  }, [sslFieldUpdate]); // Make sure to include all dependencies in the dependency array!
 
+  useEffect(() => {
     setBlueRobots(prev => {
       const updated = new Map(prev);
       sslFieldUpdate.robotsBlue.forEach(robot => {
-        updated.set(robot.robotId, robot);
+        if (robot.robotId !== undefined) {
+          updated.set(robot.robotId, robot);
+        }
       });
       return updated;
     });
