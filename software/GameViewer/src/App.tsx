@@ -5,9 +5,9 @@ import GameViewer from './components/gameViewer/GameViewer';
 import { useSSLVision } from './hooks/useSSLVision';
 import { useAIController } from './hooks/useAIController';
 import { useGameController } from './hooks/useGameController.ts';
-import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
-import { parseProto } from './helper/ParseProto';
-import { parseJson } from './helper/ParseJson';
+import { SSLGeometryFieldSize } from './proto/ssl_vision_geometry';
+// import { parseProto } from './helper/ParseProto';
+// import { parseJson } from './helper/ParseJson';
 
 import {
   getDefaultSSLFieldUpdate,
@@ -18,7 +18,6 @@ import {
   getDefaultLog,
   getDefaultVisibleRobots,
 } from './helper/defaultValues';
-import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
 
 function App() {
   const [sslFieldUpdate, setSSLFieldUpdate] = useState(getDefaultSSLFieldUpdate());
@@ -29,9 +28,9 @@ function App() {
   const [traceSetting, setTraceSetting] = useState(getDefaultTraceSetting());
   const [visibleRobots, setvisibleRobots] = useState(getDefaultVisibleRobots());
   const [terminalLog, setTerminalLog] = useState(getDefaultLog());
-  const [errorOverlay, setErrorOverlay] = useState<string | undefined>();
+  const [errorOverlay, setErrorOverlay] = useState<string>();
   const [sidebarWidth, setSidebarWidth] = useState(320);
-  const [fieldGeometry, setFieldGeometry] = useState<SSL_GeometryFieldSize | null>(null);
+  const [fieldGeometry, setFieldGeometry] = useState<SSLGeometryFieldSize | undefined>(undefined);
 
   const { isConnected: isConnectedToVision } = useSSLVision(
     setSSLFieldUpdate,

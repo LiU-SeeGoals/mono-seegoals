@@ -1,11 +1,12 @@
 import { SSLFieldUpdate } from '../types/SSLFieldUpdate';
 import { SSLWrapperPacket } from '../proto/ssl_wrapper';
+import { SSLGeometryFieldSize } from '../proto/ssl_vision_geometry';
 
 export function parseProto(
   input_data: Uint8Array,
   setSSLFieldUpdate: React.Dispatch<React.SetStateAction<SSLFieldUpdate>>,
-  setErrorOverlay: React.Dispatch<React.SetStateAction<string>>,
-  setFieldGeometry?: React.Dispatch<React.SetStateAction<SSL_GeometryFieldSize | null>> // Add this parameter
+  setErrorOverlay: React.Dispatch<React.SetStateAction<string | undefined>>,
+  setFieldGeometry?: React.Dispatch<React.SetStateAction<SSLGeometryFieldSize | undefined>> // Add this parameter
 ): void {
   try {
     const ssl_protobuf_msg = SSLWrapperPacket.decode(input_data);
