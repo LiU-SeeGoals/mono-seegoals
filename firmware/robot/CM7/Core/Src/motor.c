@@ -12,7 +12,7 @@ extern float CONTROL_FREQ;
 */
 void MOTOR_update_motor_ticks(MotorPWM* motor, float val)
 {
-    motor->cur_tick_idx = (1 + motor->cur_tick_idx) % (motor_tick_buf_size);
+    motor->cur_tick_idx = (1 + motor->cur_tick_idx) % (MOTOR_TICK_BUF_SIZE);
     motor->motor_ticks[motor->cur_tick_idx] = val;
 }
 
@@ -23,10 +23,10 @@ float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor)
 {
     // Can be made faster keeping a moving average and removing the last adding the new?
     float cur = 0;
-    for (int i = 0; i < motor_tick_buf_size; i++) {
+    for (int i = 0; i < MOTOR_TICK_BUF_SIZE; i++) {
         cur += motor->motor_ticks[i];
     }
-    return cur / ((float)motor_tick_buf_size);
+    return cur / ((float)MOTOR_TICK_BUF_SIZE);
 }
 
 void MOTOR_Init(TIM_HandleTypeDef* pwm_htim)

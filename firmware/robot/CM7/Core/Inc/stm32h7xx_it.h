@@ -61,6 +61,7 @@ void USART3_IRQHandler(void);
 void EXTI15_10_IRQHandler(void);
 void TIM8_BRK_TIM12_IRQHandler(void);
 void TIM5_IRQHandler(void);
+void TIM7_IRQHandler(void);
 /* USER CODE BEGIN EFP */
 int* ITR_GetMotorTicks(void);
 void ITR_Init(void);
