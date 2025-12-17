@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 
 export const useGameController = (
-  gc_addr: string
 ) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    console.log(`[useGameController.ts] connecting to ws://${gc_addr}`);
+    const gc_addr = import.meta.env.VITE_SSL_GAME_CONTROLLER_WS_ADDR;
+    const gc_port = import.meta.env.VITE_SSL_GAME_CONTROLLER_WS_PORT;
+    console.log(`[useGameController.ts] connecting to ws://${gc_addr}:${gc_port}`);
 
-    const ws = new WebSocket(`ws://${gc_addr}/`);
+    const ws = new WebSocket(`ws://${gc_addr}:${gc_port}/`);
     ws.binaryType = 'arraybuffer';
 
     ws.onopen = () => {

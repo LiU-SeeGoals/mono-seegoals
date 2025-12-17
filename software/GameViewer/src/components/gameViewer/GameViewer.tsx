@@ -1,22 +1,19 @@
 import './GameViewer.css';
-import { SSLGeometryFieldSize } from '../../proto/ssl_vision_geometry';
+import { SSL_GeometryFieldSize } from '../../proto/ssl_vision_geometry';
 import useResizeSidebar from '../../hooks/useResizeSidebar';
 import FootballField from './footballField/FootballField';
 import BottomBar from './bottomBar/BottomBar';
-import { Action } from '../../types/Action';
-import { SSLFieldUpdate } from '../../types/SSLFieldUpdate';
-import { AIRobotUpdate } from '../../types/AIRobotUpdate';
 
 interface gameViewerProps {
   sslFieldUpdate: SSLFieldUpdate;
   aiRobotUpdate: AIRobotUpdate;
   robotActions: Action[];
   terminalLog: string[];
-  errorOverlay: string | undefined;
+  errorOverlay: string;
   vectorSettingBlue: boolean[];
   vectorSettingYellow: boolean[];
   sidebarWidth: number;
-  fieldGeometry: SSLGeometryFieldSize | undefined;
+  fieldGeometry: SSL_GeometryFieldSize | null;
 }
 
 const GameViewer: React.FC<gameViewerProps> = ({

@@ -5,7 +5,6 @@ import ExternalLink from './externalLink/ExternalLink';
 import Header from './header/Header';
 import RobotTable from './robotTable/RobotTable';
 import { Action } from '../../types/Action';
-import { SSLFieldUpdate } from '../../types/SSLFieldUpdate';
 
 interface SidebarProps {
   vectorSettingBlue: boolean[];
@@ -60,8 +59,8 @@ const Sidebar: React.FC<SidebarProps> = ({
 
           <div>
             <hr />
-            <ExternalLink text={"SSL Vision Client"} link={"http://localhost:8082"} />
-            <ExternalLink text={"SSL Game Controller"} link={"http://localhost:8081"} />
+            <ExternalLink text={"SSL Vision Client"} link={"http://localhost:8082"} target="_blank" />
+            <ExternalLink text={"SSL Game Controller"} link={"http://localhost:8081"} target="_blank" />
             <hr />
 
             <div style={{ padding: '10px 15px' }}>

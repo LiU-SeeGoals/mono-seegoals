@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import { Action } from '../types/Action';
 
 export const useAIController = (
-  setRobotActions: React.Dispatch<React.SetStateAction<Action[]>>,
-  ai_address: string
+  setRobotActions: React.Dispatch<React.SetStateAction<Action[]>>
 ) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    console.log(`[useAIController.ts] connecting to ws://${ai_address}`);
-    let ws: WebSocket = new WebSocket(`ws://${ai_address}`);
+    const ai_address = import.meta.env.VITE_AI_CONTROLLER_WS_ADDR;
+    const ai_port = import.meta.env.VITE_AI_CONTROLLER_WS_PORT;
+    console.log(`[useAIController.ts] connecting to ws://${ai_address}:${ai_port}`);
+
+    const ws = new WebSocket(`ws://${ai_address}:${ai_port}`);
 
     ws.onopen = () => {
       setIsConnected(true);
