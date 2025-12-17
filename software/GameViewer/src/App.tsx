@@ -5,9 +5,9 @@ import GameViewer from './components/gameViewer/GameViewer';
 import { useSSLVision } from './hooks/useSSLVision';
 import { useAIController } from './hooks/useAIController';
 import { useGameController } from './hooks/useGameController.ts';
-import { SSLGeometryFieldSize } from './proto/ssl_vision_geometry';
-// import { parseProto } from './helper/ParseProto';
-// import { parseJson } from './helper/ParseJson';
+import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
+import { parseProto } from './helper/ParseProto';
+import { parseJson } from './helper/ParseJson';
 
 import {
   getDefaultSSLFieldUpdate,
@@ -18,6 +18,7 @@ import {
   getDefaultLog,
   getDefaultVisibleRobots,
 } from './helper/defaultValues';
+import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
 
 function App() {
   const [sslFieldUpdate, setSSLFieldUpdate] = useState(getDefaultSSLFieldUpdate());
@@ -28,35 +29,19 @@ function App() {
   const [traceSetting, setTraceSetting] = useState(getDefaultTraceSetting());
   const [visibleRobots, setvisibleRobots] = useState(getDefaultVisibleRobots());
   const [terminalLog, setTerminalLog] = useState(getDefaultLog());
-  const [errorOverlay, setErrorOverlay] = useState<string>();
+  const [errorOverlay, setErrorOverlay] = useState<string | undefined>();
   const [sidebarWidth, setSidebarWidth] = useState(320);
-  const [fieldGeometry, setFieldGeometry] = useState<SSLGeometryFieldSize | undefined>(undefined);
-  const [aiAddress, setAiAddress] = useState(`${import.meta.env.VITE_AI_CONTROLLER_WS_ADDR}:${import.meta.env.VITE_AI_CONTROLLER_WS_PORT}`);
-  const [gameControllerAddress, setGameControllerAddress] = useState(`${import.meta.env.VITE_SSL_GAME_CONTROLLER_WS_ADDR}:${import.meta.env.VITE_SSL_GAME_CONTROLLER_WS_PORT}`);
-  // const [sslVisionAddress, setSslVisionAddress] = useState(`${import.meta.env.VITE_SSL_VISION_WS_ADDR}:${import.meta.env.VITE_SSL_VISION_WS_PORT}`);
-   const [sslVisionAddress, setSslVisionAddress] = useState(`${import.meta.env.VITE_SSL_VISION_WS_ADDR}:${import.meta.env.VITE_SSL_VISION_WS_PORT}`);
+  const [fieldGeometry, setFieldGeometry] = useState<SSL_GeometryFieldSize | null>(null);
 
   const { isConnected: isConnectedToVision } = useSSLVision(
     setSSLFieldUpdate,
     setErrorOverlay,
-    setFieldGeometry,
-    sslVisionAddress
+    setFieldGeometry
   );
 
-  // Set the config. We need to have the config in backend for it to work when files are static
-  useEffect(() => {
-    fetch('http://localhost:5174/config') // Or use a proxy if running on same port
-      .then(res => res.json())
-      .then(data => {
-        setAiAddress(`${data.VITE_AI_CONTROLLER_WS_ADDR}:${data.VITE_AI_CONTROLLER_WS_PORT}`);
-        setGameControllerAddress(`${data.VITE_SSL_GAME_CONTROLLER_WS_ADDR}:${data.VITE_SSL_GAME_CONTROLLER_WS_PORT}`);
-        setSslVisionAddress(`${data.VITE_SSL_VISION_WS_ADDR}:${data.VITE_SSL_VISION_WS_PORT}`)
-      });
-  }, []);
+  const { isConnected: isConnectedToAI } = useAIController(setRobotActions);
 
-  const { isConnected: isConnectedToAI } = useAIController(setRobotActions, aiAddress);
-
-  const { isConnected: isConnectedToGameController } = useGameController(gameControllerAddress);
+  const { isConnected: isConnectedToGameController } = useGameController();
   useEffect(() => {
     document.title = "SeeGoals - GameViewer";
   }, []);

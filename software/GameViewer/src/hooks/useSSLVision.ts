@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
 import { parseProto } from '../helper/ParseProto';
 import { SSLFieldUpdate } from '../types/SSLFieldUpdate';
-import { SSLGeometryFieldSize } from '../proto/ssl_vision_geometry';
+import { SSL_GeometryFieldSize } from '../proto/ssl_vision_geometry';
 
 export const useSSLVision = (
   setSSLFieldUpdate: React.Dispatch<React.SetStateAction<SSLFieldUpdate>>,
   setErrorOverlay: React.Dispatch<React.SetStateAction<string | undefined>>,
-  setFieldGeometry: React.Dispatch<React.SetStateAction<SSLGeometryFieldSize | undefined>>,
-  vision_ws_addr: string
+  setFieldGeometry: React.Dispatch<React.SetStateAction<SSL_GeometryFieldSize | null>>
 ) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    console.log(`[useSSLVision.ts] connecting to ws://${vision_ws_addr}`);
+    const vision_ws_addr = import.meta.env.VITE_SSL_VISION_WS_ADDR;
+    const vision_ws_port = import.meta.env.VITE_SSL_VISION_WS_PORT;
+    console.log(`[useSSLVision.ts] connecting to ws://${vision_ws_addr}:${vision_ws_port}`);
 
-    const ws = new WebSocket(`ws://${vision_ws_addr}/`);
+    const ws = new WebSocket(`ws://${vision_ws_addr}:${vision_ws_port}/`);
     ws.binaryType = 'arraybuffer';
 
     ws.onopen = () => {
