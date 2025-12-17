@@ -2,7 +2,12 @@ import React, { useEffect, useState } from 'react';
 import './FootballField.css';
 import { AIRobot } from '../../../types/AIRobot';
 import { actionToStr } from '../../../helper/defaultValues';
-import { SSL_GeometryFieldSize } from '../../../proto/ssl_vision_geometry';
+import { SSLGeometryFieldSize } from '../../../proto/ssl_vision_geometry';
+import { SSLFieldUpdate } from '../../../types/SSLFieldUpdate';
+import { AIRobotUpdate } from '../../../types/AIRobotUpdate';
+import { Action } from '../../../types/Action';
+import { SSLRobot } from '../../../types/SSLRobot';
+import { SSLBall } from '../../../types/SSLBall';
 
 const TEAM_IDS = Object.freeze({
   YELLOW: 0,
@@ -46,10 +51,10 @@ interface FootBallFieldProps {
   sslFieldUpdate: SSLFieldUpdate;
   aiRobotUpdate: AIRobotUpdate;
   robotActions: Action[];
-  errorOverlay: string;
+  errorOverlay: string | undefined;
   vectorSettingBlue: boolean[];
   vectorSettingYellow: boolean[];
-  fieldGeometry: SSL_GeometryFieldSize | null;
+  fieldGeometry: SSLGeometryFieldSize | undefined;
 }
 
 const FootballField: React.FC<FootBallFieldProps> = ({
@@ -68,7 +73,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
 
-  const drawField = (context: CanvasRenderingContext2D, geometry: SSL_GeometryFieldSize) => {
+  const drawField = (context: CanvasRenderingContext2D, geometry: SSLGeometryFieldSize) => {
     context.fillStyle = '#1a5f1a';
     context.fillRect(0, 0, context.canvas.width, context.canvas.height);
 
@@ -165,18 +170,18 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   };
 
   const drawActions = (context: CanvasRenderingContext2D) => {
-    const actions: Action[] = robotActions;
+    const actions = robotActions;
 
     if (robotActions && robotActions.length > 0) {
       for (const action of robotActions) {
-        if (action.Dest === undefined || (action.Dest.X === undefined || action.Dest.Y === undefined)) {
+        if (action.DestY === undefined || action.DestX === undefined) {
           console.log("[FootballField.tsx] Got weird robot action", action);
           return;
         }
 
         const { canvasX, canvasY } = getCanvasCoordinates(
-          action.Dest.X,
-          action.Dest.Y,
+          action.DestX,
+          action.DestY,
           context
         );
 
