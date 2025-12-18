@@ -37,7 +37,8 @@ float angle_error(float angle, float desired)
 {
     // TODO make sure returned sign is correct for the desired direction
 
-    return desired - angle;
+    float delta = desired - angle;
+    return atan2f(sinf(delta), cosf(delta));
 }
 
 float standard_error(float current, float desired) { return desired - current; }
