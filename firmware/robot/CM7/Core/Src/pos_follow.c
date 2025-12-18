@@ -13,12 +13,12 @@ static LOG_Module internal_log_mod;
 
 void set_params()
 {
-    params_angle.umin = -100.0;
-    params_angle.umax = 100.0;
+    params_angle.umin = -300.0;
+    params_angle.umax = 300.0;
     params_angle.Ts = DELTA_T;
     params_angle.Ti = 100000000;
     params_angle.Td = 0.1;
-    params_angle.K = 40 * 1.1;
+    params_angle.K = 60 * 1.1;
 
     params_dist.umin = -100.0;
     params_dist.umax = 100.0;
@@ -37,7 +37,9 @@ float angle_error(float angle, float desired)
 {
     // TODO make sure returned sign is correct for the desired direction
 
-    return desired - angle;
+    float delta = desired - angle;
+    return atan2f(sinf(delta), cosf(delta));
+
 }
 
 float standard_error(float current, float desired) { return desired - current; }
@@ -75,7 +77,7 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
 
     const float magnitude = sqrtf(x * x + y * y);
 
-    const float umax = 100;
+    const float umax = 300;
 
     if (magnitude > umax)
     {

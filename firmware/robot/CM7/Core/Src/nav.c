@@ -160,20 +160,26 @@ void NAV_wheelToBody(float* res)
     float sin_psi = arm_sin_f32(psi);
     float sin_theta = arm_sin_f32(theta);
 
-    float m11 = r * (cos_psi / (2.0f * (cos_psi * cos_psi + cos_theta * cos_theta)));
-    float m12 = m11;
-    float m13 = -m11;
-    float m14 = -m11;
+    float denom1 = 2.0f * (cos_psi * cos_psi + cos_theta * cos_theta);
 
-    float m21 = r * (1.0 / (2.0f * (sin_psi + sin_theta)));
-    float m22 = -m21;
-    float m23 = -m21;
-    float m24 = m21;
+    float m11 = r * cos_psi / denom1;
+    float m12 = r * cos_theta / denom1;
+    float m13 = r * -cos_theta / denom1;
+    float m14 = r * -cos_psi / denom1;
 
-    float m31 = r * (sin_theta / (2.0f * R * (sin_psi + sin_theta)));
-    float m32 = m31;
-    float m33 = m31;
-    float m34 = m31;
+    float denom2 = 2.0f * (sin_psi + sin_theta);
+
+    float m21 = r * 1.f / denom2;
+    float m22 = r * -1.f / denom2;
+    float m23 = r * -1.f / denom2;
+    float m24 = r * 1.f / denom2;
+
+    float denom3 = 2 * R * (sin_psi + sin_theta);
+
+    float m31 = sin_theta / denom3;
+    float m32 = sin_psi / denom3;
+    float m33 = sin_psi / denom3;
+    float m34 = sin_theta / denom3;
 
     float u = wrf * m11 + wrb * m12 + wlb * m13 + wlf * m14;
     float v = wrf * m21 + wrb * m22 + wlb * m23 + wlf * m24;

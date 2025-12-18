@@ -280,8 +280,13 @@ int main(void)
     bool on = false;
 
     NAV_StopDribbler();
+    float out[3];
     while (1) {
     /* USER CODE END WHILE */
+
+    // NAV_wheelToBody(out);
+    LOG_INFO("x: %f y: %f angle: %f\r\n", STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle());
+    // LOG_INFO("x: %f y: %f angle: %f\r\n", out[0], out[1], out[2]);
 
     /* USER CODE BEGIN 3 */
     }
