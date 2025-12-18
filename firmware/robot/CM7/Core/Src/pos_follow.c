@@ -13,12 +13,12 @@ static LOG_Module internal_log_mod;
 
 void set_params()
 {
-    params_angle.umin = -400.0;
-    params_angle.umax = 400.0;
+    params_angle.umin = -100.0;
+    params_angle.umax = 100.0;
     params_angle.Ts = DELTA_T;
     params_angle.Ti = 100000000;
     params_angle.Td = 0.1;
-    params_angle.K = 80 * 1.1;
+    params_angle.K = 40 * 1.1;
 
     params_dist.umin = -100.0;
     params_dist.umax = 100.0;
@@ -43,24 +43,6 @@ float angle_error(float angle, float desired)
 float standard_error(float current, float desired) { return desired - current; }
 
 
-void TEST_vy(float ref_angle, float speed)
-{
-    float control_w = PID_p(STATE_get_robot_angle(), ref_angle, angle_error, &params_angle);
-    NAV_steer(0, speed, control_w);
-}
-
-void TEST_vx(float ref_angle, float speed)
-{
-    float control_w = PID_p(STATE_get_robot_angle(), ref_angle, angle_error, &params_angle);
-    NAV_steer(speed, 0.0f, control_w);
-}
-
-void TEST_angle_control(float ref_angle)
-{
-    float control_w = PID_p(STATE_get_robot_angle(), ref_angle, angle_error, &params_angle);
-    NAV_steer(0, 0, control_w);
-}
-
 void POS_go_to_position(float dest_x, float dest_y, float wantw)
 {
     // Robot to world transformation given by
@@ -75,21 +57,31 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
     // [0 1]
     // [1 0]
 
-    float cur_x = STATE_get_posx();
-    float cur_y = STATE_get_posy();
-    float angle = STATE_get_robot_angle();
+    const float cur_x = STATE_get_posx();
+    const float cur_y = STATE_get_posy();
+    const float angle = STATE_get_robot_angle();
 
     float rel_x = dest_x - cur_x;
     float rel_y = dest_y - cur_y;
-    float euclidian_distance = sqrt(rel_x * rel_x + rel_y * rel_y);
+
 
     // Control on global frame coordinates
-    float distance_control_signal = 600.f;
+    float distance_control_signal = 200.f;
     float control_w = PID_p(STATE_get_robot_angle(), wantw, angle_error, &params_angle);
 
     // Rotate from world to robot frame (inverse the robot angle)
     float x = distance_control_signal * ((rel_x * arm_cos_f32(-angle)) - (rel_y * arm_sin_f32(-angle)));
     float y = distance_control_signal * ((rel_x * arm_sin_f32(-angle)) + (rel_y * arm_cos_f32(-angle)));
+
+    const float magnitude = sqrtf(x * x + y * y);
+
+    const float umax = 100;
+
+    if (magnitude > umax)
+    {
+        x = x * umax/magnitude;
+        y = y * umax/magnitude;
+    }
 
     NAV_steer(x, y, control_w);
 }

@@ -1,6 +1,7 @@
 package action
 
 import (
+	"fmt"
 	"math"
 
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
@@ -167,10 +168,40 @@ func (mv *MoveTo) TranslateSim() *simulation.RobotCommand {
 func (mt *MoveTo) TranslateReal() *robot_action.Command {
 	// Robots only take binary commands for kick and dribblespeed.
 	// Either 0 or 1.
-	kickSpeedReal := min(1, mt.KickSpeed)
+	kickSpeedReal := 0
+
+	if mt.KickSpeed != 0 {
+		kickSpeedReal = 1
+
+	}
 	dribbleSpeedReal := 0
+
 	if mt.Dribble {
 		dribbleSpeedReal = 1
+	}
+	if kickSpeedReal == 1 && dribbleSpeedReal == 1 {
+		fmt.Println("Cannot send dribble and kick at same time, sending only kick")
+	}
+
+	if kickSpeedReal == 1 {
+		fmt.Println("Kicking")
+		dribbleSpeedReal = 1
+		command_kick := &robot_action.Command{
+			CommandId: robot_action.ActionType_KICK_ACTION,
+			RobotId:   int32(mt.Id),
+			Pos: &robot_action.Vector3D{
+				X: int32(mt.Pos.X + 10000),
+				Y: int32(mt.Pos.Y + 10000),
+				W: float32(mt.Pos.Angle * 1000),
+			},
+			Dest: &robot_action.Vector3D{
+				X: int32(mt.Dest.X + 10000),
+				Y: int32(mt.Dest.Y + 10000),
+				W: float32(mt.Dest.Angle * 1000),
+			},
+			KickSpeed: int32(kickSpeedReal),
+		}
+		return command_kick
 	}
 
 	command_move := &robot_action.Command{
@@ -186,9 +217,9 @@ func (mt *MoveTo) TranslateReal() *robot_action.Command {
 			Y: int32(mt.Dest.Y + 10000),
 			W: float32(mt.Dest.Angle * 1000),
 		},
-		KickSpeed:  int32(kickSpeedReal),
 		AngularVel: int32(dribbleSpeedReal),
 	}
+
 	return command_move
 }
 
