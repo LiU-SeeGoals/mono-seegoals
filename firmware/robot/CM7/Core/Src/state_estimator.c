@@ -2,6 +2,7 @@
 #include "arm_mat_util_f32.h"
 #include "arm_math.h"
 #include "imu.h"
+#include "nav.h"
 #include "lag_element.h"
 
 #include "log.h"
@@ -269,28 +270,24 @@ void STATE_logm44(const float32_t* m44)
 
 static void ekfStateJacobianFunc(const arm_matrix_instance_f32* pX, const arm_matrix_instance_f32* pU, arm_matrix_instance_f32* pF)
 {
+    // Motion model
+    // xk+1 = xk + (vx*cos(a) - vy*sin(a)) * dt
+    // yk+1 = yk + (vx*sin(a) + vy*cos(a)) * dt
+    // angle = angle + omega * dt
     const float dt = STATE_DELTA_T;
 
     float gyr_w = MAT_ELEMENT(*pU, 0, 0);
-    float v_x = MAT_ELEMENT(*pU, 1, 0);
-    float v_y = MAT_ELEMENT(*pU, 2, 0);
+    float vx = MAT_ELEMENT(*pU, 1, 0);
+    float vy = MAT_ELEMENT(*pU, 2, 0);
 
     float px = MAT_ELEMENT(*pX, 0, 0);
     float py = MAT_ELEMENT(*pX, 1, 0);
     float pw = MAT_ELEMENT(*pX, 2, 0);
 
     arm_mat_identity_f32(pF);
-    // x = Fx + Bu
-    // [100][x]   [100] [(-vx * sin(a) - vy*cos(a)) * dt]
-    // [010][y] + [010] [(vx * cos(a) - vy*sin(a)) * dt]
-    // [001][a]   [001] [w*dt]
 
-    MAT_ELEMENT(*pF, 0, 2) = ;
-    MAT_ELEMENT(*pF, 0, 3) = ;
-    MAT_ELEMENT(*pF, 0, 4) = ;
-
-    MAT_ELEMENT(*pF, 1, 2) = ;
-    MAT_ELEMENT(*pF, 1, 3) = ;
+    MAT_ELEMENT(*pF, 0, 2) = (-vx*sin(pw) - vy*cos(pw)) * dt;
+    MAT_ELEMENT(*pF, 1, 2) = (vx*cos(pw)-vy*sin(pw))*dt;
 }
 
 static void ekfMeasFunc(const arm_matrix_instance_f32* pX, arm_matrix_instance_f32* pY) { memcpy(pY->pData, pX->pData, sizeof(float) * 3); }
@@ -311,8 +308,8 @@ static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_
     const float dt = STATE_DELTA_T;
 
     float gyr_w = MAT_ELEMENT(*pU, 0, 0);
-    float vel_x = MAT_ELEMENT(*pU, 1, 0);
-    float vel_y = MAT_ELEMENT(*pU, 2, 0);
+    float vx = MAT_ELEMENT(*pU, 1, 0);
+    float vy = MAT_ELEMENT(*pU, 2, 0);
 
     float p_x = MAT_ELEMENT(*pX, 0, 0);
     float p_y = MAT_ELEMENT(*pX, 1, 0);
@@ -324,8 +321,8 @@ static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_
     // Robot to global from robot frame
     // Velocities are estimated in the inverse
 
-    float px1 = p_x;
-    float py1 = p_y;
+    float px1 = p_x + (vx * cos(p_w) - vy * sin(p_w))*dt;
+    float py1 = p_y + (vx * sin(p_w) + vy * cos(p_w))*dt;
     // float vx1 = v_x + a_x * dt;
     // float vy1 = v_y + a_y * dt;
     float pw1 = p_w + v_w * dt;
@@ -338,11 +335,11 @@ static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_
 }
 
 static FusionEKFConfig configFusionEKF = {
-    .posNoiseXY = 0.001f,
-    .posNoiseW = 0.001f,
+    .posNoiseXY = 0.1f,
+    .posNoiseW = 0.005f,
     .velNoiseXY = 0.005f,
     .visNoiseXY = 0.05f,
-    .visNoiseW = 0.1f,
+    .visNoiseW = 0.3f,
     .outlierMaxVelXY = 3.0f,
     .outlierMaxVelW = 3.0f,
     .trackingCoeff = 1.0f,
@@ -432,12 +429,14 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     linear_acc_y = 0;
 
     float gyrAcc[3];
+    float body_speed[3];
+    NAV_wheelToBody(body_speed);
     gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
     // TODO: if using accelerometer we can lowpass noisy accelerometer
     /*gyrAcc[1] = LagElementPT1Process(&fusionEKF.lagAccel[0], linear_acc_x);*/
     /*gyrAcc[2] = LagElementPT1Process(&fusionEKF.lagAccel[1], linear_acc_y);*/
-    gyrAcc[1] = 0.0f;
-    gyrAcc[2] = 0.0f;
+    gyrAcc[1] = body_speed[0];
+    gyrAcc[2] = body_speed[1];
 
     // TODO: Add odometry
 

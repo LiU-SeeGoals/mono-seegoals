@@ -138,16 +138,21 @@ void NAV_wheelToBody(float* res)
 
     // wheel to body psudeo inverse https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
     // TODO: measure real wheel radius and chasis radius
-    float r = 1.f;
-    float R = 1.f;
+    float r = 0.025;
+    float R = 0.09;
 
     float psi = PI * 31.f / 180.0f;
     float theta = PI * 45.f / 180.0f;
 
-    float wrf = MOTOR_get_motor_ticks_per_iteration(&motors[0]);
-    float wrb = MOTOR_get_motor_ticks_per_iteration(&motors[1]);
-    float wlb = MOTOR_get_motor_ticks_per_iteration(&motors[2]);
-    float wlf = MOTOR_get_motor_ticks_per_iteration(&motors[3]);
+    float wrf = MOTOR_get_motor_ticks_per_iteration(&motors[0]) * CONTROL_FREQ / 48.f;
+    float wlf = MOTOR_get_motor_ticks_per_iteration(&motors[1]) * CONTROL_FREQ / 48.f;
+    float wlb = MOTOR_get_motor_ticks_per_iteration(&motors[2]) * CONTROL_FREQ / 48.f;
+    float wrb = MOTOR_get_motor_ticks_per_iteration(&motors[3]) * CONTROL_FREQ / 48.f;
+
+    // motors[0].speed = wrf;
+    // motors[1].speed = wlf;
+    // motors[2].speed = wlb;
+    // motors[3].speed = wrb;
 
     float cos_psi = arm_cos_f32(psi);
     float cos_theta = arm_cos_f32(theta);
