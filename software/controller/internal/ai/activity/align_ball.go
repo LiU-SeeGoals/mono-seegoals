@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"math"
 
+	// "gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/plt"
 )
 
 type AlignConfig struct {
@@ -25,34 +28,55 @@ func GetAlignConfig() AlignConfig{
 type AlignBall struct {
 	team info.Team
 	id   info.ID
+	target   info.Position
 }
 
 func (m *AlignBall) String() string {
 	return fmt.Sprintf("AlignBall(%d)", m.id)
 }
 
-func NewAlignBall(team info.Team, id info.ID) *AlignBall {
+func NewAlignBall(team info.Team, id info.ID, target info.Position) *AlignBall {
 	return &AlignBall{
 		team,
 		id,
+		target,
 	}
 }
+var saved int
 
 func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position{
+
+	// plt.Init()
+
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
 
+
 	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
 
-	goalPos := info.Vec2{X:4000,Y:0}
+	goalPos := info.Vec2{X: m.target.X, Y: m.target.Y}
 
-	ballGoalTangent := info.Sub(ballV2, goalPos)
+	ballGoalTangent := info.Sub(goalPos, ballV2)
 	ballGoalTangent.DivNorm()
 	fmt.Println(ballGoalTangent)
 
-	robotXY := info.Sub(ballV2, ballGoalTangent.Mult(GetAlignConfig().robotBallClearence))
+	alignPos := ballGoalTangent.Mult(GetAlignConfig().robotBallClearence)
+	robotXY := info.Sub(ballV2, alignPos)
 	fmt.Println("angle",ballGoalTangent.Angle())
+	fmt.Println("x",robotXY.X)
+	fmt.Println("y",robotXY.Y)
 	robotTargetPos := info.Position{X: robotXY.X, Y:robotXY.Y, Z:0, Angle: ballGoalTangent.Angle()}
+
+	points := plotter.XYs{}
+	points = append(points, plotter.XY{X: ballPos.X, Y: ballPos.Y})
+	points = append(points, plotter.XY{X: goalPos.X, Y: goalPos.Y})
+
+	plt.Scatter(points)
+	plt.Line(plotter.XY{X:ballGoalTangent.X, Y: ballGoalTangent.Y}, plotter.XY{X:alignPos.X, Y: alignPos.Y})
+	plt.Line(plotter.XY{X:robotXY.X, Y: robotXY.Y}, plotter.XY{X:alignPos.X, Y: alignPos.Y})
+	saved += 1
+	go plt.SaveFig(fmt.Sprintf("robobitch%d.png",saved))
+
 
 	return robotTargetPos
 }
@@ -103,8 +127,9 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	fmt.Println(dist)
 	fmt.Println(GetAlignConfig().doneDist)
 	fmt.Println(angle_error, robotTargetPos.Angle, myRobotPos.Angle)
+	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError
 
-	return dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError
+	return val
 }
 
 func (m *AlignBall) GetID() info.ID {

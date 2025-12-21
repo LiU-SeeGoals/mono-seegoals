@@ -3,9 +3,10 @@ package ai
 import (
 	"sync"
 	"time"
-	// "fmt"
+	"fmt"
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/plt"
 )
 
 type Pass struct {
@@ -35,21 +36,34 @@ func (m *Pass) Init(
 	go m.run()
 }
 
+
 func (g *Pass) run() {
 
-	// gameInfo <-incoming
-	// gameInfo := <-g.incomingGameInfo
+	state := 0
+	num_states := 2
+	gi := <-g.incomingGameInfo
+	plt.Init()
 
 
 	for{
-		if g.activities[3] == nil {
-			queue := ai.NewActivityQueue(3, []ai.Activity{
-				ai.NewAlignBall(g.team, 3),
-				ai.NewKickBall(g.team, 3),
-			})
-			g.AddActivity(queue)
+		robot2, err := gi.State.GetTeam(g.team)[1].GetPosition()
+		if err != nil{
+			fmt.Println(err)
 		}
-		// g.AddActivity(ai.NewAlignBall(g.team, 3))
+
+		var activity ai.Activity
+
+		if state == 0 {
+			activity = ai.NewAlignBall(g.team, 3, robot2)
+
+		}else if state == 1 {
+			activity = ai.NewKickBall(g.team, 3)
+		}
+
+		g.AddActivity(activity)
+		if activity.Achieved(&gi){
+			state += (1 + state) % num_states
+		}
 	}
 
 }

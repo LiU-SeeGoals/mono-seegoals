@@ -13,7 +13,7 @@ import (
 
 func KickSimScenario() {
 	// This avoid the "No position in history" error for robots
-	presentYellow := []int{3}
+	presentYellow := []int{1,3}
 	presentBlue := []int{3}
 	simController := simulator.NewSimControl()
 	simController.SetPresentRobots(presentYellow, presentBlue)
