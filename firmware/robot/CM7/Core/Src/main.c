@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "com.h"
 #include "imu.h"
+#include "data_logging.h"
 #include "kicker.h"
 #include "log.h"
 #include "motor.h"
@@ -151,8 +152,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         float x = NAV_GetNavX();
         float y = NAV_GetNavY();
         float w = NAV_GetNavW();
+        DATA_log_imu_data(gyr.x, gyr.y, gyr.z);
 
-        POS_go_to_position(x, y, w);
+        POS_go_to_position(x,y,w);
     }
 
     /* USER CODE BEGIN Callback 1 */
@@ -238,6 +240,7 @@ int main(void)
     NAV_Init(&htim7, &htim1, &htim15);
     HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1);
+    DATA_Init();
     KICKER_Init(&htim5, &htim3);
     IMU_Init(&hi2c4);
     STATE_Init();
@@ -283,6 +286,8 @@ int main(void)
     while (1) {
     /* USER CODE END WHILE */
 
+    DATA_uart_read();
+    // LOG_INFO("%f\r\n", STATE_get_robot_angle());
     /* USER CODE BEGIN 3 */
     }
   /* USER CODE END 3 */
