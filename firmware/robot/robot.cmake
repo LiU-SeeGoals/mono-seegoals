@@ -70,6 +70,13 @@ set(ROBOT_COMMON_LINK_OPTIONS
     -u_printf_float
 )
 
+# generate protobuf files
+
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/nanopb/extra)
+find_package(Nanopb REQUIRED)
+nanopb_generate_cpp(TARGET proto imu.proto)
+# add_executable(simple simple.c)
+
 file(GLOB_RECURSE ROBOT_CM7_SOURCES "robot/CM7/Core/Src/*.*")
 file(GLOB ROBOT_CM7_ASM_SOURCE "robot/Buildfiles/CM7/*.s")
 set(ROBOT_CM7_LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/robot/Buildfiles/CM7/stm32h755xx_flash_CM7.ld)
@@ -84,6 +91,7 @@ add_executable(robot_CM7.elf EXCLUDE_FROM_ALL
     ${ROBOT_CM7_LINKER_SCRIPT}
 )
 
+target_compile_options(nanopb PRIVATE ${ROBOT_COMMON_COMPILE_OPTIONS})
 target_compile_options(robot_CM7.elf PRIVATE ${ROBOT_COMMON_COMPILE_OPTIONS})
 target_include_directories(robot_CM7.elf PRIVATE robot/CM7/Core/Inc ${ROBOT_COMMON_INCLUDES})
 target_compile_definitions(robot_CM7.elf PRIVATE CORE_CM7 ${ROBOT_COMMON_DEFINITIONS})
@@ -93,6 +101,7 @@ target_link_options(robot_CM7.elf PRIVATE
     -Wl,-gc-sections,--print-memory-usage,-Map=${PROJECT_BINARY_DIR}/robot_CM7.map
 )
 target_link_libraries(robot_CM7.elf c m nosys)
+target_link_libraries(robot_CM7.elf nanopb)
 
 # Robot CM4 Target
 file(GLOB_RECURSE ROBOT_CM4_SOURCES "robot/CM4/Core/*.*")
@@ -137,3 +146,5 @@ add_custom_target(flash_robot DEPENDS robot_CM7.elf
 add_custom_target(flash_robot_stm32 DEPENDS robot_CM7.elf
     COMMAND STM32_Programmer_CLI -c port=SWD -w ${PROJECT_BINARY_DIR}/robot_CM7.bin 0x08000000 -rst sn 002B00473132511438363431
 )
+
+

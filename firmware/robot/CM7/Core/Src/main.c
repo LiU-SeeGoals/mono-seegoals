@@ -291,19 +291,21 @@ int main(void)
 
     static int once = 0;
     while (1) {
-        if (data[0] != 255)
-        {
-            data[0] = data[0] + 1;
-        }
-        else if(data[1] != 255)
-        {
-            data[1] = data[1] + 1;
-        }
-        else
-        {
-            data[0] = 0;
-            data[1] = 0;
-        }
+        // if (data[0] != 255)
+        // {
+        //     data[0] = data[0] + 1;
+        // }
+        // else if(data[1] != 255)
+        // {
+        //     data[1] = data[1] + 1;
+        // }
+        // else
+        // {
+        //     data[0] = 0;
+        //     data[1] = 0;
+        // }
+    DATA_spi_read();
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -316,7 +318,7 @@ int main(void)
     // (void)SPI6->RXDR;                                // clear RX
         // hspi6->Instance->UDRDR
         // if (once == 0){
-            HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi6, data, 2, 1000);
+            // HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi6, data, 2, 1000);
             // LOG_INFO("%d\r\n", status);
             // once = 1;
         // }
