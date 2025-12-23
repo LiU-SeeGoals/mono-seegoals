@@ -15,11 +15,6 @@ OBJ	=	$(SRC:.c=.o)
 
 BINS	=	$(SRC:.c=)
 
-all:
-	$Q cat README.TXT
-	$Q echo "    $(BINS)" | fmt
-	$Q echo ""
-
 .c.o:
 	$Q echo [CC] $<
 	$Q $(CC) -c $(CFLAGS) $< -o $@
@@ -27,6 +22,3 @@ all:
 clean:
 	$Q echo "[Clean]"
 	$Q rm -f $(OBJ) *~ core tags $(BINS)
-
-depend:
-	makedepend -Y $(SRC)
