@@ -1,6 +1,7 @@
 #ifndef DATA_LOGGING_H
 #define DATA_LOGGING_H
 
+#include "stm32h7xx_hal_spi.h"
 #include <stdbool.h>
 #include <stdint.h>
 #define DOUBLE_BUFFER 2
@@ -25,5 +26,6 @@ typedef struct
 void DATA_log_imu_data(float x, float y, float z);
 void DATA_uart_read();
 void DATA_Init();
+void DATA_Init(SPI_HandleTypeDef *hspi);
 
 #endif

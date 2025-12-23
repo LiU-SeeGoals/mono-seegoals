@@ -58,6 +58,7 @@
 I2C_HandleTypeDef hi2c4;
 
 SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi6;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim3;
@@ -100,6 +101,7 @@ static void MX_TIM4_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM7_Init(void);
+static void MX_SPI6_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void I2C4_Init(void);
@@ -226,6 +228,7 @@ int main(void)
   MX_TIM5_Init();
   MX_TIM3_Init();
   MX_TIM7_Init();
+  MX_SPI6_Init();
   /* USER CODE BEGIN 2 */
 
     // Initialise modules
@@ -240,9 +243,9 @@ int main(void)
     NAV_Init(&htim7, &htim1, &htim15);
     HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1);
-    DATA_Init();
+    DATA_Init(&hspi6);
     KICKER_Init(&htim5, &htim3);
-    IMU_Init(&hi2c4);
+    // IMU_Init(&hi2c4);
     STATE_Init();
     UI_Init(&huart3);
     ITR_Init();
@@ -261,7 +264,7 @@ int main(void)
         HAL_Delay(60);
     }
 
-    STATE_calibrate_imu_gyr();
+    // STATE_calibrate_imu_gyr();
     HAL_TIM_Base_Start_IT(&htim12);
 
     COM_Init(&hspi1, &NRF_AVAILABLE);
@@ -283,12 +286,41 @@ int main(void)
     bool on = false;
 
     NAV_StopDribbler();
+    uint8_t data[2];
+    data[0] = 1;
+
+    static int once = 0;
     while (1) {
+        if (data[0] != 255)
+        {
+            data[0] = data[0] + 1;
+        }
+        else if(data[1] != 255)
+        {
+            data[1] = data[1] + 1;
+        }
+        else
+        {
+            data[0] = 0;
+            data[1] = 0;
+        }
     /* USER CODE END WHILE */
 
-    DATA_uart_read();
-    // LOG_INFO("%f\r\n", STATE_get_robot_angle());
     /* USER CODE BEGIN 3 */
+    // SPI6->CR2 &= ~SPI_CR2_TSIZE;
+    // SPI6->CR2 |= (1 << SPI_CR2_TSIZE_Pos); // 1 byte transfer
+    //
+    // while (!(SPI6->SR & SPI_SR_TXP));                // TX space
+    // *((volatile uint8_t *)&SPI6->TXDR) = data[0];
+    // while (!(SPI6->SR & SPI_SR_EOT));
+    // (void)SPI6->RXDR;                                // clear RX
+        // hspi6->Instance->UDRDR
+        // if (once == 0){
+            HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi6, data, 2, 1000);
+            // LOG_INFO("%d\r\n", status);
+            // once = 1;
+        // }
+
     }
   /* USER CODE END 3 */
 }
@@ -466,6 +498,53 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief SPI6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI6_Init(void)
+{
+
+  /* USER CODE BEGIN SPI6_Init 0 */
+
+  /* USER CODE END SPI6_Init 0 */
+
+  /* USER CODE BEGIN SPI6_Init 1 */
+
+  /* USER CODE END SPI6_Init 1 */
+  /* SPI6 parameter configuration*/
+  hspi6.Instance = SPI6;
+  hspi6.Init.Mode = SPI_MODE_SLAVE;
+  hspi6.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi6.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi6.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi6.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi6.Init.NSS = SPI_NSS_HARD_INPUT;
+  hspi6.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi6.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi6.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi6.Init.CRCPolynomial = 0x0;
+  hspi6.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi6.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi6.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi6.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi6.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi6.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi6.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi6.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi6.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+  hspi6.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  if (HAL_SPI_Init(&hspi6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI6_Init 2 */
+
+  /* USER CODE END SPI6_Init 2 */
 
 }
 
@@ -929,6 +1008,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, MOTOR4_BREAK_Pin|MOTOR2_BREAK_Pin|MOTOR3_REVERSE_Pin|MOTOR2_REVERSE_Pin

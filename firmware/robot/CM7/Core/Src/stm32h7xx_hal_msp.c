@@ -208,6 +208,50 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
 
   /* USER CODE END SPI1_MspInit 1 */
   }
+  else if(hspi->Instance==SPI6)
+  {
+  /* USER CODE BEGIN SPI6_MspInit 0 */
+
+  /* USER CODE END SPI6_MspInit 0 */
+
+  /** Initializes the peripherals clock
+  */
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI6;
+    PeriphClkInitStruct.Spi6ClockSelection = RCC_SPI6CLKSOURCE_D3PCLK1;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    /* Peripheral clock enable */
+    __HAL_RCC_SPI6_CLK_ENABLE();
+
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+    /**SPI6 GPIO Configuration
+    PA7     ------> SPI6_MOSI
+    PG8     ------> SPI6_NSS
+    PG12     ------> SPI6_MISO
+    PG13     ------> SPI6_SCK
+    */
+    GPIO_InitStruct.Pin = GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF8_SPI6;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    GPIO_InitStruct.Pin = GPIO_PIN_8|GPIO_PIN_12|GPIO_PIN_13;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF5_SPI6;
+    HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
+
+  /* USER CODE BEGIN SPI6_MspInit 1 */
+
+  /* USER CODE END SPI6_MspInit 1 */
+  }
 
 }
 
@@ -239,6 +283,28 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
   /* USER CODE BEGIN SPI1_MspDeInit 1 */
 
   /* USER CODE END SPI1_MspDeInit 1 */
+  }
+  else if(hspi->Instance==SPI6)
+  {
+  /* USER CODE BEGIN SPI6_MspDeInit 0 */
+
+  /* USER CODE END SPI6_MspDeInit 0 */
+    /* Peripheral clock disable */
+    __HAL_RCC_SPI6_CLK_DISABLE();
+
+    /**SPI6 GPIO Configuration
+    PA7     ------> SPI6_MOSI
+    PG8     ------> SPI6_NSS
+    PG12     ------> SPI6_MISO
+    PG13     ------> SPI6_SCK
+    */
+    HAL_GPIO_DeInit(GPIOA, GPIO_PIN_7);
+
+    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_8|GPIO_PIN_12|GPIO_PIN_13);
+
+  /* USER CODE BEGIN SPI6_MspDeInit 1 */
+
+  /* USER CODE END SPI6_MspDeInit 1 */
   }
 
 }
