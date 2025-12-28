@@ -297,38 +297,14 @@ int main(void)
 
     static int once = 0;
     while (1) {
-        // if (data[0] != 255)
-        // {
-        //     data[0] = data[0] + 1;
-        // }
-        // else if(data[1] != 255)
-        // {
-        //     data[1] = data[1] + 1;
-        // }
-        // else
-        // {
-        //     data[0] = 0;
-        //     data[1] = 0;
-        // }
-        DATA_spi_read();
 
-    /* USER CODE END WHILE */
+        // TODO: change log module or SPI to use
+        // interrupt or DMA to not halt the entire core (except interrupts)
+        DATA_spi_send();
 
-    /* USER CODE BEGIN 3 */
-    // SPI6->CR2 &= ~SPI_CR2_TSIZE;
-    // SPI6->CR2 |= (1 << SPI_CR2_TSIZE_Pos); // 1 byte transfer
-    //
-    // while (!(SPI6->SR & SPI_SR_TXP));                // TX space
-    // *((volatile uint8_t *)&SPI6->TXDR) = data[0];
-    // while (!(SPI6->SR & SPI_SR_EOT));
-    // (void)SPI6->RXDR;                                // clear RX
-        // hspi6->Instance->UDRDR
-        // if (once == 0){
-        // HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi6, data, test_size, 1000);
-            // LOG_INFO("%d\r\n", status);
-            // once = 1;
-        // }
+        /* USER CODE END WHILE */
 
+        /* USER CODE BEGIN 3 */
     }
   /* USER CODE END 3 */
 }

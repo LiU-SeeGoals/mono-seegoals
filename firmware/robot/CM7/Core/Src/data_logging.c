@@ -35,22 +35,18 @@ void DATA_uart_read(){
 }
 
 void DATA_Init(SPI_HandleTypeDef *hspi){
-    // data.imu_write_idx = 0;
-    // data.mutex = 0;
-    // data.imu[0].timestamp = 0;
-    // data.imu[1].timestamp = 0;
     HSPI = hspi;
     memset(&data,0,sizeof(data));
     LOG_InitModule(&internal_log_mod, "DATA", LOG_LEVEL_INFO, 0);
 }
 
-#define PROTO_BUFFER_SIZE 64
-static pb_byte_t protobuf_buf[PROTO_BUFFER_SIZE];
+#define SPI_BUFFER_SIZE 64
+static pb_byte_t protobuf_buf[SPI_BUFFER_SIZE];
 static uint8_t protobuf_len;
 
 bool pack_spi_packet()
 {
-    for (int i = 0; i < PROTO_BUFFER_SIZE; i++)
+    for (int i = 0; i < SPI_BUFFER_SIZE; i++)
     {
         protobuf_buf[i] = 0;
     }
@@ -60,7 +56,6 @@ bool pack_spi_packet()
     msg.x = 1;
     msg.y = 2;
     msg.z = 3;
-    // memcpy(packet.payload.bytes, data, data_len);
 
     // Skip the first byte to place message length there
     pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf + 1, sizeof(protobuf_buf) - 1);
@@ -71,19 +66,18 @@ bool pack_spi_packet()
         return false;
     }
 
-    if (stream.bytes_written > UINT8_MAX || stream.bytes_written > PROTO_BUFFER_SIZE)
+    if (stream.bytes_written > UINT8_MAX || stream.bytes_written > SPI_BUFFER_SIZE)
     {
         LOG_ERROR("Protobuf packet to large");
         return false;
     }
 
     protobuf_buf[0] = stream.bytes_written;
-    // protobuf_len = stream.bytes_written;
 
     return true;
 }
 
-void DATA_spi_read(){
+void DATA_spi_send(){
 
     HAL_StatusTypeDef status;
     data.mutex = true;
@@ -92,7 +86,7 @@ void DATA_spi_read(){
 
     if (pack_status == true)
     {
-        status = HAL_SPI_Transmit(HSPI, protobuf_buf, PROTO_BUFFER_SIZE, 1000);
+        status = HAL_SPI_Transmit(HSPI, protobuf_buf, SPI_BUFFER_SIZE, 1000);
     }
     data.mutex = false;
 }
