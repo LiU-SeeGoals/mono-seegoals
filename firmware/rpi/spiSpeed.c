@@ -42,7 +42,7 @@ void printBits(unsigned char x){
 
 int main (void)
 {
-  unsigned char myData[DATA_SIZE];
+  pb_byte_t myData[DATA_SIZE];
 
   int speed = 4;
   wiringPiSetup () ;
@@ -57,15 +57,16 @@ int main (void)
 	  {
 		printf ("SPI failure: %s\n", strerror (errno)) ;
 	  }
-	  pb_istream_t stream = pb_istream_from_buffer(myData, sizeof(myData));
+	  uint8_t msg_length = myData[0];
+	  pb_istream_t stream = pb_istream_from_buffer(myData + 1, msg_length);
 	  ImuSample msg = ImuSample_init_zero;
 	 
 	  if (!pb_decode(&stream, ImuSample_fields, &msg))
 	  {
 		  printf("Failed decode\n");
 	  }
-	  printf("%f %f %f\n", msg.x, msg.y, msg.z);
-	  for (int i = 0; i < DATA_SIZE; i ++)
+	  printf("%d %f %f %f\n", msg_length, msg.x, msg.y, msg.z);
+	  for (int i = 0; i < msg_length; i ++)
 	  {
 	        // printBits(myData[i]);
 	        printf("%d ", myData[i]);

@@ -45,7 +45,7 @@ void DATA_Init(SPI_HandleTypeDef *hspi){
 }
 
 #define PROTO_BUFFER_SIZE 64
-static uint8_t protobuf_buf[PROTO_BUFFER_SIZE];
+static pb_byte_t protobuf_buf[PROTO_BUFFER_SIZE];
 static uint8_t protobuf_len;
 
 bool pack_spi_packet()
@@ -62,21 +62,24 @@ bool pack_spi_packet()
     msg.z = 3;
     // memcpy(packet.payload.bytes, data, data_len);
 
-    pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf, sizeof(protobuf_buf));
+    // Skip the first byte to place message length there
+    pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf + 1, sizeof(protobuf_buf) - 1);
 
     if (!pb_encode(&stream, ImuSample_fields, &msg))
     {
-        LOG_INFO("Protobuf packet failed to encode");
+        LOG_DEBUG("Protobuf packet failed to encode");
         return false;
     }
 
-    if (stream.bytes_written > UINT8_MAX)
+    if (stream.bytes_written > UINT8_MAX || stream.bytes_written > PROTO_BUFFER_SIZE)
     {
-        LOG_INFO("Protobuf packet to large");
+        LOG_ERROR("Protobuf packet to large");
         return false;
     }
 
-    protobuf_len = stream.bytes_written;
+    protobuf_buf[0] = stream.bytes_written;
+    // protobuf_len = stream.bytes_written;
+
     return true;
 }
 
