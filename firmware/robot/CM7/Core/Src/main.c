@@ -302,9 +302,9 @@ int main(void)
         // interrupt or DMA to not halt the entire core (except interrupts)
         DATA_spi_send();
 
-        /* USER CODE END WHILE */
+    /* USER CODE END WHILE */
 
-        /* USER CODE BEGIN 3 */
+    /* USER CODE BEGIN 3 */
     }
   /* USER CODE END 3 */
 }
