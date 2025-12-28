@@ -1,40 +1,14 @@
-/*
- * spiSpeed.c:
- *	Code to measure the SPI speed/latency.
- *	Copyright (c) 2014 Gordon Henderson
- ***********************************************************************
- * This file is part of wiringPi:
- *	https://github.com/WiringPi/WiringPi/
- *
- *    wiringPi is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU Lesser General Public License as
- *    published by the Free Software Foundation, either version 3 of the
- *    License, or (at your option) any later version.
- *
- *    wiringPi is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU Lesser General Public License for more details.
- *
- *    You should have received a copy of the GNU Lesser General Public
- *    License along with wiringPi.
- *    If not, see <http://www.gnu.org/licenses/>.
- ***********************************************************************
- */
-
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
-//#include <fcntl.h>
-//#include <sys/ioctl.h>
-//#include <linux/spi/spidev.h>
 
 #include <wiringPi.h>
 #include <wiringPiSPI.h>
+#include "imu.pb.h"
+#include "pb_encode.h"
 
 #define	TRUE	(1==1)
 #define	FALSE	(!TRUE)
@@ -43,7 +17,7 @@
 #define	NUM_TIMES		100
 #define	MAX_SIZE		(1024)
 
-static int myFd ;
+static int myFd;
 
 
 void spiSetup (int speed)
@@ -62,37 +36,30 @@ void printBits(unsigned char x){
 	    printf("%d", (x >> (num - i)) & 1);
     printf(" ");
 }
+#define DATA_SIZE 64
 
 int main (void)
 {
   int spiFail ;
-  unsigned char myData[65];
+  unsigned char myData[DATA_SIZE];
 
   int speed = 2;
-  int size = 65;
   wiringPiSetup () ;
 
   spiSetup (speed * 1000000) ;
   //spiSetup (10000) ;
   while(1){
 	  spiFail = FALSE ;
-	  if (wiringPiSPIDataRW (SPI_CHAN, myData, size) == -1)
+	  if (wiringPiSPIDataRW (SPI_CHAN, myData, DATA_SIZE) == -1)
 	  {
 		printf ("SPI failure: %s\n", strerror (errno)) ;
 		spiFail = TRUE ;
 	  }
-	  unsigned char len = myData[0];
-	  for (int i = 0; i < len + 1; i ++)
+	  for (int i = 0; i < DATA_SIZE; i ++)
 	  {
 		printBits(myData[i]);
 	  }
-	  for (int i = len + 1; i < size; i ++)
-	  {
-		  if (myData[i] != 0)
-		  {
-			  printf("shit\n");
-		  }
-	  }
+
 	  printf("\n");
   }
   close (myFd) ;

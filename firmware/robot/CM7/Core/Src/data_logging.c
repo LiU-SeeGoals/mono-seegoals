@@ -1,11 +1,10 @@
 #include "imu.pb.h"
+#include "pb_encode.h"
 #include "log.h"
 #include <string.h>
 #include "data_logging.h"
 #include "log.h"
 
-#include "pb_encode.h"
-#include "imu.pb.h"
 
 static LOG_Module internal_log_mod;
 static DataLog data;
@@ -45,7 +44,7 @@ void DATA_Init(SPI_HandleTypeDef *hspi){
     LOG_InitModule(&internal_log_mod, "DATA", LOG_LEVEL_INFO, 0);
 }
 
-#define PROTO_BUFFER_SIZE 65
+#define PROTO_BUFFER_SIZE 64
 static uint8_t protobuf_buf[PROTO_BUFFER_SIZE];
 static uint8_t protobuf_len;
 
@@ -63,7 +62,7 @@ bool pack_spi_packet()
     msg.z = 3;
     // memcpy(packet.payload.bytes, data, data_len);
 
-    pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf, sizeof(protobuf_buf) - 1*sizeof(uint8_t));
+    pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf, sizeof(protobuf_buf)*sizeof(uint8_t));
 
     if (!pb_encode(&stream, ImuSample_fields, &msg))
     {
@@ -90,12 +89,12 @@ void DATA_spi_read(){
 
     if (pack_status == true)
     {
-        for (int i = 0; i < PROTO_BUFFER_SIZE - 1; i++)
-        {
-            protobuf_buf[i] = protobuf_buf[i+1];
-        }
+        // for (int i = 0; i < PROTO_BUFFER_SIZE - 1; i++)
+        // {
+        //     protobuf_buf[i] = protobuf_buf[i+1];
+        // }
 
-        protobuf_buf[0] = protobuf_len;
+        // protobuf_buf[0] = protobuf_len;
 
         status = HAL_SPI_Transmit(HSPI, protobuf_buf, PROTO_BUFFER_SIZE, 1000);
     }

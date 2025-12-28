@@ -9,6 +9,14 @@ sudo raspi-config
 
 go to interfaces and enable SPI
 
+```
+sudo apt install cmake
+```
+
+pip install protobuf dependency
+```
+python3 -m venv .venv && source .venv/bin/activate && pip install protobuf grpcio-tools
+```
 Build and install wiringPi
 
 ```

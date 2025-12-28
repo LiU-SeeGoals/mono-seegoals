@@ -181,5 +181,3 @@ add_custom_target(flash_robot DEPENDS robot_CM7.elf
 add_custom_target(flash_robot_stm32 DEPENDS robot_CM7.elf
     COMMAND STM32_Programmer_CLI -c port=SWD -w ${PROJECT_BINARY_DIR}/robot_CM7.bin 0x08000000 -rst sn 002B00473132511438363431
 )
-
-
