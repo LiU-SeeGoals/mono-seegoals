@@ -62,22 +62,21 @@ bool pack_spi_packet()
     msg.z = 3;
     // memcpy(packet.payload.bytes, data, data_len);
 
-    // pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf, sizeof(protobuf_buf));
+    pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf, sizeof(protobuf_buf));
 
-    // if (!pb_encode(&stream, ImuSample_fields, &msg))
-    // {
-    //     // LOG_INFO("Protobuf packet failed to encode");
-    //     return false;
-    // }
-    protobuf_buf[0] = 5;
+    if (!pb_encode(&stream, ImuSample_fields, &msg))
+    {
+        LOG_INFO("Protobuf packet failed to encode");
+        return false;
+    }
 
-    // if (stream.bytes_written > UINT8_MAX)
-    // {
-    //     // LOG_INFO("Protobuf packet to large");
-    //     return false;
-    // }
+    if (stream.bytes_written > UINT8_MAX)
+    {
+        LOG_INFO("Protobuf packet to large");
+        return false;
+    }
 
-    // protobuf_len = stream.bytes_written;
+    protobuf_len = stream.bytes_written;
     return true;
 }
 
@@ -88,15 +87,9 @@ void DATA_spi_read(){
     bool pack_status = pack_spi_packet();
     data.mutex = false;
 
-    static uint8_t testing_data[PROTO_BUFFER_SIZE];
-    for (int i = 0; i < PROTO_BUFFER_SIZE; i ++)
+    if (pack_status == true)
     {
-        testing_data[i] = 0;
-    }
-    testing_data[0] = 3;
-    // if (pack_status == true)
-    // {
         status = HAL_SPI_Transmit(HSPI, protobuf_buf, PROTO_BUFFER_SIZE, 1000);
-    // }
+    }
     data.mutex = false;
 }

@@ -9,6 +9,7 @@
 #include <wiringPiSPI.h>
 #include "imu.pb.h"
 #include "pb_encode.h"
+#include "pb_decode.h"
 
 #define	TRUE	(1==1)
 #define	FALSE	(!TRUE)
@@ -37,26 +38,37 @@ void printBits(unsigned char x){
 	    printf("%d", (x >> (num - i)) & 1);
     printf(" ");
 }
-#define DATA_SIZE 2
+#define DATA_SIZE 64
 
 int main (void)
 {
   unsigned char myData[DATA_SIZE];
 
-  int speed = 2;
+  int speed = 4;
   wiringPiSetup () ;
 
-  spiSetup (speed * 1000000) ;
+
+
+  spiSetup (speed * 500000) ;
   //spiSetup (speed * 1000) ;
   while(1){
+
 	  if (wiringPiSPIDataRW (SPI_CHAN, myData, DATA_SIZE) == -1)
 	  {
 		printf ("SPI failure: %s\n", strerror (errno)) ;
 	  }
-	  for (int i = 0; i < 2; i ++)
+	  pb_istream_t stream = pb_istream_from_buffer(myData, sizeof(myData));
+	  ImuSample msg = ImuSample_init_zero;
+	 
+	  if (!pb_decode(&stream, ImuSample_fields, &msg))
 	  {
-		// printBits(myData[i]);
-		printf("%d", myData[i]);
+		  printf("Failed decode\n");
+	  }
+	  printf("%f %f %f\n", msg.x, msg.y, msg.z);
+	  for (int i = 0; i < DATA_SIZE; i ++)
+	  {
+	        // printBits(myData[i]);
+	        printf("%d ", myData[i]);
 	  }
 
 	  printf("\n===================\n");

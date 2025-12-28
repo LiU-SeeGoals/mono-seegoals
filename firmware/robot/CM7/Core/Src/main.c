@@ -310,7 +310,7 @@ int main(void)
         //     data[0] = 0;
         //     data[1] = 0;
         // }
-        // DATA_spi_read();
+        DATA_spi_read();
 
     /* USER CODE END WHILE */
 
@@ -324,7 +324,7 @@ int main(void)
     // (void)SPI6->RXDR;                                // clear RX
         // hspi6->Instance->UDRDR
         // if (once == 0){
-        HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi6, data, test_size, 1000);
+        // HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi6, data, test_size, 1000);
             // LOG_INFO("%d\r\n", status);
             // once = 1;
         // }
