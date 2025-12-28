@@ -14,6 +14,7 @@
 #define	FALSE	(!TRUE)
 
 #define	SPI_CHAN		0
+#define	SPI_MODE		1
 #define	NUM_TIMES		100
 #define	MAX_SIZE		(1024)
 
@@ -22,7 +23,7 @@ static int myFd;
 
 void spiSetup (int speed)
 {
-  if ((myFd = wiringPiSPISetupMode (SPI_CHAN, speed, 0)) < 0)
+  if ((myFd = wiringPiSPISetupMode (SPI_CHAN, speed, SPI_MODE)) < 0)
   {
     fprintf (stderr, "Can't open the SPI bus: %s\n", strerror (errno)) ;
     exit (EXIT_FAILURE) ;
@@ -36,31 +37,29 @@ void printBits(unsigned char x){
 	    printf("%d", (x >> (num - i)) & 1);
     printf(" ");
 }
-#define DATA_SIZE 64
+#define DATA_SIZE 2
 
 int main (void)
 {
-  int spiFail ;
   unsigned char myData[DATA_SIZE];
 
   int speed = 2;
   wiringPiSetup () ;
 
   spiSetup (speed * 1000000) ;
-  //spiSetup (10000) ;
+  //spiSetup (speed * 1000) ;
   while(1){
-	  spiFail = FALSE ;
 	  if (wiringPiSPIDataRW (SPI_CHAN, myData, DATA_SIZE) == -1)
 	  {
 		printf ("SPI failure: %s\n", strerror (errno)) ;
-		spiFail = TRUE ;
 	  }
-	  for (int i = 0; i < DATA_SIZE; i ++)
+	  for (int i = 0; i < 2; i ++)
 	  {
-		printBits(myData[i]);
+		// printBits(myData[i]);
+		printf("%d", myData[i]);
 	  }
 
-	  printf("\n");
+	  printf("\n===================\n");
   }
   close (myFd) ;
 
