@@ -253,16 +253,16 @@ int main(void)
     const int DISCHARGE_AMNT = 50;
     COMMON_buzzer_warning_with_delay();
 
-    for (int i = 0; i < DISCHARGE_AMNT; i++)
-    {
-        if (i % 20 == 0)
-        {
-            LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
-        }
-
-        KICKER_KickSafe();
-        HAL_Delay(60);
-    }
+    // for (int i = 0; i < DISCHARGE_AMNT; i++)
+    // {
+    //     if (i % 20 == 0)
+    //     {
+    //         LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
+    //     }
+    //
+    //     KICKER_KickSafe();
+    //     HAL_Delay(60);
+    // }
 
     // STATE_calibrate_imu_gyr();
     HAL_TIM_Base_Start_IT(&htim12);
@@ -286,8 +286,14 @@ int main(void)
     bool on = false;
 
     NAV_StopDribbler();
-    uint8_t data[2];
-    data[0] = 1;
+#define test_size 2
+    uint8_t data[test_size];
+    for (int i = 0; i < test_size; i ++)
+    {
+        data[i] = 0;
+    }
+    data[1] = 5;
+    data[0] = 5;
 
     static int once = 0;
     while (1) {
@@ -304,7 +310,7 @@ int main(void)
         //     data[0] = 0;
         //     data[1] = 0;
         // }
-    DATA_spi_read();
+        // DATA_spi_read();
 
     /* USER CODE END WHILE */
 
@@ -318,7 +324,7 @@ int main(void)
     // (void)SPI6->RXDR;                                // clear RX
         // hspi6->Instance->UDRDR
         // if (once == 0){
-            // HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi6, data, 2, 1000);
+        HAL_StatusTypeDef status = HAL_SPI_Transmit(&hspi6, data, test_size, 1000);
             // LOG_INFO("%d\r\n", status);
             // once = 1;
         // }
@@ -524,7 +530,7 @@ static void MX_SPI6_Init(void)
   hspi6.Init.Direction = SPI_DIRECTION_2LINES;
   hspi6.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi6.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi6.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi6.Init.CLKPhase = SPI_PHASE_2EDGE;
   hspi6.Init.NSS = SPI_NSS_HARD_INPUT;
   hspi6.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi6.Init.TIMode = SPI_TIMODE_DISABLE;
