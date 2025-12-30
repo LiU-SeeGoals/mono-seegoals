@@ -91,7 +91,8 @@ void DATA_uart_send(){
 
 void DATA_Init(SPI_HandleTypeDef *hspi){
     HSPI = hspi;
-    DATA_spi_send();
+    // DATA_spi_send();
+    __HAL_SPI_ENABLE(hspi);
     memset(&data,0,sizeof(data));
     LOG_InitModule(&internal_log_mod, "DATA", LOG_LEVEL_INFO, 0);
 }

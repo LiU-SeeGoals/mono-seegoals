@@ -230,7 +230,6 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     __HAL_RCC_GPIOG_CLK_ENABLE();
     /**SPI6 GPIO Configuration
     PA7     ------> SPI6_MOSI
-    PG8     ------> SPI6_NSS
     PG12     ------> SPI6_MISO
     PG13     ------> SPI6_SCK
     */
@@ -241,7 +240,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     GPIO_InitStruct.Alternate = GPIO_AF8_SPI6;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-    GPIO_InitStruct.Pin = DATA_NSS_Pin|GPIO_PIN_12|GPIO_PIN_13;
+    GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -249,7 +248,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
     /* SPI6 interrupt Init */
-    HAL_NVIC_SetPriority(SPI6_IRQn, 5, 0);
+    HAL_NVIC_SetPriority(SPI6_IRQn, 4, 0);
     HAL_NVIC_EnableIRQ(SPI6_IRQn);
   /* USER CODE BEGIN SPI6_MspInit 1 */
 
@@ -297,13 +296,12 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* hspi)
 
     /**SPI6 GPIO Configuration
     PA7     ------> SPI6_MOSI
-    PG8     ------> SPI6_NSS
     PG12     ------> SPI6_MISO
     PG13     ------> SPI6_SCK
     */
     HAL_GPIO_DeInit(GPIOA, GPIO_PIN_7);
 
-    HAL_GPIO_DeInit(GPIOG, DATA_NSS_Pin|GPIO_PIN_12|GPIO_PIN_13);
+    HAL_GPIO_DeInit(GPIOG, GPIO_PIN_12|GPIO_PIN_13);
 
     /* SPI6 interrupt DeInit */
     HAL_NVIC_DisableIRQ(SPI6_IRQn);

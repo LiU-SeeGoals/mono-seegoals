@@ -113,19 +113,27 @@ static void I2C4_Init(void);
 // Handle callbacks
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-    __disable_irq();
-    switch (GPIO_Pin) {
-    case BTN_USER_Pin:
-        COM_RF_PrintInfo();
-        break;
-    case NRF_IRQ_Pin:
-        COM_RF_HandleIRQ();
-        break;
-    default:
-        LOG_WARNING("Unhandled interrupt on pin %d...\r\n", GPIO_Pin);
-        break;
+    if (GPIO_Pin == DATA_NSS_Pin)
+    {
+        DATA_spi_send();
+        // LOG_INFO("Goes high\r\n");
     }
-    __enable_irq();
+    if (GPIO_Pin == NRF_IRQ_Pin)
+    {
+        __disable_irq();
+        switch (GPIO_Pin) {
+        case BTN_USER_Pin:
+            COM_RF_PrintInfo();
+            break;
+        case NRF_IRQ_Pin:
+            COM_RF_HandleIRQ();
+            break;
+        default:
+            LOG_WARNING("Unhandled interrupt on pin %d...\r\n", GPIO_Pin);
+            break;
+        }
+        __enable_irq();
+    }
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
@@ -154,7 +162,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         float x = NAV_GetNavX();
         float y = NAV_GetNavY();
         float w = NAV_GetNavW();
-        DATA_log_imu_data(gyr.x,gyr.y,gyr.z);
+        DATA_log_imu_data(gyr.x, gyr.y, gyr.z);
 
         POS_go_to_position(x,y,w);
     }
@@ -304,7 +312,7 @@ int main(void)
             // TODO: put this pin on a gpio exti during low->high transistion
             // to trigger immediately when ready
             // Current setup gives ~10ms updates worst case
-            DATA_spi_send();
+            // DATA_spi_send();
         }
 
     /* USER CODE END WHILE */
@@ -512,7 +520,7 @@ static void MX_SPI6_Init(void)
   hspi6.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi6.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi6.Init.CLKPhase = SPI_PHASE_2EDGE;
-  hspi6.Init.NSS = SPI_NSS_HARD_INPUT;
+  hspi6.Init.NSS = SPI_NSS_SOFT;
   hspi6.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi6.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi6.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -1100,6 +1108,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : DATA_NSS_Pin */
+  GPIO_InitStruct.Pin = DATA_NSS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(DATA_NSS_GPIO_Port, &GPIO_InitStruct);
+
   /*Configure GPIO pin : NRF_CE_Pin */
   GPIO_InitStruct.Pin = NRF_CE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -1120,6 +1134,9 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(MOTOR2_ENCODER_GPIO_Port, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 7, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
