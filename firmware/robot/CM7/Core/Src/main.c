@@ -253,16 +253,16 @@ int main(void)
     const int DISCHARGE_AMNT = 50;
     COMMON_buzzer_warning_with_delay();
 
-    // for (int i = 0; i < DISCHARGE_AMNT; i++)
-    // {
-    //     if (i % 20 == 0)
-    //     {
-    //         LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
-    //     }
-    //
-    //     KICKER_KickSafe();
-    //     HAL_Delay(60);
-    // }
+    for (int i = 0; i < DISCHARGE_AMNT; i++)
+    {
+        if (i % 20 == 0)
+        {
+            LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
+        }
+
+        KICKER_KickSafe();
+        HAL_Delay(60);
+    }
 
     STATE_calibrate_imu_gyr();
     HAL_TIM_Base_Start_IT(&htim12);
@@ -288,10 +288,10 @@ int main(void)
     NAV_StopDribbler();
     while (1) {
 
+        DATA_log_state(STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle());
         if (HAL_GPIO_ReadPin(DATA_NSS_GPIO_Port, DATA_NSS_Pin) == GPIO_PIN_SET)
         {
             // When NSS goes high spi transfer ready for another data dump
-            // TODO: Using DMA instead of interrupts we can skip interrupts and should make transfer faster
             DATA_spi_send();
         }
 

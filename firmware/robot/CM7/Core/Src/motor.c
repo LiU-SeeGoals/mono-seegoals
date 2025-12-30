@@ -1,6 +1,7 @@
 #include "motor.h"
 
 /* Private includes */
+#include "data_logging.h"
 #include "log.h"
 
 /* Private variables */
@@ -76,7 +77,7 @@ int setDirection(MotorPWM* motor, float speed)
 
 */
 
-void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev, int motor_idx)
+ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev, int motor_idx)
 {
 
     setDirection(motor, speed);
@@ -88,6 +89,7 @@ void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev, int motor_idx)
         speed = -speed;
     }
     // PI control loop with integrator windup protection
+    ControlSignal sig;
 
     float umin = 0;
     float umax = 1;
@@ -110,9 +112,15 @@ void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev, int motor_idx)
     } else {
         u = v;
     }
+    sig.u = u;
+    sig.e = error;
+    sig.y = current_speed;
+    sig.r = speed;
+
     MOTOR_SendPWM(motor, u);
     *I_prev = I;
-    // for some time
+
+    return sig;
 }
 
 /*

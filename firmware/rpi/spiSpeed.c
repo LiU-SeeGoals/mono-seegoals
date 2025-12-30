@@ -18,7 +18,7 @@
 #define	SPI_MODE		1
 #define	NUM_TIMES		100
 #define	MAX_SIZE		(1024)
-#define DATA_SIZE 129
+#define DATA_SIZE 257
 
 static int myFd;
 
@@ -83,7 +83,7 @@ int main (void)
 		  {
 			  continue;
 		  }
-		  printf("%d %f %f %f %f %f %f\n", msg_length, msg.imu_x, msg.imu_y, msg.imu_z, msg.imu_ts, numFailed/numSuccess, 1000/time_stamp_dt);
+		  printf("%d %f %d %f %d %f\n", msg_length, msg.imu_z, msg.imu_ts,msg.state_z, msg.state_ts, 1000/time_stamp_dt);
 		  for (int i = 0; i < msg_length; i ++)
 		  {
 			// printBits(myData[i]);
