@@ -24,7 +24,7 @@ typedef struct
 
 
 void DATA_log_imu_data(float x, float y, float z);
-void DATA_uart_read();
+void DATA_uart_send();
 void DATA_Init(SPI_HandleTypeDef *hspi);
 void DATA_spi_send();
 

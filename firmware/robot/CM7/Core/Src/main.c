@@ -245,7 +245,7 @@ int main(void)
     MOTOR_Init(&htim1);
     DATA_Init(&hspi6);
     KICKER_Init(&htim5, &htim3);
-    // IMU_Init(&hi2c4);
+    IMU_Init(&hi2c4);
     STATE_Init();
     UI_Init(&huart3);
     ITR_Init();
@@ -253,18 +253,18 @@ int main(void)
     const int DISCHARGE_AMNT = 50;
     COMMON_buzzer_warning_with_delay();
 
-    // for (int i = 0; i < DISCHARGE_AMNT; i++)
-    // {
-    //     if (i % 20 == 0)
-    //     {
-    //         LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
-    //     }
-    //
-    //     KICKER_KickSafe();
-    //     HAL_Delay(60);
-    // }
+    for (int i = 0; i < DISCHARGE_AMNT; i++)
+    {
+        if (i % 20 == 0)
+        {
+            LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
+        }
 
-    // STATE_calibrate_imu_gyr();
+        KICKER_KickSafe();
+        HAL_Delay(60);
+    }
+
+    STATE_calibrate_imu_gyr();
     HAL_TIM_Base_Start_IT(&htim12);
 
     COM_Init(&hspi1, &NRF_AVAILABLE);

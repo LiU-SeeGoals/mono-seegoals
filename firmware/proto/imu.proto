@@ -1,7 +1,8 @@
 syntax = "proto3";
 
 message ImuSample {
-  float x = 1;
-  float y = 2;
-  float z = 3;
+  float imu_x = 1;
+  float imu_y = 2;
+  float imu_z = 3;
+  float imu_ts = 4;
 }
