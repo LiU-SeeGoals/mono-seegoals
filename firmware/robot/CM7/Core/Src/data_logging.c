@@ -5,7 +5,7 @@
 #include "data_logging.h"
 #include "log.h"
 
-#define SPI_BUFFER_SIZE 64
+#define SPI_BUFFER_SIZE 129
 
 static LOG_Module internal_log_mod;
 static DataLog data;

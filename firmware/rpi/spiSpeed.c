@@ -18,6 +18,7 @@
 #define	SPI_MODE		1
 #define	NUM_TIMES		100
 #define	MAX_SIZE		(1024)
+#define DATA_SIZE 129
 
 static int myFd;
 
@@ -38,22 +39,24 @@ void printBits(unsigned char x){
 	    printf("%d", (x >> (num - i)) & 1);
     printf(" ");
 }
-#define DATA_SIZE 64
 
 int main (void)
 {
   pb_byte_t myData[DATA_SIZE];
 
-  int speed = 4;
-  int numFailed = 0;
+  int speed = 1;
+  float numFailed = 0;
+  float numSuccess = 0;
+  float time_stamp_dt = 0;
   wiringPiSetup () ;
 
 
 
-  spiSetup (speed * 500000) ;
+  spiSetup (speed * 750000) ;
   //spiSetup (speed * 1000) ;
   while(1){
 
+	  //printf("Failed %f %f \n", numFailed/numSuccess, numFailed+numSuccess);
 	  if (wiringPiSPIDataRW (SPI_CHAN, myData, DATA_SIZE) == -1)
 	  {
 		printf ("SPI failure: %s\n", strerror (errno)) ;
@@ -65,19 +68,29 @@ int main (void)
 	  if (!pb_decode(&stream, ImuSample_fields, &msg))
 	  {
 		  // printf("Failed decode\n");
+		  numFailed++;
 	  }
 	  else
 	  {
-		  if (msg_length == 0)
+		  if (msg_length < 1)
+		  {
+			  numFailed++;
+			  continue;
+		  }
+		  static float prev_timestamp = 0;
+		  time_stamp_dt = msg.imu_ts - prev_timestamp;
+		  if (time_stamp_dt == 0 || msg.imu_ts < prev_timestamp)
 		  {
 			  continue;
 		  }
-		  printf("%d %f %f %f %f\n", msg_length, msg.imu_x, msg.imu_y, msg.imu_z, msg.imu_ts);
+		  printf("%d %f %f %f %f %f %f\n", msg_length, msg.imu_x, msg.imu_y, msg.imu_z, msg.imu_ts, numFailed/numSuccess, 1000/time_stamp_dt);
 		  for (int i = 0; i < msg_length; i ++)
 		  {
 			// printBits(myData[i]);
 			// printf("%d ", myData[i]);
 		  }
+		  numSuccess++;
+		  prev_timestamp=msg.imu_ts;
 
 		  //printf("\n===================\n");
 	  }
