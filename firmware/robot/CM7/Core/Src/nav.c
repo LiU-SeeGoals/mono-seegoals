@@ -126,9 +126,9 @@ void NAV_update_motor_state()
     // Dont move this into the other for loop, we want motors to run simultanious!!
     for (int i = 0; i < 4; i++) { // do for all motor
         if (robot_cmd.movement_enabled == 1) {
-            MOTOR_SetSpeed(&motors[i], motors[i].speed, &I_prevs[i]);
+            MOTOR_SetSpeed(&motors[i], motors[i].speed, &I_prevs[i], i);
         } else {
-            MOTOR_SetSpeed(&motors[i], 0, &I_prevs[i]);
+            MOTOR_SetSpeed(&motors[i], 0, &I_prevs[i], i);
         }
     }
 }

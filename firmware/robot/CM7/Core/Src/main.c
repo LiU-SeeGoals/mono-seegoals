@@ -286,24 +286,12 @@ int main(void)
     bool on = false;
 
     NAV_StopDribbler();
-#define test_size 2
-    uint8_t data[test_size];
-    for (int i = 0; i < test_size; i ++)
-    {
-        data[i] = 0;
-    }
-    data[1] = 5;
-    data[0] = 5;
-
-    static int once = 0;
     while (1) {
 
         if (HAL_GPIO_ReadPin(DATA_NSS_GPIO_Port, DATA_NSS_Pin) == GPIO_PIN_SET)
         {
             // When NSS goes high spi transfer ready for another data dump
-            // TODO: put this pin on a gpio exti during low->high transistion
-            // to trigger immediately when ready
-            // Current setup gives ~10ms updates worst case
+            // TODO: Using DMA instead of interrupts we can skip interrupts and should make transfer faster
             DATA_spi_send();
         }
 

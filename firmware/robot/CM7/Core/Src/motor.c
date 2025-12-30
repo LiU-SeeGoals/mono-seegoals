@@ -76,7 +76,7 @@ int setDirection(MotorPWM* motor, float speed)
 
 */
 
-void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
+void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev, int motor_idx)
 {
 
     setDirection(motor, speed);

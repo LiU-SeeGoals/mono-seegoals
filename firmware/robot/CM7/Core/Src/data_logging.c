@@ -5,7 +5,7 @@
 #include "data_logging.h"
 #include "log.h"
 
-#define SPI_BUFFER_SIZE 129
+#define SPI_BUFFER_SIZE 257
 
 static LOG_Module internal_log_mod;
 static DataLog data;
@@ -97,6 +97,8 @@ void DATA_Init(SPI_HandleTypeDef *hspi){
 }
 
 void DATA_spi_send(){
+    // TODO: Using DMA instead of interrupts we can make transfer faster
+    // Since there is no overhead with interrupts, and also uses less mcu
 
     HAL_StatusTypeDef status;
     bool pack_status = pack_spi_packet();

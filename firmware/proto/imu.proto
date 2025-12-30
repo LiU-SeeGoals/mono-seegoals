@@ -4,5 +4,26 @@ message ImuSample {
   float imu_x = 1;
   float imu_y = 2;
   float imu_z = 3;
-  float imu_ts = 4;
+  int32 imu_ts = 4;
+
+  float pos_u = 5;
+  float pos_v = 6;
+  float pos_w = 7;
+  int32 pos_ts = 9;
+
+  float state_x = 10;
+  float state_y = 11;
+  float state_z = 12;
+  int32 state_ts = 13;
+
+  float motor_1 = 14;
+  float motor_2 = 15;
+  float motor_3 = 16;
+  float motor_4 = 17;
+  int32 motor_ts = 18;
+
+  float vision_x = 19;
+  float vision_y = 20;
+  float vision_w = 21;
+  int32 vision_ts = 22;
 }
