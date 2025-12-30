@@ -154,7 +154,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         float x = NAV_GetNavX();
         float y = NAV_GetNavY();
         float w = NAV_GetNavW();
-        DATA_log_imu_data(gyr.x, gyr.y, gyr.z);
+        DATA_log_imu_data(gyr.x,gyr.y,gyr.z);
 
         POS_go_to_position(x,y,w);
     }
@@ -253,16 +253,16 @@ int main(void)
     const int DISCHARGE_AMNT = 50;
     COMMON_buzzer_warning_with_delay();
 
-    for (int i = 0; i < DISCHARGE_AMNT; i++)
-    {
-        if (i % 20 == 0)
-        {
-            LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
-        }
-
-        KICKER_KickSafe();
-        HAL_Delay(60);
-    }
+    // for (int i = 0; i < DISCHARGE_AMNT; i++)
+    // {
+    //     if (i % 20 == 0)
+    //     {
+    //         LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
+    //     }
+    //
+    //     KICKER_KickSafe();
+    //     HAL_Delay(60);
+    // }
 
     STATE_calibrate_imu_gyr();
     HAL_TIM_Base_Start_IT(&htim12);
@@ -298,9 +298,14 @@ int main(void)
     static int once = 0;
     while (1) {
 
-        // TODO: change log module or SPI to use
-        // interrupt or DMA to not halt the entire core (except interrupts)
-        DATA_spi_send();
+        if (HAL_GPIO_ReadPin(DATA_NSS_GPIO_Port, DATA_NSS_Pin) == GPIO_PIN_SET)
+        {
+            // When NSS goes high spi transfer ready for another data dump
+            // TODO: put this pin on a gpio exti during low->high transistion
+            // to trigger immediately when ready
+            // Current setup gives ~10ms updates worst case
+            DATA_spi_send();
+        }
 
     /* USER CODE END WHILE */
 

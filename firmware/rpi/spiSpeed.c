@@ -45,6 +45,7 @@ int main (void)
   pb_byte_t myData[DATA_SIZE];
 
   int speed = 4;
+  int numFailed = 0;
   wiringPiSetup () ;
 
 
@@ -63,16 +64,23 @@ int main (void)
 	 
 	  if (!pb_decode(&stream, ImuSample_fields, &msg))
 	  {
-		  printf("Failed decode\n");
+		  // printf("Failed decode\n");
 	  }
-	  printf("%d %f %f %f\n", msg_length, msg.x, msg.y, msg.z);
-	  for (int i = 0; i < msg_length; i ++)
+	  else
 	  {
-	        // printBits(myData[i]);
-	        printf("%d ", myData[i]);
-	  }
+		  if (msg_length == 0)
+		  {
+			  continue;
+		  }
+		  printf("%d %f %f %f %f\n", msg_length, msg.imu_x, msg.imu_y, msg.imu_z, msg.imu_ts);
+		  for (int i = 0; i < msg_length; i ++)
+		  {
+			// printBits(myData[i]);
+			// printf("%d ", myData[i]);
+		  }
 
-	  printf("\n===================\n");
+		  //printf("\n===================\n");
+	  }
   }
   close (myFd) ;
 

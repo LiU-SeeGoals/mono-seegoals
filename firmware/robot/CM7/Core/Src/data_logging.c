@@ -44,7 +44,7 @@ static bool pack_spi_packet()
     msg.imu_x = data.imu[idx].x;
     msg.imu_y = data.imu[idx].y;
     msg.imu_z = data.imu[idx].z;
-    msg.imu_ts = data.imu[idx].z;
+    msg.imu_ts = data.imu[idx].timestamp;
 
     // Skip the first byte to place message length there
     pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf + 1, sizeof(protobuf_buf) - 1);
@@ -91,6 +91,7 @@ void DATA_uart_send(){
 
 void DATA_Init(SPI_HandleTypeDef *hspi){
     HSPI = hspi;
+    DATA_spi_send();
     memset(&data,0,sizeof(data));
     LOG_InitModule(&internal_log_mod, "DATA", LOG_LEVEL_INFO, 0);
 }
@@ -102,7 +103,7 @@ void DATA_spi_send(){
 
     if (pack_status == true)
     {
-        status = HAL_SPI_Transmit(HSPI, protobuf_buf, SPI_BUFFER_SIZE, 1000);
+        status = HAL_SPI_Transmit_IT(HSPI, protobuf_buf, SPI_BUFFER_SIZE);
     }
     data.mutex = false;
 }
