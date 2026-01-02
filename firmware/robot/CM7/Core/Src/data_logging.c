@@ -144,10 +144,22 @@ static bool pack_spi_packet()
     msg.m4.error = data.motor[motor_idx].m4.e;
 
     int pos_idx = get_read_idx(&data.pos_write_idx);
-    msg.pos.ref = data.motor[pos_idx].m4.r;
-    msg.pos.control = data.motor[pos_idx].m4.u;
-    msg.pos.output = data.motor[pos_idx].m4.y;
-    msg.pos.error = data.motor[pos_idx].m4.e;
+    msg.pos_timestamp = data.pos[pos_idx].timestamp;
+
+    msg.pos_x.ref = data.pos[pos_idx].x.r;
+    msg.pos_x.control = data.pos[pos_idx].x.u;
+    msg.pos_x.output = data.pos[pos_idx].x.y;
+    msg.pos_x.error = data.pos[pos_idx].x.e;
+
+    msg.pos_y.ref = data.pos[pos_idx].y.r;
+    msg.pos_y.control = data.pos[pos_idx].y.u;
+    msg.pos_y.output = data.pos[pos_idx].y.y;
+    msg.pos_y.error = data.pos[pos_idx].y.e;
+
+    msg.pos_angle.ref = data.pos[pos_idx].angle.r;
+    msg.pos_angle.control = data.pos[pos_idx].angle.u;
+    msg.pos_angle.output = data.pos[pos_idx].angle.y;
+    msg.pos_angle.error = data.pos[pos_idx].angle.e;
 
     int vision_idx = get_read_idx(&data.vision_write_idx);
     msg.vision.x = data.vision[vision_idx].x;
@@ -162,7 +174,9 @@ static bool pack_spi_packet()
     msg.has_m2 = true;
     msg.has_m3 = true;
     msg.has_m4 = true;
-    msg.has_pos = true;
+    msg.has_pos_x = true;
+    msg.has_pos_y = true;
+    msg.has_pos_angle = true;
     msg.has_vision = true;
 
     // Skip the first byte to place message length there
@@ -205,6 +219,16 @@ void DATA_log_state(float x, float y, float w)
     data.state[data.state_write_idx].pw = w;
     data.state[data.state_write_idx].timestamp = timestamp;
     buffer_swap(&data.state_write_idx);
+}
+
+void DATA_log_vision(float x, float y, float w)
+{
+    uint32_t timestamp = HAL_GetTick();
+    data.vision[data.vision_write_idx].x = x;
+    data.vision[data.vision_write_idx].y = y;
+    data.vision[data.vision_write_idx].w = w;
+    data.vision[data.vision_write_idx].timestamp = timestamp;
+    buffer_swap(&data.vision_write_idx);
 }
 
 void DATA_log_motor(ControlSignal m1, ControlSignal m2, ControlSignal m3, ControlSignal m4)

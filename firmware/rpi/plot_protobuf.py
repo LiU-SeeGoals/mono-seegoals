@@ -1,82 +1,105 @@
 from read_spi import readFile
 from matplotlib import pyplot as plt
 
-zs = []
-zs_ts = []
-state_zs = []
-state_ts = []
-
-m1 = []
-m2 = []
-m3 = []
-m4 = []
-
-m1_r = []
-m2_r = []
-m3_r = []
-m4_r = []
-
-m_ts = []
+signals = {
+    "Angular vel": {
+        "t": [],
+        "signals": {
+            "gyro_z": []
+        }
+    },
+    "Angle state": {
+        "t": [],
+        "signals": {
+            "state_z": []
+        }
+    },
+    "Motor control": {
+        "t": [],
+        "signals": {
+            "m1": [],
+            "m2": [],
+            "m3": [],
+            "m4": [],
+        }
+    },
+    "Motor reference": {
+        "t": [],
+        "signals": {
+            "m1_r": [],
+            "m2_r": [],
+            "m3_r": [],
+            "m4_r": [],
+        }
+    },
+    "Position control": {
+        "t": [],
+        "signals": {
+            "x": [],
+            "y": [],
+            "angle": [],
+        }
+    },
+    "Position reference": {
+        "t": [],
+        "signals": {
+            "x_r": [],
+            "y_r": [],
+            "angle_r": [],
+        }
+    },
+}
 
 for msg in readFile():
-    zs.append(msg.gyro.z)
-    zs_ts.append(msg.gyro.timestamp / 1000.0)
-    state_zs.append(msg.state.z)
-    state_ts.append(msg.state.timestamp / 1000.0)
 
-    m1.append(msg.m1.control)
-    m2.append(msg.m2.control)
-    m3.append(msg.m3.control)
-    m4.append(msg.m4.control)
+    # Angular velocity
+    signals["Angular vel"]["t"].append(msg.gyro.timestamp / 1000.0)
+    signals["Angular vel"]["signals"]["gyro_z"].append(msg.gyro.z)
 
-    m1_r.append(msg.m1.ref)
-    m2_r.append(msg.m2.ref)
-    m3_r.append(msg.m3.ref)
-    m4_r.append(msg.m4.ref)
+    # Angle state
+    signals["Angle state"]["t"].append(msg.state.timestamp / 1000.0)
+    signals["Angle state"]["signals"]["state_z"].append(msg.state.z)
 
-    m_ts.append(msg.m_timestamp)
+    # Motor control
+    signals["Motor control"]["t"].append(msg.m_timestamp / 1000.0)
+    signals["Motor control"]["signals"]["m1"].append(msg.m1.control)
+    signals["Motor control"]["signals"]["m2"].append(msg.m2.control)
+    signals["Motor control"]["signals"]["m3"].append(msg.m3.control)
+    signals["Motor control"]["signals"]["m4"].append(msg.m4.control)
 
-plt.subplot(3,4,1)
-plt.title("Angular vel")
-plt.plot(zs_ts, zs)
+    # Motor reference
+    signals["Motor reference"]["t"].append(msg.m_timestamp / 1000.0)
+    signals["Motor reference"]["signals"]["m1_r"].append(msg.m1.ref)
+    signals["Motor reference"]["signals"]["m2_r"].append(msg.m2.ref)
+    signals["Motor reference"]["signals"]["m3_r"].append(msg.m3.ref)
+    signals["Motor reference"]["signals"]["m4_r"].append(msg.m4.ref)
 
-plt.subplot(3,4,2)
-plt.title("Angle state")
-plt.plot(state_ts, state_zs)
+    # Position control
+    signals["Position control"]["t"].append(msg.pos_timestamp / 1000.0)
+    signals["Position control"]["signals"]["x"].append(msg.pos_x.control)
+    signals["Position control"]["signals"]["y"].append(msg.pos_y.control)
+    signals["Position control"]["signals"]["angle"].append(msg.pos_angle.control)
 
-plt.subplot(3,4,3)
-plt.title("M2 control signal")
-plt.plot(m_ts, m1)
+    # Position reference
+    signals["Position reference"]["t"].append(msg.pos_timestamp / 1000.0)
+    signals["Position reference"]["signals"]["x_r"].append(msg.pos_x.ref)
+    signals["Position reference"]["signals"]["y_r"].append(msg.pos_y.ref)
+    signals["Position reference"]["signals"]["angle_r"].append(msg.pos_angle.ref)
 
-plt.subplot(3,4,4)
-plt.title("M2 control signal")
-plt.plot(m_ts, m2)
+plt.figure(figsize=(12, 8))
 
-plt.subplot(3,4,5)
-plt.title("M3 control signal")
-plt.plot(m_ts, m3)
+rows = 3
+cols = 3
 
-plt.subplot(3,4,6)
-plt.title("M4 control signal")
-plt.plot(m_ts, m4)
+for i, (group_name, group) in enumerate(signals.items(), start=1):
+    plt.subplot(rows, cols, i)
+    plt.title(group_name)
 
-plt.subplot(3,4,7)
-plt.title("M2 reference signal")
-plt.plot(m_ts, m1_r)
+    t = group["t"]
+    for name, sig in group["signals"].items():
+        plt.plot(t, sig, label=name)
 
-plt.subplot(3,4,8)
-plt.title("M2 reference signal")
-plt.plot(m_ts, m2_r)
+    plt.legend()
 
-plt.subplot(3,4,9)
-plt.title("M3 reference signal")
-plt.plot(m_ts, m3_r)
-
-plt.subplot(3,4,10)
-plt.title("M4 reference signal")
-plt.plot(m_ts, m4_r)
-
+plt.tight_layout()
 plt.show()
-
-print(sum([zs_ts[i + 1] - zs_ts[i] for i in range(len(zs_ts) - 1)]) / len(zs_ts), "Ts (ms)")
-print(sum([1000/(zs_ts[i + 1] - zs_ts[i]) for i in range(len(zs_ts) - 1)]) / len(zs_ts), "Hz")

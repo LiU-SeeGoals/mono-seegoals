@@ -22,6 +22,9 @@ message data_sample {
   control_signal m3 = 5;
   control_signal m4 = 6;
   int32 m_timestamp = 7;
-  control_signal pos = 8;
-  vec3 vision = 9;
+  control_signal pos_x = 8;
+  control_signal pos_y = 9;
+  control_signal pos_angle = 10;
+  int32 pos_timestamp = 11;
+  vec3 vision = 12;
 }

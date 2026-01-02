@@ -85,8 +85,10 @@ ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
     /*  MOTOR_SendPWM(motor, 0);*/
     /*}*/
 
+    int sign = 1;
     if (speed < 0) {
         speed = -speed;
+        sign = -1;
     }
     // PI control loop with integrator windup protection
     ControlSignal sig;
@@ -113,10 +115,10 @@ ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
         u = v;
     }
 
-    sig.u = u;
+    sig.u = u*sign;
     sig.e = error;
     sig.y = current_speed;
-    sig.r = speed;
+    sig.r = speed*sign;
 
     MOTOR_SendPWM(motor, u);
     *I_prev = I;
