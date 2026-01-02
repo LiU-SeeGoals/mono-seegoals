@@ -29,6 +29,10 @@ bool spiSetup (int speed)
     return true;
 }
 
+int getDataSize(){
+    return DATA_SIZE;
+}
+
 void printBits(unsigned char x){
 	unsigned char num = 8;
 
@@ -41,7 +45,7 @@ void spiOpen()
 {
   wiringPiSetup();
   int speed = 1;
-  spiSetup (speed * 750000) ;
+  spiSetup (speed * 850000) ;
 }
 
 void spiClose()

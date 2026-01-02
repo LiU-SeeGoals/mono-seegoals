@@ -35,13 +35,20 @@ include_directories(
 )
 
 # -------------------------------------------------
-# Source files (equivalent to SRC)
+# Common functions for executable and dynamic lib
 # -------------------------------------------------
-file(GLOB SRC "*.c")
 
-# -------------------------------------------------
-# Create one binary per .c (matches BINS logic)
-# -------------------------------------------------
+function(link_libs target)
+    target_link_libraries(${target}
+        wiringPi
+        wiringPiDev
+        pthread
+        m
+        crypt
+        rt
+    )
+    target_link_libraries(${target} proto_generated nanopb)
+endfunction()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/../nanopb/extra)
 find_package(Nanopb REQUIRED)
@@ -51,6 +58,8 @@ set(PROTO_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/../proto)
 set(GEN_DIR    ${CMAKE_BINARY_DIR}/generated)
 
 file(MAKE_DIRECTORY ${GEN_DIR})
+
+# Generate protobuf files
 
 add_custom_command(
     OUTPUT
@@ -80,17 +89,9 @@ target_include_directories(proto_generated PUBLIC
 )
 
 
-foreach(src ${SRC})
-    get_filename_component(bin ${src} NAME_WE)
-    add_executable(${bin} ${src})
+get_filename_component(bin spiSpeed.c NAME_WE)
+add_executable(${bin} spiSpeed.c)
+add_library(spi SHARED spiSpeed.c)
 
-    target_link_libraries(${bin}
-        wiringPi
-        wiringPiDev
-        pthread
-        m
-        crypt
-        rt
-    )
-    target_link_libraries(${bin} proto_generated nanopb)
-endforeach()
+link_libs(${bin})
+link_libs(spi)
