@@ -127,9 +127,9 @@ void NAV_update_motor_state()
     ControlSignal sigs[4];
     for (int i = 0; i < 4; i++) { // do for all motor
         if (robot_cmd.movement_enabled == 1) {
-            sigs[i] = MOTOR_SetSpeed(&motors[i], motors[i].speed, &I_prevs[i], i);
+            sigs[i] = MOTOR_SetSpeed(&motors[i], motors[i].speed, &I_prevs[i]);
         } else {
-            sigs[i] = MOTOR_SetSpeed(&motors[i], 0, &I_prevs[i], i);
+            sigs[i] = MOTOR_SetSpeed(&motors[i], 0, &I_prevs[i]);
         }
     }
     DATA_log_motor(sigs[0], sigs[1], sigs[2], sigs[3]);

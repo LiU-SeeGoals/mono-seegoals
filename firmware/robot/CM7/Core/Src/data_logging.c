@@ -105,24 +105,70 @@ static bool pack_spi_packet()
         protobuf_buf[i] = 0;
     }
 
-    ImuSample msg = ImuSample_init_zero;
+    data_sample msg = data_sample_init_zero;
 
     int imu_idx = get_read_idx(&data.imu_write_idx);
+    // gyro x and y unncessesary
     // msg.imu_x = data.imu[imu_idx].x;
     // msg.imu_y = data.imu[imu_idx].y;
-    msg.imu_z = data.imu[imu_idx].z;
-    msg.imu_ts = data.imu[imu_idx].timestamp;
+    msg.gyro.z = data.imu[imu_idx].z;
+    msg.gyro.timestamp = data.imu[imu_idx].timestamp;
 
     int state_idx = get_read_idx(&data.state_write_idx);
-    msg.state_x = data.state[state_idx].px;
-    msg.state_y = data.state[state_idx].py;
-    msg.state_z = data.state[state_idx].pw;
-    msg.state_ts = data.state[state_idx].timestamp;
+    msg.state.x = data.state[state_idx].px;
+    msg.state.y = data.state[state_idx].py;
+    msg.state.z = data.state[state_idx].pw;
+    msg.state.timestamp = data.state[state_idx].timestamp;
+
+    int motor_idx = get_read_idx(&data.motor_write_idx);
+    msg.m_timestamp = data.motor[motor_idx].timestamp;
+
+    msg.m1.ref = data.motor[motor_idx].m1.r;
+    msg.m1.control = data.motor[motor_idx].m1.u;
+    msg.m1.output = data.motor[motor_idx].m1.y;
+    msg.m1.error = data.motor[motor_idx].m1.e;
+
+    msg.m2.ref = data.motor[motor_idx].m2.r;
+    msg.m2.control = data.motor[motor_idx].m2.u;
+    msg.m2.output = data.motor[motor_idx].m2.y;
+    msg.m2.error = data.motor[motor_idx].m2.e;
+
+    msg.m3.ref = data.motor[motor_idx].m3.r;
+    msg.m3.control = data.motor[motor_idx].m3.u;
+    msg.m3.output = data.motor[motor_idx].m3.y;
+    msg.m3.error = data.motor[motor_idx].m3.e;
+
+    msg.m4.ref = data.motor[motor_idx].m4.r;
+    msg.m4.control = data.motor[motor_idx].m4.u;
+    msg.m4.output = data.motor[motor_idx].m4.y;
+    msg.m4.error = data.motor[motor_idx].m4.e;
+
+    int pos_idx = get_read_idx(&data.pos_write_idx);
+    msg.pos.ref = data.motor[pos_idx].m4.r;
+    msg.pos.control = data.motor[pos_idx].m4.u;
+    msg.pos.output = data.motor[pos_idx].m4.y;
+    msg.pos.error = data.motor[pos_idx].m4.e;
+
+    int vision_idx = get_read_idx(&data.vision_write_idx);
+    msg.vision.x = data.vision[vision_idx].x;
+    msg.vision.y = data.vision[vision_idx].y;
+    msg.vision.z = data.vision[vision_idx].w;
+    msg.vision.timestamp = data.motor[vision_idx].m4.e;
+
+    msg.has_gyro = true;
+    msg.has_state = true;
+    msg.has_vision = true;
+    msg.has_m1 = true;
+    msg.has_m2 = true;
+    msg.has_m3 = true;
+    msg.has_m4 = true;
+    msg.has_pos = true;
+    msg.has_vision = true;
 
     // Skip the first byte to place message length there
     pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf + 1, sizeof(protobuf_buf) - 1);
 
-    if (!pb_encode(&stream, ImuSample_fields, &msg))
+    if (!pb_encode(&stream, data_sample_fields, &msg))
     {
         LOG_DEBUG("Protobuf packet failed to encode");
         return false;

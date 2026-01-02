@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "com.h"
 #include "imu.h"
+#include "imu.pb.h"
 #include "data_logging.h"
 #include "kicker.h"
 #include "log.h"
@@ -275,6 +276,7 @@ int main(void)
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
 
+    LOG_INFO("Data sample is %d bytes of max 255\r\n", sizeof(data_sample));
     LOG_INFO("Startup done\r\n");
     COMMON_buzzer_done();
   /* USER CODE END 2 */

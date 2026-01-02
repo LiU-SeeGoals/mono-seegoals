@@ -100,13 +100,11 @@ int main (void)
 
     spiOpen();
     uint8_t out[DATA_SIZE];
-    int time_stamp_dt = 0;
     int numFailed = 0;
     int numSuccess;
     while(1)
     {
         bool status = spiRead(out);
-        ImuSample msg = ImuSample_init_zero;
         uint8_t msg_length = out[0];
         if (msg_length == 0)
         {
@@ -114,31 +112,14 @@ int main (void)
             continue;
         }
 
-        pb_istream_t stream = pb_istream_from_buffer(out + 1, msg_length);
-
-        if (!pb_decode(&stream, ImuSample_fields, &msg))
-        {
-            // printf("Failed decode\n");
-            numFailed++;
-            continue;
-        }
-
-        static float prev_timestamp = 0;
-        time_stamp_dt = msg.imu_ts - prev_timestamp;
-        if (time_stamp_dt == 0 || msg.imu_ts < prev_timestamp)
-        {
-          numFailed++;
-          continue;
-        }
-        printf("%d %f %d %f %d %f\n", msg_length, msg.imu_z, msg.imu_ts,msg.state_z, msg.state_ts, 1000.f/(float)time_stamp_dt);
+        printf("%d\n", msg_length);
         bytesToFile(file, out+1, msg_length);
         for (int i = 0; i < msg_length; i++)
         {
-            printf("%d ",out[i+1]);
+            // printf("%d ",out[i+1]);
             // printBits(out[i + 1]);
         }
-        printf("\n");
-        prev_timestamp=msg.imu_ts;
+        // printf("\n");
 
         numSuccess++;
     }

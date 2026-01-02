@@ -1,29 +1,27 @@
 syntax = "proto3";
 
-message ImuSample {
-  float imu_x = 1;
-  float imu_y = 2;
-  float imu_z = 3;
-  int32 imu_ts = 4;
+message control_signal {
+    float ref = 1;
+    float control = 2;
+    float error = 3;
+    float output = 4;
+}
 
-  float pos_u = 5;
-  float pos_v = 6;
-  float pos_w = 7;
-  int32 pos_ts = 9;
+message vec3 {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+    float timestamp = 4;
+}
 
-  float state_x = 10;
-  float state_y = 11;
-  float state_z = 12;
-  int32 state_ts = 13;
-
-  float motor_1 = 14;
-  float motor_2 = 15;
-  float motor_3 = 16;
-  float motor_4 = 17;
-  int32 motor_ts = 18;
-
-  float vision_x = 19;
-  float vision_y = 20;
-  float vision_w = 21;
-  int32 vision_ts = 22;
+message data_sample {
+  vec3 gyro = 1;
+  vec3 state = 2;
+  control_signal m1 = 3;
+  control_signal m2 = 4;
+  control_signal m3 = 5;
+  control_signal m4 = 6;
+  int32 m_timestamp = 7;
+  control_signal pos = 8;
+  vec3 vision = 9;
 }

@@ -101,3 +101,10 @@ add_library(spi SHARED spiSpeed.c)
 
 link_libs(${bin})
 link_libs(spi)
+
+add_custom_target(protobuf
+    DEPENDS
+        ${GEN_DIR}/imu.pb.c
+        ${GEN_DIR}/imu.pb.h
+        ${GEN_DIR}/imu_pb2.py
+)

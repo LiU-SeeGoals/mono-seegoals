@@ -77,7 +77,7 @@ int setDirection(MotorPWM* motor, float speed)
 
 */
 
-ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev, int motor_idx)
+ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
 {
 
     setDirection(motor, speed);
@@ -112,6 +112,7 @@ ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev, int mo
     } else {
         u = v;
     }
+
     sig.u = u;
     sig.e = error;
     sig.y = current_speed;

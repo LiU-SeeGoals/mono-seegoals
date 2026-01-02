@@ -58,7 +58,7 @@ void MOTOR_SendPWM(MotorPWM* motor, float pulse_width);
  * @param speed Motor speed setpoint in ticks per second
  * @param I_prev A pointer to store the previous I value, should be initialized as zero
  */
-ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev, int motor_idx);
+ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev);
 
 /**
  * Sets the break pin HIGH, engaging break
