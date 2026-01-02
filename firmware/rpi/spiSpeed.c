@@ -38,7 +38,18 @@ void printBits(unsigned char x){
 
 	for(int i = 1; i <= num; i++)
 	    printf("%d", (x >> (num - i)) & 1);
-    printf(" ");
+}
+
+void bytesToFile(FILE *f, uint8_t* bytes, int num_bytes){
+    for (int i = 0; i < num_bytes; i++)
+    {
+        unsigned char num = 8;
+        unsigned char x = bytes[i];
+
+        for(int i = 1; i <= num; i++)
+            fprintf(f, "%d", (x >> (num - i)) & 1);
+    }
+    fprintf(f, "\n");
 }
 
 void spiOpen()
@@ -84,6 +95,9 @@ bool spiRead(uint8_t* out)
 
 int main (void)
 {
+    FILE *file;
+    file = fopen("output.txt","w");
+
     spiOpen();
     uint8_t out[DATA_SIZE];
     int time_stamp_dt = 0;
@@ -94,6 +108,11 @@ int main (void)
         bool status = spiRead(out);
         ImuSample msg = ImuSample_init_zero;
         uint8_t msg_length = out[0];
+        if (msg_length == 0)
+        {
+            numFailed++;
+            continue;
+        }
 
         pb_istream_t stream = pb_istream_from_buffer(out + 1, msg_length);
 
@@ -112,9 +131,18 @@ int main (void)
           continue;
         }
         printf("%d %f %d %f %d %f\n", msg_length, msg.imu_z, msg.imu_ts,msg.state_z, msg.state_ts, 1000.f/(float)time_stamp_dt);
+        bytesToFile(file, out+1, msg_length);
+        for (int i = 0; i < msg_length; i++)
+        {
+            printf("%d ",out[i+1]);
+            // printBits(out[i + 1]);
+        }
+        printf("\n");
         prev_timestamp=msg.imu_ts;
+
         numSuccess++;
     }
     spiClose();
+    fclose(file);
   return 0 ;
 }

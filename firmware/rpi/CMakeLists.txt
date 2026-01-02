@@ -65,6 +65,7 @@ add_custom_command(
     OUTPUT
         ${GEN_DIR}/imu.pb.c
         ${GEN_DIR}/imu.pb.h
+        ${GEN_DIR}/imu_pb2.py
 
     COMMAND python3
         ${NANOPB_GEN}
@@ -72,11 +73,16 @@ add_custom_command(
         --output-dir=${GEN_DIR}
         ${PROTO_DIR}/imu.proto
 
+    COMMAND protoc
+        --proto_path=${PROTO_DIR}
+        --python_out=${GEN_DIR}
+        ${PROTO_DIR}/imu.proto
+
     DEPENDS
         ${PROTO_DIR}/imu.proto
         ${NANOPB_GEN}
 
-    COMMENT "Generating nanopb files (python generator)"
+    COMMENT "Generating nanopb C files and Python protobuf"
 )
 
 add_library(proto_generated

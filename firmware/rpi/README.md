@@ -10,7 +10,7 @@ sudo raspi-config
 go to interfaces and enable SPI
 
 ```
-sudo apt install cmake
+sudo apt install cmake protobuf-compiler python3-protobuf
 ```
 
 pip install protobuf dependency
@@ -24,3 +24,4 @@ cd WiringPi && ./build
 ```
 
 run program in this dir?
+
