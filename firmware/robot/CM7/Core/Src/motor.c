@@ -116,8 +116,8 @@ ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
     }
 
     sig.u = u*sign;
-    sig.e = error;
-    sig.y = current_speed;
+    sig.e = error*sign;
+    sig.y = current_speed*sign;
     sig.r = speed*sign;
 
     MOTOR_SendPWM(motor, u);

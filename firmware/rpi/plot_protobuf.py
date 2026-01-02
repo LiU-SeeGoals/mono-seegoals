@@ -14,6 +14,18 @@ signals = {
             "state_z": []
         }
     },
+    "State x": {
+        "t": [],
+        "signals": {
+            "x": [],
+        }
+    },
+    "State y": {
+        "t": [],
+        "signals": {
+            "x": [],
+        }
+    },
     "Motor control": {
         "t": [],
         "signals": {
@@ -26,10 +38,28 @@ signals = {
     "Motor reference": {
         "t": [],
         "signals": {
-            "m1_r": [],
-            "m2_r": [],
-            "m3_r": [],
-            "m4_r": [],
+            "m1": [],
+            "m2": [],
+            "m3": [],
+            "m4": [],
+        }
+    },
+    "Motor error": {
+        "t": [],
+        "signals": {
+            "m1": [],
+            "m2": [],
+            "m3": [],
+            "m4": [],
+        }
+    },
+    "Motor output": {
+        "t": [],
+        "signals": {
+            "m1": [],
+            "m2": [],
+            "m3": [],
+            "m4": [],
         }
     },
     "Position control": {
@@ -48,6 +78,14 @@ signals = {
             "angle_r": [],
         }
     },
+    "Vision": {
+        "t": [],
+        "signals": {
+            "x": [],
+            "y": [],
+            "angle": [],
+        }
+    }
 }
 
 for msg in readFile():
@@ -56,9 +94,21 @@ for msg in readFile():
     signals["Angular vel"]["t"].append(msg.gyro.timestamp / 1000.0)
     signals["Angular vel"]["signals"]["gyro_z"].append(msg.gyro.z)
 
-    # Angle state
+    # Robot state
+    signals["State x"]["t"].append(msg.state.timestamp / 1000.0)
+    signals["State x"]["signals"]["x"].append(msg.state.x)
+
+    signals["State y"]["t"].append(msg.state.timestamp / 1000.0)
+    signals["State y"]["signals"]["x"].append(msg.state.y)
+
     signals["Angle state"]["t"].append(msg.state.timestamp / 1000.0)
     signals["Angle state"]["signals"]["state_z"].append(msg.state.z)
+
+    # Vision updates
+    signals["Vision"]["t"].append(msg.state.timestamp / 1000.0)
+    signals["Vision"]["signals"]["x"].append(msg.state.x)
+    signals["Vision"]["signals"]["y"].append(msg.vision.y)
+    signals["Vision"]["signals"]["angle"].append(msg.vision.z)
 
     # Motor control
     signals["Motor control"]["t"].append(msg.m_timestamp / 1000.0)
@@ -69,10 +119,24 @@ for msg in readFile():
 
     # Motor reference
     signals["Motor reference"]["t"].append(msg.m_timestamp / 1000.0)
-    signals["Motor reference"]["signals"]["m1_r"].append(msg.m1.ref)
-    signals["Motor reference"]["signals"]["m2_r"].append(msg.m2.ref)
-    signals["Motor reference"]["signals"]["m3_r"].append(msg.m3.ref)
-    signals["Motor reference"]["signals"]["m4_r"].append(msg.m4.ref)
+    signals["Motor reference"]["signals"]["m1"].append(msg.m1.ref)
+    signals["Motor reference"]["signals"]["m2"].append(msg.m2.ref)
+    signals["Motor reference"]["signals"]["m3"].append(msg.m3.ref)
+    signals["Motor reference"]["signals"]["m4"].append(msg.m4.ref)
+
+    # Motor reference
+    signals["Motor error"]["t"].append(msg.m_timestamp / 1000.0)
+    signals["Motor error"]["signals"]["m1"].append(msg.m1.error)
+    signals["Motor error"]["signals"]["m2"].append(msg.m2.error)
+    signals["Motor error"]["signals"]["m3"].append(msg.m3.error)
+    signals["Motor error"]["signals"]["m4"].append(msg.m4.error)
+
+    # Motor reference
+    signals["Motor output"]["t"].append(msg.m_timestamp / 1000.0)
+    signals["Motor output"]["signals"]["m1"].append(msg.m1.output)
+    signals["Motor output"]["signals"]["m2"].append(msg.m2.output)
+    signals["Motor output"]["signals"]["m3"].append(msg.m3.output)
+    signals["Motor output"]["signals"]["m4"].append(msg.m4.output)
 
     # Position control
     signals["Position control"]["t"].append(msg.pos_timestamp / 1000.0)
@@ -88,8 +152,8 @@ for msg in readFile():
 
 plt.figure(figsize=(12, 8))
 
-rows = 3
-cols = 3
+rows = 4
+cols = 4
 
 for i, (group_name, group) in enumerate(signals.items(), start=1):
     plt.subplot(rows, cols, i)
