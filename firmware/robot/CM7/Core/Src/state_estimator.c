@@ -274,6 +274,12 @@ static void ekfStateJacobianFunc(const arm_matrix_instance_f32* pX, const arm_ma
     // xk+1 = xk + (vx*cos(a) - vy*sin(a)) * dt
     // yk+1 = yk + (vx*sin(a) + vy*cos(a)) * dt
     // angle = angle + omega * dt
+
+    // Gives the jacobian
+
+    // [dx/dx     dx/dy     dx/domenga]
+    // [dy/dx     dy/dy     dy/domenga]
+    // [domega/dx domega/dy domega/domenga]
     const float dt = STATE_DELTA_T;
 
     float gyr_w = MAT_ELEMENT(*pU, 0, 0);

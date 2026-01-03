@@ -20,9 +20,14 @@ typedef struct {
 } MotorPWM;
 
 /**
- * Initilaize motor
+ * Initialize motor
  */
 void MOTOR_Init(TIM_HandleTypeDef* htim);
+
+/**
+  * Get sign for motor direction
+  */
+int MOTOR_GetMotorSign(MotorPWM* motor);
 
 /**
  * Returns the average motor ticks per iteration
@@ -80,6 +85,6 @@ int setDirection(MotorPWM* motor, float speed);
  *
  * @returns float of speed
  */
-float MOTOR_ReadSpeed(MotorPWM* motor);
+float MOTOR_ReadTicksPerSecond(MotorPWM* motor);
 
 #endif
