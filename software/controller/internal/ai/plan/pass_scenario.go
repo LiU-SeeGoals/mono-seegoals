@@ -36,6 +36,8 @@ func (m *Pass) Init(
 	go m.run()
 }
 
+var once bool
+var activity ai.Activity
 
 func (g *Pass) run() {
 
@@ -43,6 +45,8 @@ func (g *Pass) run() {
 	num_states := 2
 	gi := <-g.incomingGameInfo
 	plt.Init()
+	once = false
+	prev_state := 0
 
 
 	for{
@@ -51,18 +55,28 @@ func (g *Pass) run() {
 			fmt.Println(err)
 		}
 
-		var activity ai.Activity
-
+		// fmt.Println(state)
 		if state == 0 {
 			activity = ai.NewAlignBall(g.team, 3, robot2)
+			once = false
 
-		}else if state == 1 {
-			activity = ai.NewKickBall(g.team, 3)
+		} else if state == 1 {
+			if (!once){
+				ball := gi.State.GetBall()
+				ballPos, _ := ball.GetEstimatedPosition()
+				activity = ai.NewKickBall(g.team, 3, ballPos)
+				fmt.Println("Once init")
+			}
+			once = true
 		}
 
 		g.AddActivity(activity)
+		prev_state = state
 		if activity.Achieved(&gi){
-			state += (1 + state) % num_states
+			state = (1 + state) % num_states
+			if (state != prev_state){
+				fmt.Printf("Switching state to %d\n", state)
+			}
 		}
 	}
 

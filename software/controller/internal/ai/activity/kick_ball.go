@@ -25,7 +25,7 @@ func GetKickConfig() KickConfig{
 	return KickConfig{
 		driveThrough: 200,
 		doneDist: 50,
-		ballAbortRadius: 200,
+		ballAbortRadius: 100,
 	}
 }
 
@@ -33,29 +33,21 @@ func (m *KickBall) String() string {
 	return fmt.Sprintf("KickBall(%d)", m.id)
 }
 
-func NewKickBall(team info.Team, id info.ID) *KickBall {
+func NewKickBall(team info.Team, id info.ID, ballPos info.Position) *KickBall {
+	fmt.Println("New kick ball")
 	return &KickBall{
 		team,
 		id,
-		info.Position{},
+		ballPos,
 		false,
 	}
 }
 
-func (m *KickBall) init(gi *info.GameInfo) {
-	if (m.inited){
-		return
-	}
-	ball := gi.State.GetBall()
-	ballPos, _ := ball.GetEstimatedPosition()
-	m.orignalBallPos = ballPos
-}
-
 func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position{
 
-	m.init(gi)
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
+	// fmt.Println("new pos", ballPos, m.orignalBallPos, ballPos.Norm2d(m.orignalBallPos))
 	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
 
 	robotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
@@ -94,7 +86,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	act.Pos = robotPos
 	act.Dest = robotTargetPos
 	act.Dribble = true
-	act.KickSpeed = 50
+	act.KickSpeed = 1
 
 	return &act
 }
@@ -113,6 +105,13 @@ func (m *KickBall) Achieved(gi *info.GameInfo) bool {
 	ballDist := ballPos.Norm2d(m.orignalBallPos)
 
 	// return false
+	if (ballDist > GetKickConfig().ballAbortRadius){
+		fmt.Println("Done")
+		fmt.Println(ballDist)
+		fmt.Println(ballPos, m.orignalBallPos)
+	}
+
+
 	return ballDist > GetKickConfig().ballAbortRadius
 }
 

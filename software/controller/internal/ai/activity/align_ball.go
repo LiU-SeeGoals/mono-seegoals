@@ -21,7 +21,7 @@ func GetAlignConfig() AlignConfig{
 	return AlignConfig{
 		robotBallClearence: 200,
 		doneDist: 50,
-		angleError: 4.0 * math.Pi/180,
+		angleError: 1.0 * math.Pi/180,
 	}
 }
 
@@ -58,13 +58,9 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position{
 
 	ballGoalTangent := info.Sub(goalPos, ballV2)
 	ballGoalTangent.DivNorm()
-	fmt.Println(ballGoalTangent)
 
 	alignPos := ballGoalTangent.Mult(GetAlignConfig().robotBallClearence)
 	robotXY := info.Sub(ballV2, alignPos)
-	fmt.Println("angle",ballGoalTangent.Angle())
-	fmt.Println("x",robotXY.X)
-	fmt.Println("y",robotXY.Y)
 	robotTargetPos := info.Position{X: robotXY.X, Y:robotXY.Y, Z:0, Angle: ballGoalTangent.Angle()}
 
 	points := plotter.XYs{}
@@ -75,7 +71,7 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position{
 	plt.Line(plotter.XY{X:ballGoalTangent.X, Y: ballGoalTangent.Y}, plotter.XY{X:alignPos.X, Y: alignPos.Y})
 	plt.Line(plotter.XY{X:robotXY.X, Y: robotXY.Y}, plotter.XY{X:alignPos.X, Y: alignPos.Y})
 	saved += 1
-	go plt.SaveFig(fmt.Sprintf("robobitch%d.png",saved))
+	// go plt.SaveFig(fmt.Sprintf("robobitch%d.png",saved))
 
 
 	return robotTargetPos
@@ -91,7 +87,6 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 
 	ball := gi.State.GetBall()
 	balVel := math.Sqrt(ball.GetVelocity().X * ball.GetVelocity().X + ball.GetVelocity().Y * ball.GetVelocity().Y)
-	fmt.Println("balell fs fs",balVel)
 
 	if balVel > 1{
 		robotTargetPos = myRobotPos
@@ -123,10 +118,6 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
 	dist := math.Sqrt(xx+yy)
 
-	fmt.Println(dist < GetAlignConfig().doneDist)
-	fmt.Println(dist)
-	fmt.Println(GetAlignConfig().doneDist)
-	fmt.Println(angle_error, robotTargetPos.Angle, myRobotPos.Angle)
 	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError
 
 	return val
