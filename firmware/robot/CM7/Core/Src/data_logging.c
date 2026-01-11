@@ -165,7 +165,7 @@ static bool pack_spi_packet()
     msg.vision.x = data.vision[vision_idx].x;
     msg.vision.y = data.vision[vision_idx].y;
     msg.vision.z = data.vision[vision_idx].w;
-    msg.vision.timestamp = data.motor[vision_idx].m4.e;
+    msg.vision.timestamp = data.vision[vision_idx].timestamp;
 
     msg.has_gyro = true;
     msg.has_state = true;

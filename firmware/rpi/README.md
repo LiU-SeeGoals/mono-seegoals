@@ -12,13 +12,9 @@ sudo raspi-config
 go to interfaces and enable SPI
 
 ```
-sudo apt install cmake protobuf-compiler python3-protobuf
+sudo apt install cmake protobuf-compiler python3-protobuf python3-grpcio
 ```
 
-pip install protobuf dependency
-```
-python3 -m venv .venv && source .venv/bin/activate && pip install protobuf grpcio-tools
-```
 Build and install wiringPi
 
 ```
@@ -45,3 +41,15 @@ Now run the binary to start reading spi from robot
 
 This creates a file output.txt in the build folder which contains protobuf serialised messages
 Decode each line using the data_sample proto message in your favorite programming language
+
+
+## Using output from rpi
+
+After running the rpi for some time and logging data you can scp the files over and plot the data.
+
+```
+scp rpi@rpi.local:/<file location>
+cd build
+make protobuf
+python3 <plotfile>
+```
