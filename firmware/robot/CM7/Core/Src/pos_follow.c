@@ -12,6 +12,23 @@ static float DELTA_T = 0.001;
 
 static LOG_Module internal_log_mod;
 
+// LQR gain matrix K (3x3): maps [ex, ey, e_angle] to [vx_world, vy_world, omega]
+// Row 0: vx_world = K[0][0]*ex + K[0][1]*ey + K[0][2]*e_angle
+// Row 1: vy_world = K[1][0]*ex + K[1][1]*ey + K[1][2]*e_angle
+// Row 2: omega    = K[2][0]*ex + K[2][1]*ey + K[2][2]*e_angle
+static float K_lqr[3][3] = {
+    {2.0f, 0.0f, 0.0f},   // vx_world gains
+    {0.0f, 2.0f, 0.0f},   // vy_world gains
+    {0.0f, 0.0f, 5.0f}    // omega gains
+};
+
+// Velocity limits in world frame
+static float vel_max_xy = 1.0f;    // m/s max linear velocity
+static float vel_max_w = 4.0f;     // rad/s max angular velocity
+
+// Damping gain for angular velocity (using gyro feedback)
+static float Kd_omega = 0.5f;
+
 void set_params()
 {
     params_angle.umin = -200.0;
@@ -127,6 +144,77 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
     sigw.e = angle_error(angle, wantw);
     DATA_log_pos(sigx, sigy, sigw);
 
+}
+
+// LQR controller: unified position and angle control in world frame
+void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
+{
+    ControlSignal sigx;
+    ControlSignal sigy;
+    ControlSignal sigw;
+
+    // Get current state from EKF
+    const float cur_x = STATE_get_posx();
+    const float cur_y = STATE_get_posy();
+    const float cur_w = STATE_get_robot_angle();
+
+    // Compute errors in world frame
+    float ex = dest_x - cur_x;
+    float ey = dest_y - cur_y;
+    float ew = angle_error(cur_w, dest_w);  // Wrapped to [-pi, pi]
+
+    // Apply LQR gain matrix: u = K * e
+    // u = [vx_world, vy_world, omega]
+    // e = [ex, ey, ew]
+    float vx_world = K_lqr[0][0] * ex + K_lqr[0][1] * ey + K_lqr[0][2] * ew;
+    float vy_world = K_lqr[1][0] * ex + K_lqr[1][1] * ey + K_lqr[1][2] * ew;
+    float omega    = K_lqr[2][0] * ex + K_lqr[2][1] * ey + K_lqr[2][2] * ew;
+
+    // Add gyro-based damping to reduce angular oscillations
+    float gyro_z = STATE_get_gyro_z();
+    omega = omega - Kd_omega * gyro_z;
+
+    // Saturate velocities in world frame (preserving direction)
+    float vel_xy = sqrtf(vx_world * vx_world + vy_world * vy_world);
+
+    if (vel_xy > vel_max_xy) {
+        float scale = vel_max_xy / vel_xy;
+        vx_world *= scale;
+        vy_world *= scale;
+    }
+    if (omega > vel_max_w) omega = vel_max_w;
+    if (omega < -vel_max_w) omega = -vel_max_w;
+
+    // Transform world frame velocity to robot frame
+    // v_robot = R(-theta) * v_world
+    // [vx_robot]   [cos(theta)   sin(theta)] [vx_world]
+    // [vy_robot] = [-sin(theta)  cos(theta)] [vy_world]
+    float cos_w = arm_cos_f32(cur_w);
+    float sin_w = arm_sin_f32(cur_w);
+    float vx_robot = vx_world * cos_w + vy_world * sin_w;
+    float vy_robot = -vx_world * sin_w + vy_world * cos_w;
+
+    // Scale to motor units (NAV_steer expects ~0-400 range)
+    const float vel_to_motor_scale = 250.0f;
+    float cmd_x = vx_robot * vel_to_motor_scale;
+    float cmd_y = vy_robot * vel_to_motor_scale;
+    float cmd_w = omega * 50.0f;  // Angular scaling
+
+    NAV_steer(cmd_x, cmd_y, cmd_w);
+
+    // Log for debugging
+    sigx.u = cmd_x;
+    sigx.r = dest_x;
+    sigx.e = ex;
+
+    sigy.u = cmd_y;
+    sigy.r = dest_y;
+    sigy.e = ey;
+
+    sigw.u = cmd_w;
+    sigw.r = dest_w;
+    sigw.e = ew;
+    DATA_log_pos(sigx, sigy, sigw);
 }
 
 float PID_p(float current, float desired, float (*error_func)(float, float), control_params* param)

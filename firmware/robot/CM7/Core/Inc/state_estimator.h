@@ -137,6 +137,9 @@ typedef struct _FusionEKF {
 
     } bias;
 
+    // Cached sensor values (bias-corrected)
+    float gyro_z;
+
     /*float encGyrPos[3];*/
 
     struct {
@@ -239,6 +242,11 @@ float STATE_get_vx();
  * Gets the estimated velocity in the y field direction
  */
 float STATE_get_vy();
+
+/**
+ * Gets the cached bias-corrected gyro z reading (rad/s)
+ */
+float STATE_get_gyro_z();
 
 /**
  * Output the current estimated state to the log

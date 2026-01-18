@@ -461,6 +461,9 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
     gyrAcc[1] = body_speed[0];
     gyrAcc[2] = body_speed[1];
+
+    // Cache bias-corrected gyro for use in controllers
+    fusionEKF.gyro_z = gyrAcc[0];
     // TODO: if using accelerometer we can lowpass noisy accelerometer
     /*gyrAcc[1] = LagElementPT1Process(&fusionEKF.lagAccel[0], linear_acc_x);*/
     /*gyrAcc[2] = LagElementPT1Process(&fusionEKF.lagAccel[1], linear_acc_y);*/
@@ -541,6 +544,8 @@ float STATE_get_robot_angle()
 float STATE_get_vx() { return MAT_ELEMENT(fusionEKF.ekf.x, 3, 0); }
 
 float STATE_get_vy() { return MAT_ELEMENT(fusionEKF.ekf.x, 4, 0); }
+
+float STATE_get_gyro_z() { return fusionEKF.gyro_z; }
 
 void STATE_log_states() { LOG_DEBUG("px: %f py: %f pw: %f vx: %f vy: %f\r\n", STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle(), STATE_get_vx(), STATE_get_vy()); }
 
