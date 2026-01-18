@@ -286,8 +286,8 @@ static void ekfStateJacobianFunc(const arm_matrix_instance_f32* pX, const arm_ma
     float gyr_w = MAT_ELEMENT(*pU, 0, 0);
     float vx = MAT_ELEMENT(*pU, 1, 0);
     float vy = MAT_ELEMENT(*pU, 2, 0);
-    vx = 0;
-    vy = 0;
+    // vx = 0;
+    // vy = 0;
 
     float px = MAT_ELEMENT(*pX, 0, 0);
     float py = MAT_ELEMENT(*pX, 1, 0);
@@ -331,8 +331,8 @@ static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_
     float gyr_w = MAT_ELEMENT(*pU, 0, 0);
     float vx = MAT_ELEMENT(*pU, 1, 0);
     float vy = MAT_ELEMENT(*pU, 2, 0);
-    vx = 0;
-    vy = 0;
+    // vx = 0;
+    // vy = 0;
 
     float p_x = MAT_ELEMENT(*pX, 0, 0);
     float p_y = MAT_ELEMENT(*pX, 1, 0);
@@ -344,8 +344,8 @@ static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_
     // Robot to global from robot frame
     // Velocities are estimated in the inverse
 
-    float px1 = p_x;
-    float py1 = p_y;
+    float px1 = p_x + (vx * cosf(p_w) - vy * sinf(p_w)) * dt;
+    float py1 = p_y + (vx * sinf(p_w) + vy * cosf(p_w)) * dt;
     // float vx1 = v_x + a_x * dt;
     // float vy1 = v_y + a_y * dt;
     float pw1 = p_w + v_w * dt;
@@ -454,11 +454,13 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     float body_speed[3];
     NAV_wheelToBody(body_speed);
     gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
+    gyrAcc[1] = body_speed[0];
+    gyrAcc[2] = body_speed[1];
     // TODO: if using accelerometer we can lowpass noisy accelerometer
     /*gyrAcc[1] = LagElementPT1Process(&fusionEKF.lagAccel[0], linear_acc_x);*/
     /*gyrAcc[2] = LagElementPT1Process(&fusionEKF.lagAccel[1], linear_acc_y);*/
-    gyrAcc[1] = 0;
-    gyrAcc[2] = 0;
+    // gyrAcc[1] = 0;
+    // gyrAcc[2] = 0;
 
     // TODO: Add odometry
 

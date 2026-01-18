@@ -147,10 +147,10 @@ void NAV_wheelToBody(float* res)
     float psi = PI * 31.f / 180.0f;
     float theta = PI * 45.f / 180.0f;
 
-    float wrf = MOTOR_GetMotorSign(&motors[0]) * MOTOR_ReadTicksPerSecond(&motors[0]) / 48.f;
-    float wlf = MOTOR_GetMotorSign(&motors[1]) * MOTOR_ReadTicksPerSecond(&motors[1]) / 48.f;
-    float wlb = MOTOR_GetMotorSign(&motors[2]) * MOTOR_ReadTicksPerSecond(&motors[2]) / 48.f;
-    float wrb = MOTOR_GetMotorSign(&motors[3]) * MOTOR_ReadTicksPerSecond(&motors[3]) / 48.f;
+    float wrf = MOTOR_GetMotorSign(&motors[0]) * MOTOR_ReadTicksPerSecond(&motors[0]) / 48.f * 2.0f * PI;
+    float wlf = MOTOR_GetMotorSign(&motors[1]) * MOTOR_ReadTicksPerSecond(&motors[1]) / 48.f * 2.0f * PI;
+    float wlb = MOTOR_GetMotorSign(&motors[2]) * MOTOR_ReadTicksPerSecond(&motors[2]) / 48.f * 2.0f * PI;
+    float wrb = MOTOR_GetMotorSign(&motors[3]) * MOTOR_ReadTicksPerSecond(&motors[3]) / 48.f * 2.0f * PI;
 
     // motors[0].speed = wrf;
     // motors[1].speed = wlf;
