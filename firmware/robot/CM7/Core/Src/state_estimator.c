@@ -2,13 +2,14 @@
 #include "arm_mat_util_f32.h"
 #include "arm_math.h"
 #include "imu.h"
+#include "nav.h"
 #include "lag_element.h"
 #include "data_logging.h"
 
 #include "log.h"
 #include <string.h>
 
-#define CTRL_DELTA_T 1.0f / 1000.0f
+static const float STATE_DELTA_T  = 0.001;
 
 static LOG_Module internal_log_mod;
 
@@ -126,12 +127,22 @@ void EKFUpdate(EKF* pKF)
     pKF->tmp2.numRows = pKF->h;
     pKF->tmp2.numCols = 1;
     arm_mat_sub_f32(&pKF->z, &pKF->tmp1, &pKF->tmp2);
+    // Wrap angle innovation to [-pi, pi] to avoid 2pi discontinuity issues
+    if (pKF->h >= 3) {
+        float angle_diff = pKF->tmp2.pData[2];
+        pKF->tmp2.pData[2] = atan2f(sinf(angle_diff), cosf(angle_diff));
+    }
     // tmp3 = K*tmp2 (f x 1)
     pKF->tmp3.numRows = pKF->f;
     pKF->tmp3.numCols = 1;
     arm_mat_mult_f32(&pKF->K, &pKF->tmp2, &pKF->tmp3);
     // x = x + tmp3 (f x 1)
     arm_mat_add_f32(&pKF->x, &pKF->tmp3, &pKF->x);
+    // Wrap state angle to [-pi, pi] after update
+    if (pKF->f >= 3) {
+        float angle = pKF->x.pData[2];
+        pKF->x.pData[2] = atan2f(sinf(angle), cosf(angle));
+    }
 
     // >>> Sigma = (I - K*C)*Sigma
     // tmp1 = K*C (f x f)
@@ -238,15 +249,15 @@ void STATE_Init()
     LOG_InitModule(&internal_log_mod, "STATE", LOG_LEVEL_TRACE, 0);
     initEKF();
 
-    /*LagElementPT1Init(&fusionEKF.lagAccel[0], 1.0f, fusionEKF.pConfig->emaAccelT, CTRL_DELTA_T);*/
-    /*LagElementPT1Init(&fusionEKF.lagAccel[1], 1.0f, fusionEKF.pConfig->emaAccelT, CTRL_DELTA_T);*/
+    /*LagElementPT1Init(&fusionEKF.lagAccel[0], 1.0f, fusionEKF.pConfig->emaAccelT, STATE_DELTA_T);*/
+    /*LagElementPT1Init(&fusionEKF.lagAccel[1], 1.0f, fusionEKF.pConfig->emaAccelT, STATE_DELTA_T);*/
 
-    LagElementPT1Init(&fusionEKF.lagAccel[0], 1.0f, 0.01, CTRL_DELTA_T);
-    LagElementPT1Init(&fusionEKF.lagAccel[1], 1.0f, 0.01, CTRL_DELTA_T);
+    LagElementPT1Init(&fusionEKF.lagAccel[0], 1.0f, 0.01, STATE_DELTA_T);
+    LagElementPT1Init(&fusionEKF.lagAccel[1], 1.0f, 0.01, STATE_DELTA_T);
 
     fusionEKF.ekf_lock = 0;
     fusionEKF.bias.is_calibrated = -1;
-    /*LagElementPT1Init(&fusionEKF.dribbler.lagCurrent, 1.0f, 0.005f, CTRL_DELTA_T);*/
+    /*LagElementPT1Init(&fusionEKF.dribbler.lagCurrent, 1.0f, 0.005f, STATE_DELTA_T);*/
 }
 
 /*
@@ -270,48 +281,38 @@ void STATE_logm44(const float32_t* m44)
 
 static void ekfStateJacobianFunc(const arm_matrix_instance_f32* pX, const arm_matrix_instance_f32* pU, arm_matrix_instance_f32* pF)
 {
-    // [1 0 0 0 0]
-    // [0 1 0 0 0]
-    // [0 0 1 0 0]
-    // [0 0 0 1 0]
-    // [0 0 0 0 1]
+    // Motion model
+    // xk+1 = xk + (vx*cos(a) - vy*sin(a)) * dt
+    // yk+1 = yk + (vx*sin(a) + vy*cos(a)) * dt
+    // angle = angle + omega * dt
 
-    const float dt = CTRL_DELTA_T;
+    // Gives the jacobian
+
+    // [dx/dx     dx/dy     dx/domenga]
+    // [dy/dx     dy/dy     dy/domenga]
+    // [domega/dx domega/dy domega/domenga]
+    const float dt = STATE_DELTA_T;
 
     float gyr_w = MAT_ELEMENT(*pU, 0, 0);
-    float acc_x = MAT_ELEMENT(*pU, 1, 0);
-    float acc_y = MAT_ELEMENT(*pU, 2, 0);
+    float vx = MAT_ELEMENT(*pU, 1, 0);
+    float vy = MAT_ELEMENT(*pU, 2, 0);
+    // vx = 0;
+    // vy = 0;
 
-    float p_w = MAT_ELEMENT(*pX, 2, 0);
-    float v_x = MAT_ELEMENT(*pX, 3, 0);
-    float v_y = MAT_ELEMENT(*pX, 4, 0);
-
-    /*float SF1 = gyr_w/2000.0f + p_w - M_PI_2;*/
-    float SF1 = 3.14 / 2.0;
-    float SF2 = arm_cos_f32(SF1) * dt + (gyr_w * arm_sin_f32(SF1)) * (dt * dt * 0.5f);
-    float SF3 = (gyr_w * arm_cos_f32(SF1)) * dt * dt * 0.5f;
-    float SF4 = arm_sin_f32(SF1);
-    float SF5 = acc_y - gyr_w * v_x;
-    float SF6 = arm_cos_f32(SF1);
-    float SF7 = gyr_w * dt;
+    float px = MAT_ELEMENT(*pX, 0, 0);
+    float py = MAT_ELEMENT(*pX, 1, 0);
+    float pw = MAT_ELEMENT(*pX, 2, 0);
 
     arm_mat_identity_f32(pF);
 
-    // TODO: Fix the actual jacobian.. just use identity for now.
-    /*MAT_ELEMENT(*pF, 0, 2) = - (SF5*SF6)*(dt*dt*0.5f) - (v_x*SF4)*dt - (v_y*SF6)*dt - (SF4*(acc_x + gyr_w*v_y))*(dt * dt * 0.5f);*/
-    /*MAT_ELEMENT(*pF, 0, 3) = SF2;*/
-    /*MAT_ELEMENT(*pF, 0, 4) = SF3 - SF4*dt;*/
-    /**/
-    /*MAT_ELEMENT(*pF, 1, 2) = (v_x*SF6)*(dt*dt*0.5f) - (SF4*SF5)*(dt*dt*0.5f) - (v_y*SF4)*dt + (SF6*(acc_x + gyr_w*v_y))*(dt * dt * 0.5f);*/
-    /*MAT_ELEMENT(*pF, 1, 3) = SF4*dt - SF3;*/
-    /*MAT_ELEMENT(*pF, 1, 4) = SF2;*/
-    /**/
-    /*MAT_ELEMENT(*pF, 3, 4) = SF7;*/
-    /**/
-    /*MAT_ELEMENT(*pF, 4, 3) = -SF7;*/
+    MAT_ELEMENT(*pF, 0, 2) = (-vx*sin(pw) - vy*cos(pw)) * dt;
+    MAT_ELEMENT(*pF, 1, 2) = (vx*cos(pw)-vy*sin(pw))*dt;
 }
 
-static void ekfMeasFunc(const arm_matrix_instance_f32* pX, arm_matrix_instance_f32* pY) { memcpy(pY->pData, pX->pData, sizeof(float) * 3); }
+static void ekfMeasFunc(const arm_matrix_instance_f32* pX, arm_matrix_instance_f32* pY)
+{
+    memcpy(pY->pData, pX->pData, sizeof(float) * 3);
+}
 
 void ekfMeasJacobianFunc(const arm_matrix_instance_f32* pX, arm_matrix_instance_f32* pH)
 {
@@ -323,49 +324,49 @@ void ekfMeasJacobianFunc(const arm_matrix_instance_f32* pX, arm_matrix_instance_
     MAT_ELEMENT(*pH, 2, 2) = 1.0f;
 }
 
+// static inline float wrapToPi(float angle)
+// {
+//     while (angle > M_PI)
+//         angle -= 2.0f * M_PI;
+//     while (angle < -M_PI)
+//         angle += 2.0f * M_PI;
+//     return angle;
+// }
+
 static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_f32* pU)
 {
     /*const float dt = 0.001f;*/
-    const float dt = CTRL_DELTA_T;
+    const float dt = STATE_DELTA_T;
 
     float gyr_w = MAT_ELEMENT(*pU, 0, 0);
-    float acc_x = MAT_ELEMENT(*pU, 1, 0);
-    float acc_y = MAT_ELEMENT(*pU, 2, 0);
+    float vx = MAT_ELEMENT(*pU, 1, 0);
+    float vy = MAT_ELEMENT(*pU, 2, 0);
+    // vx = 0;
+    // vy = 0;
 
     float p_x = MAT_ELEMENT(*pX, 0, 0);
     float p_y = MAT_ELEMENT(*pX, 1, 0);
     float p_w = MAT_ELEMENT(*pX, 2, 0);
-    float v_x = MAT_ELEMENT(*pX, 3, 0);
-    float v_y = MAT_ELEMENT(*pX, 4, 0);
-
-    float v_w = gyr_w;
-    /*float a = -M_PI_2 + p_w + dt*v_w*0.5f;*/
-    float angle = p_w;
-    float a_x = acc_x + v_y * v_w;
-    float a_y = acc_y - v_x * v_w;
 
     // Robot to global from robot frame
-    // Velocities are estimated in the inverse
-
-    float px1 = p_x + (arm_cos_f32(angle) * v_x - arm_sin_f32(angle) * v_y) * dt + (arm_cos_f32(angle) * a_x - arm_sin_f32(angle) * a_y) * 0.5f * dt * dt;
-    float py1 = p_y + (arm_sin_f32(angle) * v_x + arm_cos_f32(angle) * v_y) * dt + (arm_sin_f32(angle) * a_x + arm_cos_f32(angle) * a_y) * 0.5f * dt * dt;
-    float vx1 = v_x + a_x * dt;
-    float vy1 = v_y + a_y * dt;
-    float pw1 = p_w + v_w * dt;
+    float px1 = p_x + (vx * cosf(p_w) - vy * sinf(p_w)) * dt;
+    float py1 = p_y + (vx * sinf(p_w) + vy * cosf(p_w)) * dt;
+    // Wrap angle to [-pi, pi] to prevent unbounded growth
+    float pw1 = atan2f(sinf(p_w + gyr_w * dt), cosf(p_w + gyr_w * dt));
 
     MAT_ELEMENT(*pX, 0, 0) = px1;
     MAT_ELEMENT(*pX, 1, 0) = py1;
     MAT_ELEMENT(*pX, 2, 0) = pw1;
-    MAT_ELEMENT(*pX, 3, 0) = vx1;
-    MAT_ELEMENT(*pX, 4, 0) = vy1;
+    // MAT_ELEMENT(*pX, 3, 0) = vx1;
+    // MAT_ELEMENT(*pX, 4, 0) = vy1;
 }
 
 static FusionEKFConfig configFusionEKF = {
-    .posNoiseXY = 0.001f,
+    .posNoiseXY = 1.f,
     .posNoiseW = 0.001f,
     .velNoiseXY = 0.005f,
-    .visNoiseXY = 0.05f,
-    .visNoiseW = 0.1f,
+    .visNoiseXY = 0.002f,
+    .visNoiseW = 0.30f,
     .outlierMaxVelXY = 3.0f,
     .outlierMaxVelW = 3.0f,
     .trackingCoeff = 1.0f,
@@ -380,27 +381,19 @@ static FusionEKFConfig configFusionEKF = {
     .ballTimeoutMs = 2000,
     .activeDribblingForce_mN = 500,
 };
+
 int STATE_vision_initialized() { return fusionEKF.vision.online; }
+
 static void loadNoiseCovariancesFromConfig()
 {
-    if (fusionEKF.ekf.Ex.pData) // pData is null when fusionEKF has not been initialized yet
-    {
-        MAT_ELEMENT(fusionEKF.ekf.Ex, 0, 0) = fusionEKF.pConfig->posNoiseXY * fusionEKF.pConfig->posNoiseXY;
-        MAT_ELEMENT(fusionEKF.ekf.Ex, 1, 1) = fusionEKF.pConfig->posNoiseXY * fusionEKF.pConfig->posNoiseXY;
-        MAT_ELEMENT(fusionEKF.ekf.Ex, 2, 2) = fusionEKF.pConfig->posNoiseW * fusionEKF.pConfig->posNoiseW;
-        MAT_ELEMENT(fusionEKF.ekf.Ex, 3, 3) = fusionEKF.pConfig->velNoiseXY * fusionEKF.pConfig->velNoiseXY;
-        MAT_ELEMENT(fusionEKF.ekf.Ex, 4, 4) = fusionEKF.pConfig->velNoiseXY * fusionEKF.pConfig->velNoiseXY;
-
-        MAT_ELEMENT(fusionEKF.ekf.Ez, 0, 0) = fusionEKF.pConfig->visNoiseXY * fusionEKF.pConfig->visNoiseXY;
-        MAT_ELEMENT(fusionEKF.ekf.Ez, 1, 1) = fusionEKF.pConfig->visNoiseXY * fusionEKF.pConfig->visNoiseXY;
-        MAT_ELEMENT(fusionEKF.ekf.Ez, 2, 2) = fusionEKF.pConfig->visNoiseW * fusionEKF.pConfig->visNoiseW;
-    }
 }
 
 static void initEKF()
 {
-    EKFInit(&fusionEKF.ekf, 5, 3, 3, fusionEKF.ekfData);
-    arm_mat_scale_f32(&fusionEKF.ekf.Sigma, 0.001f, &fusionEKF.ekf.Sigma);
+    EKFInit(&fusionEKF.ekf, 3, 3, 3, fusionEKF.ekfData);
+    arm_mat_identity_f32(&fusionEKF.ekf.Sigma);
+    arm_mat_scale_f32(&fusionEKF.ekf.Sigma, 0.1f, &fusionEKF.ekf.Sigma);
+
     fusionEKF.ekf.pState = &ekfStateFunc;
     fusionEKF.ekf.pStateJacobian = &ekfStateJacobianFunc;
     fusionEKF.ekf.pMeas = &ekfMeasFunc;
@@ -409,8 +402,18 @@ static void initEKF()
     arm_mat_identity_f32(&fusionEKF.ekf.Ex);
     arm_mat_identity_f32(&fusionEKF.ekf.Ez);
 
+    MAT_ELEMENT(fusionEKF.ekf.Ex, 0, 0) = configFusionEKF.posNoiseXY * configFusionEKF.posNoiseXY;
+    MAT_ELEMENT(fusionEKF.ekf.Ex, 1, 1) = configFusionEKF.posNoiseXY * configFusionEKF.posNoiseXY;
+    MAT_ELEMENT(fusionEKF.ekf.Ex, 2, 2) = configFusionEKF.posNoiseW * configFusionEKF.posNoiseW;
+    // MAT_ELEMENT(fusionEKF.ekf.Ex, 3, 3) = fusionEKF.pConfig->velNoiseXY * fusionEKF.pConfig->velNoiseXY;
+    // MAT_ELEMENT(fusionEKF.ekf.Ex, 4, 4) = fusionEKF.pConfig->velNoiseXY * fusionEKF.pConfig->velNoiseXY;
+
+    MAT_ELEMENT(fusionEKF.ekf.Ez, 0, 0) = configFusionEKF.visNoiseXY * configFusionEKF.visNoiseXY;
+    MAT_ELEMENT(fusionEKF.ekf.Ez, 1, 1) = configFusionEKF.visNoiseXY * configFusionEKF.visNoiseXY;
+    MAT_ELEMENT(fusionEKF.ekf.Ez, 2, 2) = configFusionEKF.visNoiseW * configFusionEKF.visNoiseW;
+
     // TODO: Load some covariance values for process and measurement noise
-    /*loadNoiseCovariancesFromConfig();*/
+    // loadNoiseCovariancesFromConfig();
 }
 
 void STATE_FusionEKFVisionUpdate(float posx, float posy, float posw)
@@ -452,12 +455,16 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     linear_acc_y = 0;
 
     float gyrAcc[3];
+    float body_speed[3];
+    NAV_wheelToBody(body_speed);
     gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
+    gyrAcc[1] = body_speed[0];
+    gyrAcc[2] = body_speed[1];
     // TODO: if using accelerometer we can lowpass noisy accelerometer
     /*gyrAcc[1] = LagElementPT1Process(&fusionEKF.lagAccel[0], linear_acc_x);*/
     /*gyrAcc[2] = LagElementPT1Process(&fusionEKF.lagAccel[1], linear_acc_y);*/
-    gyrAcc[1] = 0.0f;
-    gyrAcc[2] = 0.0f;
+    // gyrAcc[1] = 0;
+    // gyrAcc[2] = 0;
 
     // TODO: Add odometry
 

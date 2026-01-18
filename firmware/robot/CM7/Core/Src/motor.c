@@ -49,12 +49,12 @@ void MOTOR_Break(MotorPWM* motor) { HAL_GPIO_WritePin(motor->breakPinPort, motor
 void MOTOR_StopBreak(MotorPWM* motor) { HAL_GPIO_WritePin(motor->breakPinPort, motor->breakPin, GPIO_PIN_RESET); }
 
 /*
-  Reverses motor direction and makes sure that the motor is stopped before reversing
+  Reverses motor direction
 */
 int setDirection(MotorPWM* motor, float speed)
 {
     // In theory we should have saftey checks to not reverse motor
-    // if it is running... fukit
+    // Its hard to do in a good way though...
 
     // If going backward and speed is positive, change direction
     if (motor->dir == 0 && speed > 0) {
@@ -69,14 +69,21 @@ int setDirection(MotorPWM* motor, float speed)
     return HAL_OK;
 }
 
-// TODO: How to not have globals? Will cause issues if function is not called
-// for some time
+int MOTOR_GetMotorSign(MotorPWM* motor)
+{
+    if (motor->dir == 1)
+    {
+        return 1;
+    }
+    if (motor->dir == 0)
+    {
+        return -1;
+    }
+}
+
 /*
-  PI controls the motor to the given speed value in hall ticks / second
-  Updates I_prev with the previous integrator value
-
+  PI control loop for motor ticks / second
 */
-
 ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
 {
 
@@ -98,7 +105,7 @@ ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
     float Ts = 1.f / CONTROL_FREQ;
     float Ti = 0.02;
     float K = 0.00015;
-    float current_speed = (float)MOTOR_ReadSpeed(motor);
+    float current_speed = (float)MOTOR_ReadTicksPerSecond(motor);
     float error = speed - current_speed;
     float I = *I_prev + Ts / Ti * error;
     float v = K * (error + I);
@@ -152,7 +159,7 @@ void MOTOR_SendPWM(MotorPWM* motor, float pulse_width)
     __HAL_TIM_SET_COMPARE(motor->pwm_htim, motor->channel, pwm_speed);
 }
 
-float MOTOR_ReadSpeed(MotorPWM* motor)
+float MOTOR_ReadTicksPerSecond(MotorPWM* motor)
 {
     // When I write this control freq should be 2000, each iteration is a
     // time-step of 1/2000 so this gives the speed in ticks per second.

@@ -10,7 +10,7 @@
 
 /* Private variables */
 static LOG_Module internal_log_mod;
-static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=25, .charge_wait_us = 200000, .discharge_wait_us = 230, .charges_since_last_kick = 0};
+static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=15, .charge_wait_us = 50000, .discharge_wait_us = 40, .charges_since_last_kick = 0};
 static volatile bool charging = false;
 static volatile bool kicking = false;
 static TIM_HandleTypeDef* htim_kicker_charge;

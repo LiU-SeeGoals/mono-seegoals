@@ -4,7 +4,7 @@
 #include "stm32h7xx_hal.h"
 #include "data_logging.h"
 // Tick buffer of 100 with 5000hz update is 0.05 second filter on motor
-#define MOTOR_TICK_BUF_SIZE 10
+#define MOTOR_TICK_BUF_SIZE 50
 typedef struct {
     TIM_HandleTypeDef* pwm_htim;
     uint32_t channel;
@@ -21,9 +21,14 @@ typedef struct {
 } MotorPWM;
 
 /**
- * Initilaize motor
+ * Initialize motor
  */
 void MOTOR_Init(TIM_HandleTypeDef* htim);
+
+/**
+  * Get sign for motor direction
+  */
+int MOTOR_GetMotorSign(MotorPWM* motor);
 
 /**
  * Returns the average motor ticks per iteration
@@ -81,6 +86,6 @@ int setDirection(MotorPWM* motor, float speed);
  *
  * @returns float of speed
  */
-float MOTOR_ReadSpeed(MotorPWM* motor);
+float MOTOR_ReadTicksPerSecond(MotorPWM* motor);
 
 #endif
