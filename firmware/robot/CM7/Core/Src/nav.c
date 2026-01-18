@@ -338,6 +338,8 @@ void NAV_HandleCommand(Command* cmd)
 
 void NAV_GoToAction(Command* cmd)
 {
+    // Only initialised on first run since static
+    // Large values to always respect first vision data received
     static int32_t prev_cam_x = 2147483647;
     static int32_t prev_cam_y = 2147483647;
     static int32_t prev_cam_w = 2147483647;
