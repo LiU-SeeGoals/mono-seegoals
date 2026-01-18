@@ -85,6 +85,14 @@ signals = {
             "y": [],
             "angle": [],
         }
+    },
+    "Odometry": {
+        "t": [],
+        "signals": {
+            "u": [],
+            "v": [],
+            "w": [],
+        }
     }
 }
 
@@ -159,6 +167,14 @@ for msg in readFile():
         signals["Position reference"]["signals"]["x_r"].append(msg.pos_x.ref)
         signals["Position reference"]["signals"]["y_r"].append(msg.pos_y.ref)
         signals["Position reference"]["signals"]["angle_r"].append(msg.pos_angle.ref)
+
+    if not outlier(msg.odometry.timestamp):
+        # Position control
+        signals["Odometry"]["t"].append(msg.pos_timestamp / 1000.0)
+        signals["Odometry"]["signals"]["u"].append(msg.odometry.x)
+        signals["Odometry"]["signals"]["v"].append(msg.odometry.y)
+        signals["Odometry"]["signals"]["w"].append(msg.odometry.w)
+
 
 plt.figure(figsize=(12, 8))
 

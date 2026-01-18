@@ -1,6 +1,7 @@
 #include "nav.h"
 #include "common.h"
 #include "kicker.h"
+#include "data_logging.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
 
@@ -186,6 +187,8 @@ void NAV_wheelToBody(float* res)
     float u = wrf * m11 + wrb * m12 + wlb * m13 + wlf * m14;
     float v = wrf * m21 + wrb * m22 + wlb * m23 + wlf * m24;
     float w = wrf * m31 + wrb * m32 + wlb * m33 + wlf * m34;
+
+    DATA_log_odometry(u, v, w);
     res[0] = u;
     res[1] = v;
     res[2] = w;
@@ -335,9 +338,9 @@ void NAV_HandleCommand(Command* cmd)
 
 void NAV_GoToAction(Command* cmd)
 {
-    static int32_t prev_nav_x = 2147483647;
-    static int32_t prev_nav_y = 2147483647;
-    static int32_t prev_nav_w = 2147483647;
+    static int32_t prev_cam_x = 2147483647;
+    static int32_t prev_cam_y = 2147483647;
+    static int32_t prev_cam_w = 2147483647;
 
     const int32_t nav_x = cmd->dest->x;
     const int32_t nav_y = cmd->dest->y;
@@ -363,16 +366,22 @@ void NAV_GoToAction(Command* cmd)
 
     // -- Vision update --
 
-    if (abs(prev_nav_x - nav_x + prev_nav_y - nav_y + prev_nav_w - nav_w) == 0) {
+    int32_t diff = prev_cam_x - cam_x + prev_cam_y - cam_y + prev_cam_w - cam_w;
+
+    if (abs(diff) < 5) {
         // If the vision position is exactly the same as last time it is likely not updated information.
         // Ignore old information
+        LOG_INFO("ignoring vision %d\r\n", diff);
         return;
     }
 
 
-    prev_nav_x = f_cam_x;
-    prev_nav_y = f_cam_y;
-    prev_nav_w = f_cam_w;
+    LOG_INFO("diff %d\r\n", diff);
+
+
+    prev_cam_x = cam_x;
+    prev_cam_y = cam_y;
+    prev_cam_w = cam_w;
 
     STATE_FusionEKFVisionUpdate(f_cam_x, f_cam_y, f_cam_w);
 }

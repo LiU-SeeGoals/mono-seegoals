@@ -420,6 +420,7 @@ void STATE_FusionEKFVisionUpdate(float posx, float posy, float posw)
 {
     // VISION
     DATA_log_vision(posx, posy, posw);
+    LOG_INFO("x: %f y: %f angle: %f\r\n", posx, posy, posw);
 
     float pos[3] = {posx, posy, posw};
 

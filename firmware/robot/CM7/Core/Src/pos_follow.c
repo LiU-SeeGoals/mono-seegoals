@@ -87,13 +87,9 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
     if (control_w > params_angle.umax) control_w = params_angle.umax;
     if (control_w < params_angle.umin) control_w = params_angle.umin;
 
-    // Coordinated control: reduce translation speed when angle error is large
-    // This gives priority to angular correction
-    // Scale factor: 1.0 when angle error is 0, reduced when error is large
-    // Using cos^2 for smooth falloff: full speed at 0 error, ~50% at 45deg, 0 at 90deg
+
     float angle_priority_scale = 1.0f;
     if (abs_ang_err > 0.1f) {  // ~6 degrees threshold
-        // Smooth scaling based on angle error (max error we care about is ~PI/2)
         float normalized_err = abs_ang_err / (PI / 2.0f);
         if (normalized_err > 1.0f) normalized_err = 1.0f;
         angle_priority_scale = 1.0f - 0.7f * normalized_err;  // Scale down to 30% at 90deg error
@@ -108,7 +104,6 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
 
     const float magnitude = sqrtf(x * x + y * y);
 
-    // Reduced max velocity to leave headroom for angular control
     const float umax = 250.0f;
 
     if (magnitude > umax)
