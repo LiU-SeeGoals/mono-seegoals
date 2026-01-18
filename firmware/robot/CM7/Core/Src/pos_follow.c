@@ -14,12 +14,12 @@ static LOG_Module internal_log_mod;
 
 void set_params()
 {
-    params_angle.umin = -300.0;
-    params_angle.umax = 300.0;
+    params_angle.umin = -200.0;
+    params_angle.umax = 200.0;
     params_angle.Ts = DELTA_T;
     params_angle.Ti = 100000000;
-    params_angle.Td = 0.1;
-    params_angle.K = 60 * 1.1;
+    params_angle.Td = 0.02;  // Reduced for better damping without overshoot
+    params_angle.K = 50.0;   // Slightly reduced for stability with derivative
 
     params_dist.umin = -100.0;
     params_dist.umax = 100.0;
@@ -71,10 +71,36 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
     float rel_x = dest_x - cur_x;
     float rel_y = dest_y - cur_y;
 
+    // Compute angle error first for priority-based control
+    float ang_err = angle_error(angle, wantw);
+    float abs_ang_err = fabsf(ang_err);
+
+    // Angular control with derivative term for better damping
+    static float prev_ang_err = 0.0f;
+    float ang_err_derivative = (ang_err - prev_ang_err) / DELTA_T;
+    prev_ang_err = ang_err;
+
+    // PD control for angle: u = K * (error + Td * derivative)
+    float control_w = params_angle.K * (ang_err + params_angle.Td * ang_err_derivative);
+
+    // Clamp angular control signal
+    if (control_w > params_angle.umax) control_w = params_angle.umax;
+    if (control_w < params_angle.umin) control_w = params_angle.umin;
+
+    // Coordinated control: reduce translation speed when angle error is large
+    // This gives priority to angular correction
+    // Scale factor: 1.0 when angle error is 0, reduced when error is large
+    // Using cos^2 for smooth falloff: full speed at 0 error, ~50% at 45deg, 0 at 90deg
+    float angle_priority_scale = 1.0f;
+    if (abs_ang_err > 0.1f) {  // ~6 degrees threshold
+        // Smooth scaling based on angle error (max error we care about is ~PI/2)
+        float normalized_err = abs_ang_err / (PI / 2.0f);
+        if (normalized_err > 1.0f) normalized_err = 1.0f;
+        angle_priority_scale = 1.0f - 0.7f * normalized_err;  // Scale down to 30% at 90deg error
+    }
 
     // Control on global frame coordinates
-    float distance_control_signal = 200.f;
-    float control_w = PID_p(STATE_get_robot_angle(), wantw, angle_error, &params_angle);
+    float distance_control_signal = 200.f * angle_priority_scale;
 
     // Rotate from world to robot frame (inverse the robot angle)
     float x = distance_control_signal * ((rel_x * arm_cos_f32(-angle)) - (rel_y * arm_sin_f32(-angle)));
@@ -82,7 +108,8 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
 
     const float magnitude = sqrtf(x * x + y * y);
 
-    const float umax = 300;
+    // Reduced max velocity to leave headroom for angular control
+    const float umax = 250.0f;
 
     if (magnitude > umax)
     {
