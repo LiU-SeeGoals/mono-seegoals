@@ -21,6 +21,7 @@ static MotorPWM motors[4];
 static robot_nav_command robot_cmd;
 static float I_prevs[4]; // PI control I-parts
 const float CLOCK_FREQ = 400000000;
+const float CONTROL_TIM_FREQ = 200000000;
 float CONTROL_FREQ; // set in init
 static int queued = 0;
 
@@ -93,7 +94,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
         motors[i].cur_tick_idx = 0;
         motors[i].cur_tick_idx = 0;
         I_prevs[i] = 0.0f;
-        for (int j = 0; j < motor_tick_buf_size; j++) {
+        for (int j = 0; j < MOTOR_TICK_BUF_SIZE; j++) {
             motors[i].motor_ticks[j] = 0;
         }
     }
@@ -105,7 +106,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     NAV_EnableMovement();
     float control_clock_prescaler = motor_tick_itr->Init.Prescaler + 1;
     float control_clock_period = motor_tick_itr->Init.Period + 1;
-    CONTROL_FREQ = CLOCK_FREQ / (control_clock_prescaler * control_clock_period);
+    CONTROL_FREQ = CONTROL_TIM_FREQ / (control_clock_prescaler * control_clock_period);
     HAL_TIM_Base_Start_IT(motor_tick_itr);
 }
 
@@ -123,13 +124,15 @@ void NAV_update_motor_state()
     }
 
     // Dont move this into the other for loop, we want motors to run simultanious!!
+    ControlSignal sigs[4];
     for (int i = 0; i < 4; i++) { // do for all motor
         if (robot_cmd.movement_enabled == 1) {
-            MOTOR_SetSpeed(&motors[i], motors[i].speed, &I_prevs[i]);
+            sigs[i] = MOTOR_SetSpeed(&motors[i], motors[i].speed, &I_prevs[i]);
         } else {
-            MOTOR_SetSpeed(&motors[i], 0, &I_prevs[i]);
+            sigs[i] = MOTOR_SetSpeed(&motors[i], 0, &I_prevs[i]);
         }
     }
+    DATA_log_motor(sigs[0], sigs[1], sigs[2], sigs[3]);
 }
 
 // res is a 3x1 vector
@@ -340,11 +343,12 @@ void NAV_GoToAction(Command* cmd)
         return;
     }
 
-    STATE_FusionEKFVisionUpdate(f_cam_x, f_cam_y, f_cam_w);
 
     prev_nav_x = f_cam_x;
     prev_nav_y = f_cam_y;
     prev_nav_w = f_cam_w;
+
+    STATE_FusionEKFVisionUpdate(f_cam_x, f_cam_y, f_cam_w);
 }
 
 /*

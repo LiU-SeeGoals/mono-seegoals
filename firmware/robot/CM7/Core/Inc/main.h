@@ -132,6 +132,8 @@ extern volatile atomic_uint main_tasks;
 #define MOTOR3_BREAK_GPIO_Port GPIOD
 #define MOTOR2_BREAKD13_Pin GPIO_PIN_13
 #define MOTOR2_BREAKD13_GPIO_Port GPIOD
+#define DATA_NSS_Pin GPIO_PIN_8
+#define DATA_NSS_GPIO_Port GPIOG
 #define NRF_CE_Pin GPIO_PIN_6
 #define NRF_CE_GPIO_Port GPIOC
 #define IR_IN_Pin GPIO_PIN_11

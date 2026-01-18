@@ -17,8 +17,26 @@ Further details can be found within the subfolders `README.md`, but here follows
 ## Compiling and flashing
 See the `sg-fw` command.
 
-TODO:
-- Manually?
+### Manually
+
+in firmware directory
+
+```
+cmake . -B build
+cd build
+```
+Now depending on what you want to do different targets exist
+
+targets: flash_robot, robot, flash_basestation, basestation
+```
+make <target>
+```
+
+### Required packages
+
+```
+sudo apt install stlink-tools gcc-arm-none-eabi protobuf-compiler python3-grpcio python3-protobuf 
+```
 
 ## Debugging
 See `sg-fw serial` command.

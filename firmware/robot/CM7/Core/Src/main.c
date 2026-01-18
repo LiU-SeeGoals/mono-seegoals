@@ -23,6 +23,8 @@
 /* USER CODE BEGIN Includes */
 #include "com.h"
 #include "imu.h"
+#include "imu.pb.h"
+#include "data_logging.h"
 #include "kicker.h"
 #include "log.h"
 #include "motor.h"
@@ -57,11 +59,13 @@
 I2C_HandleTypeDef hi2c4;
 
 SPI_HandleTypeDef hspi1;
+SPI_HandleTypeDef hspi6;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim12;
 TIM_HandleTypeDef htim15;
 
@@ -97,6 +101,8 @@ static void MX_I2C4_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_TIM7_Init(void);
+static void MX_SPI6_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void I2C4_Init(void);
@@ -136,6 +142,24 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     if (htim->Instance == TIM3) {
         KICKER_KickStop();
     }
+    if (htim->Instance == TIM7) {
+        NAV_update_motor_state();
+    }
+
+
+    if (htim->Instance == TIM12 && STATE_is_calibrated() == 1) {
+        IMU_AccelVec3 acc = IMU_read_accel_mps2();
+        IMU_GyroVec3 gyr = IMU_read_gyro_radps();
+
+        STATE_FusionEKFIntertialUpdate(acc, gyr);
+        float x = NAV_GetNavX();
+        float y = NAV_GetNavY();
+        float w = NAV_GetNavW();
+        DATA_log_imu_data(gyr.x,gyr.y,gyr.z);
+
+        POS_go_to_position(x,y,w);
+    }
+
     /* USER CODE BEGIN Callback 1 */
 
     /* USER CODE END Callback 1 */
@@ -204,6 +228,8 @@ int main(void)
   MX_TIM4_Init();
   MX_TIM5_Init();
   MX_TIM3_Init();
+  MX_TIM7_Init();
+  MX_SPI6_Init();
   /* USER CODE BEGIN 2 */
 
     // Initialise modules
@@ -215,9 +241,10 @@ int main(void)
         LOG_INFO("ID is %i (serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
     }
     POS_Init();
-    NAV_Init(&htim12, &htim1, &htim15);
+    NAV_Init(&htim7, &htim1, &htim15);
     HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1);
+    DATA_Init(&hspi6);
     KICKER_Init(&htim5, &htim3);
     IMU_Init(&hi2c4);
     STATE_Init();
@@ -239,6 +266,7 @@ int main(void)
     }
 
     STATE_calibrate_imu_gyr();
+    HAL_TIM_Base_Start_IT(&htim12);
 
     COM_Init(&hspi1, &NRF_AVAILABLE);
 
@@ -248,6 +276,7 @@ int main(void)
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
 
+    LOG_INFO("Data sample is %d bytes of max 255\r\n", sizeof(data_sample));
     LOG_INFO("Startup done\r\n");
     COMMON_buzzer_done();
   /* USER CODE END 2 */
@@ -260,6 +289,14 @@ int main(void)
 
     NAV_StopDribbler();
     while (1) {
+
+        DATA_log_state(STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle());
+        if (HAL_GPIO_ReadPin(DATA_NSS_GPIO_Port, DATA_NSS_Pin) == GPIO_PIN_SET)
+        {
+            // When NSS goes high spi transfer ready for another data dump
+            DATA_spi_send();
+        }
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -440,6 +477,53 @@ static void MX_SPI1_Init(void)
   /* USER CODE BEGIN SPI1_Init 2 */
 
   /* USER CODE END SPI1_Init 2 */
+
+}
+
+/**
+  * @brief SPI6 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI6_Init(void)
+{
+
+  /* USER CODE BEGIN SPI6_Init 0 */
+
+  /* USER CODE END SPI6_Init 0 */
+
+  /* USER CODE BEGIN SPI6_Init 1 */
+
+  /* USER CODE END SPI6_Init 1 */
+  /* SPI6 parameter configuration*/
+  hspi6.Instance = SPI6;
+  hspi6.Init.Mode = SPI_MODE_SLAVE;
+  hspi6.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi6.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi6.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi6.Init.CLKPhase = SPI_PHASE_2EDGE;
+  hspi6.Init.NSS = SPI_NSS_HARD_INPUT;
+  hspi6.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi6.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi6.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi6.Init.CRCPolynomial = 0x0;
+  hspi6.Init.NSSPMode = SPI_NSS_PULSE_DISABLE;
+  hspi6.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi6.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi6.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi6.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi6.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi6.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+  hspi6.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi6.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+  hspi6.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  if (HAL_SPI_Init(&hspi6) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI6_Init 2 */
+
+  /* USER CODE END SPI6_Init 2 */
 
 }
 
@@ -682,6 +766,44 @@ static void MX_TIM5_Init(void)
 }
 
 /**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 9999;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 39;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
   * @brief TIM12 Initialization Function
   * @param None
   * @retval None
@@ -865,6 +987,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOG_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, MOTOR4_BREAK_Pin|MOTOR2_BREAK_Pin|MOTOR3_REVERSE_Pin|MOTOR2_REVERSE_Pin

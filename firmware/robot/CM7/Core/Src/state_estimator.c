@@ -3,6 +3,7 @@
 #include "arm_math.h"
 #include "imu.h"
 #include "lag_element.h"
+#include "data_logging.h"
 
 #include "log.h"
 #include <string.h>
@@ -415,6 +416,7 @@ static void initEKF()
 void STATE_FusionEKFVisionUpdate(float posx, float posy, float posw)
 {
     // VISION
+    DATA_log_vision(posx, posy, posw);
 
     float pos[3] = {posx, posy, posw};
 

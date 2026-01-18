@@ -1,6 +1,7 @@
 #include "motor.h"
 
 /* Private includes */
+#include "data_logging.h"
 #include "log.h"
 
 /* Private variables */
@@ -12,7 +13,7 @@ extern float CONTROL_FREQ;
 */
 void MOTOR_update_motor_ticks(MotorPWM* motor, float val)
 {
-    motor->cur_tick_idx = (1 + motor->cur_tick_idx) % (motor_tick_buf_size);
+    motor->cur_tick_idx = (1 + motor->cur_tick_idx) % (MOTOR_TICK_BUF_SIZE);
     motor->motor_ticks[motor->cur_tick_idx] = val;
 }
 
@@ -23,10 +24,10 @@ float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor)
 {
     // Can be made faster keeping a moving average and removing the last adding the new?
     float cur = 0;
-    for (int i = 0; i < motor_tick_buf_size; i++) {
+    for (int i = 0; i < MOTOR_TICK_BUF_SIZE; i++) {
         cur += motor->motor_ticks[i];
     }
-    return cur / ((float)motor_tick_buf_size);
+    return cur / ((float)MOTOR_TICK_BUF_SIZE);
 }
 
 void MOTOR_Init(TIM_HandleTypeDef* pwm_htim)
@@ -76,7 +77,7 @@ int setDirection(MotorPWM* motor, float speed)
 
 */
 
-void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
+ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
 {
 
     setDirection(motor, speed);
@@ -84,10 +85,13 @@ void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
     /*  MOTOR_SendPWM(motor, 0);*/
     /*}*/
 
+    int sign = 1;
     if (speed < 0) {
         speed = -speed;
+        sign = -1;
     }
     // PI control loop with integrator windup protection
+    ControlSignal sig;
 
     float umin = 0;
     float umax = 1;
@@ -110,9 +114,16 @@ void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
     } else {
         u = v;
     }
+
+    sig.u = u*sign;
+    sig.e = error*sign;
+    sig.y = current_speed*sign;
+    sig.r = speed*sign;
+
     MOTOR_SendPWM(motor, u);
     *I_prev = I;
-    // for some time
+
+    return sig;
 }
 
 /*
