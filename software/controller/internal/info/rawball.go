@@ -4,6 +4,8 @@ import (
 	"container/list"
 	"errors"
 	"time"
+	"sync"
+	"fmt"
 )
 
 type rawBallPos struct {
@@ -12,11 +14,14 @@ type rawBallPos struct {
 }
 
 type rawBall struct {
-	history         *list.List
+	mu sync.Mutex
+	history *list.List
 	historyCapacity int
 }
 
 func (b *rawBall) SetPositionTime(x, y, z float64, time int64) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.history.Len() >= b.historyCapacity {
 		element := b.history.Back()
 		b.history.Remove(element)
@@ -33,6 +38,29 @@ func (b *rawBall) SetPositionTime(x, y, z float64, time int64) {
 		pos := Position{x, y, z, 0}
 		b.history.PushFront(&rawBallPos{pos, time})
 	}
+}
+
+func (b *rawBall) GetVelocity() (Vec2, error){
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.history.Len() < 2 {
+		return Vec2{0,0}, fmt.Errorf("No balls in history")
+	}
+
+	element := b.history.Front()
+	ball := element.Value.(*rawBallPos)
+
+	element2 := element.Next()
+	if (element2 == nil){
+		return Vec2{0,0}, fmt.Errorf("Ball 2 nil why is it nil?")
+	}
+	ball2 := element2.Value.(*rawBallPos)
+
+	dt := float64(ball.time) - float64(ball2.time)
+	dPos := ball.pos.Sub(&ball2.pos)
+
+	return Vec2{dPos.X/dt, dPos.Y/dt}, nil
 }
 
 func (b *rawBall) GetPositionTime() (Position, int64, error) {

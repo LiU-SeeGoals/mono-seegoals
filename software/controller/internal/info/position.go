@@ -51,6 +51,11 @@ func (v *Vec2) DivNorm() {
 	v.Y = v.Y / norm
 }
 
+func (v *Vec2) Norm() float64 {
+	norm := math.Sqrt(v.X * v.X + v.Y * v.Y)
+	return norm
+}
+
 func (p *Position) Norm2d(other Position) float64{
 	xx :=(p.X - other.X)*(p.X - other.X) 
 	yy :=(p.Y - other.Y)*(p.Y - other.Y) 

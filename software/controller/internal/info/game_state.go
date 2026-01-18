@@ -84,43 +84,17 @@ func (gs *GameState) Update() {
 		if !robot.IsActive() {
 			continue
 		}
-		// robot.Update()
+   	// robot.Update()
 	}
 
 	latestBallPos, _ := gs.Ball.GetPosition()
-	latestPossessor := gs.Ball.GetPossessor()
 	newPossessor := gs.FindBallPossessor()
+	gs.Ball.SetPossessor(newPossessor)
 
-	if gs.Ball.GetAge() < 50 { // Have a new ball measurement,  WARN: Magic number
+	// if gs.Ball.GetAge() < 50 { // Have a new ball measurement,  WARN: Magic number
 		// fmt.Println("New ball measurement")
 		gs.Ball.SetEstimatedPosition(latestBallPos)
-
-		if latestPossessor != nil {
-			if gs.LostBall(latestPossessor) { // We have a new measurement, so we can check if possessor has lost the ball
-				gs.Ball.SetPossessor(nil)
-			}
-		}
-
-		// If we have a new possessor (and either didn't have one before, or just lost it), update it.
-		// Note: This allows instant "stealing" logic if we wanted, but primarily handles the case where latestPossessor was nil.
-		if gs.Ball.GetPossessor() == nil && newPossessor != nil {
-			gs.Ball.SetPossessor(newPossessor)
-		}
-
-	} else if latestPossessor != nil { // No new ball measurement, so we have to rely on the latest possessor
-
-		// fmt.Println("No new ball measurement but we have a possessor")
-		gs.Ball.SetEstimatedPosition(latestPossessor.DribblerPos())
-	} else if newPossessor != nil { // A robot has arrived at the latest location of the ball
-		// fmt.Println("No new ball measurement but we have a new possessor")
-		gs.Ball.SetPossessor(newPossessor)
-		gs.Ball.SetEstimatedPosition(newPossessor.DribblerPos())
-
-	} else { // No new ball measurement and no possessor
-
-		gs.Ball.SetEstimatedPosition(latestBallPos)
-	}
-
+	// }
 }
 
 func (gs *GameState) FindBallPossessor() *Robot {
@@ -135,7 +109,7 @@ func (gs *GameState) FindBallPossessor() *Robot {
 	closestToBall, _ := gs.ClosestRobot(ballPos)
 
 	// Threshold for possession.
-	const possessionThreshold = 30.0
+	const possessionThreshold = 100.0
 
 	if closestToBall != nil {
 		dist := ballPos.Distance(closestToBall.DribblerPos())

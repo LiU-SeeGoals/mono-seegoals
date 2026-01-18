@@ -5,10 +5,10 @@ import (
 	"math"
 
 	// "gonum.org/v1/plot"
-	"gonum.org/v1/plot/plotter"
+	// "gonum.org/v1/plot/plotter"
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/controller/internal/plt"
+	// "github.com/LiU-SeeGoals/controller/internal/plt"
 )
 
 type AlignConfig struct {
@@ -21,40 +21,35 @@ func GetAlignConfig() AlignConfig{
 	return AlignConfig{
 		robotBallClearence: 200,
 		doneDist: 50,
-		angleError: 1.0 * math.Pi/180,
+		angleError: 2.0 * math.Pi/180,
 	}
 }
 
 type AlignBall struct {
 	team info.Team
 	id   info.ID
-	target   info.Position
+	to   info.Position
+	from   info.Position
 }
 
 func (m *AlignBall) String() string {
 	return fmt.Sprintf("AlignBall(%d)", m.id)
 }
 
-func NewAlignBall(team info.Team, id info.ID, target info.Position) *AlignBall {
+func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) *AlignBall {
 	return &AlignBall{
 		team,
 		id,
-		target,
+		to,
+		from,
 	}
 }
-var saved int
 
 func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position{
 
-	// plt.Init()
+	ballV2 := info.Vec2{X: m.from.X, Y: m.from.Y}
 
-	ball := gi.State.GetBall()
-	ballPos, _ := ball.GetEstimatedPosition()
-
-
-	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
-
-	goalPos := info.Vec2{X: m.target.X, Y: m.target.Y}
+	goalPos := info.Vec2{X: m.to.X, Y: m.to.Y}
 
 	ballGoalTangent := info.Sub(goalPos, ballV2)
 	ballGoalTangent.DivNorm()
@@ -62,17 +57,6 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position{
 	alignPos := ballGoalTangent.Mult(GetAlignConfig().robotBallClearence)
 	robotXY := info.Sub(ballV2, alignPos)
 	robotTargetPos := info.Position{X: robotXY.X, Y:robotXY.Y, Z:0, Angle: ballGoalTangent.Angle()}
-
-	points := plotter.XYs{}
-	points = append(points, plotter.XY{X: ballPos.X, Y: ballPos.Y})
-	points = append(points, plotter.XY{X: goalPos.X, Y: goalPos.Y})
-
-	plt.Scatter(points)
-	plt.Line(plotter.XY{X:ballGoalTangent.X, Y: ballGoalTangent.Y}, plotter.XY{X:alignPos.X, Y: alignPos.Y})
-	plt.Line(plotter.XY{X:robotXY.X, Y: robotXY.Y}, plotter.XY{X:alignPos.X, Y: alignPos.Y})
-	saved += 1
-	// go plt.SaveFig(fmt.Sprintf("robobitch%d.png",saved))
-
 
 	return robotTargetPos
 }

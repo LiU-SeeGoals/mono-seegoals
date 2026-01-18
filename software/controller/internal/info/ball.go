@@ -2,6 +2,8 @@ package info
 
 import (
 	"container/list"
+	// "fmt"
+
 	"github.com/LiU-SeeGoals/controller/internal/tracker"
 )
 
@@ -61,7 +63,28 @@ func (b *Ball) GetVelocity() Position {
 		sum_deltas = sum_deltas.Add(&scaled)
 	}
 	return sum_deltas.Scale(1 / float64(b.history.Len()-1))
+}
 
+func (b *Ball) GetVelocity2() (Vec2, error){
+
+	return b.rawBall.GetVelocity()
+	// if b.history.Len() < 2 {
+	// 	return Vec2{0,0}, fmt.Errorf("No balls in history")
+	// }
+	//
+	// element := b.history.Front()
+	// ball := element.Value.(*rawBallPos)
+	//
+	// element2 := element.Next()
+	// if (element2 == nil){
+	// 	return Vec2{0,0}, fmt.Errorf("Ball 2 nil why is it nil?")
+	// }
+	// ball2 := element2.Value.(*rawBallPos)
+	//
+	// dt := float64(ball.time) - float64(ball2.time)
+	// dPos := ball.pos.Sub(&ball2.pos)
+	//
+	// return Vec2{dPos.X/dt, dPos.Y/dt}, nil
 }
 
 type BallDTO struct {
