@@ -2,6 +2,7 @@
 #define __MOTOR_H
 
 #include "stm32h7xx_hal.h"
+#include "data_logging.h"
 // Tick buffer of 100 with 5000hz update is 0.05 second filter on motor
 #define MOTOR_TICK_BUF_SIZE 50
 typedef struct {
@@ -62,7 +63,7 @@ void MOTOR_SendPWM(MotorPWM* motor, float pulse_width);
  * @param speed Motor speed setpoint in ticks per second
  * @param I_prev A pointer to store the previous I value, should be initialized as zero
  */
-void MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev);
+ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev);
 
 /**
  * Sets the break pin HIGH, engaging break

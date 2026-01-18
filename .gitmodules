@@ -1,0 +1,6 @@
+[submodule "firmware/nanopb"]
+	path = firmware/nanopb
+	url = git@github.com:nanopb/nanopb.git
+[submodule "firmware/WiringPi"]
+	path = firmware/rpi/WiringPi
+	url = https://github.com/WiringPi/WiringPi.git

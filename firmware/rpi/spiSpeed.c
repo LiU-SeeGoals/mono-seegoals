@@ -1,0 +1,129 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <string.h>
+#include <errno.h>
+
+#include <wiringPi.h>
+#include <wiringPiSPI.h>
+#include "imu.pb.h"
+#include "pb_encode.h"
+#include "pb_decode.h"
+
+#define	SPI_CHAN		0
+#define	SPI_MODE		1
+#define DATA_SIZE       257
+
+static int myFd;
+
+bool spiSetup (int speed)
+{
+
+    if ((myFd = wiringPiSPISetupMode (SPI_CHAN, speed, SPI_MODE)) < 0)
+    {
+        fprintf (stderr, "Can't open the SPI bus: %s\n", strerror (errno)) ;
+        // exit (EXIT_FAILURE) ;
+        return false;
+    }
+    return true;
+}
+
+int getDataSize(){
+    return DATA_SIZE;
+}
+
+void printBits(unsigned char x){
+	unsigned char num = 8;
+
+	for(int i = 1; i <= num; i++)
+	    printf("%d", (x >> (num - i)) & 1);
+}
+
+void bytesToFile(FILE *f, uint8_t* bytes, int num_bytes){
+    for (int i = 0; i < num_bytes; i++)
+    {
+        unsigned char num = 8;
+        unsigned char x = bytes[i];
+
+        for(int i = 1; i <= num; i++)
+            fprintf(f, "%d", (x >> (num - i)) & 1);
+    }
+    fprintf(f, "\n");
+}
+
+void spiOpen()
+{
+  wiringPiSetup();
+  int speed = 1;
+  spiSetup (speed * 850000) ;
+}
+
+void spiClose()
+{
+  close(myFd) ;
+}
+
+bool spiRead(uint8_t* out)
+{
+  uint8_t spiData[DATA_SIZE];
+
+  if (wiringPiSPIDataRW (SPI_CHAN, spiData, DATA_SIZE) == -1)
+  {
+    printf ("SPI failure: %s\n", strerror (errno)) ;
+  }
+  uint8_t msg_length = spiData[0];
+
+  if (msg_length < 1)
+  {
+      return false;
+  }
+
+  for (int i = 0; i < msg_length; i ++)
+  {
+    // printBits(spiData[i]);
+    // printf("%d ", spiData[i]);
+  }
+
+  for (int i = 0; i < DATA_SIZE; i ++)
+  {
+      out[i] = spiData[i];
+  }
+
+  return true;
+}
+
+int main (void)
+{
+    FILE *file;
+    file = fopen("output.txt","w");
+
+    spiOpen();
+    uint8_t out[DATA_SIZE];
+    int numFailed = 0;
+    int numSuccess;
+    while(1)
+    {
+        bool status = spiRead(out);
+        uint8_t msg_length = out[0];
+        if (msg_length == 0)
+        {
+            numFailed++;
+            continue;
+        }
+
+        printf("%d\n", msg_length);
+        bytesToFile(file, out+1, msg_length);
+        for (int i = 0; i < msg_length; i++)
+        {
+            // printf("%d ",out[i+1]);
+            // printBits(out[i + 1]);
+        }
+        // printf("\n");
+
+        numSuccess++;
+    }
+    spiClose();
+    fclose(file);
+  return 0 ;
+}
