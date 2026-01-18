@@ -352,7 +352,7 @@ void NAV_GoToAction(Command* cmd)
     const int32_t cam_y = cmd->pos->y;
     const int32_t cam_w = cmd->pos->w;
 
-    // Hax to cange to to float meter rep just for testing first time... hehe
+    // Within the robot we work in meters
     // Angle is scaled by 1000 before sent to robot.
     const float f_nav_x = ((float)nav_x) / 1000.f;
     const float f_nav_y = ((float)nav_y) / 1000.f;
