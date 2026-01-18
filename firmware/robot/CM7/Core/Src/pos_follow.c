@@ -1,5 +1,6 @@
 #include "pos_follow.h"
 #include "log.h"
+#include "data_logging.h"
 #include "math.h"
 #include "nav.h"
 #include "state_estimator.h"
@@ -57,6 +58,10 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
     // [0 1]
     // [1 0]
 
+    ControlSignal sigx;
+    ControlSignal sigy;
+    ControlSignal sigw;
+
     const float cur_x = STATE_get_posx();
     const float cur_y = STATE_get_posy();
     const float angle = STATE_get_robot_angle();
@@ -84,6 +89,20 @@ void POS_go_to_position(float dest_x, float dest_y, float wantw)
     }
 
     NAV_steer(x, y, control_w);
+
+    sigx.u = x;
+    sigx.r = dest_x;
+    sigx.e = rel_x;
+
+    sigy.u = y;
+    sigy.r = dest_y;
+    sigy.e = rel_y;
+
+    sigw.u = control_w;
+    sigw.r = wantw;
+    sigw.e = angle_error(angle, wantw);
+    DATA_log_pos(sigx, sigy, sigw);
+
 }
 
 float PID_p(float current, float desired, float (*error_func)(float, float), control_params* param)

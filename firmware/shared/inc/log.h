@@ -10,7 +10,7 @@
 
 /* Public defines */
 #define LOG_BUFFER_SIZE 5
-#define LOG_MSG_SIZE 100
+#define LOG_MSG_SIZE 1000
 
 #define LOG_PRINTF(level, fmt, ...) LOG_Printf(&internal_log_mod, level, fmt, ##__VA_ARGS__)
 #define LOG_UI(fmt, ...) LOG_Printf(&internal_log_mod, LOG_LEVEL_UI, fmt, ##__VA_ARGS__)

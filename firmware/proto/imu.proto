@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+message control_signal {
+    float ref = 1;
+    float control = 2;
+    float error = 3;
+    float output = 4;
+}
+
+message vec3 {
+    float x = 1;
+    float y = 2;
+    float z = 3;
+    float timestamp = 4;
+}
+
+message data_sample {
+  vec3 gyro = 1;
+  vec3 state = 2;
+  control_signal m1 = 3;
+  control_signal m2 = 4;
+  control_signal m3 = 5;
+  control_signal m4 = 6;
+  int32 m_timestamp = 7;
+  control_signal pos_x = 8;
+  control_signal pos_y = 9;
+  control_signal pos_angle = 10;
+  int32 pos_timestamp = 11;
+  vec3 vision = 12;
+}

@@ -1,3 +1,43 @@
+
+# === Generate protobuf files ===
+set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/nanopb/extra)
+find_package(Nanopb REQUIRED)
+
+set(NANOPB_GEN ${CMAKE_SOURCE_DIR}/nanopb/generator/nanopb_generator.py)
+set(PROTO_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/proto)
+set(GEN_DIR    ${CMAKE_BINARY_DIR}/generated)
+
+file(MAKE_DIRECTORY ${GEN_DIR})
+
+add_custom_command(
+    OUTPUT
+        ${GEN_DIR}/imu.pb.c
+        ${GEN_DIR}/imu.pb.h
+
+    COMMAND python3
+        ${NANOPB_GEN}
+        --proto-path=${PROTO_DIR}
+        --output-dir=${GEN_DIR}
+        ${PROTO_DIR}/imu.proto
+
+    DEPENDS
+        ${PROTO_DIR}/imu.proto
+        ${NANOPB_GEN}
+
+    COMMENT "Generating nanopb files (python generator)"
+)
+
+add_library(proto_generated
+    ${GEN_DIR}/imu.pb.c
+)
+
+target_include_directories(proto_generated PUBLIC
+    ${GEN_DIR}
+    ${CMAKE_SOURCE_DIR}/nanopb
+)
+
+# === Generate protobuf files ===
+
 set(DRIVERS_ROOT robot/Drivers/STM32H7xx_HAL_Driver/Src)
 set(DSP_ROOT robot/Drivers/CMSIS/DSP/Source)
 file(GLOB ROBOT_DRIVERS_SOURCE
@@ -70,6 +110,7 @@ set(ROBOT_COMMON_LINK_OPTIONS
     -u_printf_float
 )
 
+
 file(GLOB_RECURSE ROBOT_CM7_SOURCES "robot/CM7/Core/Src/*.*")
 file(GLOB ROBOT_CM7_ASM_SOURCE "robot/Buildfiles/CM7/*.s")
 set(ROBOT_CM7_LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/robot/Buildfiles/CM7/stm32h755xx_flash_CM7.ld)
@@ -84,6 +125,8 @@ add_executable(robot_CM7.elf EXCLUDE_FROM_ALL
     ${ROBOT_CM7_LINKER_SCRIPT}
 )
 
+target_compile_options(nanopb PRIVATE ${ROBOT_COMMON_COMPILE_OPTIONS})
+target_compile_options(proto_generated PRIVATE ${ROBOT_COMMON_COMPILE_OPTIONS})
 target_compile_options(robot_CM7.elf PRIVATE ${ROBOT_COMMON_COMPILE_OPTIONS})
 target_include_directories(robot_CM7.elf PRIVATE robot/CM7/Core/Inc ${ROBOT_COMMON_INCLUDES})
 target_compile_definitions(robot_CM7.elf PRIVATE CORE_CM7 ${ROBOT_COMMON_DEFINITIONS})
@@ -93,6 +136,7 @@ target_link_options(robot_CM7.elf PRIVATE
     -Wl,-gc-sections,--print-memory-usage,-Map=${PROJECT_BINARY_DIR}/robot_CM7.map
 )
 target_link_libraries(robot_CM7.elf c m nosys)
+target_link_libraries(robot_CM7.elf proto_generated nanopb)
 
 # Robot CM4 Target
 file(GLOB_RECURSE ROBOT_CM4_SOURCES "robot/CM4/Core/*.*")
