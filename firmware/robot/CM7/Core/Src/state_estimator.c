@@ -127,12 +127,22 @@ void EKFUpdate(EKF* pKF)
     pKF->tmp2.numRows = pKF->h;
     pKF->tmp2.numCols = 1;
     arm_mat_sub_f32(&pKF->z, &pKF->tmp1, &pKF->tmp2);
+    // Wrap angle innovation to [-pi, pi] to avoid 2pi discontinuity issues
+    if (pKF->h >= 3) {
+        float angle_diff = pKF->tmp2.pData[2];
+        pKF->tmp2.pData[2] = atan2f(sinf(angle_diff), cosf(angle_diff));
+    }
     // tmp3 = K*tmp2 (f x 1)
     pKF->tmp3.numRows = pKF->f;
     pKF->tmp3.numCols = 1;
     arm_mat_mult_f32(&pKF->K, &pKF->tmp2, &pKF->tmp3);
     // x = x + tmp3 (f x 1)
     arm_mat_add_f32(&pKF->x, &pKF->tmp3, &pKF->x);
+    // Wrap state angle to [-pi, pi] after update
+    if (pKF->f >= 3) {
+        float angle = pKF->x.pData[2];
+        pKF->x.pData[2] = atan2f(sinf(angle), cosf(angle));
+    }
 
     // >>> Sigma = (I - K*C)*Sigma
     // tmp1 = K*C (f x f)
@@ -338,17 +348,11 @@ static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_
     float p_y = MAT_ELEMENT(*pX, 1, 0);
     float p_w = MAT_ELEMENT(*pX, 2, 0);
 
-    float v_w = gyr_w;
-    float angle = atan2f(sinf(p_w + gyr_w * dt), cosf(p_w + gyr_w * dt));
-
     // Robot to global from robot frame
-    // Velocities are estimated in the inverse
-
     float px1 = p_x + (vx * cosf(p_w) - vy * sinf(p_w)) * dt;
     float py1 = p_y + (vx * sinf(p_w) + vy * cosf(p_w)) * dt;
-    // float vx1 = v_x + a_x * dt;
-    // float vy1 = v_y + a_y * dt;
-    float pw1 = p_w + v_w * dt;
+    // Wrap angle to [-pi, pi] to prevent unbounded growth
+    float pw1 = atan2f(sinf(p_w + gyr_w * dt), cosf(p_w + gyr_w * dt));
 
     MAT_ELEMENT(*pX, 0, 0) = px1;
     MAT_ELEMENT(*pX, 1, 0) = py1;
