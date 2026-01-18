@@ -370,15 +370,15 @@ void NAV_GoToAction(Command* cmd)
 
     int32_t diff = prev_cam_x - cam_x + prev_cam_y - cam_y + prev_cam_w - cam_w;
 
-    if (abs(diff) < 5) {
+    if (abs(diff) < 2) {
         // If the vision position is exactly the same as last time it is likely not updated information.
         // Ignore old information
-        LOG_INFO("ignoring vision %d\r\n", diff);
+        // LOG_INFO("ignoring vision %d\r\n", diff);
         return;
     }
 
 
-    LOG_INFO("diff %d\r\n", diff);
+    // LOG_INFO("diff %d\r\n", diff);
 
 
     prev_cam_x = cam_x;

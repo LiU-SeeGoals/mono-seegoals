@@ -362,11 +362,11 @@ static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_
 }
 
 static FusionEKFConfig configFusionEKF = {
-    .posNoiseXY = 1.f,
+    .posNoiseXY = .05f,
     .posNoiseW = 0.001f,
     .velNoiseXY = 0.005f,
-    .visNoiseXY = 0.002f,
-    .visNoiseW = 0.30f,
+    .visNoiseXY = 0.02f,
+    .visNoiseW = 0.70f,
     .outlierMaxVelXY = 3.0f,
     .outlierMaxVelW = 3.0f,
     .trackingCoeff = 1.0f,
