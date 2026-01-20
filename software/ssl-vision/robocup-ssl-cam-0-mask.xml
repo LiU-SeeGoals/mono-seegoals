@@ -89,5 +89,29 @@
 				932
 			</Var>
 		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1710
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				665
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1659
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				899
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1649
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				928
+			</Var>
+		</Var>
 	</Var>
 </VarXML>

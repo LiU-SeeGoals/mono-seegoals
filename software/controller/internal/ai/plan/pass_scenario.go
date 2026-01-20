@@ -110,11 +110,11 @@ func (g *Pass) waitRecieve(robot ID, gi GameInfo, once bool, state int, activity
 
 	// State transitions
 
-	if ballPos.Norm2d(robotPos) > 800 {
+	if ballPos.Dist2d(robotPos) > 800 {
 		state = 0
 		// once = false
 	}
-	if ballPos.Norm2d(robotPos) < 800 && activity.Achieved(&gi) && state == 0 {
+	if ballPos.Dist2d(robotPos) < 800 && activity.Achieved(&gi) && state == 0 {
 		state = 1
 	} else if state == 1 && activity.Achieved(&gi) {
 		state = 2
@@ -151,16 +151,17 @@ func (g *Pass) run() {
 			continue
 		}
 
-		ball := gi.State.GetBall()
+		//ball := gi.State.GetBall()
 
-		ballVel, err := ball.GetVelocity2()
-		fmt.Println(gi.State.GetTrackedBall().Vel)
+		// ballVel, err := ball.GetVelocity2()
+		ball := gi.State.GetTrackedBall()
+		//ballPos, err := ball.GetTrackedPosition()
+		ballVel, err := ball.GetTrackedVelocity()
 
-		if err != nil {
-			ballVel = Vec2{X: 1000, Y: 1000}
-			fmt.Println("Ignoreing becaues", err)
-		} else if ballVel.Norm() > 0.001 && ballVel.Norm() < 1000 {
-			fmt.Println(ballVel.Norm())
+		if err != true {
+			ballVel = Position{X: 1000, Y: 1000, Z: 0, Angle: 0}
+		} else if ballVel.Norm2d() > 0.001 && ballVel.Norm() < 1000 {
+			// fmt.Println("ball vel", ballVel.Norm2d())
 			// vels = append(vels, plotter.XY{X: float64(fignum), Y: ballVel.Norm()})
 		}
 
@@ -170,13 +171,13 @@ func (g *Pass) run() {
 		if !doner2 {
 			stater2, oncer2, actr2, doner2 = g.waitRecieve(1, gi, oncer2, stater2, actr2)
 		}
-		if doner1 && stater2 == 0 && ballVel.Norm() < 0.005 {
+		if doner1 && stater2 == 0 && ballVel.Norm2d() < 0.01 {
 			doner1 = false
 			// doner2 = false
 		}
 
 		fignum += 1
-		fmt.Println(stater1, stater2)
+		//fmt.Println(stater1, stater2)
 		// if (fignum % 10 == 0){
 		// 	plt.SaveFig(fmt.Sprintf("ballvel%d.png",fignum))
 		// }

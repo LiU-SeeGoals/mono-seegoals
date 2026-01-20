@@ -9,22 +9,22 @@ import (
 )
 
 type RecieveBall struct {
-	team info.Team
-	id   info.ID
+	team           info.Team
+	id             info.ID
 	orignalBallPos info.Position
-	inited bool
+	inited         bool
 }
 
 type RecieveConfig struct {
-	driveThrough float64
-	doneDist float64
+	driveThrough    float64
+	doneDist        float64
 	ballAbortRadius float64
 }
 
-func GetRecieveConfig() RecieveConfig{
+func GetRecieveConfig() RecieveConfig {
 	return RecieveConfig{
-		driveThrough: 200,
-		doneDist: 50,
+		driveThrough:    200,
+		doneDist:        50,
 		ballAbortRadius: 100,
 	}
 }
@@ -43,7 +43,7 @@ func NewRecieveBall(team info.Team, id info.ID, ballPos info.Position) *RecieveB
 	}
 }
 
-func (m *RecieveBall) GetTargetPos(gi *info.GameInfo) info.Position{
+func (m *RecieveBall) GetTargetPos(gi *info.GameInfo) info.Position {
 
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
@@ -51,7 +51,7 @@ func (m *RecieveBall) GetTargetPos(gi *info.GameInfo) info.Position{
 	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
 
 	robotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
-	if err != nil{
+	if err != nil {
 		fmt.Println(err)
 	}
 
@@ -61,7 +61,7 @@ func (m *RecieveBall) GetTargetPos(gi *info.GameInfo) info.Position{
 	ballRobotTangent.DivNorm()
 
 	robotXY := info.Add(ballV2, ballRobotTangent.Mult(GetRecieveConfig().driveThrough))
-	robotTargetPos := info.Position{X: robotXY.X, Y:robotXY.Y, Z:0, Angle: ballRobotTangent.Angle()}
+	robotTargetPos := info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: ballRobotTangent.Angle()}
 	return robotTargetPos
 }
 
@@ -69,14 +69,14 @@ func (m *RecieveBall) GetAction(gi *info.GameInfo) action.Action {
 	robotTargetPos := m.GetTargetPos(gi)
 
 	robotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
-	if err != nil{
+	if err != nil {
 		fmt.Println(err)
 	}
 
 	ball := gi.State.GetBall()
-	balVel := math.Sqrt(ball.GetVelocity().X * ball.GetVelocity().X + ball.GetVelocity().Y * ball.GetVelocity().Y)
+	balVel := math.Sqrt(ball.GetVelocity().X*ball.GetVelocity().X + ball.GetVelocity().Y*ball.GetVelocity().Y)
 
-	if balVel > 1{
+	if balVel > 1 {
 		robotTargetPos = robotPos
 	}
 
@@ -102,15 +102,14 @@ func (m *RecieveBall) Achieved(gi *info.GameInfo) bool {
 	// robotTargetPos := m.GetTargetPos(gi)
 
 	// robotDist := robotTargetPos.Norm2d(myRobotPos)
-	ballDist := ballPos.Norm2d(m.orignalBallPos)
+	ballDist := ballPos.Dist2d(m.orignalBallPos)
 
 	// return false
-	if (ballDist > GetRecieveConfig().ballAbortRadius){
+	if ballDist > GetRecieveConfig().ballAbortRadius {
 		fmt.Println("Done")
 		fmt.Println(ballDist)
 		fmt.Println(ballPos, m.orignalBallPos)
 	}
-
 
 	return ballDist > GetRecieveConfig().ballAbortRadius
 }
@@ -119,4 +118,3 @@ func (m *RecieveBall) GetID() info.ID {
 
 	return m.id
 }
-

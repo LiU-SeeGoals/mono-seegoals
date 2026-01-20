@@ -2,7 +2,6 @@ package ai
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -73,10 +72,15 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 		fmt.Println(err)
 	}
 
-	ball := gi.State.GetBall()
-	balVel := math.Sqrt(ball.GetVelocity().X*ball.GetVelocity().X + ball.GetVelocity().Y*ball.GetVelocity().Y)
+	//ball := gi.State.GetBall()
+	//balVel := math.Sqrt(ball.GetVelocity().X*ball.GetVelocity().X + ball.GetVelocity().Y*ball.GetVelocity().Y)
 
-	if balVel > 2 {
+	ball := gi.State.GetTrackedBall()
+	//ballPos, err := ball.GetTrackedPosition()
+	ballVel, _ := ball.GetTrackedVelocity()
+
+	speed := ballVel.Norm2d()
+	if speed > 0.05 {
 		robotTargetPos = robotPos
 	}
 
@@ -103,7 +107,7 @@ func (m *KickBall) Achieved(gi *info.GameInfo) bool {
 
 	// robotDist := robotTargetPos.Norm2d(myRobotPos)
 
-	ballDist := ballPos.Norm2d(m.orignalBallPos)
+	ballDist := ballPos.Dist2d(m.orignalBallPos)
 
 	// return false
 	if ballDist > GetKickConfig().ballAbortRadius {

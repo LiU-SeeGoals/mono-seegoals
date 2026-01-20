@@ -21,7 +21,7 @@ func GetAlignConfig() AlignConfig {
 	return AlignConfig{
 		robotBallClearence: 200,
 		doneDist:           50,
-		angleError:         2.0 * math.Pi / 180,
+		angleError:         3.0 * math.Pi / 180,
 	}
 }
 
@@ -68,11 +68,13 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	if err != nil {
 		fmt.Println(err)
 	}
+	ball := gi.State.GetTrackedBall()
+	//ballPos, err := ball.GetTrackedPosition()
+	ballVel, _ := ball.GetTrackedVelocity()
 
-	ball := gi.State.GetBall()
-	balVel := math.Sqrt(ball.GetVelocity().X*ball.GetVelocity().X + ball.GetVelocity().Y*ball.GetVelocity().Y)
+	speed := ballVel.Norm2d()
 
-	if balVel > 1 {
+	if speed > 0.3 {
 		robotTargetPos = myRobotPos
 	}
 
@@ -100,9 +102,10 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	angle_error := info.NormalizeAngleDelta(robotTargetPos.Angle, myRobotPos.Angle)
 
 	dist := math.Sqrt(xx + yy)
-
 	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError
-
+	if m.id == 3 {
+		fmt.Println("angle error", math.Abs(angle_error), GetAlignConfig().angleError, dist, GetAlignConfig().doneDist)
+	}
 	return val
 }
 
