@@ -13,15 +13,15 @@ import (
 
 func KickSimScenario() {
 	// This avoid the "No position in history" error for robots
-	presentYellow := []int{0}
-	presentBlue := []int{0}
+	presentYellow := []int{1, 3}
+	presentBlue := []int{7}
 	simController := simulator.NewSimControl()
 	simController.SetPresentRobots(presentYellow, presentBlue)
 
 	gameInfo := info.NewGameInfo(10)
 	ssl_receiver := client.NewSSLClient(config.GetSSLClientAddress())
 
-	TestKickPlan := plan.NewTestKick(info.Yellow)
+	TestKickPlan := plan.NewPass(info.Yellow)
 	Executor := ai.NewActivityExecutor()
 
 	aiYellow := ai.NewAi(info.Yellow, TestKickPlan, Executor)

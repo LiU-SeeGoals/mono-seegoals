@@ -16,11 +16,14 @@ func FwRealScenario() {
 
 	// Yellow team
 	// slowBrainYellow := plan.NewPlannerFw(info.Yellow)
-	slowBrainYellow := plan.NewTestKick(info.Yellow)
+	slowBrainYellow := plan.NewPass(info.Yellow)
+	slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
 
 	fastBrainYellow := ai.NewActivityExecutor()
+	fastBrainBlue := ai.NewActivityExecutor()
 
 	aiYellow := ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
+	aiBlue := ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
 	basestationClient := client.NewBaseStationClient(config.GetBasestationAddress())
 
@@ -31,9 +34,12 @@ func FwRealScenario() {
 
 		ssl_receiver.UpdateState(gameInfo, playTime)
 		yellow_actions := aiYellow.GetActions(gameInfo)
+		blue_actions := aiBlue.GetActions(gameInfo)
 
 		client.BroadcastActions(yellow_actions)
+		client.BroadcastActions(blue_actions)
 
 		basestationClient.SendActions(yellow_actions)
+		basestationClient.SendActions(blue_actions)
 	}
 }

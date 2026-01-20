@@ -100,34 +100,17 @@ func (gs *GameState) Update() {
 		if !robot.IsActive() {
 			continue
 		}
+		// robot.Update()
 	}
 
 	latestBallPos, _ := gs.Ball.GetPosition()
-	latestPossessor := gs.Ball.GetPossessor()
 	newPossessor := gs.FindBallPossessor()
+	gs.Ball.SetPossessor(newPossessor)
 
-	if gs.Ball.GetAge() < 50 {
-		gs.Ball.SetEstimatedPosition(latestBallPos)
-
-		if latestPossessor != nil {
-			if gs.LostBall(latestPossessor) {
-				gs.Ball.SetPossessor(nil)
-			}
-		}
-
-		if gs.Ball.GetPossessor() == nil && newPossessor != nil {
-			gs.Ball.SetPossessor(newPossessor)
-		}
-
-	} else if latestPossessor != nil {
-		gs.Ball.SetEstimatedPosition(latestPossessor.DribblerPos())
-	} else if newPossessor != nil {
-		gs.Ball.SetPossessor(newPossessor)
-		gs.Ball.SetEstimatedPosition(newPossessor.DribblerPos())
-
-	} else {
-		gs.Ball.SetEstimatedPosition(latestBallPos)
-	}
+	// if gs.Ball.GetAge() < 50 { // Have a new ball measurement,  WARN: Magic number
+	// fmt.Println("New ball measurement")
+	gs.Ball.SetEstimatedPosition(latestBallPos)
+	// }
 }
 
 func (gs *GameState) FindBallPossessor() *Robot {
@@ -139,7 +122,8 @@ func (gs *GameState) FindBallPossessor() *Robot {
 
 	closestToBall, _ := gs.ClosestRobot(ballPos)
 
-	const possessionThreshold = 30.0
+	// Threshold for possession.
+	const possessionThreshold = 100.0
 
 	if closestToBall != nil {
 		dist := ballPos.Distance(closestToBall.DribblerPos())
@@ -316,4 +300,3 @@ func (gs GameState) ToJson() []byte {
 	}
 	return gameStateJson
 }
-

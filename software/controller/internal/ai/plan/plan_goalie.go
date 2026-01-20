@@ -42,23 +42,15 @@ func (m *plannerGoalie) Init(
 // This is the main loop of the AI in this slow brain
 func (m *plannerGoalie) run() {
 
-	way_points := []info.Position{
-		{X: 0, Y: 0, Z: 0, Angle: 0},
-		{X: -3000, Y: 0, Z: 0, Angle: 0},
-		{X: 1000, Y: 0, Z: 0, Angle: 0},
-	}
-	index := 0
-
 	for {
 		// No need for slow brain to be fast
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(5 * time.Millisecond)
 
 		//fmt.Println("slow, number of activities:", len(*m.activities))
 
-		if m.activities[2] == nil {
+		if m.activities[7] == nil {
 			fmt.Println("done with action: ", m.team)
-			m.AddActivity(ai.NewGoalie(m.team, 0))
-			index = (index + 1) % len(way_points)
+			m.AddActivity(ai.NewGoalie(m.team, 7))
 		}
 	}
 }

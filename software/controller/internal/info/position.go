@@ -5,11 +5,62 @@ import (
 	"math"
 )
 
+type Vec2 struct {
+	X     float64
+	Y     float64
+}
+
 type Position struct {
 	X     float64
 	Y     float64
 	Z     float64
 	Angle float64
+}
+
+func Sub(a Vec2, b Vec2) Vec2 {
+	return Vec2{
+		X: a.X - b.X,
+		Y: a.Y - b.Y, 
+	}
+}
+
+func (v *Vec2) String() string {
+	return fmt.Sprintf("X: %f Y: %f", v.X, v.Y)
+}
+
+func (v *Vec2) Angle() float64 {
+	return math.Atan2(v.Y, v.X)
+}
+
+func (v *Vec2) Mult(scalar float64) Vec2 {
+	return Vec2{
+		v.X * scalar, 
+		v.Y * scalar}
+}
+
+func Add(a Vec2, b Vec2) Vec2 {
+	return Vec2{
+		X: a.X + b.X,
+		Y: a.Y + b.Y, 
+	}
+}
+
+func (v *Vec2) DivNorm() {
+	norm := math.Sqrt(v.X * v.X + v.Y * v.Y)
+	v.X = v.X / norm
+	v.Y = v.Y / norm
+}
+
+func (v *Vec2) Norm() float64 {
+	norm := math.Sqrt(v.X * v.X + v.Y * v.Y)
+	return norm
+}
+
+func (p *Position) Norm2d(other Position) float64{
+	xx :=(p.X - other.X)*(p.X - other.X) 
+	yy :=(p.Y - other.Y)*(p.Y - other.Y) 
+
+	return math.Sqrt(xx + yy)
 }
 
 func (p *Position) FacingPosition(target Position, threshold float64) bool {
