@@ -8,7 +8,6 @@ import (
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/plt"
-	"gonum.org/v1/plot/plotter"
 )
 
 type Pass struct {
@@ -142,7 +141,7 @@ func (g *Pass) run() {
 	var actr2 ai.Activity
 	doner1 := false
 	doner2 := false
-	vels := plotter.XYs{}
+	// vels := plotter.XYs{}
 
 	fignum := 0
 	active_robots := []int{1, 3}
@@ -153,7 +152,9 @@ func (g *Pass) run() {
 		}
 
 		ball := gi.State.GetBall()
+
 		ballVel, err := ball.GetVelocity2()
+		fmt.Println(gi.State.GetTrackedBall().Vel)
 
 		if err != nil {
 			ballVel = Vec2{X: 1000, Y: 1000}

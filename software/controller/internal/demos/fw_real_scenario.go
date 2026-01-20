@@ -12,7 +12,8 @@ import (
 
 func FwRealScenario() {
 	gameInfo := info.NewGameInfo(10)
-	ssl_receiver := client.NewSSLClient(config.GetSSLClientAddressReal())
+	ssl_receiver_tracked_vision := client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
+	ssl_receiver_raw_vision := client.NewSSLClient(config.GetSSLClientAddressReal())
 
 	// Yellow team
 	// slowBrainYellow := plan.NewPlannerFw(info.Yellow)
@@ -32,7 +33,8 @@ func FwRealScenario() {
 	for {
 		playTime := time.Now().UnixMilli()
 
-		ssl_receiver.UpdateState(gameInfo, playTime)
+		ssl_receiver_tracked_vision.UpdateState(gameInfo, playTime)
+		ssl_receiver_raw_vision.UpdateState(gameInfo, playTime)
 		yellow_actions := aiYellow.GetActions(gameInfo)
 		blue_actions := aiBlue.GetActions(gameInfo)
 
