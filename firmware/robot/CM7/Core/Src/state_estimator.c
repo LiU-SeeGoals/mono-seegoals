@@ -362,11 +362,11 @@ static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_
 }
 
 static FusionEKFConfig configFusionEKF = {
-    .posNoiseXY = 1.f,
+    .posNoiseXY = .05f,
     .posNoiseW = 0.001f,
     .velNoiseXY = 0.005f,
-    .visNoiseXY = 0.002f,
-    .visNoiseW = 0.30f,
+    .visNoiseXY = 0.02f,
+    .visNoiseW = 0.70f,
     .outlierMaxVelXY = 3.0f,
     .outlierMaxVelW = 3.0f,
     .trackingCoeff = 1.0f,
@@ -420,6 +420,7 @@ void STATE_FusionEKFVisionUpdate(float posx, float posy, float posw)
 {
     // VISION
     DATA_log_vision(posx, posy, posw);
+    LOG_INFO("x: %f y: %f angle: %f\r\n", posx, posy, posw);
 
     float pos[3] = {posx, posy, posw};
 
@@ -458,8 +459,11 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     float body_speed[3];
     NAV_wheelToBody(body_speed);
     gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
-    gyrAcc[1] = body_speed[0];
-    gyrAcc[2] = body_speed[1];
+    gyrAcc[1] = 0;
+    gyrAcc[2] = 0;
+
+    // Cache bias-corrected gyro for use in controllers
+    fusionEKF.gyro_z = gyrAcc[0];
     // TODO: if using accelerometer we can lowpass noisy accelerometer
     /*gyrAcc[1] = LagElementPT1Process(&fusionEKF.lagAccel[0], linear_acc_x);*/
     /*gyrAcc[2] = LagElementPT1Process(&fusionEKF.lagAccel[1], linear_acc_y);*/
@@ -540,6 +544,8 @@ float STATE_get_robot_angle()
 float STATE_get_vx() { return MAT_ELEMENT(fusionEKF.ekf.x, 3, 0); }
 
 float STATE_get_vy() { return MAT_ELEMENT(fusionEKF.ekf.x, 4, 0); }
+
+float STATE_get_gyro_z() { return fusionEKF.gyro_z; }
 
 void STATE_log_states() { LOG_DEBUG("px: %f py: %f pw: %f vx: %f vy: %f\r\n", STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle(), STATE_get_vx(), STATE_get_vy()); }
 

@@ -88,9 +88,10 @@ ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
 {
 
     setDirection(motor, speed);
-    /*if (setDirection(motor, speed) == HAL_BUSY) {*/
-    /*  MOTOR_SendPWM(motor, 0);*/
-    /*}*/
+
+    // if (setDirection(motor, speed) == HAL_BUSY) {
+    //     MOTOR_SendPWM(motor, 0);
+    // }
 
     int sign = 1;
     if (speed < 0) {
@@ -107,8 +108,18 @@ ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
     float K = 0.00015;
     float current_speed = (float)MOTOR_ReadTicksPerSecond(motor);
     float error = speed - current_speed;
-    float I = *I_prev + Ts / Ti * error;
-    float v = K * (error + I);
+    float I;
+    float v;
+    if (fabs(error) < 10.f){
+        error = 0;
+        I = *I_prev;
+        v = 0;
+    }
+    else{
+        I = *I_prev + Ts / Ti * error;
+        v = K * (error + I);
+    }
+
     float u = 0;
     // integrator windup fix
     if (v < umin || v > umax) {
@@ -150,7 +161,7 @@ void MOTOR_SendPWM(MotorPWM* motor, float pulse_width)
         pulse_width = 0;
     }
 
-    float max_scale = 0.5;                 // Use a max scaling for the motor speed
+    float max_scale = 0.1;                 // Use a max scaling for the motor speed
     float scale = max_scale * pulse_width; // make max_scale largest scaling
 
     // TODO: How to handle rounding errors, do they even matter?

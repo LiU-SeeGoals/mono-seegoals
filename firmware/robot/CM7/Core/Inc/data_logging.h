@@ -18,6 +18,7 @@ void DATA_log_state(float x, float y, float w);
 void DATA_log_motor(ControlSignal m1, ControlSignal m2, ControlSignal m3, ControlSignal m4);
 void DATA_log_pos(ControlSignal x, ControlSignal y, ControlSignal angle);
 void DATA_log_vision(float x, float y, float w);
+void DATA_log_odometry(float u, float v, float w);
 void DATA_uart_send();
 void DATA_Init(SPI_HandleTypeDef *hspi);
 void DATA_spi_send();
