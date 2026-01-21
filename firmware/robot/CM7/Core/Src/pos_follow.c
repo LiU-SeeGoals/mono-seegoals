@@ -158,7 +158,7 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     float ey = dest_y - cur_y;
     float ew = angle_error(cur_w, dest_w);  // Wrapped to [-pi, pi]
     float Ix = i_dist_x + (DELTA_T / 5.5) * ex;
-    float Iy = i_dist_y + (DELTA_T / 2.5) * ey;
+    float Iy = i_dist_y + (DELTA_T / 5.5) * ey;
 
     float vx_world = K[0][0] * (ex + Ix);
     float vy_world = K[1][1] * (ey + Iy);
