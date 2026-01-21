@@ -34,6 +34,15 @@ void POS_set_params();
 void POS_go_to_position(float dest_x, float dest_y, float wantw);
 
 /**
+ * LQR controller: unified position and angle control in world frame.
+ * Computes optimal velocity commands considering both position and angle errors.
+ * @param dest_x, desired field x position (meters)
+ * @param dest_y, desired field y position (meters)
+ * @param dest_w, desired rotation (radians)
+ */
+void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w);
+
+/**
  * Initializes the POS module.
  */
 void POS_Init();

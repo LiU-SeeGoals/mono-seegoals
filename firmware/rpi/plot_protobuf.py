@@ -78,12 +78,28 @@ signals = {
             "angle_r": [],
         }
     },
+    "Position error": {
+        "t": [],
+        "signals": {
+            "x": [],
+            "y": [],
+            "angle": [],
+        }
+    },
     "Vision": {
         "t": [],
         "signals": {
             "x": [],
             "y": [],
             "angle": [],
+        }
+    },
+    "Odometry": {
+        "t": [],
+        "signals": {
+            "u": [],
+            "v": [],
+            "w": [],
         }
     }
 }
@@ -159,6 +175,20 @@ for msg in readFile():
         signals["Position reference"]["signals"]["x_r"].append(msg.pos_x.ref)
         signals["Position reference"]["signals"]["y_r"].append(msg.pos_y.ref)
         signals["Position reference"]["signals"]["angle_r"].append(msg.pos_angle.ref)
+
+        # Position reference
+        signals["Position error"]["t"].append(msg.pos_timestamp / 1000.0)
+        signals["Position error"]["signals"]["x"].append(msg.pos_x.error)
+        signals["Position error"]["signals"]["y"].append(msg.pos_y.error)
+        signals["Position error"]["signals"]["angle"].append(msg.pos_angle.error)
+
+    if not outlier(msg.odometry.timestamp):
+        # Position control
+        signals["Odometry"]["t"].append(msg.pos_timestamp / 1000.0)
+        signals["Odometry"]["signals"]["u"].append(msg.odometry.x)
+        signals["Odometry"]["signals"]["v"].append(msg.odometry.y)
+        signals["Odometry"]["signals"]["w"].append(msg.odometry.w)
+
 
 plt.figure(figsize=(12, 8))
 
