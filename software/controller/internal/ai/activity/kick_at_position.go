@@ -10,21 +10,23 @@ import (
 
 type KickAtPosition struct {
 	GenericComposition
-	targetPosition info.Position
-	retrievingBall bool
+	targetPosition   info.Position
+	simpleReposition bool
+	retrievingBall   bool
 }
 
 func (k *KickAtPosition) String() string {
 	return fmt.Sprintf("(Robot %d, KickAtPosition(%v))", k.id, k.targetPosition)
 }
 
-func NewKickAtPosition(team info.Team, id info.ID, targetPosition info.Position) *KickAtPosition {
+func NewKickAtPosition(team info.Team, id info.ID, targetPosition info.Position, simpleReposition bool) *KickAtPosition {
 	return &KickAtPosition{
 		GenericComposition: GenericComposition{
 			team: team,
 			id:   id,
 		},
 		targetPosition: targetPosition,
+		simpleReposition: simpleReposition
 		retrievingBall: true,
 	}
 }
@@ -75,20 +77,32 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		angleDelta := info.NormalizeAngleDelta(robotPos.Angle, ballPos.AngleToPosition(kp.targetPosition))
 
 		direction := math.Copysign(1.0, angleDelta)
-		// Positive direction: Turn left
-		// Negative direction: Turn right
-		stepSize := 150.0 // millimeters
-		radius := 115.0   // WARNING MAGIC NUMBER
 
 		vecBallToRobot := robotPos.Sub(&ballPos)
 		angleFromBall := vecBallToRobot.Angle
 
-		tangentAngle := angleFromBall + (direction * math.Pi / 2)
+		// Positive direction: Turn left
+		// Negative direction: Turn right
 
-		tangentPoint := robotPos.OnRadius(stepSize, tangentAngle)
-		vecBallToNextPos := tangentPoint.Sub(&ballPos).Normalize().Scale(radius)
-		nextPosition := ballPos.Add(&vecBallToNextPos)
-		nextPosition.Angle = nextPosition.AngleToPosition(ballPos)
+		// Simple repositioning should only move in straight lines, and then rotate
+		if simpleReposition{
+			stepSize := 150.0 // millimeters
+			radius := 115.0   // WARNING MAGIC NUMBER	
+			tangentAngle := angleFromBall + (direction * math.Pi / 2)
+
+		}
+		// More advanced arc-like repositioning (Currently only works in sim) that rotates and moves around the ball simultaniously.
+		else{
+			stepSize := 150.0 // millimeters
+			radius := 115.0   // WARNING MAGIC NUMBER
+
+			tangentAngle := angleFromBall + (direction * math.Pi / 2)
+
+			tangentPoint := robotPos.OnRadius(stepSize, tangentAngle)
+			vecBallToNextPos := tangentPoint.Sub(&ballPos).Normalize().Scale(radius)
+			nextPosition := ballPos.Add(&vecBallToNextPos)
+			nextPosition.Angle = nextPosition.AngleToPosition(ballPos)
+		}
 
 		// Create move action to the current target
 		moveAction := action.MoveTo{
