@@ -157,7 +157,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         float w = NAV_GetNavW();
         DATA_log_imu_data(gyr.x,gyr.y,gyr.z);
 
-        POS_go_to_position(x,y,w);
+        POS_go_to_position_lqr(x,y,w);
     }
 
     /* USER CODE BEGIN Callback 1 */
