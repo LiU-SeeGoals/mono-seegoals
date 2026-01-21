@@ -72,9 +72,11 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 		fmt.Println(err)
 	}
 
-	//ball := gi.State.GetBall()
-	//balVel := math.Sqrt(ball.GetVelocity().X*ball.GetVelocity().X + ball.GetVelocity().Y*ball.GetVelocity().Y)
+	ballUntracked, err := gi.State.GetBall().GetPosition()
 
+	if err != nil {
+		fmt.Println(err)
+	}
 	ball := gi.State.GetTrackedBall()
 	//ballPos, err := ball.GetTrackedPosition()
 	ballVel, _ := ball.GetTrackedVelocity()
@@ -83,14 +85,17 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	if speed > 0.05 {
 		robotTargetPos = robotPos
 	}
-
 	act := action.MoveTo{}
 	act.Id = int(m.id)
 	act.Team = m.team
 	act.Pos = robotPos
 	act.Dest = robotTargetPos
-	act.Dribble = true
-	act.KickSpeed = 1
+
+	if robotPos.Dist2d(ballUntracked) > 200 {
+		act.Dribble = true
+	} else {
+		act.KickSpeed = 1
+	}
 
 	return &act
 }

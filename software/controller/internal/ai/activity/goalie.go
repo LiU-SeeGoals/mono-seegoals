@@ -59,7 +59,14 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 		xMultiplier = 1.0
 	}
 	goalieX := xMultiplier * GOALIE_DIST_FROM_CENTER
+	goalSize := 1110.0
 	goalieY := ballPos.Y
+
+	if goalieY > goalSize {
+		goalieY = goalSize
+	} else if goalieY < -goalSize {
+		goalieY = -goalSize
+	}
 
 	goaliePos := info.Position{X: goalieX, Y: goalieY, Z: 0.0, Angle: 0.0}
 

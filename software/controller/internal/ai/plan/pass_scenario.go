@@ -61,6 +61,10 @@ func (g *Pass) kickToHomie(robot ID, homie ID, gi GameInfo, state int, once bool
 		once = true
 	}
 
+	if robot2.Dist2d(ballPos) < 800 {
+		done = true
+	}
+
 	g.AddActivity(activity)
 
 	if activity.Achieved(&gi) {
@@ -126,7 +130,6 @@ func (g *Pass) waitRecieve(robot ID, gi GameInfo, once bool, state int, activity
 	}
 
 	return state, once, activity, done
-
 }
 
 func (g *Pass) run() {
