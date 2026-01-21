@@ -459,8 +459,8 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     float body_speed[3];
     NAV_wheelToBody(body_speed);
     gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
-    gyrAcc[1] = body_speed[0];
-    gyrAcc[2] = body_speed[1];
+    gyrAcc[1] = 0;
+    gyrAcc[2] = 0;
 
     // Cache bias-corrected gyro for use in controllers
     fusionEKF.gyro_z = gyrAcc[0];

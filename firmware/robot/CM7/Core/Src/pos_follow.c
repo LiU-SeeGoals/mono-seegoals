@@ -197,6 +197,17 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     float cmd_y = vy_robot * vel_to_motor_scale;
     float cmd_w = omega * 50.0f;  // Angular scaling
 
+    float deadzone = 5;
+    if (cmd_w < deadzone && cmd_w > -deadzone){
+        cmd_w = 0;
+    }
+    if (cmd_x < deadzone && cmd_x > -deadzone){
+        cmd_x = 0;
+    }
+    if (cmd_y < deadzone && cmd_y > -deadzone){
+        cmd_y = 0;
+    }
+
     NAV_steer(cmd_x, cmd_y, cmd_w);
 
     sigx.u = cmd_x;
