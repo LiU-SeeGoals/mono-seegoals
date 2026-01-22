@@ -21,7 +21,7 @@ func KickSimScenario() {
 	gameInfo := info.NewGameInfo(10)
 	ssl_receiver := client.NewSSLClient(config.GetSSLClientAddress())
 
-	TestKickPlan := plan.NewPass(info.Yellow)
+	TestKickPlan := plan.NewGameScenario(info.Yellow)
 	Executor := ai.NewActivityExecutor()
 
 	aiYellow := ai.NewAi(info.Yellow, TestKickPlan, Executor)

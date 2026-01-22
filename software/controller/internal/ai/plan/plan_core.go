@@ -47,6 +47,10 @@ func (m *plannerCore) AddActivity(activity ai.Activity) {
 	m.activities[idx] = activity
 }
 
+func (m *plannerCore) GetActivity(id info.ID) ai.Activity {
+	return m.activities[id]
+}
+
 func (m *plannerCore) ReplaceActivities(activities *[info.TEAM_SIZE]ai.Activity) {
 	m.activity_lock.Lock()
 	defer m.activity_lock.Unlock()
@@ -89,7 +93,7 @@ func (m *plannerCore) HandleRef(gi *info.GameInfo, active_robots []int) bool {
 			m.prev_ref = true
 			return true
 		} else {
-			
+
 			m.AddActivity(ai.NewStop(3))
 			m.AddActivity(ai.NewStop(1))
 			m.prev_ref = true
