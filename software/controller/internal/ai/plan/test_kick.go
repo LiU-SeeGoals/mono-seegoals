@@ -48,7 +48,7 @@ func (g *TestKick) run() {
 		if g.activities[0] == nil {
 			queue := ai.NewActivityQueue(0, []ai.Activity{
 				ai.NewMoveToBall(g.team, 0),
-				ai.NewKickAtPosition(g.team, 0, info.Position{X: 2900, Y: 100}, true),
+				ai.NewKickAtPosition(g.team, 0, info.Position{X: 2900, Y: 100}, false),
 			})
 			g.AddActivity(queue)
 		}

@@ -159,7 +159,7 @@ func (gs *GameState) LostBall(robot *Robot) bool {
 		return true
 	}
 
-	farAway := ballPos.Distance(robot.DribblerPos()) > 50 // WARN: Magic number, mm
+	farAway := ballPos.Distance(robot.DribblerPos()) > 150 // WARN: Magic number, mm
 
 	// If the robot is not facing the ball
 	// it has lost the ball

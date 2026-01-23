@@ -85,16 +85,15 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		// Positive direction: Turn left
 		// Negative direction: Turn right
 		stepSize := 150.0 // millimeters
-		radius := 115.0   // WARNING MAGIC NUMBER
-
 		var nextPosition info.Position
 		// Simple repositioning should only move in straight lines, and then rotate
 		if kp.simpleReposition {
-			stepSize = 150.0 // millimeters
+			stepSize = 100.0 // millimeters
 			nextPosition = robotPos.OnRadius(stepSize, tangentAngle)
 			nextPosition.Angle = nextPosition.AngleToPosition(ballPos)
 		} else {
 			// More advanced arc-like repositioning (Currently only works in sim) that rotates and moves around the ball simultaniously.
+			radius := 115.0 // WARNING MAGIC NUMBER
 			tangentPoint := robotPos.OnRadius(stepSize, tangentAngle)
 			vecBallToNextPos := tangentPoint.Sub(&ballPos).Normalize().Scale(radius)
 			nextPosition = ballPos.Add(&vecBallToNextPos)
@@ -122,7 +121,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		Dest: destination,
 		Team: kp.team,
 	}
-	KickSpeed := float32(5)
+	KickSpeed := float32(10)
 	moveAction.KickSpeed = int(KickSpeed)
 	return &moveAction
 }
