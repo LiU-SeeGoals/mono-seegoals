@@ -31,7 +31,7 @@ func (m *plannerGWDemo) Init(
 	team info.Team,
 ) {
 	m.incomingGameInfo = incoming
-	m.activities = activities // store pointer directly
+	m.activities = activities
 	m.activity_lock = lock
 	m.team = team
 	m.start = time.Now()

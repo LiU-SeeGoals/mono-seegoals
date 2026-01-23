@@ -33,7 +33,7 @@ func (m *KickBall) String() string {
 }
 
 func NewKickBall(team info.Team, id info.ID, ballPos info.Position) *KickBall {
-	fmt.Println("New kick ball")
+	// fmt.Println("New kick ball")
 	return &KickBall{
 		team,
 		id,
@@ -116,9 +116,9 @@ func (m *KickBall) Achieved(gi *info.GameInfo) bool {
 
 	// return false
 	if ballDist > GetKickConfig().ballAbortRadius {
-		fmt.Println("Done")
-		fmt.Println(ballDist)
-		fmt.Println(ballPos, m.orignalBallPos)
+		// fmt.Println("Done")
+		// fmt.Println(ballDist)
+		// fmt.Println(ballPos, m.orignalBallPos)
 	}
 
 	return ballDist > GetKickConfig().ballAbortRadius

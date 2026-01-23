@@ -184,7 +184,7 @@ func (mt *MoveTo) TranslateReal() *robot_action.Command {
 	}
 
 	if kickSpeedReal == 1 {
-		fmt.Println("Kicking")
+		// fmt.Println("Kicking")
 		dribbleSpeedReal = 1
 		command_kick := &robot_action.Command{
 			CommandId: robot_action.ActionType_KICK_ACTION,
