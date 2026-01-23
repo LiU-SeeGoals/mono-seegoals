@@ -47,7 +47,7 @@ func (m *ShootAtGoal) run() {
 
 			activityLoop := []ai.Activity{
 				ai.NewMoveToBall(m.team, 2),
-				ai.NewKickAtPosition(m.team, 2, info.Position{X: 2000, Y: 2000, Z: 0, Angle: 0}),
+				ai.NewKickAtPosition(m.team, 2, info.Position{X: 2000, Y: 2000, Z: 0, Angle: 0}, true),
 				// ai.NewKickToPlayer(m.team, 2, 1),
 			}
 			loop := ai.NewActivityLoop(2, activityLoop)
