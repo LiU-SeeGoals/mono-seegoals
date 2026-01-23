@@ -39,8 +39,8 @@ func FwRealScenario() {
 	basestationClient.Init()
 
 	simController.TeleportRobot(-2000, 0, 1, info.Yellow)
-  	simController.TeleportRobot(-2000, 500, 3, info.Yellow)
-  	simController.TeleportRobot(1500, 0, 7, info.Blue)
+	simController.TeleportRobot(-10000, 500, 3, info.Yellow)
+	simController.TeleportRobot(1500, 0, 7, info.Blue)
 
 	for {
 		playTime := time.Now().UnixMilli()
@@ -57,8 +57,8 @@ func FwRealScenario() {
 		basestationClient.SendActions(actionsYellow)
 		basestationClient.SendActions(actionsBlue)
 
-        simClientYellow.SendActions(actionsYellow)
-        simClientBlue.SendActions(actionsBlue)
+		simClientYellow.SendActions(actionsYellow)
+		simClientBlue.SendActions(actionsBlue)
 
 		time.Sleep(10 * time.Millisecond)
 	}
