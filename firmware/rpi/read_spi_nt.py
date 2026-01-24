@@ -22,6 +22,41 @@ sys.path.append(proto_dir)
 import imu_pb2
 
 
+def publishvec3(table):
+    x = table.getFloatTopic("x").publish()
+    y = table.getFloatTopic("y").publish()
+    z = table.getFloatTopic("z").publish()
+    dt = table.getFloatTopic("dt").publish()
+    return (x, y, z, dt)
+
+
+def setvec3(topics, x, y, z, dt):
+    x, y, z, dt = topics
+
+    x.set(x)
+    y.set(y)
+    z.set(z)
+    dt.set(dt)
+
+
+def publish_control_signal(table):
+    ref = table.getFloatTopic("Reference").publish()
+    control = table.getFloatTopic("Control").publish()
+    error = table.getFloatTopic("Error").public()
+    output = table.getFloatTopic("Output").public()
+
+    return (ref, control, error, output)
+
+
+def set_control_signal(topics, ref, control, error, output):
+    ref, control, error, output = topics
+
+    ref.set(ref)
+    control.set(ref)
+    error.set(ref)
+    output.set(ref)
+
+
 def readSpi():
     lib_path = os.path.abspath(file_dir / "build/libspi.so")
 
@@ -31,11 +66,35 @@ def readSpi():
 
     table = inst.getTable("Robot 1")
 
-    imu_table = table.getTable("Imu")
-    imu_x_pub = imu_table.getFloatTopic("x").publish()
-    imu_y_pub = imu_table.getFloatTopic("y").publish()
-    imu_z_pub = imu_table.getFloatTopic("z").publish()
-    imu_dt_pub = imu_table.getFloatTopic("dt").publish()
+    imu_table = table.getSubTable("Imu")
+    imu_topics = publishvec3(imu_table)
+
+    state_table = table.getSubTable("State")
+    state_topics = publishvec3(state_table)
+
+    vision_table = table.getSubTable("Vision")
+    vision_topics = publishvec3(vision_table)
+
+    odom_table = table.getSubTable("Odometry")
+    odom_topics = publishvec3(odom_table)
+
+    motor_table = table.getSubTable("Motors")
+    m1_table = motor_table.getSubTable("m1")
+    m1_topics = publish_control_signal(m1_table)
+    m2_table = motor_table.getSubTable("m2")
+    m2_topics = publish_control_signal(m2_table)
+    m3_table = motor_table.getSubTable("m3")
+    m3_topics = publish_control_signal(m3_table)
+    m4_table = motor_table.getSubTable("m4")
+    m4_topics = publish_control_signal(m4_table)
+
+    pos_table = table.getSubTable("Pos")
+    pos_x_table = pos_table.getSubTable("pos_x")
+    pos_x_topics = publish_control_signal(pos_x_table)
+    pos_y_table = pos_table.getSubTable("pos_y")
+    pos_y_topics = publish_control_signal(pos_y_table)
+    pos_angle_table = pos_table.getSubTable("pos_angle")
+    pos_angle_topics = publish_control_signal(pos_angle_table)
 
     spi = ctypes.CDLL(lib_path)
     dataSize = spi.getDataSize()
@@ -59,17 +118,64 @@ def readSpi():
 
         # print("Passed decode check")
 
-        dt = msg.gyro.timestamp - prev_ts
-        if msg.gyro.timestamp < 1 or dt < 1:
+        imu_dt = msg.gyro.timestamp - imu_prev_ts
+        if msg.gyro.timestamp < 1 or imu_dt < 1:
             failed += 1
             continue
 
-        imu_x_pub.set(msg.gyro.x)
-        imu_y_pub.set(msg.gyro.y)
-        imu_z_pub.set(msg.gyro.z)
-        imu_dt_pub.set(dt)
+        imu_prev_ts = msg.gyro.timestamp
 
-        prev_ts = msg.gyro.timestamp
+        setvec3(imu_topics, msg.gyro.x, imu.gyro.y, imu.gyro.z, imu_dt)
+
+        state_dt = msg.state.timestamp - state_prev_ts
+        state_prev_ts = msg.state.timestamp
+
+        setvec3(state_topics, msg.state.x, msg.state.y, msg.state.z, state_dt)
+
+        vision_dt = msg.vision.timestamp - vision_prev_ts
+        vision_prev_ts = msg.vision.timestamp
+
+        setvec3(vision_topics, msg.vision.x, msg.vision.y, msg.vision.z, vision_dt)
+
+        odom_dt = msg.odometry.timestamp - odom_prev_ts
+        odom_prev_ts = msg.odometry.timestamp
+
+        setvec3(odom_topics, msg.odometry.x, msg.odometry.y, msg.odometry.z, odom_dt)
+
+        set_control_signal(
+            m1_topics, msg.m1.ref, msg.m1.contol, msg.m1.error, msg.m1.output
+        )
+        set_control_signal(
+            m2_topics, msg.m2.ref, msg.m2.contol, msg.m2.error, msg.m2.output
+        )
+        set_control_signal(
+            m3_topics, msg.m3.ref, msg.m3.contol, msg.m3.error, msg.m3.output
+        )
+        set_control_signal(
+            m4_topics, msg.m4.ref, msg.m4.contol, msg.m4.error, msg.m4.output
+        )
+
+        set_control_signal(
+            pos_x_topics,
+            msg.pos_x.ref,
+            msg.pos_x.contol,
+            msg.pos_x.error,
+            msg.pos_x.output,
+        )
+        set_control_signal(
+            pos_y_topics,
+            msg.pos_y.ref,
+            msg.pos_y.contol,
+            msg.pos_y.error,
+            msg.pos_y.output,
+        )
+        set_control_signal(
+            pos_angle_topics,
+            msg.pos_angle.ref,
+            msg.pos_angle.contol,
+            msg.pos_angle.error,
+            msg.pos_angle.output,
+        )
 
         print(1000 / dt)
 
