@@ -366,7 +366,7 @@ static FusionEKFConfig configFusionEKF = {
     .posNoiseW = 0.001f,
     .velNoiseXY = 0.005f,
     .visNoiseXY = 0.02f,
-    .visNoiseW = 0.70f,
+    .visNoiseW = 0.10f,
     .outlierMaxVelXY = 3.0f,
     .outlierMaxVelW = 3.0f,
     .trackingCoeff = 1.0f,
@@ -459,8 +459,8 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     float body_speed[3];
     NAV_wheelToBody(body_speed);
     gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
-    gyrAcc[1] = 0;
-    gyrAcc[2] = 0;
+    gyrAcc[1] = body_speed[0];
+    gyrAcc[2] = body_speed[1];
 
     // Cache bias-corrected gyro for use in controllers
     fusionEKF.gyro_z = gyrAcc[0];
