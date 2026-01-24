@@ -1,11 +1,3 @@
-# /// script
-# dependencies = [
-#    "robotpy",
-#    "protobuf",
-#    "grpcio",
-# ]
-# ///
-
 import ctypes
 import os
 import sys
