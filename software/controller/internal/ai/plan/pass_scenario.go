@@ -8,7 +8,6 @@ import (
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/controller/internal/plt"
 )
 
 const DEBUG = false
@@ -167,7 +166,7 @@ func (g *GameScenario) kicker(myID ID, receiver ID, gi GameInfo, statemachine in
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
 	var activity ai.Activity = nil
-	receiverPos := Position{X: 2000, Y: 1500, Z: 0, Angle: 0}
+	receiverPos := Position{X: 1500, Y: 1500, Z: 0, Angle: 0}
 
 	sm := &RobotStateMachine{
 		robotID:      myID,
@@ -269,7 +268,6 @@ func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state in
 					sm.ToStateMachine(RECEIVER_KICK_GOAL)
 				}
 			}
-
 		case RECEIVER_KICK_GOAL:
 			switch sm.state {
 			case STATE_START:
@@ -287,7 +285,7 @@ func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state in
 		case RECEIVER_POSITION:
 			switch sm.state {
 			case STATE_START:
-				wantedPos := Position{X: 2000, Y: 1500, Z: 0, Angle: 0}
+				wantedPos := Position{X: 1500, Y: 1500, Z: 0, Angle: 0}
 				activity = ai.NewMoveToPosition(g.team, myID, wantedPos)
 				debugf("Robot %d POSITION: Created new MoveToPosition activity to (%.0f,%.0f)\n", myID, wantedPos.X, wantedPos.Y)
 				sm.NextState()
@@ -296,7 +294,7 @@ func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state in
 				if existingActivity != nil {
 					achieved := existingActivity.Achieved(&gi)
 					myPos, _ := gi.State.GetTeam(g.team)[myID].GetPosition()
-					targetPos := Position{X: 2000, Y: 1500, Z: 0, Angle: 0}
+					targetPos := Position{X: 1500, Y: 1500, Z: 0, Angle: 0}
 					distance := myPos.Dist2d(targetPos)
 					debugf("Robot %d POSITION check: achieved=%v, distance=%.2f, myPos=(%.0f,%.0f), target=(%.0f,%.0f)\n",
 						myID, achieved, distance, myPos.X, myPos.Y, targetPos.X, targetPos.Y)
@@ -336,14 +334,12 @@ func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state in
 }
 
 func (g *GameScenario) run() {
-	plt.Init()
-
-	kicker := info.ID(3)
+	//kicker := info.ID(3)
 	receiver := info.ID(1)
 	// active_robots := []int{int(kicker), int(receiver)}
 
-	kicker_SM := KICKER_FETCH_BALL
-	kicker_S := STATE_START
+	//kicker_SM := KICKER_FETCH_BALL
+	//kicker_S := STATE_START
 
 	receiver_SM := RECEIVER_POSITION
 	receiver_S := STATE_START
@@ -353,12 +349,12 @@ func (g *GameScenario) run() {
 
 	for {
 		gi = <-g.incomingGameInfo
-		time.Sleep(5 * time.Millisecond)
+		//time.Sleep(5 * time.Millisecond)
 		// if g.HandleRef(&gi, active_robots) {
 		// 	continue
 		// }
 
-		kicker_SM, kicker_S = g.kicker(kicker, receiver, gi, kicker_SM, kicker_S, g.ballOwner)
+		//kicker_SM, kicker_S = g.kicker(kicker, receiver, gi, kicker_SM, kicker_S, g.ballOwner)
 		receiver_SM, receiver_S = g.receiver(receiver, gi, receiver_SM, receiver_S, g.ballOwner)
 	}
 }
