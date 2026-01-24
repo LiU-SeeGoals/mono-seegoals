@@ -16,6 +16,14 @@ func Init() {
 	// p.Y.Min = -2000
 }
 
+func InitFieldPlot() {
+	p = plot.New();
+	p.X.Max = 4000
+	p.Y.Max = 2000
+	p.X.Min = -4000
+	p.Y.Min = -2000
+}
+
 func Get() *plot.Plot {
 	return p
 }

@@ -171,6 +171,16 @@ func (p Position) Scale(scalar float64) Position {
 	}
 }
 
+func (p Position) Normalize2d() Position {
+	norm := p.Norm()
+	return Position{
+		X:     p.X / norm + 0.00001,
+		Y:     p.Y / norm + 0.00001,
+		Z:     p.Z,
+		Angle: p.Angle,
+	}
+}
+
 func (p Position) Normalize() Position {
 	norm := p.Norm()
 	return Position{

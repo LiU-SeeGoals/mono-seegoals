@@ -77,9 +77,6 @@ func FwRealScenario() {
 		client.BroadcastActions(actionsBlue)
 
 		if config.IsSimulated() {
-			client.BroadcastActions(actionsYellow)
-			client.BroadcastActions(actionsBlue)
-
 			simClientYellow.SendActions(actionsYellow)
 			simClientBlue.SendActions(actionsBlue)
 
@@ -88,7 +85,7 @@ func FwRealScenario() {
 				simController.TeleportBall(0, 0)
 			}
 
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(2 * time.Millisecond)
 		} else {
 			basestationClient.SendActions(actionsYellow)
 			basestationClient.SendActions(actionsBlue)

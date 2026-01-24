@@ -26,7 +26,6 @@ type MoveToPosition struct {
 	significantChange bool             // Flag to indicate if obstacles have moved significantly
 	gi                *info.GameInfo
 	avoidBall         bool
-	stuckCounter      int           // Counter to detect when robot is stuck
 	lastPosition      info.Position // Last position to detect lack of movement
 	stuckThreshold    int           // Number of cycles to consider robot as stuck
 }
@@ -54,11 +53,11 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 	// Initialize with reasonable RRT parameters
 	rrtConfig := rrtConfiguration{
 		maxIterations:      1000,
-		stepSize:           150.0,   // mm per step (increased for more aggressive exploration)
-		goalBias:           0.01,    // 20% chance of sampling the goal directly (increased for more direct paths)
+		stepSize:           50.0,   // mm per step (increased for more aggressive exploration)
+		goalBias:           0.30,    // 20% chance of sampling the goal directly (increased for more direct paths)
 		waypointThreshold:  50.0,    // mm to consider waypoint reached
-		fieldWidth:         13400.0, // Standard SSL field width in mm
-		fieldHeight:        10400.0, // Standard SSL field height in mm
+		fieldWidth:         9000.0, // Standard SSL field width in mm
+		fieldHeight:        6000.0, // Standard SSL field height in mm
 		completionDistance: 50.0,    // mm to consider the goal reached
 	}
 
@@ -72,8 +71,6 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 		planningInterval:  50 * time.Millisecond, // Replan more frequently (50ms instead of 100ms)
 		previousObstacles: []info.Position{},
 		significantChange: true, // Force initial planning
-		stuckCounter:      0,
-		stuckThreshold:    10, // Consider robot stuck after 10 cycles without movement
 	}
 }
 
@@ -92,144 +89,103 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	myRobot := gi.State.GetTeam(m.team)[m.id]
 	myPos, _ := myRobot.GetPosition()
 
-	// Check if robot is stuck by comparing current position with last position
-	//if m.lastPosition.X != 0 || m.lastPosition.Y != 0 { // Skip first cycle
-	//	moveDistance := distanceBetween(myPos, m.lastPosition)
-	//	if moveDistance < 5.0 { // If robot has moved less than 5mm, increment stuck counter
-	//		m.stuckCounter++
-	//		if m.stuckCounter > m.stuckThreshold {
-	//			// Robot is stuck, force immediate replanning with shorter interval
-	//			m.planningInterval = 20 * time.Millisecond
-	//			m.significantChange = true
-	//		}
-	//	} else {
-	//		// Robot is moving, reset stuck counter
-	//		m.stuckCounter = 0
-	//		m.planningInterval = 50 * time.Millisecond
-	//	}
-	//}
-	//m.lastPosition = myPos
-	//
-	//// Check for immediate collisions - Emergency avoidance
-	//obstacles := m.GetObstaclePositions(gi)
-	//inCollision := false
-	//
-	//// Calculate repulsive vector if we're too close to obstacles
-	//repulsiveX, repulsiveY := 0.0, 0.0
-	//
-	//for _, obstacle := range obstacles {
-	//	dist := distanceBetween(myPos, obstacle)
-	//	if dist <= RobotSafetyRadius {
-	//		inCollision = true
-	//
-	//		// Calculate unit vector away from obstacle
-	//		dx := myPos.X - obstacle.X
-	//		dy := myPos.Y - obstacle.Y
-	//
-	//		// Normalize (avoid division by zero)
-	//		if dist > 0.001 {
-	//			dx /= dist
-	//			dy /= dist
-	//		} else {
-	//			// If almost exactly overlapping, move in random direction
-	//			angle := rand.Float64() * 2 * math.Pi
-	//			dx = math.Cos(angle)
-	//			dy = math.Sin(angle)
-	//		}
-	//
-	//		// Stronger repulsion for closer obstacles (inverse square law)
-	//		force := 1.0 / math.Max(0.001, dist*dist) * 10000.0
-	//
-	//		repulsiveX += dx * force
-	//		repulsiveY += dy * force
-	//	}
-	//}
-	//
-	//// If in collision, use emergency evasion movement
-	//if inCollision {
-	//	// Normalize the repulsive vector
-	//	magnitude := math.Sqrt(repulsiveX*repulsiveX + repulsiveY*repulsiveY)
-	//	if magnitude > 0 {
-	//		repulsiveX /= magnitude
-	//		repulsiveY /= magnitude
-	//	}
-	//
-	//	// Create an emergency target position in the direction of the repulsive force
-	//	emergencyTarget := info.Position{
-	//		X:     myPos.X + repulsiveX*300.0, // Move 300mm in the repulsive direction
-	//		Y:     myPos.Y + repulsiveY*300.0,
-	//		Angle: myPos.Angle,
-	//	}
+	m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination) / float64(m.rrtConfig.maxIterations), 2), m.rrtConfig.stepSize)
+	// fmt.Println(m.rrtConfig.stepSize)
+	// fmt.Println(m.final_destination)
+	// fmt.Println(myPos)
 
-	//	// Create move action to the emergency target
-	//	act := action.MoveTo{}
-	//	act.Id = int(m.id)
-	//	act.Team = m.team
-	//	act.Pos = myPos
-	//	act.Dest = emergencyTarget
-	//	act.Dribble = false
-	//	return act
-	//}
-	//
-	//// Check for significant obstacle changes
-	//currentObstacles := obstacles
-	//m.CheckForSignificantChanges(currentObstacles)
-	//
-	//// Check if we need to replan due to time, path emptiness, or significant obstacle changes
-	//if time.Since(m.lastPlanningTime) >= m.planningInterval ||
-	//	len(m.path) == 0 ||
-	//	m.significantChange {
-	//	m.PlanPath(gi, myPos)
-	//	m.lastPlanningTime = time.Now()
-	//	m.previousObstacles = currentObstacles
-	//	m.significantChange = false
-	//}
-	//
-	//// If we have a path, navigate to the next waypoint
-	targetPos := m.final_destination
-	//if len(m.path) > 0 {
-	//	// Check if we've reached the current waypoint
-	//	distance := distanceBetween(myPos, m.path[0])
-	//	if distance <= m.rrtConfig.waypointThreshold && len(m.path) > 1 {
-	//		// Remove the first waypoint
-	//		m.path = m.path[1:]
-	//	}
-	//
-	//	// Get target waypoint
-	//	targetPos = m.path[0]
-	//
-	//	// Extend the waypoint further in the same direction to avoid slow PID behavior
-	//	// Only extend if we're not at the final waypoint
-	//	if len(m.path) > 1 || targetPos != m.final_destination {
-	//		// Calculate direction vector from current position to target
-	//		dx := targetPos.X - myPos.X
-	//		dy := targetPos.Y - myPos.Y
-	//		dist := math.Sqrt(dx*dx + dy*dy)
-	//
-	//		// Only apply extension if we're close enough to be affected by PID slowdown
-	//		// but not so close that we've essentially reached the waypoint
-	//		const minExtensionDist = 100.0 // Don't extend if we're closer than this
-	//		const extensionAmount = 150.0  // Extend by this amount
-	//
-	//		if dist > minExtensionDist {
-	//			// Normalize direction
-	//			if dist > 0 {
-	//				dx /= dist
-	//				dy /= dist
-	//			}
-	//
-	//			// Extend the waypoint
-	//			targetPos.X += dx * extensionAmount
-	//			targetPos.Y += dy * extensionAmount
-	//
-	//			// If this is the last waypoint and it's our final destination, don't modify
-	//			if len(m.path) == 1 && distanceBetween(targetPos, m.final_destination) < 100.0 {
-	//				targetPos = m.final_destination
-	//			}
-	//		}
-	//	}
-	//}
+	m.AvoidBall(true)
+	targetPos := myPos
 
+	m.lastPosition = myPos
+
+	// Check for immediate collisions - Emergency avoidance
+	obstacles := m.GetObstaclePositions(gi)
+	inCollision := false
+
+	// Calculate repulsive vector if we're too close to obstacles
+	repulsiveX, repulsiveY := 0.0, 0.0
+
+	for _, obstacle := range obstacles {
+		dist := distanceBetween(myPos, obstacle)
+		if dist <= RobotSafetyRadius {
+			inCollision = true
+
+			// Calculate unit vector away from obstacle
+			dx := myPos.X - obstacle.X
+			dy := myPos.Y - obstacle.Y
+
+			// Normalize (avoid division by zero)
+			if dist > 0.001 {
+				dx /= dist
+				dy /= dist
+			} else {
+				// If almost exactly overlapping, move in random direction
+				angle := rand.Float64() * 2 * math.Pi
+				dx = math.Cos(angle)
+				dy = math.Sin(angle)
+			}
+
+			// Stronger repulsion for closer obstacles (inverse square law)
+			force := 1.0 / math.Max(0.001, dist*dist) * 10000.0
+
+			repulsiveX += dx * force
+			repulsiveY += dy * force
+		}
+	}
+
+	// If in collision, use emergency evasion movement
+	if inCollision {
+		// Normalize the repulsive vector
+		magnitude := math.Sqrt(repulsiveX*repulsiveX + repulsiveY*repulsiveY)
+		if magnitude > 0 {
+			repulsiveX /= magnitude
+			repulsiveY /= magnitude
+		}
+
+		// Create an emergency target position in the direction of the repulsive force
+		emergencyTarget := info.Position{
+			X:     myPos.X + repulsiveX*200.0, // Move 300mm in the repulsive direction
+			Y:     myPos.Y + repulsiveY*200.0,
+			Angle: myPos.Angle,
+		}
+
+		// Create move action to the emergency target
+		act := action.MoveTo{}
+		act.Id = int(m.id)
+		act.Team = m.team
+		act.Pos = myPos
+		act.Dest = emergencyTarget
+		act.Dribble = false
+		return act
+	}
+
+	// Check for significant obstacle changes
+	// currentObstacles := obstacles
+	// m.CheckForSignificantChanges(currentObstacles)
+
+	// Check if we need to replan due to time, path emptiness, or significant obstacle changes
+	// if time.Since(m.lastPlanningTime) >= m.planningInterval ||
+	// 	len(m.path) == 0 ||
+	// 	m.significantChange {
+	m.PlanPath(gi, myPos)
+	// 	m.lastPlanningTime = time.Now()
+	// 	m.previousObstacles = currentObstacles
+	// 	m.significantChange = false
+	// }
+
+	// fmt.Println(len(m.path))
+	if len(m.path) > 0 {
+		distance := distanceBetween(myPos, m.path[0])
+		if distance <= m.rrtConfig.waypointThreshold && len(m.path) > 1 {
+			m.path = m.path[1:]
+		}
+
+		// Get target waypoint
+		targetPos = m.path[0]
+	}
+
+	// targetPos := m.final_destination
 	// Create move action to the current target
 	act := action.MoveTo{}
 	act.Id = int(m.id)

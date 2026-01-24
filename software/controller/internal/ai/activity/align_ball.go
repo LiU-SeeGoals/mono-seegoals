@@ -78,12 +78,15 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 		robotTargetPos = myRobotPos
 	}
 
-	act := action.MoveTo{}
-	act.Id = int(m.id)
-	act.Team = m.team
-	act.Pos = myRobotPos
-	act.Dest = robotTargetPos
-	act.Dribble = false
+	act := NewMoveToPosition(m.team, m.id, robotTargetPos).GetMoveToAction(gi)
+	act.Dest.Angle = robotTargetPos.Angle
+
+	// act := action.MoveTo{}
+	// act.Id = int(m.id)
+	// act.Team = m.team
+	// act.Pos = myRobotPos
+	// act.Dest = robotTargetPos
+	// act.Dribble = false
 
 	return &act
 }
