@@ -42,8 +42,8 @@ def setvec3(topics, x, y, z, dt):
 def publish_control_signal(table):
     ref = table.getFloatTopic("Reference").publish()
     control = table.getFloatTopic("Control").publish()
-    error = table.getFloatTopic("Error").public()
-    output = table.getFloatTopic("Output").public()
+    error = table.getFloatTopic("Error").publish()
+    output = table.getFloatTopic("Output").publish()
 
     return (ref, control, error, output)
 
@@ -102,7 +102,10 @@ def readSpi():
     success = 0
 
     spi.spiOpen()
-    prev_ts = 0
+    imu_prev_ts = 0
+    state_prev_ts = 0
+    vision_prev_ts = 0
+    odom_prev_ts = 0
 
     while True:
         spiBytes = (ctypes.c_uint8 * dataSize)()
