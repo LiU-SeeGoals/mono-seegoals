@@ -247,3 +247,8 @@ func GetBasestationPort() string {
 	cfg := GetInstance()
 	return cfg.BS.Port
 }
+
+func IsSimulated() bool {
+	cfg := GetInstance()
+	return cfg.Env == "simulation"
+}

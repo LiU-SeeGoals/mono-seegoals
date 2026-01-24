@@ -245,7 +245,7 @@ func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state in
 
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
-	opponentGoal := Position{X: 4500, Y: 0, Z: 0, Angle: 0}
+	opponentGoal := Position{X: 3050, Y: 0, Z: 0, Angle: 0}
 
 	sm := &RobotStateMachine{
 		robotID:      myID,
@@ -336,7 +336,7 @@ func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state in
 func (g *GameScenario) run() {
 	//kicker := info.ID(3)
 	receiver := info.ID(1)
-	// active_robots := []int{int(kicker), int(receiver)}
+	//active_robots := []int{int(kicker), int(receiver)}
 
 	//kicker_SM := KICKER_FETCH_BALL
 	//kicker_S := STATE_START
@@ -350,9 +350,9 @@ func (g *GameScenario) run() {
 	for {
 		gi = <-g.incomingGameInfo
 		//time.Sleep(5 * time.Millisecond)
-		// if g.HandleRef(&gi, active_robots) {
-		// 	continue
-		// }
+		//if g.HandleRef(&gi, active_robots) {
+		//	continue
+		//}
 
 		//kicker_SM, kicker_S = g.kicker(kicker, receiver, gi, kicker_SM, kicker_S, g.ballOwner)
 		receiver_SM, receiver_S = g.receiver(receiver, gi, receiver_SM, receiver_S, g.ballOwner)
