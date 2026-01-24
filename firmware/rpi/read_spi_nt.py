@@ -31,12 +31,12 @@ def publishvec3(table):
 
 
 def setvec3(topics, x, y, z, dt):
-    x, y, z, dt = topics
+    x_pub, y_pub, z_pub, dt_pub = topics
 
-    x.set(x)
-    y.set(y)
-    z.set(z)
-    dt.set(dt)
+    x_pub.set(x)
+    y_pub.set(y)
+    z_pub.set(z)
+    dt_pub.set(dt)
 
 
 def publish_control_signal(table):
@@ -49,12 +49,12 @@ def publish_control_signal(table):
 
 
 def set_control_signal(topics, ref, control, error, output):
-    ref, control, error, output = topics
+    ref_pub, control_pub, error_pub, output_pub = topics
 
-    ref.set(ref)
-    control.set(ref)
-    error.set(ref)
-    output.set(ref)
+    ref_pub.set(ref)
+    control_pub.set(ref)
+    error_pub.set(ref)
+    output_pub.set(ref)
 
 
 def readSpi():
@@ -128,7 +128,7 @@ def readSpi():
 
         imu_prev_ts = msg.gyro.timestamp
 
-        setvec3(imu_topics, msg.gyro.x, imu.gyro.y, imu.gyro.z, imu_dt)
+        setvec3(imu_topics, msg.gyro.x, msg.gyro.y, msg.gyro.z, imu_dt)
 
         state_dt = msg.state.timestamp - state_prev_ts
         state_prev_ts = msg.state.timestamp
