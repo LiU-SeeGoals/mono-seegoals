@@ -52,9 +52,9 @@ def set_control_signal(topics, ref, control, error, output):
     ref_pub, control_pub, error_pub, output_pub = topics
 
     ref_pub.set(ref)
-    control_pub.set(ref)
-    error_pub.set(ref)
-    output_pub.set(ref)
+    control_pub.set(control)
+    error_pub.set(error)
+    output_pub.set(output)
 
 
 def readSpi():
