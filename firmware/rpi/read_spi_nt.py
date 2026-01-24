@@ -31,9 +31,11 @@ def readSpi():
 
     table = inst.getTable("Robot 1")
 
-    x_pub = table.getFloatTopic("x").publish()
-    y_pub = table.getFloatTopic("y").publish()
-    z_pub = table.getFloatTopic("z").publish()
+    imu_table = table.getTable("Imu")
+    imu_x_pub = imu_table.getFloatTopic("x").publish()
+    imu_y_pub = imu_table.getFloatTopic("y").publish()
+    imu_z_pub = imu_table.getFloatTopic("z").publish()
+    imu_dt_pub = imu_table.getFloatTopic("dt").publish()
 
     spi = ctypes.CDLL(lib_path)
     dataSize = spi.getDataSize()
@@ -51,26 +53,23 @@ def readSpi():
         try:
             msg.ParseFromString(bytes(spiBytes)[1 : msg_size + 1])
         except DecodeError as e:
-            print(f"Decode Error: {e}")
+            # print(f"Decode Error: {e}")
             failed += 1
             continue
 
-        print("Passed decode check")
-
-        x_pub.set(msg.gyro.x)
-        y_pub.set(msg.gyro.y)
-        z_pub.set(msg.gyro.z)
+        # print("Passed decode check")
 
         dt = msg.gyro.timestamp - prev_ts
         if msg.gyro.timestamp < 1 or dt < 1:
             failed += 1
             continue
 
-        prev_ts = msg.gyro.timestamp
+        imu_x_pub.set(msg.gyro.x)
+        imu_y_pub.set(msg.gyro.y)
+        imu_z_pub.set(msg.gyro.z)
+        imu_dt_pub.set(dt)
 
-        if dt < 1 or msg.gyro.timestamp < 1:
-            failed += 1
-            continue
+        prev_ts = msg.gyro.timestamp
 
         print(1000 / dt)
 
