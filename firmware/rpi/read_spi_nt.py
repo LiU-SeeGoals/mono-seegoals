@@ -11,6 +11,7 @@ import os
 import sys
 import numpy as np
 import ntcore
+import time
 from pathlib import Path
 from google.protobuf.message import DecodeError
 
@@ -25,7 +26,7 @@ def readSpi():
     lib_path = os.path.abspath(file_dir / "build/libspi.so")
 
     inst = ntcore.NetworkTableInstance.getDefault()
-    inst.startClient("Robot 1")
+    inst.startClient4("Robot 1")
     inst.setServer("almaz.local")
 
     table = inst.getTable("Robot 1")
@@ -80,6 +81,15 @@ def readFile():
     failed = 0
     success = 0
     prev_ts = 0
+    inst = ntcore.NetworkTableInstance.getDefault()
+    inst.startClient4("Robot 1")
+    inst.setServer("almaz.local")
+
+    table = inst.getTable("Robot 1")
+
+    x_pub = table.getFloatTopic("x").publish()
+    y_pub = table.getFloatTopic("y").publish()
+    z_pub = table.getFloatTopic("z").publish()
 
     with open(file_dir / "build/output.txt") as f:
         for protoBits in f.readlines():
@@ -94,7 +104,11 @@ def readFile():
             except DecodeError as e:
                 failed += 1
                 continue
+            x_pub.set(msg.gyro.x)
+            y_pub.set(msg.gyro.y)
+            z_pub.set(msg.gyro.z)
 
+            time.sleep(0.100)
             success += 1
             yield msg
 
