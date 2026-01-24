@@ -48,13 +48,17 @@ def readSpi():
         msg_size = int(bytes(spiBytes)[0])
         msg = imu_pb2.data_sample()
         try:
-            msg.ParseFromString(bytes(spiBytes)[1:])
+            msg.ParseFromString(bytes(spiBytes)[1 : msg_size + 1])
         except DecodeError as e:
             print(f"Decode Error: {e}")
             failed += 1
             continue
 
         print("Passed decode check")
+
+        x_pub.set(msg.gyro.x)
+        y_pub.set(msg.gyro.y)
+        z_pub.set(msg.gyro.z)
 
         dt = msg.gyro.timestamp - prev_ts
         if msg.gyro.timestamp < 1 or dt < 1:
@@ -66,10 +70,6 @@ def readSpi():
         if dt < 1 or msg.gyro.timestamp < 1:
             failed += 1
             continue
-
-        x_pub.set(msg.gyro.x)
-        y_pub.set(msg.gyro.y)
-        z_pub.set(msg.gyro.z)
 
         print(1000 / dt)
 
