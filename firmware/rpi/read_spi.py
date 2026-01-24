@@ -11,6 +11,7 @@ sys.path.append(proto_dir)
 
 import imu_pb2
 
+
 def readSpi():
     lib_path = os.path.abspath(file_dir / "build/libspi.so")
 
@@ -44,19 +45,23 @@ def readSpi():
             failed += 1
             continue
 
-        print(1000/dt)
+        print(1000 / dt)
 
     spi.spiClose()
+
 
 def readFile():
     failed = 0
     success = 0
     prev_ts = 0
 
-    with open(file_dir/"build/output.txt") as f:
+    with open(file_dir / "build/output.txt") as f:
         for protoBits in f.readlines():
             msg = imu_pb2.data_sample()
-            b = bytes(int(protoBits[i:i+8], 2) for i in range(0, len(protoBits.strip()), 8))
+            b = bytes(
+                int(protoBits[i : i + 8], 2)
+                for i in range(0, len(protoBits.strip()), 8)
+            )
 
             try:
                 msg.ParseFromString(b)
@@ -68,6 +73,7 @@ def readFile():
             yield msg
 
     print(f"Failed {failed} out of {failed + success} packets")
+
 
 if __name__ == "__main__":
     # readSpi()

@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#    "robotpy",
+#    "protobuf",
+#    "grpcio",
+# ]
+# ///
+
 import ctypes
 import os
 import sys
@@ -17,7 +25,8 @@ def readSpi():
     lib_path = os.path.abspath(file_dir / "build/libspi.so")
 
     inst = ntcore.NetworkTableInstance.getDefault()
-    inst.setServer("")
+    inst.startClient("Robot 1")
+    inst.setServer("almaz.local")
 
     table = inst.getTable("Robot 1")
 
@@ -41,8 +50,11 @@ def readSpi():
         try:
             msg.ParseFromString(bytes(spiBytes)[1:])
         except DecodeError as e:
+            print(f"Decode Error: {e}")
             failed += 1
             continue
+
+        print("Passed decode check")
 
         dt = msg.gyro.timestamp - prev_ts
         if msg.gyro.timestamp < 1 or dt < 1:
