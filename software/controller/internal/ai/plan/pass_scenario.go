@@ -334,13 +334,12 @@ func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state in
 }
 
 func (g *GameScenario) run() {
-	//kicker := info.ID(3)
+	kicker := info.ID(3)
 	receiver := info.ID(1)
 	//active_robots := []int{int(kicker), int(receiver)}
 
-	//kicker_SM := KICKER_FETCH_BALL
-	//kicker_S := STATE_START
-
+	kicker_SM := KICKER_FETCH_BALL
+	kicker_S := STATE_START
 	receiver_SM := RECEIVER_POSITION
 	receiver_S := STATE_START
 
@@ -354,7 +353,7 @@ func (g *GameScenario) run() {
 		//	continue
 		//}
 
-		//kicker_SM, kicker_S = g.kicker(kicker, receiver, gi, kicker_SM, kicker_S, g.ballOwner)
+		kicker_SM, kicker_S = g.kicker(kicker, receiver, gi, kicker_SM, kicker_S, g.ballOwner)
 		receiver_SM, receiver_S = g.receiver(receiver, gi, receiver_SM, receiver_S, g.ballOwner)
 	}
 }
