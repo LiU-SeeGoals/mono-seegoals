@@ -161,21 +161,21 @@ def readSpi():
         set_control_signal(
             pos_x_topics,
             msg.pos_x.ref,
-            msg.pos_x.contol,
+            msg.pos_x.control,
             msg.pos_x.error,
             msg.pos_x.output,
         )
         set_control_signal(
             pos_y_topics,
             msg.pos_y.ref,
-            msg.pos_y.contol,
+            msg.pos_y.control,
             msg.pos_y.error,
             msg.pos_y.output,
         )
         set_control_signal(
             pos_angle_topics,
             msg.pos_angle.ref,
-            msg.pos_angle.contol,
+            msg.pos_angle.control,
             msg.pos_angle.error,
             msg.pos_angle.output,
         )
