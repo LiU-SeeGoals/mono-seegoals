@@ -180,7 +180,7 @@ def readSpi():
             msg.pos_angle.output,
         )
 
-        print(1000 / dt)
+        # print(1000 / dt)
 
     spi.spiClose()
 
