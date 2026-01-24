@@ -70,8 +70,20 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 
 	goaliePos := info.Position{X: goalieX, Y: goalieY, Z: 0.0, Angle: 0.0}
 
-	move := NewMoveToPosition(g.team, g.id, goaliePos)
-	return move.GetAction(gi)
+	myRobotPos, _ := gi.State.GetTeam(g.team)[g.id].GetPosition()
+
+	//move := NewMoveToPosition(g.team, g.id, goaliePos)
+	act := action.MoveTo{}
+	act.Id = int(g.id)
+	act.Team = g.team
+	act.Pos = myRobotPos
+	act.Dest = goaliePos
+	act.Dest.Angle = goaliePos.Angle
+	act.Dribble = false
+
+	return &act
+
+	//return move.GetAction(gi)
 }
 
 // Achieved returns whether this action is "complete".

@@ -20,16 +20,17 @@ type AlignConfig struct {
 func GetAlignConfig() AlignConfig {
 	return AlignConfig{
 		robotBallClearence: 200,
-		doneDist:           50,
-		angleError:         3.0 * math.Pi / 180,
+		doneDist:           70,
+		angleError:         4.0 * math.Pi / 180,
 	}
 }
 
 type AlignBall struct {
-	team info.Team
-	id   info.ID
-	to   info.Position
-	from info.Position
+	team       info.Team
+	id         info.ID
+	to         info.Position
+	from       info.Position
+	AlignAngle float64
 }
 
 func (m *AlignBall) String() string {
@@ -42,6 +43,7 @@ func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) 
 		id,
 		to,
 		from,
+		0,
 	}
 }
 
@@ -57,7 +59,7 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 	alignPos := ballGoalTangent.Mult(GetAlignConfig().robotBallClearence)
 	robotXY := info.Sub(ballV2, alignPos)
 	robotTargetPos := info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: ballGoalTangent.Angle()}
-
+	m.AlignAngle = ballGoalTangent.Angle()
 	return robotTargetPos
 }
 

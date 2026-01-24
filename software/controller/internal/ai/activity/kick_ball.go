@@ -85,6 +85,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	if speed > 0.05 {
 		robotTargetPos = robotPos
 	}
+
 	act := action.MoveTo{}
 	act.Id = int(m.id)
 	act.Team = m.team

@@ -81,8 +81,10 @@ func (g *GameScenario) run() {
 	kickerRole := roles.NewKickerRole(kicker, g)
 	receiverRole := roles.NewReceiverRole(receiver, g)
 
+	g.changeBallOwner(kicker, "start of game")
+
 	gi := <-g.incomingGameInfo
-	// fmt.Println(gi.Status)
+	fmt.Println(gi.Status)
 
 	for {
 		gi = <-g.incomingGameInfo
