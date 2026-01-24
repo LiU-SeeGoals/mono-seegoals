@@ -1,6 +1,7 @@
 package demos
 
 import (
+	"math"
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/ai"
@@ -16,8 +17,9 @@ func FwRealScenario() {
 	teamYellow := []int{1, 3}
 	teamBlue := []int{7}
 
-	//sslClientTracked := client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
+	sslClientTracked := client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 	sslClientRaw := client.NewSSLClient(config.GetSSLClientAddress())
+	//sslClientRaw := client.NewSSLClient(config.GetSSLClientAddressReal())
 
 	simClientYellow := client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
 	simClientBlue := client.NewSimClient(config.GetSimBlueTeamAddress(), gameInfo)
@@ -46,7 +48,13 @@ func FwRealScenario() {
 		playTime := time.Now().UnixMilli()
 
 		sslClientRaw.UpdateState(gameInfo, playTime)
-		//sslClientTracked.UpdateState(gameInfo, playTime)
+		ball, _ := gameInfo.State.GetBall().GetPosition()
+		// If the ball is outside the field put it back
+		if math.Abs(ball.Y) > 3000 || math.Abs(ball.X) > 4500 {
+			simController.TeleportBall(0, 0)
+		}
+		//fmt.Println(ball)
+		sslClientTracked.UpdateState(gameInfo, playTime)
 
 		actionsYellow := aiYellow.GetActions(gameInfo)
 		actionsBlue := aiBlue.GetActions(gameInfo)

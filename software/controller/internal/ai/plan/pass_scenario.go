@@ -33,42 +33,41 @@ const (
 	STATE_EXECUTING = 1
 )
 
-func KickerGetStateMachineName(sm *RobotStateMachine) string {
-	if sm.isBallOwner {
-		switch sm.stateMachine {
-		case KICKER_FETCH_BALL:
-			return "FETCH_BALL"
-		case KICKER_PASS_BALL:
-			return "PASS_BALL"
+func (sm *RobotStateMachine) GetStateMachineName() string {
+	switch sm.role {
+	case "kicker":
+		if sm.isBallOwner {
+			switch sm.stateMachine {
+			case KICKER_FETCH_BALL:
+				return "FETCH_BALL"
+			case KICKER_PASS_BALL:
+				return "PASS_BALL"
+			}
+		} else {
+			switch sm.stateMachine {
+			case KICKER_STAY:
+				return "KICKER_STAY"
+			}
 		}
-	} else {
-		switch sm.stateMachine {
-		case KICKER_STAY:
-			return "WATCH_BALL"
+	case "receiver":
+		if sm.isBallOwner {
+			switch sm.stateMachine {
+			case RECEIVER_TURN_TO_GOAL:
+				return "TURN_TO_GOAL"
+			case RECEIVER_KICK_GOAL:
+				return "KICK_GOAL"
+			}
+		} else {
+			switch sm.stateMachine {
+			case RECEIVER_POSITION:
+				return "POSITION"
+			case RECEIVER_WATCH_BALL:
+				return "WATCH_BALL"
+			}
 		}
 	}
 
-	return "UNKNOWN"
-}
-
-func ReceiverGetStateMachineName(sm *RobotStateMachine) string {
-	if sm.isBallOwner {
-		switch sm.stateMachine {
-		case RECEIVER_TURN_TO_GOAL:
-			return "TURN_TO_GOAL"
-		case RECEIVER_KICK_GOAL:
-			return "KICK_GOAL"
-		}
-	} else {
-		switch sm.stateMachine {
-		case RECEIVER_POSITION:
-			return "POSITION"
-		case RECEIVER_WATCH_BALL:
-			return "WATCH_BALL"
-		}
-	}
-
-	return "UNKNOWN"
+	return fmt.Sprintf("SM_%d", sm.stateMachine)
 }
 
 type RobotStateMachine struct {
@@ -90,44 +89,33 @@ func NewRobotStateMachine(robotID ID, role string, gs *GameScenario) *RobotState
 	}
 }
 
-func (sm *RobotStateMachine) GetStateName() string {
-	switch sm.role {
-	case "kicker":
-		return KickerGetStateMachineName(sm)
-	case "receiver":
-		return ReceiverGetStateMachineName(sm)
-	}
-	return fmt.Sprintf("SM_%d", sm.stateMachine)
-}
-
 func (sm *RobotStateMachine) ToStateMachine(newSM int) {
-	oldName := sm.GetStateName()
+	oldName := sm.GetStateMachineName()
 	sm.stateMachine = newSM
 	sm.state = STATE_START
-	newName := sm.GetStateName()
+	newName := sm.GetStateMachineName()
 	fmt.Printf("Robot %d (%s): %s -> %s, State -> START\n", sm.robotID, sm.role, oldName, newName)
 }
 
 func (sm *RobotStateMachine) NextState() {
 	if sm.state != STATE_EXECUTING {
-		fmt.Printf("Robot %d (%s): %s State START -> EXECUTING\n", sm.robotID, sm.role, sm.GetStateName())
+		fmt.Printf("Robot %d (%s): %s State START -> EXECUTING\n", sm.robotID, sm.role, sm.GetStateMachineName())
 		sm.state = STATE_EXECUTING
 	}
 }
 
 func (sm *RobotStateMachine) ResetState() {
 	if sm.state != STATE_START {
-		fmt.Printf("Robot %d (%s): %s State EXECUTING -> START\n", sm.robotID, sm.role, sm.GetStateName())
+		fmt.Printf("Robot %d (%s): %s State EXECUTING -> START\n", sm.robotID, sm.role, sm.GetStateMachineName())
 		sm.state = STATE_START
 	}
 }
 
 func (sm *RobotStateMachine) ResetIfPreviousOwner() {
 	if sm.gameScenario.previousBallOwner == sm.robotID {
-		fmt.Printf("Reset since previous owner: ", sm.robotID)
+		fmt.Println("Reset since previous owner:", sm.robotID)
 		sm.ToStateMachine(0)
 		sm.gameScenario.previousBallOwner = 50
-		sm.isBallOwner = false
 	}
 }
 
@@ -141,7 +129,7 @@ type GameScenario struct {
 
 func (g *GameScenario) changeBallOwner(newOwner *RobotStateMachine, reason string) {
 	if g.ballOwner != newOwner.robotID {
-		fmt.Printf("Ball Owner: %d -> %d (%s)\n", g.ballOwner, newOwner, reason)
+		fmt.Printf("Ball Owner: %d -> %d (%s)\n", g.ballOwner, newOwner.robotID, reason)
 		g.previousBallOwner = g.ballOwner
 		g.ballOwner = newOwner.robotID
 		newOwner.isBallOwner = true
@@ -175,7 +163,7 @@ func (m *GameScenario) Init(
 	go m.run()
 }
 
-func (g *GameScenario) kicker(myID ID, receiver ID, gi GameInfo, statemachine int, state int) (int, int) {
+func (g *GameScenario) kicker(myID ID, receiver ID, gi GameInfo, statemachine int, state int, ballowner ID) (int, int) {
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
 	var activity ai.Activity = nil
@@ -187,6 +175,7 @@ func (g *GameScenario) kicker(myID ID, receiver ID, gi GameInfo, statemachine in
 		stateMachine: statemachine,
 		state:        state,
 		gameScenario: g,
+		isBallOwner:  ballowner == myID,
 	}
 
 	sm.ResetIfPreviousOwner()
@@ -204,12 +193,15 @@ func (g *GameScenario) kicker(myID ID, receiver ID, gi GameInfo, statemachine in
 					sm.ToStateMachine(KICKER_PASS_BALL)
 				}
 			}
-
 		case KICKER_PASS_BALL:
 			switch sm.state {
 			case STATE_START:
-				activity = ai.NewKickBall(g.team, myID, ballPos)
-				sm.NextState()
+				activity = ai.NewAlign(g.team, myID, receiverPos, ballPos)
+				achieved := activity.Achieved(&gi)
+				if achieved {
+					activity = ai.NewKickBall(g.team, myID, ballPos)
+					sm.NextState()
+				}
 			case STATE_EXECUTING:
 				existingActivity := g.GetActivity(myID)
 				if existingActivity != nil && existingActivity.Achieved(&gi) {
@@ -249,13 +241,12 @@ func (g *GameScenario) kicker(myID ID, receiver ID, gi GameInfo, statemachine in
 	return sm.stateMachine, sm.state
 }
 
-func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state int) (int, int) {
+func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state int, ballowner ID) (int, int) {
 	var activity ai.Activity = nil
 
-	//ball := gi.State.GetTrackedBall()
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
-	opponentGoal := Position{X: 10000, Y: 0, Z: 0, Angle: 0}
+	opponentGoal := Position{X: 4500, Y: 0, Z: 0, Angle: 0}
 
 	sm := &RobotStateMachine{
 		robotID:      myID,
@@ -263,6 +254,7 @@ func (g *GameScenario) receiver(myID ID, gi GameInfo, statemachine int, state in
 		stateMachine: statemachine,
 		state:        state,
 		gameScenario: g,
+		isBallOwner:  ballowner == myID,
 	}
 
 	sm.ResetIfPreviousOwner()
@@ -366,7 +358,7 @@ func (g *GameScenario) run() {
 		// 	continue
 		// }
 
-		kicker_SM, kicker_S = g.kicker(kicker, receiver, gi, kicker_SM, kicker_S)
-		receiver_SM, receiver_S = g.receiver(receiver, gi, receiver_SM, receiver_S)
+		kicker_SM, kicker_S = g.kicker(kicker, receiver, gi, kicker_SM, kicker_S, g.ballOwner)
+		receiver_SM, receiver_S = g.receiver(receiver, gi, receiver_SM, receiver_S, g.ballOwner)
 	}
 }
