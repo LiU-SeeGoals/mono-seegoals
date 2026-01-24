@@ -146,16 +146,16 @@ def readSpi():
         setvec3(odom_topics, msg.odometry.x, msg.odometry.y, msg.odometry.z, odom_dt)
 
         set_control_signal(
-            m1_topics, msg.m1.ref, msg.m1.contol, msg.m1.error, msg.m1.output
+            m1_topics, msg.m1.ref, msg.m1.control, msg.m1.error, msg.m1.output
         )
         set_control_signal(
-            m2_topics, msg.m2.ref, msg.m2.contol, msg.m2.error, msg.m2.output
+            m2_topics, msg.m2.ref, msg.m2.control, msg.m2.error, msg.m2.output
         )
         set_control_signal(
-            m3_topics, msg.m3.ref, msg.m3.contol, msg.m3.error, msg.m3.output
+            m3_topics, msg.m3.ref, msg.m3.control, msg.m3.error, msg.m3.output
         )
         set_control_signal(
-            m4_topics, msg.m4.ref, msg.m4.contol, msg.m4.error, msg.m4.output
+            m4_topics, msg.m4.ref, msg.m4.control, msg.m4.error, msg.m4.output
         )
 
         set_control_signal(
