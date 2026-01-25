@@ -40,7 +40,7 @@ func (kr *KickerRole) GetStateMachineName() string {
 	return fmt.Sprintf("SM_%d", kr.stateMachine)
 }
 
-func (kr *KickerRole) KickerStateMachine(gi GameInfo, team Team, g GameScenarioInterface) ai.Activity {
+func (kr *KickerRole) StateMachine(gi GameInfo, team Team, g GameScenarioInterface) ai.Activity {
 	var activity ai.Activity = nil
 
 	ball := gi.State.GetBall()
@@ -61,7 +61,6 @@ func (kr *KickerRole) KickerStateMachine(gi GameInfo, team Team, g GameScenarioI
 		case KICKER_FETCH_BALL:
 			switch kr.state {
 			case 0: // STATE_START
-				g.ChangeBallOwner(kr.robotID, "start of game")
 				activity = ai.NewAlign(team, kr.robotID, receiverPos, ballPos)
 				achieved := activity.Achieved(&gi)
 				if achieved {

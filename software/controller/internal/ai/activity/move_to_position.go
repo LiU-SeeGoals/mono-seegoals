@@ -10,6 +10,8 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
+const RRT = false
+
 // RobotSafetyRadius defines the no-movement zone around each robot
 const RobotSafetyRadius = 250.0 // mm - increased for better safety margin
 
@@ -89,103 +91,108 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	myRobot := gi.State.GetTeam(m.team)[m.id]
 	myPos, _ := myRobot.GetPosition()
 
-	m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/float64(m.rrtConfig.maxIterations), 2), m.rrtConfig.stepSize)
-	// fmt.Println(m.rrtConfig.stepSize)
-	// fmt.Println(m.final_destination)
-	// fmt.Println(myPos)
+	var targetPos info.Position
 
-	m.AvoidBall(true)
-	targetPos := myPos
+	if RRT {
+		m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/float64(m.rrtConfig.maxIterations), 2), m.rrtConfig.stepSize)
+		// fmt.Println(m.rrtConfig.stepSize)
+		// fmt.Println(m.final_destination)
+		// fmt.Println(myPos)
 
-	m.lastPosition = myPos
+		m.AvoidBall(true)
+		targetPos = myPos
 
-	// Check for immediate collisions - Emergency avoidance
-	obstacles := m.GetObstaclePositions(gi)
-	inCollision := false
+		m.lastPosition = myPos
 
-	// Calculate repulsive vector if we're too close to obstacles
-	repulsiveX, repulsiveY := 0.0, 0.0
+		// Check for immediate collisions - Emergency avoidance
+		obstacles := m.GetObstaclePositions(gi)
+		inCollision := false
 
-	for _, obstacle := range obstacles {
-		dist := distanceBetween(myPos, obstacle)
-		if dist <= RobotSafetyRadius {
-			inCollision = true
+		// Calculate repulsive vector if we're too close to obstacles
+		repulsiveX, repulsiveY := 0.0, 0.0
 
-			// Calculate unit vector away from obstacle
-			dx := myPos.X - obstacle.X
-			dy := myPos.Y - obstacle.Y
+		for _, obstacle := range obstacles {
+			dist := distanceBetween(myPos, obstacle)
+			if dist <= RobotSafetyRadius {
+				inCollision = true
 
-			// Normalize (avoid division by zero)
-			if dist > 0.001 {
-				dx /= dist
-				dy /= dist
-			} else {
-				// If almost exactly overlapping, move in random direction
-				angle := rand.Float64() * 2 * math.Pi
-				dx = math.Cos(angle)
-				dy = math.Sin(angle)
+				// Calculate unit vector away from obstacle
+				dx := myPos.X - obstacle.X
+				dy := myPos.Y - obstacle.Y
+
+				// Normalize (avoid division by zero)
+				if dist > 0.001 {
+					dx /= dist
+					dy /= dist
+				} else {
+					// If almost exactly overlapping, move in random direction
+					angle := rand.Float64() * 2 * math.Pi
+					dx = math.Cos(angle)
+					dy = math.Sin(angle)
+				}
+
+				// Stronger repulsion for closer obstacles (inverse square law)
+				force := 1.0 / math.Max(0.001, dist*dist) * 10000.0
+
+				repulsiveX += dx * force
+				repulsiveY += dy * force
+			}
+		}
+
+		// If in collision, use emergency evasion movement
+		if inCollision {
+			// Normalize the repulsive vector
+			magnitude := math.Sqrt(repulsiveX*repulsiveX + repulsiveY*repulsiveY)
+			if magnitude > 0 {
+				repulsiveX /= magnitude
+				repulsiveY /= magnitude
 			}
 
-			// Stronger repulsion for closer obstacles (inverse square law)
-			force := 1.0 / math.Max(0.001, dist*dist) * 10000.0
+			// Create an emergency target position in the direction of the repulsive force
+			emergencyTarget := info.Position{
+				X:     myPos.X + repulsiveX*200.0, // Move 300mm in the repulsive direction
+				Y:     myPos.Y + repulsiveY*200.0,
+				Angle: myPos.Angle,
+			}
 
-			repulsiveX += dx * force
-			repulsiveY += dy * force
+			// Create move action to the emergency target
+			act := action.MoveTo{}
+			act.Id = int(m.id)
+			act.Team = m.team
+			act.Pos = myPos
+			act.Dest = emergencyTarget
+			act.Dribble = false
+			return act
 		}
+
+		// Check for significant obstacle changes
+		// currentObstacles := obstacles
+		// m.CheckForSignificantChanges(currentObstacles)
+
+		// Check if we need to replan due to time, path emptiness, or significant obstacle changes
+		// if time.Since(m.lastPlanningTime) >= m.planningInterval ||
+		// 	len(m.path) == 0 ||
+		// 	m.significantChange {
+		m.PlanPath(gi, myPos)
+		// 	m.lastPlanningTime = time.Now()
+		// 	m.previousObstacles = currentObstacles
+		// 	m.significantChange = false
+		// }
+
+		// fmt.Println(len(m.path))
+		if len(m.path) > 0 {
+			distance := distanceBetween(myPos, m.path[0])
+			if distance <= m.rrtConfig.waypointThreshold && len(m.path) > 1 {
+				m.path = m.path[1:]
+			}
+
+			// Get target waypoint
+			targetPos = m.path[0]
+		}
+	} else {
+		targetPos = m.final_destination
 	}
 
-	// If in collision, use emergency evasion movement
-	if inCollision {
-		// Normalize the repulsive vector
-		magnitude := math.Sqrt(repulsiveX*repulsiveX + repulsiveY*repulsiveY)
-		if magnitude > 0 {
-			repulsiveX /= magnitude
-			repulsiveY /= magnitude
-		}
-
-		// Create an emergency target position in the direction of the repulsive force
-		emergencyTarget := info.Position{
-			X:     myPos.X + repulsiveX*200.0, // Move 300mm in the repulsive direction
-			Y:     myPos.Y + repulsiveY*200.0,
-			Angle: myPos.Angle,
-		}
-
-		// Create move action to the emergency target
-		act := action.MoveTo{}
-		act.Id = int(m.id)
-		act.Team = m.team
-		act.Pos = myPos
-		act.Dest = emergencyTarget
-		act.Dribble = false
-		return act
-	}
-
-	// Check for significant obstacle changes
-	// currentObstacles := obstacles
-	// m.CheckForSignificantChanges(currentObstacles)
-
-	// Check if we need to replan due to time, path emptiness, or significant obstacle changes
-	// if time.Since(m.lastPlanningTime) >= m.planningInterval ||
-	// 	len(m.path) == 0 ||
-	// 	m.significantChange {
-	m.PlanPath(gi, myPos)
-	// 	m.lastPlanningTime = time.Now()
-	// 	m.previousObstacles = currentObstacles
-	// 	m.significantChange = false
-	// }
-
-	// fmt.Println(len(m.path))
-	if len(m.path) > 0 {
-		distance := distanceBetween(myPos, m.path[0])
-		if distance <= m.rrtConfig.waypointThreshold && len(m.path) > 1 {
-			m.path = m.path[1:]
-		}
-
-		// Get target waypoint
-		targetPos = m.path[0]
-	}
-
-	// targetPos := m.final_destination
 	// Create move action to the current target
 	act := action.MoveTo{}
 	act.Id = int(m.id)

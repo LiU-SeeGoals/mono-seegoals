@@ -73,26 +73,92 @@ func (m *GameScenario) Init(
 	go m.run()
 }
 
+var refStateNames = map[info.RefState]string{
+	info.STATE_HALTED:              "halted",
+	info.STATE_STOPPED:             "stopped",
+	info.STATE_PLAYING:             "playing",
+	info.STATE_KICKOFF_PREPARATION: "kickoff_preparation",
+	info.STATE_PENALTY_PREPARATION: "penalty_preparation",
+	info.STATE_FREE_KICK:           "free_kick",
+	info.STATE_TIMEOUT:             "timeout",
+	info.STATE_BALL_PLACEMENT:      "ball_placement",
+}
+
+var oldRefState info.RefState = -1
+
 func (g *GameScenario) run() {
-	kicker := info.ID(3)
-	receiver := info.ID(1)
-	//active_robots := []int{int(kicker), int(receiver)}
+	kickerID := info.ID(3)
+	receiverID := info.ID(1)
 
-	kickerRole := roles.NewKickerRole(kicker, g)
-	receiverRole := roles.NewReceiverRole(receiver, g)
+	kicker := roles.NewKickerRole(kickerID, g)
+	receiverRole := roles.NewReceiverRole(receiverID, g)
+	kickoffer := roles.NewKickofferRole(kickerID, g)
+	kickoffReceiver := roles.NewKickoffReceiver(receiverID, g)
+	freeKicker := roles.NewFreekickerRole(kickerID, g)
 
-	g.changeBallOwner(kicker, "start of game")
+	kickerDefenderPos := Position{X: -1000, Y: 0, Z: 0, Angle: 0}
+	receiverDefenderPos := Position{X: -1000, Y: 1500, Z: 0, Angle: 0}
 
 	gi := <-g.incomingGameInfo
 	fmt.Println(gi.Status)
 
+	g.changeBallOwner(kickerID, "start of game")
+
 	for {
 		gi = <-g.incomingGameInfo
-		//if g.HandleRef(&gi, active_robots) {
-		//	continue
-		//}
 
-		kickerRole.KickerStateMachine(gi, g.team, g)
-		receiverRole.ReceiverStateMachine(gi, g.team, g)
+		ge := gi.Status.GetGameEvent()
+		currentState := ge.GetCurrentState()
+		previousState := ge.GetPreviousState()
+		teamPossesor := ge.GetTeamWithPossession()
+		if currentState != oldRefState {
+			fmt.Printf("\nReferee: %s -> %s (%s)\n", refStateNames[previousState], refStateNames[currentState], teamPossesor)
+			oldRefState = currentState
+		}
+
+		switch currentState {
+		case info.STATE_KICKOFF_PREPARATION:
+			if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
+				g.changeBallOwner(kickerID, "kickoff")
+				kickoffer.ToStateMachine(0, kickoffer)
+				kickoffReceiver.ToStateMachine(0, kickoffReceiver)
+			}
+
+			if teamPossesor == g.team {
+				kickoffer.StateMachine(gi, g.team, g, receiverID)
+				kickoffReceiver.StateMachine(gi, g.team, g, kickerID)
+			} else {
+				g.AddActivity(ai.NewMoveToPosition(g.team, kickerID, kickerDefenderPos))
+				g.AddActivity(ai.NewMoveToPosition(g.team, receiverID, receiverDefenderPos))
+			}
+		case info.STATE_FREE_KICK:
+			ballPos, _ := gi.State.GetBall().GetPosition()
+			if teamPossesor == g.team {
+				g.changeBallOwner(kickerID, "freekick our team")
+				freeKicker.StateMachine(gi, g.team, g, kickerID)
+				ballPos.X -= 300
+				ballPos.Y -= 300
+				g.AddActivity(ai.NewMoveToPosition(g.team, receiverID, ballPos))
+			} else {
+				g.changeBallOwner(0, "freekick other team")
+				ballPos.X -= 600
+				ballPos.Y -= 600
+				g.AddActivity(ai.NewMoveToPosition(g.team, kickerID, ballPos))
+				g.AddActivity(ai.NewMoveToPosition(g.team, receiverID, ballPos))
+			}
+		case info.STATE_PENALTY_PREPARATION:
+		case info.STATE_HALTED, info.STATE_STOPPED, info.STATE_TIMEOUT, info.STATE_BALL_PLACEMENT:
+			// ball placement/stopped should keep distance to ball only, halt should stop everything (and ball placement for now)
+			str := fmt.Sprintf("game %s", currentState)
+			g.changeBallOwner(0, str)
+			kickerPos, _ := gi.State.GetTeam(g.team)[kickerID].GetPosition()
+			receiverPos, _ := gi.State.GetTeam(g.team)[receiverID].GetPosition()
+			g.AddActivity(ai.NewMoveToPosition(g.team, kickerID, kickerPos))
+			g.AddActivity(ai.NewMoveToPosition(g.team, receiverID, receiverPos))
+		case info.STATE_PLAYING:
+			kicker.StateMachine(gi, g.team, g)
+			receiverRole.ReceiverStateMachine(gi, g.team, g)
+		default:
+		}
 	}
 }

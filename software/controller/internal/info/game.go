@@ -57,7 +57,6 @@ func (gi GameInfo) PrintField() {
 // field_arcs:{name:"CenterCircle" center:{x:0 y:0} radius:500 a1:0 a2:6.2831855 thickness:10}
 
 func (gi GameInfo) GetFieldLine(line string) *ssl_vision.SSL_FieldLineSegment {
-
 	for i := range gi.field.FieldLines{
 		if *gi.field.FieldLines[i].Name == "CenterLine"{
 			return gi.field.FieldLines[i]

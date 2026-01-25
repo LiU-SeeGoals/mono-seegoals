@@ -261,6 +261,10 @@ func (gs *GameState) GetRobot(id ID, team Team) *Robot {
 	return gs.GetTeam(team)[id]
 }
 
+func (gs *GameState) GetRobotPosition(team Team, id ID) (Position, error) {
+	return gs.GetTeam(team)[id].GetPosition()
+}
+
 func (gs *GameState) String() string {
 	gs_str := "{\n blue team: {\n"
 	var i ID

@@ -1,6 +1,7 @@
 package demos
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/ai"
@@ -83,6 +84,32 @@ func FwRealScenario() {
 			ball, _ := gameInfo.State.GetBall().GetPosition()
 			if ball.Y > 3000 || ball.Y < -3000 || ball.X > 4500 || ball.X < -4500 {
 				simController.TeleportBall(0, 0)
+			}
+
+			ge := gameInfo.Status.GetGameEvent()
+			previousState := ge.GetPreviousState()
+			currentState := ge.GetCurrentState()
+			switch currentState {
+			case info.STATE_KICKOFF_PREPARATION:
+				if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
+					fmt.Println("teleported ball (new kickoff)")
+					simController.TeleportBall(0, 0)
+				}
+			case info.STATE_FREE_KICK:
+			case info.STATE_HALTED, info.STATE_STOPPED:
+			case info.STATE_PENALTY_PREPARATION, info.STATE_TIMEOUT:
+			case info.STATE_PLAYING:
+			case info.STATE_BALL_PLACEMENT:
+				ball, _ := gameInfo.State.GetBall().GetPosition()
+				if previousState != info.STATE_BALL_PLACEMENT {
+					toX := ge.GetDesignatedPosition().At(0, 0)
+					toY := ge.GetDesignatedPosition().At(1, 0)
+					finalX := ball.X - toX
+					finalY := ball.Y - toY
+					fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", toX, toY, ge.GetTeamWithPossession())
+					simController.TeleportBall(float32(finalX), float32(finalY))
+				}
+			default:
 			}
 
 			time.Sleep(2 * time.Millisecond)
