@@ -147,8 +147,14 @@ func (g *GameScenario) run() {
 				g.AddActivity(ai.NewMoveToPosition(g.team, receiverID, ballPos))
 			}
 		case info.STATE_PENALTY_PREPARATION:
-		case info.STATE_HALTED, info.STATE_STOPPED, info.STATE_TIMEOUT, info.STATE_BALL_PLACEMENT:
-			// ball placement/stopped should keep distance to ball only, halt should stop everything (and ball placement for now)
+		case info.STATE_STOPPED:
+				ballPos, _ := gi.State.GetBall().GetPosition()
+				ballPos.X -= 1500
+				ballPos.Y -= 1500
+				g.AddActivity(ai.NewMoveToPosition(g.team, kickerID, ballPos))
+				g.AddActivity(ai.NewMoveToPosition(g.team, receiverID, ballPos))
+		case info.STATE_HALTED, info.STATE_TIMEOUT, info.STATE_BALL_PLACEMENT:
+			// ball placement should keep distance to ball only, halt should stop everything (and ball placement for now)
 			str := fmt.Sprintf("game %s", currentState)
 			g.changeBallOwner(0, str)
 			kickerPos, _ := gi.State.GetTeam(g.team)[kickerID].GetPosition()

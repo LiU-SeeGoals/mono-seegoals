@@ -46,12 +46,13 @@ func (kr *KickerRole) StateMachine(gi GameInfo, team Team, g GameScenarioInterfa
 
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
-	receiverPos := Position{X: 1500, Y: 1500, Z: 0, Angle: 0}
 
-	currentOwner := g.GetBallOwner()
-	previousOwner := g.GetPreviousBallOwner()
-	debugf("[DEBUG] Kicker %d: CurrentOwner: %d, PreviousOwner: %d, SM: %d, State: %d\n",
-		kr.robotID, currentOwner, previousOwner, kr.stateMachine, kr.state)
+	receiverPos := Position{}
+	if team == info.Yellow {
+		receiverPos = Position{X: 1500, Y: 1500, Z: 0, Angle: 0}
+	} else {
+		receiverPos = Position{X: -5050, Y: 0, Z: 0, Angle: 0}
+	}
 
 	kr.ResetIfPreviousOwner(kr, g)
 

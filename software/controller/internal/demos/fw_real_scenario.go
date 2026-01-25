@@ -26,7 +26,7 @@ func FwRealScenario() {
 
 	if config.IsSimulated() {
 		teamYellow := []int{1, 3}
-		teamBlue := []int{7, 1, 2, 3, 4}
+		teamBlue := []int{7}
 
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
 
@@ -37,7 +37,8 @@ func FwRealScenario() {
 		simController.SetPresentRobots(teamYellow, teamBlue)
 
 		slowBrainYellow := plan.NewGameScenario(info.Yellow)
-		slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
+		//slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
+		slowBrainBlue := plan.NewGameScenario2(info.Blue)
 
 		fastBrainYellow := ai.NewActivityExecutor()
 		fastBrainBlue := ai.NewActivityExecutor()
@@ -45,13 +46,13 @@ func FwRealScenario() {
 		aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
 		aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
-		simController.TeleportRobot(-1000, 0, 1, info.Blue)
-		simController.TeleportRobot(1000, 700, 2, info.Blue)
-		simController.TeleportRobot(1500, 100, 3, info.Blue)
+		//simController.TeleportRobot(-1000, 0, 1, info.Blue)
+		//simController.TeleportRobot(1000, 700, 2, info.Blue)
+		//simController.TeleportRobot(1500, 100, 3, info.Blue)
 
-		simController.TeleportRobot(-2000, 0, 1, info.Yellow)
-		simController.TeleportRobot(1000, 500, 3, info.Yellow)
-		simController.TeleportRobot(1500, 0, 7, info.Blue)
+		//simController.TeleportRobot(-2000, 0, 1, info.Yellow)
+		//simController.TeleportRobot(1000, 500, 3, info.Yellow)
+		//simController.TeleportRobot(1500, 0, 7, info.Blue)
 	} else {
 		//sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddressReal())
