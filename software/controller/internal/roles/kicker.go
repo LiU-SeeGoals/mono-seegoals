@@ -74,7 +74,7 @@ func (kr *KickerRole) KickerStateMachine(gi GameInfo, team Team, g GameScenarioI
 				activity = ai.NewAlign(team, kr.robotID, receiverPos, ballPos)
 				achieved := activity.Achieved(&gi)
 				if achieved {
-					activity = ai.NewKickBall(team, kr.robotID, ballPos)
+					activity = ai.NewKickBall(team, kr.robotID, receiverPos, ballPos)
 					kr.NextState(kr)
 				}
 			case 1: // STATE_EXECUTING

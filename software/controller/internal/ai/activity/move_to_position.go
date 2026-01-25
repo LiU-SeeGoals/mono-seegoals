@@ -11,7 +11,10 @@ import (
 )
 
 // RobotSafetyRadius defines the no-movement zone around each robot
-const RobotSafetyRadius = 250.0 // mm - increased for better safety margin
+const RobotSafetyRadius = 240.0 // mm - increased for better safety margin
+const BallSafetyRadius = 150.0  // mm - increased for better safety margin
+const PlanningRadius = 400.0    // mm - increased for better safety margin
+const MotionRadius = 100.0      // mm - increased for better safety margin
 
 // MoveToPositionWithCollisionAvoidance handles collision avoidance using RRT
 type MoveToPosition struct {
@@ -48,19 +51,24 @@ type RRTNode struct {
 	cost     float64
 }
 
+// RRTNode represents a node in the RRT tree
+type Obstacle struct {
+	position info.Position
+	size     float64
+}
+
 // NewMoveToPositionWithCollisionAvoidance creates a new instance
 func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPosition {
 	// Initialize with reasonable RRT parameters
 	rrtConfig := rrtConfiguration{
 		maxIterations:      1000,
 		stepSize:           50.0,   // mm per step (increased for more aggressive exploration)
-		goalBias:           0.30,   // 20% chance of sampling the goal directly (increased for more direct paths)
-		waypointThreshold:  50.0,   // mm to consider waypoint reached
+		goalBias:           0.05,   // 20% chance of sampling the goal directly (increased for more direct paths)
+		waypointThreshold:  600.0,  // mm to consider waypoint reached
 		fieldWidth:         9000.0, // Standard SSL field width in mm
 		fieldHeight:        6000.0, // Standard SSL field height in mm
 		completionDistance: 50.0,   // mm to consider the goal reached
 	}
-
 	return &MoveToPosition{
 		team:              team,
 		id:                id,
@@ -89,7 +97,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	myRobot := gi.State.GetTeam(m.team)[m.id]
 	myPos, _ := myRobot.GetPosition()
 
-	m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/float64(m.rrtConfig.maxIterations), 2), m.rrtConfig.stepSize)
+	m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), m.rrtConfig.stepSize)
 	// fmt.Println(m.rrtConfig.stepSize)
 	// fmt.Println(m.final_destination)
 	// fmt.Println(myPos)
@@ -99,90 +107,41 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 
 	m.lastPosition = myPos
 
-	// Check for immediate collisions - Emergency avoidance
-	obstacles := m.GetObstaclePositions(gi)
-	inCollision := false
-
-	// Calculate repulsive vector if we're too close to obstacles
-	repulsiveX, repulsiveY := 0.0, 0.0
-
-	for _, obstacle := range obstacles {
-		dist := distanceBetween(myPos, obstacle)
-		if dist <= RobotSafetyRadius {
-			inCollision = true
-
-			// Calculate unit vector away from obstacle
-			dx := myPos.X - obstacle.X
-			dy := myPos.Y - obstacle.Y
-
-			// Normalize (avoid division by zero)
-			if dist > 0.001 {
-				dx /= dist
-				dy /= dist
-			} else {
-				// If almost exactly overlapping, move in random direction
-				angle := rand.Float64() * 2 * math.Pi
-				dx = math.Cos(angle)
-				dy = math.Sin(angle)
-			}
-
-			// Stronger repulsion for closer obstacles (inverse square law)
-			force := 1.0 / math.Max(0.001, dist*dist) * 10000.0
-
-			repulsiveX += dx * force
-			repulsiveY += dy * force
-		}
-	}
-
-	// If in collision, use emergency evasion movement
-	if inCollision {
-		// Normalize the repulsive vector
-		magnitude := math.Sqrt(repulsiveX*repulsiveX + repulsiveY*repulsiveY)
-		if magnitude > 0 {
-			repulsiveX /= magnitude
-			repulsiveY /= magnitude
-		}
-
-		// Create an emergency target position in the direction of the repulsive force
-		emergencyTarget := info.Position{
-			X:     myPos.X + repulsiveX*200.0, // Move 300mm in the repulsive direction
-			Y:     myPos.Y + repulsiveY*200.0,
-			Angle: myPos.Angle,
-		}
-
-		// Create move action to the emergency target
-		act := action.MoveTo{}
-		act.Id = int(m.id)
-		act.Team = m.team
-		act.Pos = myPos
-		act.Dest = emergencyTarget
-		act.Dribble = false
-		return act
-	}
-
-	// Check for significant obstacle changes
-	// currentObstacles := obstacles
-	// m.CheckForSignificantChanges(currentObstacles)
-
-	// Check if we need to replan due to time, path emptiness, or significant obstacle changes
-	// if time.Since(m.lastPlanningTime) >= m.planningInterval ||
-	// 	len(m.path) == 0 ||
-	// 	m.significantChange {
 	m.PlanPath(gi, myPos)
-	// 	m.lastPlanningTime = time.Now()
-	// 	m.previousObstacles = currentObstacles
-	// 	m.significantChange = false
-	// }
 
 	// fmt.Println(len(m.path))
 	if len(m.path) > 0 {
-		distance := distanceBetween(myPos, m.path[0])
-		if distance <= m.rrtConfig.waypointThreshold && len(m.path) > 1 {
-			m.path = m.path[1:]
-		}
+		bestPoint := m.final_destination
+		bestPointDist := 100000000.0
+		if distanceBetween(m.path[len(m.path)-1], myPos) < m.rrtConfig.waypointThreshold &&
+			m.IsPathClear(myPos, m.path[len(m.path)-1], m.GetObstaclePositions(gi), MotionRadius) ||
+			len(m.path) == 1 {
 
+			bestPoint = m.path[len(m.path)-1]
+		} else {
+			for i := 0; i < len(m.path)-1; i++ {
+				a := info.Vec2{X: m.path[i].X, Y: m.path[i].Y}
+				b := info.Vec2{X: m.path[i+1].X, Y: m.path[i+1].Y}
+				p := info.Vec2{X: myPos.X, Y: myPos.Y}
+				pointToLine := info.PointToLineSegment(a, b, p)
+				distanceToThreshold := math.Abs(info.NormV2(info.Sub(pointToLine, p)) - m.rrtConfig.waypointThreshold)
+				if distanceToThreshold < float64(bestPointDist) && m.IsPathClear(myPos, info.Position{X: pointToLine.X, Y: pointToLine.Y, Z: 0, Angle: 0}, m.GetObstaclePositions(gi), MotionRadius) {
+					bestPointDist = distanceToThreshold
+
+					bestPoint = info.Position{X: pointToLine.X, Y: pointToLine.Y, Z: myPos.Z, Angle: myPos.Angle}
+				}
+
+				//if distance <= m.rrtConfig.waypointThreshold && len(m.path) > 1 {
+				//	m.path = m.path[1:]
+				//}
+			}
+
+		}
+		fmt.Println("closest point", bestPoint, bestPoint.Dist2d(myPos))
+
+		//fmt.Println(bestPoint, m.final_destination)
 		// Get target waypoint
-		targetPos = m.path[0]
+		targetPos = bestPoint
 	}
 
 	// targetPos := m.final_destination
@@ -234,12 +193,12 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 	shortestDist := math.MaxFloat64
 
 	for _, obstacle := range obstacles {
-		dist := distanceBetween(startPos, obstacle)
-		if dist <= RobotSafetyRadius {
+		dist := distanceBetween(startPos, obstacle.position)
+		if dist <= obstacle.size {
 			robotsNearby = true
 			if dist < shortestDist {
 				shortestDist = dist
-				nearestObstacle = obstacle
+				nearestObstacle = obstacle.position
 			}
 		}
 	}
@@ -275,12 +234,6 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 		return
 	}
 
-	// Check if direct path to goal is clear
-	if m.IsPathClear(startPos, m.final_destination, obstacles) {
-		m.path = []info.Position{m.final_destination}
-		return
-	}
-
 	// Initialize RRT
 	startNode := &RRTNode{
 		position: startPos,
@@ -309,17 +262,11 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 		current = current.parent
 	}
 
-	// Skip the start position if it's in the path
-	if len(path) > 1 {
-		path = path[1:]
-	}
-
-	// Simplify the path by removing redundant waypoints
-	m.path = m.SimplifyPath(path, obstacles)
+	m.path = path
 }
 
 // RunRRT executes the RRT algorithm and returns the goal node if a path is found
-func (m *MoveToPosition) RunRRT(nodes []*RRTNode, obstacles []info.Position) *RRTNode {
+func (m *MoveToPosition) RunRRT(nodes []*RRTNode, obstacles []Obstacle) *RRTNode {
 	rand.Seed(time.Now().UnixNano())
 
 	for i := 0; i < m.rrtConfig.maxIterations; i++ {
@@ -347,7 +294,7 @@ func (m *MoveToPosition) RunRRT(nodes []*RRTNode, obstacles []info.Position) *RR
 		}
 
 		// Check if the path to the new node is clear
-		if !m.IsPathClear(nearestNode.position, newNode.position, obstacles) {
+		if !m.IsPathClear(nearestNode.position, newNode.position, obstacles, PlanningRadius) {
 			continue
 		}
 
@@ -366,7 +313,7 @@ func (m *MoveToPosition) RunRRT(nodes []*RRTNode, obstacles []info.Position) *RR
 			}
 
 			// Check if the path to the goal is clear
-			if m.IsPathClear(newNode.position, goalNode.position, obstacles) {
+			if m.IsPathClear(newNode.position, goalNode.position, obstacles, PlanningRadius) {
 				return goalNode
 			}
 		}
@@ -437,14 +384,14 @@ func (m *MoveToPosition) ExtendTree(nearest *RRTNode, random info.Position, step
 
 // IsNodeValid checks if a node is valid (not too close to obstacles)
 // Added isStartPosition parameter to allow the starting position even if it's near obstacles
-func (m *MoveToPosition) IsNodeValid(position info.Position, obstacles []info.Position, isStartPosition bool) bool {
+func (m *MoveToPosition) IsNodeValid(position info.Position, obstacles []Obstacle, isStartPosition bool) bool {
 	// Skip obstacle check for the starting position if specified
 	if isStartPosition {
 		return true
 	}
 
 	for _, obstacle := range obstacles {
-		if distanceBetween(position, obstacle) <= RobotSafetyRadius {
+		if distanceBetween(position, obstacle.position) <= obstacle.size {
 			return false
 		}
 	}
@@ -452,7 +399,7 @@ func (m *MoveToPosition) IsNodeValid(position info.Position, obstacles []info.Po
 }
 
 // IsPathClear checks if the path between two positions is clear of obstacles
-func (m *MoveToPosition) IsPathClear(start, end info.Position, obstacles []info.Position) bool {
+func (m *MoveToPosition) IsPathClear(start, end info.Position, obstacles []Obstacle, extraMargin float64) bool {
 	// Check several points along the path
 	const numChecks = 10
 
@@ -478,15 +425,16 @@ func (m *MoveToPosition) IsPathClear(start, end info.Position, obstacles []info.
 }
 
 // GetObstaclePositions gets positions of all other robots on the field
-func (m *MoveToPosition) GetObstaclePositions(gi *info.GameInfo) []info.Position {
-	obstacles := []info.Position{}
+func (m *MoveToPosition) GetObstaclePositions(gi *info.GameInfo) []Obstacle {
+	obstacles := []Obstacle{}
 
 	// Get all robots
 	allRobots := append(gi.State.GetTeam(info.Blue)[:], gi.State.GetTeam(info.Yellow)[:]...)
 
 	if m.avoidBall {
 		ballPos, _ := gi.State.Ball.GetPosition()
-		obstacles = append(obstacles, ballPos)
+		ballObstacle := Obstacle{ballPos, BallSafetyRadius}
+		obstacles = append(obstacles, ballObstacle)
 	}
 
 	for _, robot := range allRobots {
@@ -507,72 +455,72 @@ func (m *MoveToPosition) GetObstaclePositions(gi *info.GameInfo) []info.Position
 		// if pos.X == 0 && pos.Y == 0 {
 		// 	continue
 		// }
-
-		obstacles = append(obstacles, pos)
+		robotObstacle := Obstacle{pos, RobotSafetyRadius}
+		obstacles = append(obstacles, robotObstacle)
 	}
 
 	return obstacles
 }
 
 // SimplifyPath removes redundant waypoints from the path with more aggressive pruning
-func (m *MoveToPosition) SimplifyPath(path []info.Position, obstacles []info.Position) []info.Position {
-	if len(path) <= 2 {
-		return path
-	}
-
-	// Start with first node
-	simplified := []info.Position{path[0]}
-
-	// Initially try to connect directly to the goal
-	if m.IsPathClear(path[0], path[len(path)-1], obstacles) {
-		return []info.Position{path[len(path)-1]}
-	}
-
-	// Use a sliding window approach with increasing window size for more aggressive pruning
-	startIdx := 0
-
-	// Keep extending the window until we've processed the whole path
-	for startIdx < len(path)-1 {
-		// Try largest possible skip first
-		foundSkip := false
-		for endIdx := len(path) - 1; endIdx > startIdx+1; endIdx-- {
-			if m.IsPathClear(path[startIdx], path[endIdx], obstacles) {
-				// We can skip directly to this node
-				simplified = append(simplified, path[endIdx])
-				startIdx = endIdx
-				foundSkip = true
-				break
-			}
-		}
-
-		// If we couldn't skip ahead, just add the next node
-		if !foundSkip {
-			simplified = append(simplified, path[startIdx+1])
-			startIdx++
-		}
-	}
-
-	// Make sure we have at most MAX_WAYPOINTS
-	const MAX_WAYPOINTS = 5
-	if len(simplified) > MAX_WAYPOINTS {
-		// Keep first and last waypoints, and evenly sample the rest
-		result := []info.Position{simplified[0]}
-		step := float64(len(simplified)-2) / float64(MAX_WAYPOINTS-2)
-
-		for i := 1; i < MAX_WAYPOINTS-1; i++ {
-			idx := int(float64(i) * step)
-			if idx >= len(simplified)-1 {
-				break
-			}
-			result = append(result, simplified[idx+1])
-		}
-
-		result = append(result, simplified[len(simplified)-1])
-		return result
-	}
-
-	return simplified
-}
+//func (m *MoveToPosition) SimplifyPath(path []info.Position, obstacles []info.Position) []info.Position {
+//	if len(path) <= 2 {
+//		return path
+//	}
+//
+//	// Start with first node
+//	simplified := []info.Position{path[0]}
+//
+//	// Initially try to connect directly to the goal
+//	if m.IsPathClear(path[0], path[len(path)-1], obstacles) {
+//		return []info.Position{path[len(path)-1]}
+//	}
+//
+//	// Use a sliding window approach with increasing window size for more aggressive pruning
+//	startIdx := 0
+//
+//	// Keep extending the window until we've processed the whole path
+//	for startIdx < len(path)-1 {
+//		// Try largest possible skip first
+//		foundSkip := false
+//		for endIdx := len(path) - 1; endIdx > startIdx+1; endIdx-- {
+//			if m.IsPathClear(path[startIdx], path[endIdx], obstacles) {
+//				// We can skip directly to this node
+//				simplified = append(simplified, path[endIdx])
+//				startIdx = endIdx
+//				foundSkip = true
+//				break
+//			}
+//		}
+//
+//		// If we couldn't skip ahead, just add the next node
+//		if !foundSkip {
+//			simplified = append(simplified, path[startIdx+1])
+//			startIdx++
+//		}
+//	}
+//
+//	// Make sure we have at most MAX_WAYPOINTS
+//	const MAX_WAYPOINTS = 5
+//	if len(simplified) > MAX_WAYPOINTS {
+//		// Keep first and last waypoints, and evenly sample the rest
+//		result := []info.Position{simplified[0]}
+//		step := float64(len(simplified)-2) / float64(MAX_WAYPOINTS-2)
+//
+//		for i := 1; i < MAX_WAYPOINTS-1; i++ {
+//			idx := int(float64(i) * step)
+//			if idx >= len(simplified)-1 {
+//				break
+//			}
+//			result = append(result, simplified[idx+1])
+//		}
+//
+//		result = append(result, simplified[len(simplified)-1])
+//		return result
+//	}
+//
+//	return simplified
+//}
 
 // Achieved returns true if the robot is sufficiently close to the final destination
 func (m *MoveToPosition) Achieved(gi *info.GameInfo) bool {

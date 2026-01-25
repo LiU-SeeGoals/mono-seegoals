@@ -48,7 +48,9 @@ func (rr *ReceiverRole) ReceiverStateMachine(gi GameInfo, team Team, g GameScena
 
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
-	opponentGoal := Position{X: 5050, Y: 0, Z: 0, Angle: 0}
+	opponentGoal := gi.EnemyGoalCenter(team)
+	fmt.Println(opponentGoal)
+	//opponentGoal := Position{X: 5050, Y: 0, Z: 0, Angle: 0}
 
 	currentOwner := g.GetBallOwner()
 	previousOwner := g.GetPreviousBallOwner()
@@ -72,7 +74,7 @@ func (rr *ReceiverRole) ReceiverStateMachine(gi GameInfo, team Team, g GameScena
 		case RECEIVER_KICK_GOAL:
 			switch rr.state {
 			case 0: // STATE_START
-				activity = ai.NewKickBall(team, rr.robotID, ballPos)
+				activity = ai.NewKickBall(team, rr.robotID, opponentGoal, ballPos)
 				rr.NextState(rr)
 			case 1: // STATE_EXECUTING
 				existingActivity := g.GetActivity(rr.robotID)
