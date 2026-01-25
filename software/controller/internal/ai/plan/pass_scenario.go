@@ -156,7 +156,7 @@ func (g *GameScenario) run() {
 			g.AddActivity(ai.NewMoveToPosition(g.team, kickerID, kickerPos))
 			g.AddActivity(ai.NewMoveToPosition(g.team, receiverID, receiverPos))
 		case info.STATE_PLAYING:
-			kicker.StateMachine(gi, g.team, g)
+			kicker.StateMachine(gi, g.team, g, receiverID)
 			receiverRole.ReceiverStateMachine(gi, g.team, g)
 		default:
 		}

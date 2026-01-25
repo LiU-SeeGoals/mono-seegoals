@@ -12,6 +12,7 @@ type KickBall struct {
 	id             info.ID
 	orignalBallPos info.Position
 	inited         bool
+	to             info.Position
 }
 
 type KickConfig struct {
@@ -32,13 +33,14 @@ func (m *KickBall) String() string {
 	return fmt.Sprintf("KickBall(%d)", m.id)
 }
 
-func NewKickBall(team info.Team, id info.ID, ballPos info.Position) *KickBall {
+func NewKickBall(team info.Team, id info.ID, to, ballPos info.Position) *KickBall {
 	// fmt.Println("New kick ball")
 	return &KickBall{
 		team,
 		id,
 		ballPos,
 		false,
+		to,
 	}
 }
 
@@ -55,12 +57,17 @@ func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 	}
 
 	robotV2 := info.Vec2{X: robotPos.X, Y: robotPos.Y}
+	toPosV2 := info.Vec2{X: m.to.X, Y: m.to.Y}
+
+	ballToTangent := info.Sub(toPosV2, ballV2)
+	ballToTangent.DivNorm()
+	kickAngle := ballToTangent.Angle()
 
 	ballRobotTangent := info.Sub(ballV2, robotV2)
 	ballRobotTangent.DivNorm()
 
 	robotXY := info.Add(ballV2, ballRobotTangent.Mult(GetKickConfig().driveThrough))
-	robotTargetPos := info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: ballRobotTangent.Angle()}
+	robotTargetPos := info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: kickAngle}
 	return robotTargetPos
 }
 
@@ -95,7 +102,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	if robotPos.Dist2d(ballUntracked) > 200 {
 		act.Dribble = true
 	} else {
-		act.KickSpeed = 1
+		act.KickSpeed = 2
 	}
 
 	return &act

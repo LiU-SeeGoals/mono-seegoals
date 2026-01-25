@@ -58,7 +58,7 @@ func (r *KickoffReceiver) StateMachine(gi GameInfo, team Team, g GameScenarioInt
 				opponentGoal := Position{X: 5050, Y: 0, Z: 0, Angle: 0}
 				activity = ai.NewAlign(team, r.robotID, opponentGoal, ballPos)
 				if activity.Achieved(&gi) {
-					activity = ai.NewKickBall(team, r.robotID, ballPos)
+					activity = ai.NewKickBall(team, r.robotID, opponentGoal, ballPos)
 				}
 			}
 		}

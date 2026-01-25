@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"time"
-
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -44,9 +42,6 @@ func (fb *activityExecutor) Init(
 
 func (fb *activityExecutor) Run() {
 	for {
-		// For example, throttle the loop slightly to avoid busy-loop:
-		time.Sleep(1 * time.Millisecond) // or read from fb.incomingGameInfo if event-driven
-
 		gameInfo := <-fb.incomingGameInfo
 
 		// Make a snapshot of current activities under lock

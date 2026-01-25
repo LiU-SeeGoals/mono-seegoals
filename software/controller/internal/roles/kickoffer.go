@@ -76,7 +76,7 @@ func (r *KickofferRole) StateMachine(gi GameInfo, team Team, g GameScenarioInter
 				activity = ai.NewAlign(team, r.robotID, receiverPos, ballPos)
 				achieved := activity.Achieved(&gi)
 				if achieved {
-					activity = ai.NewKickBall(team, r.robotID, ballPos)
+					activity = ai.NewKickBall(team, r.robotID, receiverPos, ballPos)
 					r.NextState(r)
 				}
 			case 1:

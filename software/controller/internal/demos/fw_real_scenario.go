@@ -26,7 +26,7 @@ func FwRealScenario() {
 
 	if config.IsSimulated() {
 		teamYellow := []int{1, 3}
-		teamBlue := []int{7}
+		teamBlue := []int{7, 1, 2, 3, 4}
 
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
 
@@ -45,8 +45,12 @@ func FwRealScenario() {
 		aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
 		aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
+		simController.TeleportRobot(-1000, 0, 1, info.Blue)
+		simController.TeleportRobot(1000, 700, 2, info.Blue)
+		simController.TeleportRobot(1500, 100, 3, info.Blue)
+
 		simController.TeleportRobot(-2000, 0, 1, info.Yellow)
-		simController.TeleportRobot(-2000, 500, 3, info.Yellow)
+		simController.TeleportRobot(1000, 500, 3, info.Yellow)
 		simController.TeleportRobot(1500, 0, 7, info.Blue)
 	} else {
 		//sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
@@ -81,8 +85,9 @@ func FwRealScenario() {
 			simClientYellow.SendActions(actionsYellow)
 			simClientBlue.SendActions(actionsBlue)
 
-			ball, _ := gameInfo.State.GetBall().GetPosition()
-			if ball.Y > 3000 || ball.Y < -3000 || ball.X > 4500 || ball.X < -4500 {
+			ball := gameInfo.State.GetBall()
+			ballPos, ballTime, _ := ball.GetPositionTime()
+			if ballPos.Y > 3000 || ballPos.Y < -3000 || ballPos.X > 4500 || ballPos.X < -4500 || time.Now().UnixMilli()-ballTime > 5000 {
 				simController.TeleportBall(0, 0)
 			}
 
