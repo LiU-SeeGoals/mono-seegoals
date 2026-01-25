@@ -102,7 +102,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	if robotPos.Dist2d(ballUntracked) > 200 {
 		act.Dribble = true
 	} else {
-		act.KickSpeed = 1
+		act.KickSpeed = 2
 	}
 
 	return &act

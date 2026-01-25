@@ -92,7 +92,7 @@ func (g *GameScenario) run() {
 		//	continue
 		//}
 
-		kickerRole.KickerStateMachine(gi, g.team, g)
+		kickerRole.KickerStateMachine(gi, g.team, g, receiver)
 		receiverRole.ReceiverStateMachine(gi, g.team, g)
 	}
 }

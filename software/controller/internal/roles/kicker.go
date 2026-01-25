@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -40,7 +41,7 @@ func (kr *KickerRole) GetStateMachineName() string {
 	return fmt.Sprintf("SM_%d", kr.stateMachine)
 }
 
-func (kr *KickerRole) KickerStateMachine(gi GameInfo, team Team, g GameScenarioInterface) ai.Activity {
+func (kr *KickerRole) KickerStateMachine(gi GameInfo, team Team, g GameScenarioInterface, reciverId info.ID) ai.Activity {
 	var activity ai.Activity = nil
 
 	ball := gi.State.GetBall()
@@ -85,20 +86,20 @@ func (kr *KickerRole) KickerStateMachine(gi GameInfo, team Team, g GameScenarioI
 			}
 		}
 	} else { // not ball owner
+		robotPos, _ := gi.State.GetTeam(team)[kr.robotID].GetPosition()
+		receiverPos, _ := gi.State.GetTeam(team)[reciverId].GetPosition()
+		ab := receiverPos.Sub(&robotPos)
+		tangent := Vec2{X: ab.X, Y: ab.Y}
+		lookAtReciverAngle := tangent.Angle()
+
 		switch kr.stateMachine {
 		case KICKER_STAY:
 			switch kr.state {
 			case 0: // STATE_START
-				robotPos, _ := gi.State.GetTeam(team)[kr.robotID].GetPosition()
-				activity = ai.NewMoveToPosition(team, kr.robotID, robotPos)
-				kr.NextState(kr)
-			case 1: // STATE_EXECUTING
-				if ballPos.X < 0 {
-					kr.TakeOwnership(kr, g, "ball on my side")
-				}
-				existingActivity := g.GetActivity(kr.robotID)
-				if existingActivity != nil && existingActivity.Achieved(&gi) {
-					kr.ResetState(kr)
+				followPos := Position{X: receiverPos.X, Y: -2000, Z: robotPos.Z, Angle: lookAtReciverAngle}
+				activity = ai.NewMoveToPosition(team, kr.robotID, followPos)
+				if ballPos.X < 0 || ballPos.Y < 0 {
+					kr.TakeOwnership(kr, g, "ball on my side or close")
 				}
 			}
 		}

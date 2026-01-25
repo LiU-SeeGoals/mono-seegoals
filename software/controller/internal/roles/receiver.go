@@ -49,8 +49,6 @@ func (rr *ReceiverRole) ReceiverStateMachine(gi GameInfo, team Team, g GameScena
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
 	opponentGoal := gi.EnemyGoalCenter(team)
-	fmt.Println(opponentGoal)
-	//opponentGoal := Position{X: 5050, Y: 0, Z: 0, Angle: 0}
 
 	currentOwner := g.GetBallOwner()
 	previousOwner := g.GetPreviousBallOwner()
