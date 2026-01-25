@@ -59,6 +59,7 @@ func FwRealScenario() {
 
 		slowBrainYellow := plan.NewGameScenario(info.Yellow)
 		slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
+		//slowBrainBlue := plan.NewGameScenario2(info.Blue)
 
 		fastBrainYellow := ai.NewActivityExecutor()
 		fastBrainBlue := ai.NewActivityExecutor()
