@@ -53,3 +53,23 @@ cd build
 make protobuf
 python3 <plotfile>
 ```
+
+# Live Telemetry
+
+## Setup
+Follow the setup instructions above for logging.
+
+To use the live telemetry you need to have AdvantageScope installed on your
+machine installation instructions can be found at:
+https://docs.advantagescope.org/overview/installation
+
+### Configuring AdvantageScope
+AdvantageScope needs to be configured to use fetdatorns ip address,
+this setting is found in `App > Show Preferences`.
+Then set `Robot Address` to `192.168.1.1`.
+
+## Running live telemetry
+1. Start Glass on fetdatorn
+2. Run the script on the raspberry pi. `./live_telem.py` (this requires [uv](https://docs.astral.sh/uv/))
+3. Start AdvantageScope on your machine and press `Ctrl+k` or navigate to `File > Connect to Robot` to connect to the server.
+
