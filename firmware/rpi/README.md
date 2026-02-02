@@ -60,7 +60,7 @@ python3 <plotfile>
 Follow the setup instructions above for logging.
 
 To use the live telemetry you need to have AdvantageScope installed on your
-machine installation instructions can be found at:
+machine, installation instructions can be found at:
 https://docs.advantagescope.org/overview/installation
 
 ### Configuring AdvantageScope

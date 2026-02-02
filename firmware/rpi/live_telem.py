@@ -16,6 +16,7 @@ import os
 import sys
 import numpy as np
 import ntcore
+import wpimath
 import argparse
 from pathlib import Path
 from google.protobuf.message import DecodeError
@@ -106,6 +107,12 @@ def readSpi(server: String):
     pos_angle_table = pos_table.getSubTable("pos_angle")
     pos_angle_topics = publish_control_signal(pos_angle_table)
 
+    pose_table = table.getSubTable("Poses")
+    pose_reference = pose_table.publish("reference", wpimath.geometry.Pose2d).publish()
+    # pose_control = table.publish("control", wpimath.geometry.Pose2d).publish()
+    # pose_error = table.publish("error", wpimath.geometry.Pose2d).publish()
+    pose_output = pose_table.publish("output", wpimath.geometry.Pose2d).publish()
+
     spi = ctypes.CDLL(lib_path)
     dataSize = spi.getDataSize()
     failed = 0
@@ -188,6 +195,15 @@ def readSpi(server: String):
             msg.pos_angle.control,
             msg.pos_angle.error,
             msg.pos_angle.output,
+        )
+
+        pose_reference.set(
+            wpimath.geometry.Pose2d(msg.pos_x.ref, msg.pos_y.ref, msg.pos_angle.ref)
+        )
+        pose_output.set(
+            wpimath.geometry.Pose2d(
+                msg.pos_x.output, msg.pos_y.output, msg.pos_angle.output
+            )
         )
 
     spi.spiClose()
