@@ -1,16 +1,17 @@
 package client
 
 import (
-	"fmt"
-	"net"
-	"sync"
+    "fmt"
+    "net"
+    "sync"
+    "time"
 
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
-	"github.com/LiU-SeeGoals/controller/internal/action"
-	"github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/proto_go/gc"
-	"github.com/LiU-SeeGoals/proto_go/simulation"
-	"google.golang.org/protobuf/proto"
+    . "github.com/LiU-SeeGoals/controller/internal/logger"
+    "github.com/LiU-SeeGoals/controller/internal/action"
+    "github.com/LiU-SeeGoals/controller/internal/info"
+    "github.com/LiU-SeeGoals/proto_go/gc"
+    "github.com/LiU-SeeGoals/proto_go/simulation"
+    "google.golang.org/protobuf/proto"
 )
 
 // SSL Vision receiver
@@ -100,41 +101,49 @@ func (client *SimClient) SendActions(actions []action.Action) {
 	client.actionListMutex.Unlock()
 }
 
+
 func (client *SimClient) sendActionThread() {
-	for {
-		client.actionListMutex.Lock()
+    // Rate limit to ~100Hz — simulators typically run at 60-120Hz,
+    // sending faster just wastes CPU and creates garbage.
+    ticker := time.NewTicker(10 * time.Millisecond)
+    defer ticker.Stop()
 
-		// Send all the commands to the simulator
-		robotCommands := make([]*simulation.RobotCommand, 0)
-		for _, action := range client.savedActions {
-			robotCommands = append(robotCommands, action.TranslateSim())
-		}
-		// wrap the commands in a RobotControl message
-		RobotControl := &simulation.RobotControl{
-			RobotCommands: robotCommands,
-		}
+    // Pre-allocate the slice and RobotControl to avoid per-iteration allocations
+    robotCommands := make([]*simulation.RobotCommand, 0, 16)
+    robotControl := &simulation.RobotControl{}
 
-		client.Send(RobotControl)
+    for range ticker.C {
+        client.actionListMutex.Lock()
 
-		// Make sure all the MoveTo actions is updated with current data
-		for i, act := range client.savedActions {
-			if a, ok := act.(*action.MoveTo); ok {
-				pos, err := client.gameState.GetTeam(a.Team)[a.Id].GetPosition()
-				if err != nil {
-					Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
-					continue
-				}
-				a.Pos = pos
-				client.savedActions[i] = a
-			}
-		}
-		client.actionListMutex.Unlock()
-	}
+        // Reuse the slice by resetting length to 0 (keeps capacity)
+        robotCommands = robotCommands[:0]
+        for _, action := range client.savedActions {
+            robotCommands = append(robotCommands, action.TranslateSim())
+        }
+
+        // Reuse the RobotControl wrapper
+        robotControl.RobotCommands = robotCommands
+        client.Send(robotControl)
+
+        // Make sure all the MoveTo actions is updated with current data
+        for i, act := range client.savedActions {
+            if a, ok := act.(*action.MoveTo); ok {
+                pos, err := client.gameState.GetTeam(a.Team)[a.Id].GetPosition()
+                if err != nil {
+                    Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
+                    continue
+                }
+                a.Pos = pos
+                client.savedActions[i] = a
+            }
+        }
+        client.actionListMutex.Unlock()
+    }
 }
 
 func (client *SimClient) Send(msg proto.Message) (int, error) {
 	// fmt.Println("Sending message")
-
+	//sendActionThreadsendActionThread
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		return 0, fmt.Errorf("unable to marshal TeleportRobot data: %w", err)
