@@ -103,8 +103,8 @@ func (client *SimClient) SendActions(actions []action.Action) {
 
 
 func (client *SimClient) sendActionThread() {
-    // Rate limit to ~100Hz — simulators typically run at 60-120Hz,
-    // sending faster just wastes CPU and creates garbage.
+	//TODO: Do we want to send actions only when a new action is added?
+    // Rate limit to ~100hz
     ticker := time.NewTicker(10 * time.Millisecond)
     defer ticker.Stop()
 
