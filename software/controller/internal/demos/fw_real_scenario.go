@@ -15,7 +15,7 @@ import (
 func FwRealScenario() {
 	gameInfo := info.NewGameInfo(10)
 
-	//var sslClientTracked *client.SSLTrackedClient
+	var sslClientTracked *client.SSLTrackedClient
 	var sslClientRaw *client.SSLClient
 	var aiYellow *ai.Ai
 	var aiBlue *ai.Ai
@@ -28,6 +28,7 @@ func FwRealScenario() {
 		teamYellow := []int{1, 3}
 		teamBlue := []int{7}
 
+		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
 
 		simClientYellow = client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
@@ -54,7 +55,7 @@ func FwRealScenario() {
 		//simController.TeleportRobot(1000, 500, 3, info.Yellow)
 		//simController.TeleportRobot(1500, 0, 7, info.Blue)
 	} else {
-		//sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
+		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddressReal())
 
 		slowBrainYellow := plan.NewGameScenario(info.Yellow)
@@ -75,7 +76,7 @@ func FwRealScenario() {
 		playTime := time.Now().UnixMilli()
 
 		sslClientRaw.UpdateState(gameInfo, playTime)
-		//sslClientTracked.UpdateState(gameInfo, playTime)
+		sslClientTracked.UpdateState(gameInfo, playTime)
 
 		actionsYellow := aiYellow.GetActions(gameInfo)
 		actionsBlue := aiBlue.GetActions(gameInfo)
