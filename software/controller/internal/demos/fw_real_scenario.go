@@ -37,8 +37,8 @@ func FwRealScenario() {
 		simController.SetPresentRobots(teamYellow, teamBlue)
 
 		slowBrainYellow := plan.NewGameScenario(info.Yellow)
-		//slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
-		slowBrainBlue := plan.NewGameScenario2(info.Blue)
+		slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
+		//slowBrainBlue := plan.NewGameScenario2(info.Blue)
 
 		fastBrainYellow := ai.NewActivityExecutor()
 		fastBrainBlue := ai.NewActivityExecutor()
@@ -59,6 +59,7 @@ func FwRealScenario() {
 
 		slowBrainYellow := plan.NewGameScenario(info.Yellow)
 		slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
+		//slowBrainBlue := plan.NewGameScenario2(info.Blue)
 
 		fastBrainYellow := ai.NewActivityExecutor()
 		fastBrainBlue := ai.NewActivityExecutor()

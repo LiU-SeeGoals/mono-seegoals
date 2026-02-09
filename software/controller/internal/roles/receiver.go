@@ -86,7 +86,7 @@ func (rr *ReceiverRole) ReceiverStateMachine(gi GameInfo, team Team, g GameScena
 		case RECEIVER_POSITION:
 			switch rr.state {
 			case 0: // STATE_START
-				wantedPos := Position{X: 1500, Y: 1500, Z: 0, Angle: 0}
+				wantedPos := Position{X: 1000, Y: 1500, Z: 0, Angle: 0}
 				activity = ai.NewMoveToPosition(team, rr.robotID, wantedPos)
 				rr.NextState(rr)
 			case 1: // STATE_EXECUTING

@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	KICKOFFER_GOTO_POS = 0
+	KICKOFFER_GOTO_POS   = 0
 	KICKOFFER_PASS_BALL  = 1
 	KICKOFFER_SHOOT_GOAL = 2
 	KICKOFFER_STAY       = 0
@@ -48,12 +48,12 @@ func (r *KickofferRole) StateMachine(gi GameInfo, team Team, g GameScenarioInter
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
 
-	startPos := Position{}
-	if team == info.Yellow {
-		startPos = Position{X: -200, Y: 0, Z: 0, Angle: 0}
-	} else {
-		startPos = Position{X: 200, Y: 0, Z: 0, Angle: 0}
-	}
+	//startPos := Position{}
+	//if team == info.Yellow {
+	//	startPos = Position{X: -200, Y: 0, Z: 0, Angle: 0}
+	//} else {
+	//	startPos = Position{X: 200, Y: 0, Z: 0, Angle: 0}
+	//}
 
 	r.ResetIfPreviousOwner(r, g)
 
@@ -65,14 +65,10 @@ func (r *KickofferRole) StateMachine(gi GameInfo, team Team, g GameScenarioInter
 		case KICKOFFER_GOTO_POS:
 			switch r.state {
 			case 0:
-				activity = ai.NewMoveToPosition(team, r.robotID, startPos)
-				if activity.Achieved(&gi) {
-					r.NextState(r)
-				}
-			case 1:
-				activity = ai.NewAlign(team, r.robotID, ballPos, startPos)
+				receiverPos, _ := gi.State.GetTeam(team)[receiverID].GetPosition()
+				activity = ai.NewAlign(team, r.robotID, receiverPos, ballPos)
 				achieved := activity.Achieved(&gi)
-				if achieved && ge.RefCommand == info.NORMAL_START{
+				if achieved && ge.RefCommand == info.NORMAL_START {
 					if team == info.Yellow {
 						r.ToStateMachine(KICKOFFER_PASS_BALL, r)
 					} else {
