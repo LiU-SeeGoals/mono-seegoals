@@ -1,10 +1,16 @@
 package main
 
+// this is how you trace to see what's taking up time in the controller. 
+// When you run this, it will create a file called trace.out. You can then analyze this file using the go tool trace command:
+// go tool trace trace.out
+// You can also watch the pprof server on localhost:6060 to see live profiling data.
+// Todo this, run the command go tool pprof -alloc_space http://localhost:6060/debug/pprof/heap and then write top to see memeory usage.
+
 import (
 	"fmt"
 	"log"
-	"net/http"          // <--- CHANGE 1: Import net/http
-	_ "net/http/pprof"  // <--- CHANGE 2: Import pprof for side effects
+	"net/http"          
+	_ "net/http/pprof"  
 	"os"
 	"os/signal"
 	"runtime/trace"
@@ -14,27 +20,23 @@ import (
 )
 
 func main() {
-	// --- CHANGE 3: Start the PPROF server in the background ---
 	go func() {
 		fmt.Println("Pprof server running on port 6060")
 		log.Println(http.ListenAndServe("localhost:6060", nil))
 	}()
-	// ----------------------------------------------------------
 
-	// 1. Create the trace file
 	f, err := os.Create("trace.out")
 	if err != nil {
 		panic(err)
 	}
 	defer f.Close()
 
-	// 2. Start the trace
 	err = trace.Start(f)
 	if err != nil {
 		panic(err)
 	}
 
-	// 3. Setup signal handling
+
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
