@@ -12,10 +12,45 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
 
+func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl){
+
+	ball := gameInfo.State.GetBall()
+	ballPos, ballTime, _ := ball.GetPositionTime()
+	if ballPos.Y > 3000 || ballPos.Y < -3000 || ballPos.X > 4500 || ballPos.X < -4500 || time.Now().UnixMilli()-ballTime > 5000 {
+		simController.TeleportBall(0, 0)
+	}
+
+	ge := gameInfo.Status.GetGameEvent()
+	previousState := ge.GetPreviousState()
+	currentState := ge.GetCurrentState()
+	switch currentState {
+	case info.STATE_KICKOFF_PREPARATION:
+		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
+			fmt.Println("teleported ball (new kickoff)")
+			simController.TeleportBall(0, 0)
+		}
+	case info.STATE_FREE_KICK:
+	case info.STATE_HALTED, info.STATE_STOPPED:
+	case info.STATE_PENALTY_PREPARATION, info.STATE_TIMEOUT:
+	case info.STATE_PLAYING:
+	case info.STATE_BALL_PLACEMENT:
+		ball, _ := gameInfo.State.GetBall().GetPosition()
+		if previousState != info.STATE_BALL_PLACEMENT {
+			toX := ge.GetDesignatedPosition().At(0, 0)
+			toY := ge.GetDesignatedPosition().At(1, 0)
+			finalX := ball.X - toX
+			finalY := ball.Y - toY
+			fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", toX, toY, ge.GetTeamWithPossession())
+			simController.TeleportBall(float32(finalX), float32(finalY))
+		}
+	default:
+	}
+}
+
 func FwRealScenario() {
 	gameInfo := info.NewGameInfo(10)
 
-	//var sslClientTracked *client.SSLTrackedClient
+	// var sslClientTracked *client.SSLTrackedClient
 	var sslClientRaw *client.SSLClient
 	var aiYellow *ai.Ai
 	var aiBlue *ai.Ai
@@ -23,6 +58,16 @@ func FwRealScenario() {
 	var simController *simulator.SimControl
 	var simClientYellow *client.SimClient
 	var simClientBlue *client.SimClient
+
+	slowBrainYellow := plan.NewGameScenario(info.Yellow)
+	slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
+	//slowBrainBlue := plan.NewGameScenario2(info.Blue)
+
+	fastBrainYellow := ai.NewActivityExecutor()
+	fastBrainBlue := ai.NewActivityExecutor()
+
+	aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
+	aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
 	if config.IsSimulated() {
 		teamYellow := []int{1, 3}
@@ -36,36 +81,9 @@ func FwRealScenario() {
 		simController = simulator.NewSimControl()
 		simController.SetPresentRobots(teamYellow, teamBlue)
 
-		slowBrainYellow := plan.NewGameScenario(info.Yellow)
-		slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
-		//slowBrainBlue := plan.NewGameScenario2(info.Blue)
-
-		fastBrainYellow := ai.NewActivityExecutor()
-		fastBrainBlue := ai.NewActivityExecutor()
-
-		aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
-		aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
-
-		//simController.TeleportRobot(-1000, 0, 1, info.Blue)
-		//simController.TeleportRobot(1000, 700, 2, info.Blue)
-		//simController.TeleportRobot(1500, 100, 3, info.Blue)
-
-		//simController.TeleportRobot(-2000, 0, 1, info.Yellow)
-		//simController.TeleportRobot(1000, 500, 3, info.Yellow)
-		//simController.TeleportRobot(1500, 0, 7, info.Blue)
 	} else {
 		//sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddressReal())
-
-		slowBrainYellow := plan.NewGameScenario(info.Yellow)
-		slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
-		//slowBrainBlue := plan.NewGameScenario2(info.Blue)
-
-		fastBrainYellow := ai.NewActivityExecutor()
-		fastBrainBlue := ai.NewActivityExecutor()
-
-		aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
-		aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
 		basestationClient = client.NewBaseStationClient(config.GetBasestationAddress())
 		basestationClient.Init()
@@ -87,37 +105,7 @@ func FwRealScenario() {
 			simClientYellow.SendActions(actionsYellow)
 			simClientBlue.SendActions(actionsBlue)
 
-			ball := gameInfo.State.GetBall()
-			ballPos, ballTime, _ := ball.GetPositionTime()
-			if ballPos.Y > 3000 || ballPos.Y < -3000 || ballPos.X > 4500 || ballPos.X < -4500 || time.Now().UnixMilli()-ballTime > 5000 {
-				simController.TeleportBall(0, 0)
-			}
-
-			ge := gameInfo.Status.GetGameEvent()
-			previousState := ge.GetPreviousState()
-			currentState := ge.GetCurrentState()
-			switch currentState {
-			case info.STATE_KICKOFF_PREPARATION:
-				if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
-					fmt.Println("teleported ball (new kickoff)")
-					simController.TeleportBall(0, 0)
-				}
-			case info.STATE_FREE_KICK:
-			case info.STATE_HALTED, info.STATE_STOPPED:
-			case info.STATE_PENALTY_PREPARATION, info.STATE_TIMEOUT:
-			case info.STATE_PLAYING:
-			case info.STATE_BALL_PLACEMENT:
-				ball, _ := gameInfo.State.GetBall().GetPosition()
-				if previousState != info.STATE_BALL_PLACEMENT {
-					toX := ge.GetDesignatedPosition().At(0, 0)
-					toY := ge.GetDesignatedPosition().At(1, 0)
-					finalX := ball.X - toX
-					finalY := ball.Y - toY
-					fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", toX, toY, ge.GetTeamWithPossession())
-					simController.TeleportBall(float32(finalX), float32(finalY))
-				}
-			default:
-			}
+			handleSimulatedBall(gameInfo, simController)
 
 			time.Sleep(2 * time.Millisecond)
 		} else {
