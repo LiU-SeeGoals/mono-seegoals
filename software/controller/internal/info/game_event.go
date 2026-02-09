@@ -65,45 +65,33 @@ const (
 	STATE_BALL_PLACEMENT
 )
 
-// Import your existing info package for Team type
-// This is already imported as we're in the same package
-
 // GameEvent contains information about the current game state and referee commands
 type GameEvent struct {
-	// Command issued by the referee.
 	RefCommand RefCommand
-	// Current game state based on referee commands
 	CurrentState RefState
-	// Team with possession/advantage in the current state
+	PreviousState RefState
 	TeamWithPossession Team
-	// The UNIX timestamp when the command was issued, in microseconds.
 	CommandTimestamp uint64
-	// The UNIX timestamp when the last unique command was issued, for timeout tracking
 	LastUniqueCommandTimestamp uint64
-	// The last unique command received, for detecting command changes
 	LastUniqueCommand RefCommand
 	// The coordinates of the Designated Position for ball placement
 	DesignatedPosition *mat.VecDense
-	// The command that will be issued after the current stoppage
 	NextCommand RefCommand
-	// The time in microseconds remaining until the current action times out
 	CurrentActionTimeRemaining int64
-	// Indicates if the ball is currently in play
 	BallInPlay bool
 }
 
-// NewGameEvent creates a new GameEvent with default values
 func NewGameEvent() *GameEvent {
 	return &GameEvent{
 		RefCommand:   HALT,
 		CurrentState: STATE_HALTED,
+		PreviousState: STATE_HALTED,
 		// TeamWithPossession will have its zero value
 		DesignatedPosition: mat.NewVecDense(2, nil),
 		BallInPlay:         false,
 	}
 }
 
-// String method for RefCommand to convert the enum to a human-readable string
 func (rc RefCommand) String() string {
 	switch rc {
 	case HALT:
@@ -143,7 +131,6 @@ func (rc RefCommand) String() string {
 	}
 }
 
-// String method for RefState
 func (rs RefState) String() string {
 	switch rs {
 	case STATE_HALTED:
@@ -167,9 +154,6 @@ func (rs RefState) String() string {
 	}
 }
 
-// No need for TeamColor String method as we're using the existing Team type
-
-// String method for GameEvent
 func (ge *GameEvent) String() string {
 	position := "N/A"
 	if ge.DesignatedPosition != nil {
@@ -211,7 +195,6 @@ func (ge *GameEvent) String() string {
 	)
 }
 
-// UpdateFromRefCommand updates the game state based on a new referee command
 func (ge *GameEvent) UpdateFromRefCommand(
 	refCommand RefCommand,
 	commandTimestamp uint64,
@@ -220,26 +203,24 @@ func (ge *GameEvent) UpdateFromRefCommand(
 	nextCommand RefCommand,
 	currentActionTimeRemaining int64) {
 
-	// Update basic fields
 	ge.RefCommand = refCommand
 	ge.CommandTimestamp = commandTimestamp
 	ge.NextCommand = nextCommand
 	ge.CurrentActionTimeRemaining = currentActionTimeRemaining
 
-	// Check if this is a new unique command
 	if refCommand != ge.LastUniqueCommand {
 		ge.LastUniqueCommand = refCommand
 		ge.LastUniqueCommandTimestamp = commandTimestamp
 	}
 
-	// Update designated position if needed
 	if ge.DesignatedPosition == nil {
 		ge.DesignatedPosition = mat.NewVecDense(2, nil)
 	}
 	ge.DesignatedPosition.SetVec(0, desPosX)
 	ge.DesignatedPosition.SetVec(1, desPosY)
 
-	// Update game state based on command
+	ge.PreviousState = ge.CurrentState
+
 	switch refCommand {
 	case HALT:
 		ge.CurrentState = STATE_HALTED
@@ -319,16 +300,22 @@ func (ge *GameEvent) UpdateFromRefCommand(
 	// Check for timeouts and automatically update state if needed
 }
 
-// GetCurrentState returns the current state after checking for any timeouts
-// This ensures we always get the most up-to-date state
 func (ge *GameEvent) GetCurrentState() RefState {
 	// Check for timeouts and update state if needed
-
 	return ge.CurrentState
+}
+
+func (ge *GameEvent) GetPreviousState() RefState {
+	// Check for timeouts and update state if needed
+	return ge.PreviousState
 }
 
 func (ge *GameEvent) GetTeamWithPossession() Team {
 	return ge.TeamWithPossession
+}
+
+func (ge *GameEvent) GetDesignatedPosition() *mat.VecDense {
+	return ge.DesignatedPosition
 }
 
 // If we should keep distance from ball it is 500 mm

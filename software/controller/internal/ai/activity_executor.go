@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"time"
-
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -44,9 +42,6 @@ func (fb *activityExecutor) Init(
 
 func (fb *activityExecutor) Run() {
 	for {
-		// For example, throttle the loop slightly to avoid busy-loop:
-		time.Sleep(1 * time.Millisecond) // or read from fb.incomingGameInfo if event-driven
-
 		gameInfo := <-fb.incomingGameInfo
 
 		// Make a snapshot of current activities under lock
@@ -62,14 +57,11 @@ func (fb *activityExecutor) Run() {
 				continue
 			} // Skip nil activities
 
-			if activitiesCopy[i].Achieved(&gameInfo) { // If achieved, remove it
-
+			if activitiesCopy[i].Achieved(&gameInfo) { // If achieved, log it but let planner handle lifecycle
 				Logger.Info(fmt.Sprintf("Activity achieved: %v ", activitiesCopy[i]))
-				fb.activity_lock.Lock()
-				fb.activities[i] = nil
-				fb.activity_lock.Unlock()
+				// Don't clear the activity - let the planner detect achievement and transition states
+				actions = append(actions, activitiesCopy[i].GetAction(&gameInfo))
 			} else { // Otherwise, get an action
-
 				Logger.Info(fmt.Sprintf("Activity running: %v", activitiesCopy[i]))
 				actions = append(actions, activitiesCopy[i].GetAction(&gameInfo))
 			}

@@ -83,5 +83,5 @@ services:
     command:
       - "-hl"
       - "-va"
-      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"
+      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_REAL_MAIN_PORT}"
     network_mode: host

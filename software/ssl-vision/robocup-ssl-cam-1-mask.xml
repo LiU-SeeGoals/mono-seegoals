@@ -65,5 +65,29 @@
 				142
 			</Var>
 		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1678
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				135
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				1720
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				396
+			</Var>
+		</Var>
+		<Var name="" type="list">
+			<Var name="x" type="int" minval="" maxval="">
+				347
+			</Var>
+			<Var name="y" type="int" minval="" maxval="">
+				104
+			</Var>
+		</Var>
 	</Var>
 </VarXML>

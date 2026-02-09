@@ -9,6 +9,10 @@ type SSLClient struct {
 	vision  *SSLVisionClient
 	referee *SSLRefereeClient
 }
+type SSLTrackedClient struct {
+	vision  *SSLTrackedVisionClient
+	referee *SSLRefereeClient
+}
 
 func NewSSLClient(visionAddress string) *SSLClient {
 	return &SSLClient{
@@ -17,7 +21,19 @@ func NewSSLClient(visionAddress string) *SSLClient {
 	}
 }
 
+func NewSSLTrackedClient(visionAddress string) *SSLTrackedClient {
+	return &SSLTrackedClient{
+		vision:  NewSSLTrackedVisionClient(visionAddress),
+		referee: NewSSLRefereeClient(config.GetGCClientAddress()),
+	}
+}
+
 func (client *SSLClient) UpdateState(gi *info.GameInfo, play_time int64) {
 	client.vision.UpdateGameInfo(gi, play_time)
+	client.referee.UpdateGameInfo(gi)
+}
+
+func (client *SSLTrackedClient) UpdateState(gi *info.GameInfo, play_time int64) {
+	client.vision.UpdateGameInfoTracked(gi, play_time)
 	client.referee.UpdateGameInfo(gi)
 }

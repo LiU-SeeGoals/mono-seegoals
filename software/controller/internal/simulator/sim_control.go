@@ -231,8 +231,7 @@ func (sc *SimControl) TeleportRobot(x float32, y float32, id uint32, team info.T
 func (sc *SimControl) TeleportBall(x float32, y float32) {
 	// Set default values for orientation and velocities
 	zero := float32(0.0)
-	x = x / 1000.0
-	y = y / 1000.0
+
 	teleball := &simulation.TeleportBall{
 		X:  &x,
 		Y:  &y,
