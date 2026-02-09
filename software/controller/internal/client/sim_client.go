@@ -4,7 +4,6 @@ import (
     "fmt"
     "net"
     "sync"
-    "time"
 
     . "github.com/LiU-SeeGoals/controller/internal/logger"
     "github.com/LiU-SeeGoals/controller/internal/action"
@@ -14,12 +13,9 @@ import (
     "google.golang.org/protobuf/proto"
 )
 
-// SSL Vision receiver
 type SimClient struct {
-	// Connection
 	conn *net.UDPConn
 
-	// UDP address
 	addr *net.UDPAddr
 
 	savedActions    []action.Action
@@ -38,13 +34,11 @@ func NewSimClient(addr string, gameInfo ...*info.GameInfo) *SimClient {
 		Logger.Panicf("Unable to resolve UDP address: %v", err)
 	}
 
-	// Create the SimClient instance
 	sim_client := &SimClient{
 		conn: nil,
 		addr: udpAddr,
 	}
 
-	// Set gamestate if provided
 	if len(gameInfo) > 0 && gameInfo[0] != nil {
 		sim_client.gameState = gameInfo[0].State
 	}
@@ -61,89 +55,31 @@ func (client *SimClient) Init() {
 		panic(err)
 	}
 	client.conn = conn
-	go client.sendActionThread()
 }
 
 func (client *SimClient) CloseConnection() {
 	// Do nothing, only implemented to satisfy interface
 }
 
-// sends all the actions to the simulator
-// OBS make sure gamestate is provided in the constructor when sending moveTo actions
 func (client *SimClient) SendActions(actions []action.Action) {
-	// To simulate how robot acts, we send action until action changed
-	// Ex. We send moveTo, then this action will be submitted all the time until
-	//     another action (Ex. Kick) is sent
 	if client.gameState == nil {
 		fmt.Println("Please provide gamestate in the sim_client constructor")
 		Logger.Panic("Please provide gamestate in the sim_client constructor")
 	}
-	client.actionListMutex.Lock()
-
-	// If robot have active action --> replace that one, otherwise add as new one
+	
+	robotCommands := make([]*simulation.RobotCommand, 0, len(actions))
 	for _, action := range actions {
-		found := false // Flag to track if we found a match
-		for i, savedAction := range client.savedActions {
-			if action.ToDTO().Id == savedAction.ToDTO().Id {
-				// Update the existing action
-				client.savedActions[i] = action
-				found = true // Mark as found
-				break        // Exit inner loop since we've found and updated the action
-			}
-		}
-
-		// Only append if no match was found
-		if !found {
-			client.savedActions = append(client.savedActions, action)
-		}
+		robotCommands = append(robotCommands, action.TranslateSim())
 	}
-
-	client.actionListMutex.Unlock()
-}
-
-
-func (client *SimClient) sendActionThread() {
-	//TODO: Do we want to send actions only when a new action is added?
-    // Rate limit to ~100hz
-    ticker := time.NewTicker(10 * time.Millisecond)
-    defer ticker.Stop()
-
-    // Pre-allocate the slice and RobotControl to avoid per-iteration allocations
-    robotCommands := make([]*simulation.RobotCommand, 0, 16)
-    robotControl := &simulation.RobotControl{}
-
-    for range ticker.C {
-        client.actionListMutex.Lock()
-
-        // Reuse the slice by resetting length to 0 (keeps capacity)
-        robotCommands = robotCommands[:0]
-        for _, action := range client.savedActions {
-            robotCommands = append(robotCommands, action.TranslateSim())
-        }
-
-        // Reuse the RobotControl wrapper
-        robotControl.RobotCommands = robotCommands
-        client.Send(robotControl)
-
-        // Make sure all the MoveTo actions is updated with current data
-        for i, act := range client.savedActions {
-            if a, ok := act.(*action.MoveTo); ok {
-                pos, err := client.gameState.GetTeam(a.Team)[a.Id].GetPosition()
-                if err != nil {
-                    Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
-                    continue
-                }
-                a.Pos = pos
-                client.savedActions[i] = a
-            }
-        }
-        client.actionListMutex.Unlock()
-    }
+	
+	robotControl := &simulation.RobotControl{
+		RobotCommands: robotCommands,
+	}
+	
+	client.Send(robotControl)
 }
 
 func (client *SimClient) Send(msg proto.Message) (int, error) {
-	// fmt.Println("Sending message")
-	//sendActionThreadsendActionThread
 	data, err := proto.Marshal(msg)
 	if err != nil {
 		return 0, fmt.Errorf("unable to marshal TeleportRobot data: %w", err)
@@ -157,7 +93,6 @@ func (client *SimClient) Send(msg proto.Message) (int, error) {
 }
 
 func (client *SimClient) SendTestMessage() (int, error) {
-	// fmt.Println("Sending message")
 	idNum := uint32(3)
 	team := gc.Team_BLUE
 
