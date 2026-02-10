@@ -12,7 +12,7 @@ type EventName string
 
 
 type State interface {
-	Update()
+	Update() EventName
 	Initialize(sm *StateMachine)
 	GetName() StateName
 }
@@ -38,6 +38,13 @@ func (sm *StateMachine) AddTransition(from StateName, event EventName, to State)
 	sm.StateTransitions[from][event] = to
 }
 
+func (sm *StateMachine) SetGlobalTransition(event EventName, to State) {
+	if sm.StateTransitions["GLOBAL"] == nil {
+		sm.StateTransitions["GLOBAL"] = make(map[EventName]State)
+	}
+	sm.StateTransitions["GLOBAL"][event] = to
+}
+
 func (sm *StateMachine) TriggerEvent(event EventName) {
 	transitions := sm.StateTransitions[sm.currentState.GetName()]
 	newState, ok := transitions[event]
@@ -53,7 +60,8 @@ func (sm *StateMachine) ChangeState(newState State) {
 }
 
 func (sm *StateMachine) Update() {
-	sm.currentState.Update()
+	event := sm.currentState.Update()
+	sm.TriggerEvent(event)
 }
 
 
@@ -63,6 +71,7 @@ type AlignState struct {
 	robotId info.ID
 	team info.Team
 	from info.Position
+	name string
 }
 
 func (s *AlignState) Initialize(sm *StateMachine) {
@@ -73,7 +82,7 @@ func (s *AlignState) GetName() StateName {
 	return "Align"
 }
 
-func (s *AlignState) Update() {
+func (s *AlignState) Update() EventName{
 
 	ball := s.gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
@@ -81,35 +90,58 @@ func (s *AlignState) Update() {
 	activity := ai.NewAlign(s.team, s.robotId, s.from, ballPos)
 	achieved := activity.Achieved(s.gi)
 	if achieved {
-		s.sm.TriggerEvent("Aligned")
+		return "ALIGNED"
 	}
+	return "NONE"
 }
 
 type KickState struct {
+	name StateName
+	robotId info.ID
+	team info.Team
 	sm *StateMachine
+	kickAct *ai.KickBall
+	gi *info.GameInfo
 }
 
 func (s *KickState) Initialize(sm *StateMachine) {
 	s.sm = sm
 	fmt.Println("Entering Kick State")
+	ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
+	receiverPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
+
+	s.kickAct = ai.NewKickBall(s.team, s.robotId, receiverPos, ballPos)
+	g.AddActivity(s.kickAct)
 }
 
 func (s *KickState) GetName() StateName {
-	return "Kick"
+	return s.name
 }
 
-func (s *KickState) Update() {
-
+func (s *KickState) Update() EventName {
+	if(s.kickAct.Achieved(s.gi)){
+		return "KICKED"
+	}
+	return "NONE"
 }
 
 
 func main() {
-	align := &AlignState{gi, team, robotId}
-	kick := &KickState{}
+	position := info.Position{1,1,1,1}
+	team := info.Yellow
+	robotId := info.ID(3)
+	gi := info.NewGameInfo(1)
+
+	align := &AlignState{gi: gi, team: team, robotId: robotId, name: "Align", from: position}
+	prepareKick := &AlignState{gi: gi, team: team, robotId: robotId, name: "PrepareKick", from: position}
+	kick := &KickState{name: "Kick", gi: gi, team: team, robotId: robotId}
 
 	sm := NewStateMachine(align)
 
-	sm.AddTransition("Align", "Aligned", kick)
+	sm.SetGlobalTransition("BALL_LOST", align)
+	sm.AddTransition("Align", "BALL_OWNER", prepareKick)
+	sm.AddTransition("KickPrepare", "ALIGNED", kick)
+	sm.AddTransition("Kick", "KICKED", align)
 
 	sm.Update()
 }
