@@ -151,4 +151,6 @@ float NAV_GetNavY();
  */
 float NAV_GetNavW();
 void NAV_SetCommandPosition(float nav_x, float nav_y, float nav_z);
+
+int NAV_IsRemoteControlled();
 #endif /* NAV_H */

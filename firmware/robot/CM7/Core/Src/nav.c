@@ -25,6 +25,7 @@ const float CLOCK_FREQ = 400000000;
 const float CONTROL_TIM_FREQ = 200000000;
 float CONTROL_FREQ; // set in init
 static int queued = 0;
+static int is_remote_controlled = 0;
 
 /* Private functions declarations */
 void set_motors(float m1, float m2, float m3, float m4);
@@ -273,6 +274,8 @@ void NAV_DisableMovement() { robot_cmd.movement_enabled = 0; }
 
 void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
+int NAV_IsRemoteControlled() { return is_remote_controlled; }
+
 void NAV_HandleCommand(Command* cmd)
 {
     static int kicks_since_last_kick = 0;
@@ -298,16 +301,31 @@ void NAV_HandleCommand(Command* cmd)
     } break;
 
     case ACTION_TYPE__MOVE_ACTION: {
-        const int32_t speed = cmd->kick_speed;
+        const int32_t kickSpeed = cmd->kick_speed;
         const int32_t x = cmd->direction->x;
         const int32_t y = cmd->direction->y;
 
-        NAV_EnableMovement();
+        const float angle = cmd->angular_vel / 100.f;
 
-        // TODO: Should somehow know that we're in remote control mode
-        if (0 <= speed && speed <= 10) {
-            NAV_TEST_Set_robot_cmd(x, y, speed);
+        is_remote_controlled = 1;
+        if (kickSpeed == 1)
+        {
+            LOG_INFO("%d\r\n", kickSpeed);
+            KICKER_ChargeStart();
         }
+        else if (x == 0 && y == 0)
+        {
+            STATE_set_posx(0);
+            STATE_set_posy(0);
+            NAV_SetCommandPosition(0, 0, angle);
+        }
+        else
+        {
+            LOG_INFO("%d %d\r\n", x, y);
+            NAV_EnableMovement();
+            NAV_SetCommandPosition(x*1000, y*1000, angle);
+        }
+
     } break;
     case ACTION_TYPE__ROTATE_ACTION:
         break;

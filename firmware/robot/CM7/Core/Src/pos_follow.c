@@ -56,6 +56,39 @@ float angle_error(float angle, float desired)
 
 float standard_error(float current, float desired) { return desired - current; }
 
+void POS_velocity_control(float vel_u, float vel_v, float dest_w)
+{
+    const float cur_w = STATE_get_robot_angle();
+
+    // Compute errors in world frame
+
+    float ew = angle_error(cur_w, dest_w);  // Wrapped to [-pi, pi]
+
+    float omega  = K[2][2] * ew;
+
+    // Add gyro-based damping to reduce angular oscillations
+    // Essentialy makes it PD loop
+    float gyro_z = STATE_get_gyro_z();
+    omega = omega - Kd_omega * gyro_z;
+
+    if (omega > vel_max_w) omega = vel_max_w;
+    if (omega < -vel_max_w) omega = -vel_max_w;
+
+    // Transform world frame velocity to robot frame
+    float cos_w = arm_cos_f32(cur_w);
+    float sin_w = arm_sin_f32(cur_w);
+
+    const float vel_to_motor_scale = 250.0f;
+    float cmd_w = omega * 50.0f;  // Angular scaling
+
+    float deadzone = 5;
+    if (cmd_w < deadzone && cmd_w > -deadzone){
+        cmd_w = 0;
+    }
+
+    NAV_steer(vel_u, vel_v, cmd_w);
+}
+
 void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
 {
     ControlSignal sigx;

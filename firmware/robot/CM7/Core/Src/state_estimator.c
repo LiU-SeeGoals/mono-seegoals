@@ -534,6 +534,10 @@ float STATE_get_posx() { return MAT_ELEMENT(fusionEKF.ekf.x, 0, 0); }
 
 float STATE_get_posy() { return MAT_ELEMENT(fusionEKF.ekf.x, 1, 0); }
 
+float STATE_set_posx(float val) { MAT_ELEMENT(fusionEKF.ekf.x, 0, 0) = val; }
+
+float STATE_set_posy(float val) { MAT_ELEMENT(fusionEKF.ekf.x, 1, 0) = val; }
+
 float STATE_get_robot_angle()
 {
 

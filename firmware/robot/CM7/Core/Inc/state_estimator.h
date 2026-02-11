@@ -265,4 +265,7 @@ static void ekfMeasJacobianFunc(const arm_matrix_instance_f32* pX, arm_matrix_in
 static void EKFInit(EKF* pKF, uint16_t numStates, uint16_t numCtrl, uint16_t numSensors, float* pData);
 static void initEKF();
 
+float STATE_set_posx(float val);
+float STATE_set_posy(float val);
+
 #endif
