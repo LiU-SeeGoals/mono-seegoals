@@ -12,6 +12,7 @@ type MoveRemote struct {
 	Id        int
 	Direction *mat.VecDense // 2D vector, first value is x, second is y
 	Speed     int
+	Angle     int32
 }
 
 // Do nothing, only implemented to satisfy interface
@@ -30,7 +31,8 @@ func (s *MoveRemote) TranslateReal() *robot_action.Command {
 			X: int32(s.Direction.AtVec(0)),
 			Y: int32(s.Direction.AtVec(1)),
 		},
-		KickSpeed: int32(s.Speed),
+		AngularVel: s.Angle,
+		KickSpeed:  int32(s.Speed),
 	}
 	return command
 }
