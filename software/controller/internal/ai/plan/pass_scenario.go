@@ -66,8 +66,8 @@ func (m *GameScenario) Init(
 	team Team,
 ) {
 	m.incomingGameInfo = incoming
-	m.activities = activities
-	m.activity_lock = lock
+	m.ActivityHandler.activities = activities
+	m.ActivityHandler.activity_lock = lock
 	m.team = team
 
 	go m.run()
