@@ -310,7 +310,6 @@ void NAV_HandleCommand(Command* cmd)
         is_remote_controlled = 1;
         if (kickSpeed == 1)
         {
-            LOG_INFO("%d\r\n", kickSpeed);
             KICKER_ChargeStart();
         }
         else if (x == 0 && y == 0)
@@ -321,7 +320,6 @@ void NAV_HandleCommand(Command* cmd)
         }
         else
         {
-            LOG_INFO("%d %d\r\n", x, y);
             NAV_EnableMovement();
             NAV_SetCommandPosition(x*1000, y*1000, angle);
         }
