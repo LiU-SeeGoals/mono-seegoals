@@ -31,8 +31,8 @@ func (m *plannerRw) Init(
 	team info.Team,
 ) {
 	m.incomingGameInfo = incoming
-	m.activities = activities // store pointer directly
-	m.activity_lock = lock
+	m.ActivityHandler.Activities = activities // store pointer directly
+	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.start = time.Now()
 
@@ -64,10 +64,10 @@ func (m *plannerRw) run() {
 		time.Sleep(100 * time.Millisecond)
 
 		robot := robots[0]
-		if m.activities[robot] == nil {
+		if m.ActivityHandler.Activities[robot] == nil {
 			fmt.Println(fmt.Sprintf("done with (%d) action (%s)", robot, m.team))
 			fmt.Println("next action: ", way_points[index])
-			m.AddActivity(ai.NewMoveToPosition(m.team, info.ID(robot), way_points[index]))
+			m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(robot), way_points[index]))
 			index = (index + 1) % len(way_points)
 		}
 	}

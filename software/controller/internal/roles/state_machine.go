@@ -3,7 +3,8 @@ package roles
 import (
 	"fmt"
 
-	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	ai "github.com/LiU-SeeGoals/controller/internal/ai"
+	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -13,7 +14,7 @@ type EventName string
 
 type State interface {
 	Update() EventName
-	Initialize(sm *StateMachine)
+	Initialize()
 	GetName() StateName
 }
 
@@ -51,15 +52,19 @@ func (sm *StateMachine) TriggerEvent(event EventName) {
 	if !ok {
 		return
 	}
+	fmt.Println(event ,sm.currentState.GetName(), "->", newState.GetName())
 	sm.ChangeState(newState)
 }
 
 func (sm *StateMachine) ChangeState(newState State) {
 	sm.currentState = newState
-	newState.Initialize(sm)
+	newState.Initialize()
 }
 
 func (sm *StateMachine) Update() {
+	if sm.currentState == nil{
+		fmt.Println("States have not been initialized!!")
+	}
 	event := sm.currentState.Update()
 	sm.TriggerEvent(event)
 }
@@ -71,15 +76,15 @@ type AlignState struct {
 	robotId info.ID
 	team info.Team
 	from info.Position
-	name string
+	name StateName
+	activityHandler *ai.ActivityHandler
 }
 
-func (s *AlignState) Initialize(sm *StateMachine) {
-	s.sm = sm
+func (s *AlignState) Initialize() {
 }
 
 func (s *AlignState) GetName() StateName {
-	return "Align"
+	return s.name
 }
 
 func (s *AlignState) Update() EventName{
@@ -87,7 +92,8 @@ func (s *AlignState) Update() EventName{
 	ball := s.gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
 
-	activity := ai.NewAlign(s.team, s.robotId, s.from, ballPos)
+	activity := act.NewAlign(s.team, s.robotId, s.from, ballPos)
+	s.activityHandler.AddActivity(activity)
 	achieved := activity.Achieved(s.gi)
 	if achieved {
 		return "ALIGNED"
@@ -100,18 +106,18 @@ type KickState struct {
 	robotId info.ID
 	team info.Team
 	sm *StateMachine
-	kickAct *ai.KickBall
+	kickAct *act.KickBall
 	gi *info.GameInfo
+	handle *ai.ActivityHandler
 }
 
-func (s *KickState) Initialize(sm *StateMachine) {
-	s.sm = sm
+func (s *KickState) Initialize() {
 	fmt.Println("Entering Kick State")
 	ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
 	receiverPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
 
-	s.kickAct = ai.NewKickBall(s.team, s.robotId, receiverPos, ballPos)
-	g.AddActivity(s.kickAct)
+	s.kickAct = act.NewKickBall(s.team, s.robotId, receiverPos, ballPos)
+	s.handle.AddActivity(s.kickAct)
 }
 
 func (s *KickState) GetName() StateName {

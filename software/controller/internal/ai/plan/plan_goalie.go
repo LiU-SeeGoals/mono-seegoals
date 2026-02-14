@@ -31,8 +31,8 @@ func (m *plannerGoalie) Init(
 	team info.Team,
 ) {
 	m.incomingGameInfo = incoming
-	m.activities = activities // store pointer directly
-	m.activity_lock = lock
+	m.ActivityHandler.Activities = activities // store pointer directly
+	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.start = time.Now()
 
@@ -48,9 +48,9 @@ func (m *plannerGoalie) run() {
 
 		//fmt.Println("slow, number of activities:", len(*m.activities))
 
-		if m.activities[7] == nil {
+		if m.ActivityHandler.Activities[7] == nil {
 			fmt.Println("done with action: ", m.team)
-			m.AddActivity(ai.NewGoalie(m.team, 7))
+			m.ActivityHandler.AddActivity(ai.NewGoalie(m.team, 7))
 		}
 	}
 }
