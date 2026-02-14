@@ -127,7 +127,7 @@ func (kr *SupportAttackIntent) getFromPosition() info.Position{
 		x := randVal(xmax)
 		y := randVal(ymax)
 
-		pos := info.Position{x, y,0,0}
+		pos := info.Position{X: x, Y: y, Z:0, Angle: 0}
 		fmt.Println(pos)
 		if isGoalShotAvailable(kr.team, pos, kr.gi){
 			return pos
@@ -144,23 +144,20 @@ func (kr *SupportAttackIntent) getTargetPosition() info.Position {
 }
 
 func (kr *OffenseRole) Init() {
-
-
-	// position := info.Position{8000,8000,0,0}
-	alignName := StateName(fmt.Sprintf("Align ID %d",kr.id))
+	awaitName := StateName(fmt.Sprintf("Align ID %d",kr.id))
 	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d",kr.id))
 	kickName := StateName(fmt.Sprintf("Kick ID %d",kr.id))
 
 	offenseContext := AttemptGoalIntent{gi: kr.gi, team:kr.team, id:kr.id}
 	supportContext := SupportAttackIntent{gi: kr.gi, team:kr.team, id:kr.id}
 
-	awaitBall := &SupportState{ctx: &supportContext, gi: kr.gi, team: kr.team, robotId: kr.id, name: alignName, activityHandler: kr.activityHandler}
+	awaitBall := &SupportState{ctx: &supportContext, gi: kr.gi, team: kr.team, robotId: kr.id, name: awaitName, activityHandler: kr.activityHandler}
 	prepareKick := &AlignState{ctx: &offenseContext, gi: kr.gi, team: kr.team, robotId: kr.id, name: kickPrepareName, activityHandler: kr.activityHandler}
 	kick := &KickState{ctx: &offenseContext, name: kickName, gi: kr.gi, team: kr.team, robotId: kr.id, handle: kr.activityHandler}
 
 	sm := NewStateMachine(awaitBall)
 
-	sm.AddTransition(alignName, "BALL_OWNER", prepareKick)
+	sm.AddTransition(awaitName, "BALL_OWNER", prepareKick)
 
 	sm.AddTransition(kickPrepareName, "ALIGNED", kick)
 	sm.AddTransition(kickPrepareName, "BALL_LOST", awaitBall)
