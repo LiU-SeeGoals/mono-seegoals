@@ -88,7 +88,7 @@ func (g *GameScenario) run() {
 
 
 	for {
-		// Only coordinate robot roles
+		// Only coordinate robot roles, trigger ball events
 
 		time.Sleep(time.Millisecond * 1);
 		// Attack strategy
