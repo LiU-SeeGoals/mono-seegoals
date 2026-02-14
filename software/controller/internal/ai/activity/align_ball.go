@@ -109,7 +109,7 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	dist := math.Sqrt(xx + yy)
 	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError
 	if m.id == 3 {
-		//fmt.Println("angle error", math.Abs(angle_error), GetAlignConfig().angleError, dist, GetAlignConfig().doneDist)
+		// fmt.Println("angle error", math.Abs(angle_error), "threshold: ",GetAlignConfig().angleError, "dist:", dist, "threshold: ", GetAlignConfig().doneDist, val)
 	}
 	return val
 }

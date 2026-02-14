@@ -91,10 +91,10 @@ func (gi GameInfo) EnemyGoalLine(team Team) []Position {
 
 func (gi GameInfo) EnemyGoalCenter(team Team) Position {
 	// Segfaults when not in sim
-	// opponentGoal := gi.EnemyGoalLine(team)[0].Add(&gi.EnemyGoalLine(team)[1])
-	// opponentGoal.Div2d(2.0)
-	//return opponentGoal
-	return Position{X: 3050, Y: 0, Z: 0, Angle: 0}
+	opponentGoal := gi.EnemyGoalLine(team)[0].Add(&gi.EnemyGoalLine(team)[1])
+	opponentGoal.Div2d(2.0)
+	return opponentGoal
+	// return Position{X: 3050, Y: 0, Z: 0, Angle: 0}
 }
 
 func (gi GameInfo) FieldSize() Position {

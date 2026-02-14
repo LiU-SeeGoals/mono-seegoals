@@ -126,12 +126,13 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 					a := info.Vec2{X: m.path[i].X, Y: m.path[i].Y}
 					b := info.Vec2{X: m.path[i+1].X, Y: m.path[i+1].Y}
 					p := info.Vec2{X: myPos.X, Y: myPos.Y}
-					pointToLine := info.PointToLineSegment(a, b, p)
-					distanceToThreshold := math.Abs(info.NormV2(info.Sub(pointToLine, p)) - m.rrtConfig.waypointThreshold)
-					if distanceToThreshold < float64(bestPointDist) && m.IsPathClear(myPos, info.Position{X: pointToLine.X, Y: pointToLine.Y, Z: 0, Angle: 0}, m.GetObstaclePositions(gi), MotionRadius) {
+					pointOnLine := info.PointToLineSegment(a, b, p)
+					distToPathSegment := info.DistToLineSegment(a,b,p)
+					distanceToThreshold := math.Abs(distToPathSegment - m.rrtConfig.waypointThreshold)
+					if distanceToThreshold < float64(bestPointDist) && m.IsPathClear(myPos, info.Position{X: pointOnLine.X, Y: pointOnLine.Y, Z: 0, Angle: 0}, m.GetObstaclePositions(gi), MotionRadius) {
 						bestPointDist = distanceToThreshold
 
-						bestPoint = info.Position{X: pointToLine.X, Y: pointToLine.Y, Z: myPos.Z, Angle: myPos.Angle}
+						bestPoint = info.Position{X: pointOnLine.X, Y: pointOnLine.Y, Z: myPos.Z, Angle: myPos.Angle}
 					}
 				}
 			}

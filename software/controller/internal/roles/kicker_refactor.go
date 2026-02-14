@@ -2,13 +2,15 @@
 package roles
 
 import (
-
+	"fmt"
+	"math/rand"
+	"math"
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
 )
 
-type KickerRole2 struct {
+type OffenseRole struct {
 	id info.ID
 	sm *StateMachine
 	activityHandler *ai.ActivityHandler
@@ -16,8 +18,8 @@ type KickerRole2 struct {
 	team Team
 }
 
-func NewKickerRole2(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo, team Team) *KickerRole2 {
-	return &KickerRole2{
+func NewKickerRole2(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo, team Team) *OffenseRole {
+	return &OffenseRole{
 		id: robotID,
 		sm: nil,
 		activityHandler: &activityHandler,
@@ -26,29 +28,152 @@ func NewKickerRole2(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo
 	}
 }
 
-func (kr *KickerRole2) Init() {
 
-	position := info.Position{1,1,1,1}
+func (kr *AttemptGoalIntent) GetBestHomiePos() info.Position{
 
-	align := &AlignState{gi: kr.gi, team: kr.team, robotId: kr.id, name: "Align", from: position, activityHandler: kr.activityHandler}
-	prepareKick := &AlignState{gi: kr.gi, team: kr.team, robotId: kr.id, name: "PrepareKick", from: position, activityHandler: kr.activityHandler}
-	kick := &KickState{name: "Kick", gi: kr.gi, team: kr.team, robotId: kr.id}
+	// TODO implement some smarter way of kicking to best homie
+	// For example one that has free sight of the goal
+	homieId := 1
+	if kr.id == 1{
+		homieId = 3
+	}
 
-	sm := NewStateMachine(align)
+	pos, err := kr.gi.State.GetRobotPosition(kr.team, ID(homieId))
+	if err != nil{
+		fmt.Println("Could not get best homies pos")
+	}
 
-	sm.SetGlobalTransition("BALL_LOST", align)
-	sm.AddTransition("Align", "BALL_OWNER", prepareKick)
-	sm.AddTransition("KickPrepare", "ALIGNED", kick)
-	sm.AddTransition("Kick", "KICKED", align)
-
-	kr.sm = sm
-
+	return pos
 }
 
-func (kr *KickerRole2) Run() {
+type AttemptGoalIntent struct{
+	gi *GameInfo
+	team Team
+	id ID
+}
+
+func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool{
+
+	// Try to shoot goal if the sight is clear
+	// Otherwise pass to a homie
+
+	goalPosition := gi.EnemyGoalCenter(team)
+
+	enemies := gi.State.GetOtherTeam(team)
+	for i := 0; i < int(TEAM_SIZE); i++{
+		enemyPos,err := enemies[i].GetPosition()
+		if err != nil{
+			continue
+		}
+		dist := info.DistToLineSegment(goalPosition.ToV2(), from.ToV2(),enemyPos.ToV2())
+		if dist < 200{
+			return false
+		}
+	}
+
+	return true
+}
+
+func (kr *AttemptGoalIntent) getTargetPosition() info.Position{
+
+	// Try to shoot goal if the sight is clear
+	// Otherwise pass to a homie
+	goalPosition := kr.gi.EnemyGoalCenter(kr.team)
+	robotPos,err := kr.gi.State.GetRobotPosition(kr.team, kr.id)
+
+	if err != nil{
+		fmt.Println("failed robot pos")
+	}
+
+	if isGoalShotAvailable(kr.team, robotPos, kr.gi){
+		return goalPosition
+	}else{
+		return kr.GetBestHomiePos()
+	}
+}
+
+func (kr *AttemptGoalIntent) getFromPosition() info.Position {
+	pos, _ := kr.gi.State.GetBall().GetEstimatedPosition()
+
+	return pos
+}
+
+type SupportAttackIntent struct{
+	gi *GameInfo
+	team Team
+	id ID
+}
+
+func randVal(interval float64) float64{
+	randVal :=  (float64(rand.Int31()) / math.Pow(2,31) * 2.0 - 1.0) * interval
+	return randVal
+}
+
+func (kr *SupportAttackIntent) getFromPosition() info.Position{
+
+	// Some smarter way of selecting tactical positions should be done
+	// here in order to help the main offensive player
+	field := kr.gi.FieldSize()
+
+	pos,_ := kr.gi.State.GetRobotPosition(kr.team,kr.id)
+
+	if isGoalShotAvailable(kr.team, pos, kr.gi){
+		return pos
+	}
+
+	xmax := field.X
+	ymax := field.Y
+	for i := 0; i < 10; i++{
+		x := randVal(xmax)
+		y := randVal(ymax)
+
+		pos := info.Position{x, y,0,0}
+		fmt.Println(pos)
+		if isGoalShotAvailable(kr.team, pos, kr.gi){
+			return pos
+		}
+	}
+
+	return pos
+}
+
+func (kr *SupportAttackIntent) getTargetPosition() info.Position {
+	pos, _ := kr.gi.State.GetBall().GetEstimatedPosition()
+
+	return pos
+}
+
+func (kr *OffenseRole) Init() {
+
+
+	// position := info.Position{8000,8000,0,0}
+	alignName := StateName(fmt.Sprintf("Align ID %d",kr.id))
+	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d",kr.id))
+	kickName := StateName(fmt.Sprintf("Kick ID %d",kr.id))
+
+	offenseContext := AttemptGoalIntent{gi: kr.gi, team:kr.team, id:kr.id}
+	supportContext := SupportAttackIntent{gi: kr.gi, team:kr.team, id:kr.id}
+
+	awaitBall := &SupportState{ctx: &supportContext, gi: kr.gi, team: kr.team, robotId: kr.id, name: alignName, activityHandler: kr.activityHandler}
+	prepareKick := &AlignState{ctx: &offenseContext, gi: kr.gi, team: kr.team, robotId: kr.id, name: kickPrepareName, activityHandler: kr.activityHandler}
+	kick := &KickState{ctx: &offenseContext, name: kickName, gi: kr.gi, team: kr.team, robotId: kr.id, handle: kr.activityHandler}
+
+	sm := NewStateMachine(awaitBall)
+
+	sm.AddTransition(alignName, "BALL_OWNER", prepareKick)
+
+	sm.AddTransition(kickPrepareName, "ALIGNED", kick)
+	sm.AddTransition(kickPrepareName, "BALL_LOST", awaitBall)
+	sm.AddTransition(kickName, "KICKED", prepareKick)
+	sm.AddTransition(kickName, "BALL_LOST", awaitBall)
+
+	kr.sm = sm
+}
+
+func (kr *OffenseRole) Run() {
 	kr.sm.Update()
 }
 
-func (kr *KickerRole2) TriggerEvent(event EventName) {
+func (kr *OffenseRole) TriggerEvent(event EventName) {
 	kr.sm.TriggerEvent(event)
 }

@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"time"
 
@@ -41,12 +42,37 @@ func (m *GameScenario) Init(
 	go m.run()
 }
 
-func (g *GameScenario) run() {
-	kickerID := info.ID(3)
+func (g *GameScenario) getRobotClosestToBall(activeRobots []info.ID) info.ID{
 
 	gi := <-g.incomingGameInfo
-	kicker := roles.NewKickerRole2(kickerID, g.ActivityHandler, &gi, g.team)
-	kicker.Init()
+	ballPos,_ := gi.State.GetBall().GetEstimatedPosition()
+	dist := math.Inf(1)
+
+	clostestId := info.ID(0)
+	for _, id := range activeRobots{
+		robotPos,_ := gi.State.GetRobotPosition(g.team, id)
+		ballrobotDist := ballPos.Dist2d(robotPos) 
+		// fmt.Println(id ,ballrobotDist)
+		if ballrobotDist < dist{
+			clostestId = id
+			dist = ballrobotDist
+		}
+	}
+	return clostestId
+}
+
+func (g *GameScenario) run() {
+
+	activeRobots := []info.ID {1,3}
+	kickers := make(map[info.ID]*roles.OffenseRole)
+
+	gi := <-g.incomingGameInfo
+	for _, id := range activeRobots{
+		kicker := roles.NewKickerRole2(id, g.ActivityHandler, &gi, g.team)
+		kicker.Init()
+		kickers[id] = kicker
+	}
+	// kicker := roles.NewKickerRole2(kickerID, g.ActivityHandler, &gi, g.team)
 	// receiverID := info.ID(1)
 
 	// kicker := roles.NewKickerRole(kickerID, g)
@@ -60,16 +86,28 @@ func (g *GameScenario) run() {
 
 	fmt.Println(gi.Status)
 
-	// g.changeBallOwner(kickerID, "start of game")
 
 	for {
-		time.Sleep(10);
-		pos,_ := gi.State.GetRobot(kickerID, g.team).GetPosition()
-		ballPos,_ := gi.State.GetBall().GetEstimatedPosition()
-		if pos.Dist2d(ballPos) < 800{
-			kicker.TriggerEvent("BALL_OWNER")
+		// Only coordinate robot roles
+
+		time.Sleep(time.Millisecond * 1);
+		// Attack strategy
+
+		closestId := g.getRobotClosestToBall(activeRobots)
+
+		for _, id := range activeRobots{
+			if id != closestId{
+				kickers[id].TriggerEvent("BALL_LOST")
+			}
+		}
+		kickers[closestId].TriggerEvent("BALL_OWNER")
+
+		for _,kicker := range kickers{
+			kicker.Run()
 		}
 
-		kicker.Run()
+		// Defense strategy
+
+		// Etc...
 	}
 }

@@ -3,6 +3,8 @@ package info
 import (
 	"fmt"
 	"math"
+
+	// "github.com/LiU-SeeGoals/controller/internal/info"
 )
 
 type Vec2 struct {
@@ -18,6 +20,13 @@ type Position struct {
 }
 
 func Sub(a Vec2, b Vec2) Vec2 {
+	return Vec2{
+		X: a.X - b.X,
+		Y: a.Y - b.Y,
+	}
+}
+
+func NormV2(a Vec2, b Vec2) Vec2 {
 	return Vec2{
 		X: a.X - b.X,
 		Y: a.Y - b.Y,
@@ -61,10 +70,13 @@ func (v *Vec2) Norm() float64 {
 	return norm
 }
 
-func NormV2(v Vec2) float64 {
-	norm := math.Sqrt(v.X*v.X + v.Y*v.Y)
-	return norm
+func DistV2(a, b Vec2) float64 {
+	xx := (a.X - b.X) * (a.X - b.X)
+	yy := (a.Y - b.Y) * (a.Y - b.Y)
+
+	return math.Sqrt(xx + yy)
 }
+
 
 func (p *Position) Dist2d(other Position) float64 {
 	xx := (p.X - other.X) * (p.X - other.X)
@@ -209,6 +221,10 @@ func (p Position) ToDTO() string {
 	return fmt.Sprintf("(%f, %f, %f, %f)", p.X, p.Y, p.Z, p.Angle)
 }
 
+func (p Position) ToV2() Vec2 {
+	return Vec2{p.X,p.Y}
+}
+
 func PointToLineSegment(a, b, c Vec2) Vec2 {
 
 	ab := Sub(b, a)
@@ -223,4 +239,10 @@ func PointToLineSegment(a, b, c Vec2) Vec2 {
 	} else {
 		return Add(a, ab.Mult(t))
 	}
+}
+
+func DistToLineSegment(a, b, c Vec2) float64 {
+
+	pointOnLine := PointToLineSegment(a,b,c)
+	return DistV2(pointOnLine, c)
 }
