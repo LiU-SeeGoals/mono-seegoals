@@ -15,7 +15,7 @@ const RRT = true
 // RobotSafetyRadius defines the no-movement zone around each robot
 const RobotSafetyRadius = 180.0 // mm - increased for better safety margin
 const BallSafetyRadius = 90.0  // mm - increased for better safety margin
-const PlanningRadius = 100.0    // mm - increased for better safety margin
+const PlanningRadius = 200.0    // mm - increased for better safety margin
 const MotionRadius = 00.0      // mm - increased for better safety margin
 
 // MoveToPositionWithCollisionAvoidance handles collision avoidance using RRT
@@ -221,7 +221,7 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 		path = append([]info.Position{current.position}, path...)
 		current = current.parent
 	}
-
+	m.SimplifyPath(path, m.GetObstaclePositions(gi))
 	m.path = path
 }
 
@@ -394,6 +394,65 @@ func (m *MoveToPosition) IsPathClear(start, end info.Position, obstacles []Obsta
 	// }
 
 	return true
+}
+
+func (m *MoveToPosition) SimplifyPath(path []info.Position, obstacles []Obstacle) []info.Position {
+	if len(path) <= 2 {
+		return path
+	}
+
+	// Start with first node
+	simplified := []info.Position{path[0]}
+
+	// Initially try to connect directly to the goal
+	if m.IsPathClear(path[0], path[len(path)-1], obstacles, PlanningRadius) {
+		return []info.Position{path[len(path)-1]}
+	}
+
+	// Use a sliding window approach with increasing window size for more aggressive pruning
+	startIdx := 0
+
+	// Keep extending the window until we've processed the whole path
+	for startIdx < len(path)-1 {
+		// Try largest possible skip first
+		foundSkip := false
+		for endIdx := len(path) - 1; endIdx > startIdx+1; endIdx-- {
+			if m.IsPathClear(path[startIdx], path[endIdx], obstacles, PlanningRadius) {
+				// We can skip directly to this node
+				simplified = append(simplified, path[endIdx])
+				startIdx = endIdx
+				foundSkip = true
+				break
+			}
+		}
+
+		// If we couldn't skip ahead, just add the next node
+		if !foundSkip {
+			simplified = append(simplified, path[startIdx+1])
+			startIdx++
+		}
+	}
+
+	// Make sure we have at most MAX_WAYPOINTS
+	const MAX_WAYPOINTS = 5
+	if len(simplified) > MAX_WAYPOINTS {
+		// Keep first and last waypoints, and evenly sample the rest
+		result := []info.Position{simplified[0]}
+		step := float64(len(simplified)-2) / float64(MAX_WAYPOINTS-2)
+
+		for i := 1; i < MAX_WAYPOINTS-1; i++ {
+			idx := int(float64(i) * step)
+			if idx >= len(simplified)-1 {
+				break
+			}
+			result = append(result, simplified[idx+1])
+		}
+
+		result = append(result, simplified[len(simplified)-1])
+		return result
+	}
+
+	return simplified
 }
 
 // GetObstaclePositions gets positions of all other robots on the field
