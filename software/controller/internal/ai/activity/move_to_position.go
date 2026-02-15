@@ -15,7 +15,7 @@ const RRT = true
 // RobotSafetyRadius defines the no-movement zone around each robot
 const RobotSafetyRadius = 180.0 // 2x robot radius
 const BallSafetyRadius = 30 + 90.0  // Ball + robot radius
-const PlanningRadius = 200.0    // Safety radius used when planning rrt
+const PlanningRadius = 250.0    // Safety radius used when planning rrt
 const MotionRadius = 100.0      // Safety radius used when planning motion
 
 // MoveToPositionWithCollisionAvoidance handles collision avoidance using RRT
@@ -57,7 +57,7 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 	// Initialize with reasonable RRT parameters
 	rrtConfig := rrtConfiguration{
 		maxIterations:      1000,
-		stepSize:           50.0,   // mm per step (increased for more aggressive exploration)
+		stepSize:           100.0,   // mm per step (increased for more aggressive exploration)
 		goalBias:           0.15,   // 20% chance of sampling the goal directly (increased for more direct paths)
 		lookAheadHorizon:   500.0,  // mm to consider waypoint reached
 		fieldWidth:         9000.0, // Standard SSL field width in mm
@@ -92,7 +92,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	var targetPos info.Position
 
 	if RRT {
-		m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/100, 5), m.rrtConfig.stepSize)
+		m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/50, 5), m.rrtConfig.stepSize)
 
 		m.AvoidBall(true)
 		targetPos = myPos
@@ -141,7 +141,56 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 // PlanPath uses RRT to plan a collision-free path
 func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 	// Create a list of obstacle positions (other robots)
+
 	obstacles := m.GetObstacles(gi)
+
+   // Check if we're already in collision
+   robotsNearby := false
+   var nearestObstacle Obstacle
+   shortestDist := math.MaxFloat64
+
+   for _, obstacle := range obstacles {
+           dist := info.Dist2d(startPos, obstacle.position)
+           if dist <= obstacle.size + PlanningRadius {
+                   robotsNearby = true
+                   if dist < shortestDist {
+                           shortestDist = dist
+                           nearestObstacle = obstacle
+                   }
+           }
+   }
+
+   // If we're stuck in collision, generate a temporary escape path
+   if robotsNearby {
+           // Calculate direction away from nearest obstacle
+           dx := startPos.X - nearestObstacle.position.X
+           dy := startPos.Y - nearestObstacle.position.Y
+           dist := math.Sqrt(dx*dx + dy*dy)
+
+           // Normalize and scale to get a point outside the safety radius
+           safeDistance := nearestObstacle.size + PlanningRadius // Add extra margin
+           if dist > 0 {
+                   dx = dx / dist * safeDistance
+                   dy = dy / dist * safeDistance
+           } else {
+                   // If exactly overlapping, move in random direction
+                   angle := rand.Float64() * 2 * math.Pi
+                   dx = math.Cos(angle) * safeDistance
+                   dy = math.Sin(angle) * safeDistance
+           }
+
+           // Create escape position
+           escapePos := info.Position{
+                   X:     nearestObstacle.position.X + dx,
+                   Y:     nearestObstacle.position.Y + dy,
+                   Angle: startPos.Angle,
+           }
+
+           // Set this as our immediate path
+           m.path = []info.Position{escapePos}
+           return
+   }
+
 
 	// Initialize RRT
 	startNode := &RRTNode{
@@ -176,7 +225,6 @@ func (m *MoveToPosition) PlanPath(gi *info.GameInfo, startPos info.Position) {
 func (m *MoveToPosition) RunRRT(nodes []*RRTNode, obstacles []Obstacle) *RRTNode {
 	rand.Seed(time.Now().UnixNano())
 
-	nodeClearFailed := 0
 	pathClearFailed := 0
 
 	for i := 0; i < m.rrtConfig.maxIterations; i++ {
@@ -224,8 +272,7 @@ func (m *MoveToPosition) RunRRT(nodes []*RRTNode, obstacles []Obstacle) *RRTNode
 	}
 
 	// If we reach max iterations without finding a path, connect to the node closest to the goal
-	fmt.Println("node", nodeClearFailed)
-	fmt.Println("path", pathClearFailed)
+	fmt.Println("Collisions", pathClearFailed)
 	closestNode := m.FindNearestNode(nodes, m.final_destination)
 
 	// If the closest node is too far from the goal, return nil
