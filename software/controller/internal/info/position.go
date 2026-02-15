@@ -85,6 +85,13 @@ func (p *Position) Dist2d(other Position) float64 {
 	return math.Sqrt(xx + yy)
 }
 
+func Dist2d(a,b Position) float64 {
+	xx := (a.X - b.X) * (a.X - b.X)
+	yy := (a.Y - b.Y) * (a.Y - b.Y)
+
+	return math.Sqrt(xx + yy)
+}
+
 func (p *Position) Norm2d() float64 {
 	xx := (p.X) * (p.X)
 	yy := (p.Y) * (p.Y)
