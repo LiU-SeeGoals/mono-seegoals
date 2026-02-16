@@ -26,13 +26,6 @@ func Sub(a Vec2, b Vec2) Vec2 {
 	}
 }
 
-func NormV2(a Vec2, b Vec2) Vec2 {
-	return Vec2{
-		X: a.X - b.X,
-		Y: a.Y - b.Y,
-	}
-}
-
 func (v *Vec2) String() string {
 	return fmt.Sprintf("X: %f Y: %f", v.X, v.Y)
 }
@@ -77,6 +70,10 @@ func DistV2(a, b Vec2) float64 {
 	return math.Sqrt(xx + yy)
 }
 
+func NormV2(v Vec2) float64 {
+	norm := math.Sqrt(v.X*v.X + v.Y*v.Y)
+	return norm
+}
 
 func (p *Position) Dist2d(other Position) float64 {
 	xx := (p.X - other.X) * (p.X - other.X)
