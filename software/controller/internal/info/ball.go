@@ -4,24 +4,20 @@ import (
 	"container/list"
 	// "fmt"
 
-	"github.com/LiU-SeeGoals/controller/internal/tracker"
 )
 
 type Ball struct {
 	rawBall
 	possessor         *Robot
-	tracker           *tracker.BallTracker
 	estimatedPosition Position
 }
 
 func NewBall(historyCapacity int) *Ball {
-	tracker := tracker.NewBallTracker()
 	return &Ball{
 		rawBall: rawBall{
 			history:         list.New(),
 			historyCapacity: historyCapacity,
 		},
-		tracker:   tracker,
 		possessor: nil,
 	}
 }
