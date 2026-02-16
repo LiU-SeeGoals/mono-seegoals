@@ -128,7 +128,6 @@ func (kr *SupportAttackIntent) getFromPosition() info.Position{
 		y := randVal(ymax)
 
 		pos := info.Position{X: x, Y: y, Z:0, Angle: 0}
-		fmt.Println(pos)
 		if isGoalShotAvailable(kr.team, pos, kr.gi){
 			return pos
 		}
