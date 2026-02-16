@@ -23,9 +23,9 @@ type KickConfig struct {
 
 func GetKickConfig() KickConfig {
 	return KickConfig{
-		driveThrough:    0,
-		doneDist:        50,
-		ballAbortRadius: 100,
+		driveThrough:    30,
+		doneDist:        20,
+		ballAbortRadius: 200,
 	}
 }
 
@@ -57,11 +57,10 @@ func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 	}
 
 	robotV2 := info.Vec2{X: robotPos.X, Y: robotPos.Y}
-	toPosV2 := info.Vec2{X: m.to.X, Y: m.to.Y}
 
-	ballToTangent := info.Sub(toPosV2, ballV2)
-	ballToTangent.DivNorm()
-	kickAngle := ballToTangent.Angle()
+	// Assume the robot was aligned prior to kicking
+	// Meaning we should keep the same angle when driving into the ball
+	kickAngle := robotPos.Angle
 
 	ballRobotTangent := info.Sub(ballV2, robotV2)
 	ballRobotTangent.DivNorm()

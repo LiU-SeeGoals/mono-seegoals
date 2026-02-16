@@ -2,8 +2,11 @@ package ai
 
 import (
 	"sync"
+	"reflect"
+	"strings"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
+	. "github.com/LiU-SeeGoals/controller/internal/logger"
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -75,4 +78,54 @@ func (ai *Ai) GetActions(gi *info.GameInfo) []action.Action {
 	if len(actions) > 0 {
 	}
 	return actions
+}
+
+type ActivityHandler struct {
+	Activities       *[info.TEAM_SIZE]ai.Activity // <-- pointer to the slice
+	Activity_lock    *sync.Mutex                  // shared mutex for synchronization
+}
+
+func (m *ActivityHandler) ClearActivities() {
+	m.Activity_lock.Lock()
+	defer m.Activity_lock.Unlock()
+	*m.Activities = [info.TEAM_SIZE]ai.Activity{}
+}
+
+func (m *ActivityHandler) AddActivity(activity ai.Activity) {
+	// m.activity_lock.Lock()
+	// defer m.activity_lock.Unlock()
+	idx := activity.GetID()
+	Logger.Infof("Adding activity %v", activity)
+	m.Activities[idx] = activity
+}
+
+func (m *ActivityHandler) GetActivity(id info.ID) ai.Activity {
+	return m.Activities[id]
+}
+
+func (m *ActivityHandler) ReplaceActivities(activities *[info.TEAM_SIZE]ai.Activity) {
+	m.Activity_lock.Lock()
+	defer m.Activity_lock.Unlock()
+	m.Activities = activities
+}
+
+func (m *ActivityHandler) GetActionTypeName(activity ai.Activity) string {
+	// Check if activity is nil
+	if activity == nil {
+		return ""
+	}
+
+	// Get the type using reflection
+	t := reflect.TypeOf(activity)
+
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+
+	// Get the full name (including package)
+	fullName := t.String()
+
+	// just the type name without the package
+	parts := strings.Split(fullName, ".")
+	return parts[len(parts)-1]
 }

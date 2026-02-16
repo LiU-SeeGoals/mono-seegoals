@@ -3,6 +3,8 @@ package info
 import (
 	"fmt"
 	"math"
+
+	// "github.com/LiU-SeeGoals/controller/internal/info"
 )
 
 type Vec2 struct {
@@ -59,6 +61,13 @@ func (v *Vec2) DivNorm() {
 func (v *Vec2) Norm() float64 {
 	norm := math.Sqrt(v.X*v.X + v.Y*v.Y)
 	return norm
+}
+
+func DistV2(a, b Vec2) float64 {
+	xx := (a.X - b.X) * (a.X - b.X)
+	yy := (a.Y - b.Y) * (a.Y - b.Y)
+
+	return math.Sqrt(xx + yy)
 }
 
 func NormV2(v Vec2) float64 {
@@ -209,6 +218,10 @@ func (p Position) ToDTO() string {
 	return fmt.Sprintf("(%f, %f, %f, %f)", p.X, p.Y, p.Z, p.Angle)
 }
 
+func (p Position) ToV2() Vec2 {
+	return Vec2{p.X,p.Y}
+}
+
 func PointToLineSegment(a, b, c Vec2) Vec2 {
 
 	ab := Sub(b, a)
@@ -223,4 +236,10 @@ func PointToLineSegment(a, b, c Vec2) Vec2 {
 	} else {
 		return Add(a, ab.Mult(t))
 	}
+}
+
+func DistToLineSegment(a, b, c Vec2) float64 {
+
+	pointOnLine := PointToLineSegment(a,b,c)
+	return DistV2(pointOnLine, c)
 }
