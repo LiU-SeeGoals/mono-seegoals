@@ -86,8 +86,14 @@ func (g *GameScenario) run() {
 
 	fmt.Println(gi.Status)
 
-
 	for {
+		// trackedBall := gi.State.GetTrackedBall();
+		// ball := gi.State.GetBall();
+		// ballPos, _ := ball.GetPosition()
+		// fmt.Println("Untracked - Tracked: ", ballPos, "\t", trackedBall.Vel);
+		ge := gi.Status.GetGameEvent()
+		fmt.Println(ge.CurrentState)
+
 		// Only coordinate robot roles, trigger ball events
 
 		time.Sleep(time.Millisecond * 1);
