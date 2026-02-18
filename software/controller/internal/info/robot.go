@@ -6,7 +6,6 @@ import (
 	"math"
 
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
-	"github.com/LiU-SeeGoals/controller/internal/tracker"
 )
 
 type Team int8
@@ -32,7 +31,6 @@ func (t Team) String() string {
 
 type Robot struct {
 	rawRobot
-	tracker tracker.RobotTracker
 }
 
 func NewRobot(id ID, team Team, history_capasity int) *Robot {
