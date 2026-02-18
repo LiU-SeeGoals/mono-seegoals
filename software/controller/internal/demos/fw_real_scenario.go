@@ -50,7 +50,7 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 func FwRealScenario() {
 	gameInfo := info.NewGameInfo(10)
 
-	// var sslClientTracked *client.SSLTrackedClient
+	var sslClientTracked *client.SSLTrackedClient
 	var sslClientRaw *client.SSLClient
 	var aiYellow *ai.Ai
 	var aiBlue *ai.Ai
@@ -73,6 +73,7 @@ func FwRealScenario() {
 		teamYellow := []int{1, 3}
 		teamBlue := []int{7}
 
+		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
 
 		simClientYellow = client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
@@ -80,9 +81,8 @@ func FwRealScenario() {
 
 		simController = simulator.NewSimControl()
 		simController.SetPresentRobots(teamYellow, teamBlue)
-
 	} else {
-		//sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
+		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddressReal())
 
 		basestationClient = client.NewBaseStationClient(config.GetBasestationAddress())
@@ -93,7 +93,11 @@ func FwRealScenario() {
 		playTime := time.Now().UnixMilli()
 
 		sslClientRaw.UpdateState(gameInfo, playTime)
-		//sslClientTracked.UpdateState(gameInfo, playTime)
+		sslClientTracked.UpdateState(gameInfo, playTime)
+
+		if !gameInfo.HasField() || !gameInfo.State.IsValid() {
+			continue
+		}
 
 		actionsYellow := aiYellow.GetActions(gameInfo)
 		actionsBlue := aiBlue.GetActions(gameInfo)
@@ -106,8 +110,6 @@ func FwRealScenario() {
 			simClientBlue.SendActions(actionsBlue)
 
 			handleSimulatedBall(gameInfo, simController)
-
-			time.Sleep(2 * time.Millisecond)
 		} else {
 			basestationClient.SendActions(actionsYellow)
 			basestationClient.SendActions(actionsBlue)

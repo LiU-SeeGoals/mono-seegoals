@@ -24,8 +24,6 @@ type SSLConnection struct {
 	addr *net.UDPAddr
 	// Read buffer
 	buff []byte
-	// SSL lets not heap allocate this every time
-	packet ssl_vision.SSL_WrapperPacket
 }
 
 // Create a new SSL vision receiver.
@@ -64,19 +62,17 @@ func (r *SSLConnection) Receive(packetChan chan *ssl_vision.SSL_WrapperPacket) {
 	for {
 		sz, err := r.conn.Read(r.buff)
 		if err != nil {
-			// fmt.Printf("Unable to receive packet: %s", err)
 			Logger.Errorf("Unable to receive packet: %v", err)
 			continue
 		}
 
-		err = proto.Unmarshal(r.buff[:sz], &r.packet)
+		packet := &ssl_vision.SSL_WrapperPacket{}
+		err = proto.Unmarshal(r.buff[:sz], packet)
 		if err != nil {
-			// fmt.Printf("Unable to unmarshal packet: %s", err)
 			Logger.Errorf("Unable to unmarshal packet: %v", err)
 			continue
 		}
-		// packetChan <- &r.packet
-		helper.NB_Send[ssl_vision.SSL_WrapperPacket](packetChan, &r.packet)
+		helper.NB_Send[ssl_vision.SSL_WrapperPacket](packetChan, packet)
 	}
 }
 
@@ -140,8 +136,11 @@ func (receiver *SSLVisionClient) handlePacket(packet *ssl_vision.SSL_WrapperPack
 }
 
 func (receiver *SSLVisionClient) UpdateGameInfo(gi *info.GameInfo, play_time int64) {
-	packet, ok := <-receiver.ssl_channel
-	receiver.handlePacket(packet, ok, gi, play_time)
+	select {
+	case packet, ok := <-receiver.ssl_channel:
+		receiver.handlePacket(packet, ok, gi, play_time)
+	default:
+	}
 }
 
 // Start a SSL Vision receiver, returns a channel from
@@ -152,7 +151,7 @@ func (receiver *SSLVisionClient) Connect() {
 }
 
 func NewSSLVisionClient(sslReceiverAddress string) *SSLVisionClient {
-	ssl_channel := make(chan *ssl_vision.SSL_WrapperPacket)
+	ssl_channel := make(chan *ssl_vision.SSL_WrapperPacket, 1)
 	receiver := &SSLVisionClient{
 		ssl:         NewSSLConnection(sslReceiverAddress),
 		ssl_channel: ssl_channel,

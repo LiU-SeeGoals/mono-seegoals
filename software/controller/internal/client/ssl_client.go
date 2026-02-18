@@ -35,5 +35,4 @@ func (client *SSLClient) UpdateState(gi *info.GameInfo, play_time int64) {
 
 func (client *SSLTrackedClient) UpdateState(gi *info.GameInfo, play_time int64) {
 	client.vision.UpdateGameInfoTracked(gi, play_time)
-	client.referee.UpdateGameInfo(gi)
 }
