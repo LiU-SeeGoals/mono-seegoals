@@ -16,10 +16,12 @@
     "@mui/icons-material": "^5.15.20",
     "@mui/material": "^5.15.19",
     "@solidjs/router": "^0.12.5",
-    "proto": "link:src/proto",
+    "plotly.js": "^3.3.1",
+    "proto": "file:src/proto",
     "protobufjs": "^7.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-plotly.js": "^2.6.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

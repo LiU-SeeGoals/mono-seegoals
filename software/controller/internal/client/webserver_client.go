@@ -186,6 +186,14 @@ func BroadcastActions(actions []action.Action) {
 	webserver.gameStateQueueMutex.Unlock()
 }
 
+func BroadcastPlots(actions []action.Action) {
+	actionsJson := actionsToJson(actions)
+	webserver := getInstance()
+	webserver.gameStateQueueMutex.Lock()
+	webserver.gameStatePacketQueue = append(webserver.gameStatePacketQueue, actionsJson)
+	webserver.gameStateQueueMutex.Unlock()
+}
+
 func UpdateWebGUI(gs *info.GameState, actions []action.Action, terminal_messages []string) {
 	var gamestate_DTO = gs.ToDTO()
 	var actionTDO = make([]action.ActionDTO, len(actions))

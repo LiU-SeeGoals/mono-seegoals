@@ -1,12 +1,16 @@
 package plt
 
 import (
+	"time"
 	"gonum.org/v1/plot"
 	"gonum.org/v1/plot/vg"
 	"gonum.org/v1/plot/plotter"
 )
 
 var p *plot.Plot
+var lastSave time.Time
+// Make plotting max 10hz
+const cooldown = 10 * time.Millisecond
 
 func Init() {
 	p = plot.New();
@@ -29,6 +33,10 @@ func Get() *plot.Plot {
 }
 
 func SaveFig(name string) {
+	if time.Since(lastSave) < cooldown{
+		// Do not run to often
+		return
+	}
 	err := p.Save(8 * vg.Inch, 8 * vg.Inch, name)
 	if err != nil{
 		panic(err)

@@ -18,7 +18,7 @@ import {
   getDefaultLog,
   getDefaultVisibleRobots,
 } from './helper/defaultValues';
-import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
+import Plotter from './components/plotComponent/plot.tsx';
 
 function App() {
   const [sslFieldUpdate, setSSLFieldUpdate] = useState(getDefaultSSLFieldUpdate());
@@ -32,6 +32,7 @@ function App() {
   const [errorOverlay, setErrorOverlay] = useState<string | undefined>();
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [fieldGeometry, setFieldGeometry] = useState<SSL_GeometryFieldSize | null>(null);
+  const [count, setCount] = useState(0);
 
   const { isConnected: isConnectedToVision } = useSSLVision(
     setSSLFieldUpdate,
@@ -45,8 +46,10 @@ function App() {
   useEffect(() => {
     document.title = "SeeGoals - GameViewer";
   }, []);
+  const plotComponent = 
+    <Plotter/>
 
-  return (
+  const gameComponent = 
     <div className="app-container">
       <Sidebar
         vectorSettingBlue={vectorSettingBlue}
@@ -76,7 +79,19 @@ function App() {
         fieldGeometry={fieldGeometry}
       />
     </div>
-  );
+
+  const components = [
+    gameComponent,
+    plotComponent
+  ]
+
+  return <div className="app-container">
+      {<button onClick={() => setCount(0)}>prev</button>}
+      {<button onClick={() => setCount(count + 1)}>next</button>}
+    {
+      components[count]
+    }
+  </div>
 }
 
 export default App;
