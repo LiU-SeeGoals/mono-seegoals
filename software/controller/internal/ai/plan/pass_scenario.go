@@ -106,6 +106,7 @@ func (g *GameScenario) run() {
 				kickers[id].TriggerEvent("BALL_LOST")
 			}
 		}
+
 		kickers[closestId].TriggerEvent("BALL_OWNER")
 
 		for _,kicker := range kickers{

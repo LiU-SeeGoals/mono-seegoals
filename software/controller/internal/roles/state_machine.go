@@ -59,38 +59,38 @@ func (sm *StateMachine) ChangeState(newState State) {
 
 func (sm *StateMachine) Update() {
 	if sm.currentState == nil{
-		fmt.Println("States have not been initialized!!")
+		panic("States have not been initialized!!")
 	}
 	event := sm.currentState.Update()
 	sm.TriggerEvent(event)
 }
 
 type TargetContext interface{
-	getTargetPosition() info.Position
-	getFromPosition() info.Position
+	GetTargetPosition() info.Position
+	GetFromPosition() info.Position
 }
 
 type AlignState struct {
-	gi *info.GameInfo
-	robotId info.ID
-	team info.Team
-	name StateName
-	activityHandler *ai.ActivityHandler
-	ctx TargetContext
+	Gi *info.GameInfo
+	RobotId info.ID
+	Team info.Team
+	Name StateName
+	ActivityHandler *ai.ActivityHandler
+	Ctx TargetContext
 }
 
 func (s *AlignState) Initialize() {
 }
 
 func (s *AlignState) GetName() StateName {
-	return s.name
+	return s.Name
 }
 
 func (s *AlignState) Update() EventName{
 
-	activity := act.NewAlign(s.team, s.robotId, s.ctx.getTargetPosition(), s.ctx.getFromPosition())
-	s.activityHandler.AddActivity(activity)
-	achieved := activity.Achieved(s.gi)
+	activity := act.NewAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
+	s.ActivityHandler.AddActivity(activity)
+	achieved := activity.Achieved(s.Gi)
 	if achieved {
 		return "ALIGNED"
 	}
@@ -115,7 +115,7 @@ func (s *SupportState) GetName() StateName {
 
 func (s *SupportState) Update() EventName{
 
-	activity := act.NewMoveToPosition(s.team, s.robotId, s.ctx.getFromPosition())
+	activity := act.NewMoveToPosition(s.team, s.robotId, s.ctx.GetFromPosition())
 	s.activityHandler.AddActivity(activity)
 	achieved := activity.Achieved(s.gi)
 	if achieved {
@@ -125,27 +125,27 @@ func (s *SupportState) Update() EventName{
 }
 
 type KickState struct {
-	name StateName
-	robotId info.ID
-	team info.Team
-	kickAct *act.KickBall
-	gi *info.GameInfo
-	handle *ai.ActivityHandler
-	ctx TargetContext
+	Name StateName
+	RobotId info.ID
+	Team info.Team
+	KickAct *act.KickBall
+	Gi *info.GameInfo
+	ActivityHandler *ai.ActivityHandler
+	Ctx TargetContext
 }
 
 func (s *KickState) Initialize() {
 
-	s.kickAct = act.NewKickBall(s.team, s.robotId, s.ctx.getTargetPosition(), s.ctx.getFromPosition())
-	s.handle.AddActivity(s.kickAct)
+	s.KickAct = act.NewKickBall(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
+	s.ActivityHandler.AddActivity(s.KickAct)
 }
 
 func (s *KickState) GetName() StateName {
-	return s.name
+	return s.Name
 }
 
 func (s *KickState) Update() EventName {
-	if(s.kickAct.Achieved(s.gi)){
+	if(s.KickAct.Achieved(s.Gi)){
 		return "KICKED"
 	}
 	return "NONE"
