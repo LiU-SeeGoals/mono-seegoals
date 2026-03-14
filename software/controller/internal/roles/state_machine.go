@@ -65,6 +65,10 @@ func (sm *StateMachine) Update() {
 	sm.TriggerEvent(event)
 }
 
+func (sm *StateMachine) CurrentStateName() StateName{
+	return sm.currentState.GetName()
+}
+
 type TargetContext interface{
 	GetTargetPosition() info.Position
 	GetFromPosition() info.Position
