@@ -2,6 +2,7 @@ package referee
 
 import (
 	"fmt"
+	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
@@ -10,16 +11,22 @@ import (
 )
 
 const (
-	HALT = "Halt"
-	STOP = "Stop"
-	NORMAL_START = "NormalStart"
-	FORCE_START = "ForceStart"
+	FREEKICK_MAX_TIME     = 10
+	BALL_IN_PLAY_DISTANCE = 1000
+	BALL_IN_PLAY_VELOCITY = 1
+)
+
+const (
+	HALT            = "Halt"
+	STOP            = "Stop"
+	NORMAL_START    = "NormalStart"
+	FORCE_START     = "ForceStart"
 	PREPARE_KICKOFF = "PrepareKickoff"
-	FREE_KICK = "FreeKick"
-	BALL_PLACEMENT = "BallPlacement"
-	TIMEOUT = "Timeout"
-	CONTINUE = "Continue"
-	UNKNOWN = "Unknown"
+	FREE_KICK       = "FreeKick"
+	BALL_PLACEMENT  = "BallPlacement"
+	TIMEOUT         = "Timeout"
+	CONTINUE        = "Continue"
+	UNKNOWN         = "Unknown"
 )
 
 const (
@@ -45,7 +52,9 @@ type Halt struct {
 
 type FreeKick struct {
 	RefereeInfo
-	freeKick *roles.StateMachine
+	freeKick        *roles.StateMachine
+	freeKickStart   time.Time
+	originalBallPos info.Position
 }
 
 type Stop struct {
@@ -60,8 +69,10 @@ type PrepareKickoff struct {
 
 type Kickoff struct {
 	RefereeInfo
-	kickOff *roles.StateMachine
-	recieve *roles.StateMachine
+	kickOff         *roles.StateMachine
+	recieve         *roles.StateMachine
+	originalBallPos info.Position
+	kickStart       time.Time
 }
 
 type Running struct {
@@ -104,7 +115,7 @@ func (s *RecieveIntent) GetTargetPosition() info.Position {
 }
 
 func (s *RecieveIntent) GetFromPosition() info.Position {
-	return info.Position{X: 1000, Y: 0, Z: 0, Angle: 0}
+	return info.Position{X: 0, Y: 1000, Z: 0, Angle: 0}
 }
 
 type KickOffIntent struct {
@@ -114,7 +125,7 @@ type KickOffIntent struct {
 }
 
 func (s *KickOffIntent) GetTargetPosition() info.Position {
-	return info.Position{X: 1000, Y: 0, Z: 0, Angle: 0}
+	return info.Position{X: 0, Y: 1000, Z: 0, Angle: 0}
 }
 
 func (s *KickOffIntent) GetFromPosition() info.Position {
@@ -124,21 +135,43 @@ func (s *KickOffIntent) GetFromPosition() info.Position {
 func (s *FreeKick) Initialize() {
 
 	kickOffID := info.ID(1)
-
 	kickPrepareName := roles.StateName(fmt.Sprintf("KickPrepare ID %d", kickOffID))
-
 	kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickOffID}
-
 	prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
-
 	// kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
+	// After 10 seconds we are allowed to kick the ball
+	s.freeKickStart = time.Now()
+	originalBallPos, ok := s.gi.State.GetTrackedBall().GetTrackedPosition()
+	if !ok {
+		fmt.Println("Failed getting original ball pos during FreeKick")
+	}
 
 	s.freeKick = roles.NewStateMachine(prepareKick)
+
+	s.originalBallPos = originalBallPos
+
 }
 
 func (s *FreeKick) Update() roles.EventName {
 
-	s.freeKick.Update()
+	trackedBall := s.gi.State.GetTrackedBall()
+	vel, ok := trackedBall.GetTrackedVelocity()
+	pos, ok := trackedBall.GetTrackedPosition()
+
+	if ok {
+		posDiff := pos.Sub(&s.originalBallPos)
+		// If ball has velocity or has moved far enough from the start
+		// We can assume that the ball touched rule is fullfilled
+		if vel.Norm2d() > BALL_IN_PLAY_VELOCITY || posDiff.Norm2d() > BALL_IN_PLAY_DISTANCE || time.Now().Sub(s.freeKickStart) > time.Second*10 {
+			return GAME_RUNNING_DETECTED
+		}
+	}
+
+	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
+		s.freeKick.Update()
+	} else {
+		moveRobotsToDefensePosition(s.activeRobots, s.team, s.activityHandler)
+	}
 
 	return "NONE"
 }
@@ -160,12 +193,17 @@ func (s *PrepareKickoff) Initialize() {
 
 	s.kickOff = roles.NewStateMachine(prepareKick)
 	s.recieve = roles.NewStateMachine(reciever)
+
 }
 
 func (s *PrepareKickoff) Update() roles.EventName {
 
-	s.kickOff.Update()
-	s.recieve.Update()
+	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
+		s.kickOff.Update()
+		s.recieve.Update()
+	} else {
+		moveRobotsToDefensePosition(s.activeRobots, s.team, s.activityHandler)
+	}
 
 	return "NONE"
 }
@@ -179,28 +217,49 @@ func (s *Kickoff) Initialize() {
 	kickName := roles.StateName(fmt.Sprintf("Kick ID %d", kickOffID))
 
 	recieveName := roles.StateName(fmt.Sprintf("Kickoff recieve ID %d", recieveID))
+	originalBallPos, ok := s.gi.State.GetTrackedBall().GetTrackedPosition()
+	s.kickStart = time.Now()
 
-	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
-		// If we dont have possession we should chill or smth
-	} else {
-		kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickOffID}
-		recieve := RecieveIntent{gi: s.gi, team: s.team, id: kickOffID}
-
-		prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
-		kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickName, ActivityHandler: s.activityHandler}
-		reciever := &roles.AlignState{Ctx: &recieve, Gi: s.gi, Team: s.team, RobotId: recieveID, Name: recieveName, ActivityHandler: s.activityHandler}
-
-		s.kickOff = roles.NewStateMachine(prepareKick)
-		s.kickOff.AddTransition(kickPrepareName, "ALIGNED", kick)
-
-		s.recieve = roles.NewStateMachine(reciever)
+	if !ok {
+		fmt.Println("Failed retriving original ball pos during KickOff")
 	}
+	s.originalBallPos = originalBallPos
+
+	kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickOffID}
+	recieve := RecieveIntent{gi: s.gi, team: s.team, id: kickOffID}
+
+	prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
+	kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickName, ActivityHandler: s.activityHandler}
+	reciever := &roles.AlignState{Ctx: &recieve, Gi: s.gi, Team: s.team, RobotId: recieveID, Name: recieveName, ActivityHandler: s.activityHandler}
+
+	s.kickOff = roles.NewStateMachine(prepareKick)
+	s.kickOff.AddTransition(kickPrepareName, "ALIGNED", kick)
+
+	s.recieve = roles.NewStateMachine(reciever)
+	// If we dont have possession we take good defense position
 }
 
 func (s *Kickoff) Update() roles.EventName {
 
-	s.kickOff.Update()
-	s.recieve.Update()
+	trackedBall := s.gi.State.GetTrackedBall()
+	vel, ok := trackedBall.GetTrackedVelocity()
+	pos, ok := trackedBall.GetTrackedPosition()
+
+	if ok {
+		posDiff := pos.Sub(&s.originalBallPos)
+		// If ball has velocity or has moved far enough from the start
+		// We can assume that the ball touched rule is fullfilled
+		if vel.Norm2d() > BALL_IN_PLAY_VELOCITY || posDiff.Norm2d() > BALL_IN_PLAY_DISTANCE || time.Now().Sub(s.kickStart) > time.Second*10 {
+			return GAME_RUNNING_DETECTED
+		}
+	}
+
+	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
+		s.kickOff.Update()
+		s.recieve.Update()
+	} else {
+		moveRobotsToDefensePosition(s.activeRobots, s.team, s.activityHandler)
+	}
 
 	return "NONE"
 }
@@ -236,120 +295,6 @@ type RefereeHandler struct {
 	activeRobots []info.ID
 }
 
-func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team, activityHandler *ai.ActivityHandler) *RefereeHandler {
-
-	freeKickName := roles.StateName("FREEKICK")
-	stopName := roles.StateName("STOP")
-	haltName := roles.StateName("HALT")
-	prepareKickoffName := roles.StateName("PREPAREKICKOFF")
-	kickOffName := roles.StateName("KICKOFF")
-	// timeoutName := roles.StateName("TIMEOUT")
-	ballPlacementName := roles.StateName("BALLPLACEMENT")
-
-	freeKick := &FreeKick{
-		RefereeInfo: RefereeInfo{
-			gi:           gi,
-			activeRobots: activeRobots,
-			team:         team,
-			name:         freeKickName,
-		},
-	}
-
-	prepareKickoff := &PrepareKickoff{
-		RefereeInfo: RefereeInfo{
-			gi:           gi,
-			activeRobots: activeRobots,
-			team:         team,
-			name:         prepareKickoffName,
-		},
-	}
-	stop := &Stop{
-		RefereeInfo: RefereeInfo{
-			gi:           gi,
-			activeRobots: activeRobots,
-			team:         team,
-			name:         stopName,
-		},
-	}
-	ballPlacement := &Stop{
-		RefereeInfo: RefereeInfo{
-			gi:           gi,
-			activeRobots: activeRobots,
-			team:         team,
-			name:         ballPlacementName,
-		},
-	}
-	// Not needed but might be good in the future
-	// timeout := &Stop{
-	// 	RefereeInfo: RefereeInfo{
-	// 		gi: gi,
-	// 		activeRobots: activeRobots,
-	// 		team: team,
-	// 		name: timeoutName,
-	// 		},
-	// }
-	halt := &Halt{
-		RefereeInfo: RefereeInfo{
-			gi:           gi,
-			activeRobots: activeRobots,
-			team:         team,
-			name:         haltName,
-		},
-	}
-	kickOff := &Kickoff{
-		RefereeInfo: RefereeInfo{
-			gi:           gi,
-			activeRobots: activeRobots,
-			team:         team,
-			name:         kickOffName,
-		},
-	}
-	running := &Running{}
-	uninitialized := &UninitializedRef{}
-
-	// Note that Timeout, ballplacement, PreparePenalty and Penalty are not implemented
-	// Since it is not required to play a match
-
-	refereeSM := roles.NewStateMachine(uninitialized)
-
-	refereeSM.AddTransition("HALT", STOP, stop)
-	// refereeSM.AddTransition("STOP", "Timeout", timeout)
-
-	refereeSM.AddTransition("STOP", PREPARE_KICKOFF, prepareKickoff)
-	refereeSM.AddTransition("STOP", FREE_KICK, freeKick)
-	refereeSM.AddTransition("STOP", BALL_PLACEMENT, ballPlacement)
-	refereeSM.AddTransition("STOP", FORCE_START, running)
-
-	refereeSM.AddTransition("BALLPLACEMENT", STOP, stop)
-	refereeSM.AddTransition("BALLPLACEMENT", CONTINUE, freeKick)
-
-	refereeSM.AddTransition("PREPAREKICKOFF", NORMAL_START, kickOff)
-
-	refereeSM.AddTransition("KICKOFF", GAME_RUNNING_DETECTED, running)
-	refereeSM.AddTransition("FREEKICK", GAME_RUNNING_DETECTED, running)
-
-	refereeSM.AddTransition("RUNNING", STOP, stop)
-
-	// All states go to halt
-	refereeSM.AddTransition("STOP", HALT, halt)
-	refereeSM.AddTransition("BALLPLACEMENT", HALT, halt)
-	refereeSM.AddTransition("PREPAREKICKOFF", HALT, halt)
-	refereeSM.AddTransition("KICKOFF", HALT, halt)
-	refereeSM.AddTransition("FREEKICK", HALT, halt)
-	refereeSM.AddTransition("RUNNING", HALT, halt)
-
-	// When starting the state is unknown, try parse the latest ref command
-	refereeSM.AddTransition(uninitialized.GetName(), PREPARE_KICKOFF, prepareKickoff)
-	refereeSM.AddTransition(uninitialized.GetName(), STOP, stop)
-	refereeSM.AddTransition(uninitialized.GetName(), HALT, halt)
-	refereeSM.AddTransition(uninitialized.GetName(), NORMAL_START, running)
-	refereeSM.AddTransition(uninitialized.GetName(), TIMEOUT, stop)
-	refereeSM.AddTransition(uninitialized.GetName(), GAME_RUNNING_DETECTED, running)
-	refereeSM.AddTransition(uninitialized.GetName(), FORCE_START, running)
-
-	return &RefereeHandler{gi, refereeSM, activeRobots}
-}
-
 func refCommandToEventName(rc info.RefCommand) string {
 	switch rc {
 	case info.HALT:
@@ -381,6 +326,133 @@ func refCommandToEventName(rc info.RefCommand) string {
 	}
 }
 
+func moveRobotsToDefensePosition(activeRobots []info.ID, team info.Team, activityHandler *ai.ActivityHandler) {
+
+	numRobots := float64(len(activeRobots))
+	increment := 120.0
+	minPos := -increment * numRobots
+
+	for i, robotID := range activeRobots {
+		pos := info.Position{X: -2000, Y: minPos + increment*float64(i), Z: 0, Angle: 0}
+		activityHandler.AddActivity(act.NewMoveToPosition(team, info.ID(robotID), pos))
+	}
+}
+
+func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team, activityHandler *ai.ActivityHandler) *RefereeHandler {
+
+	freeKickName := roles.StateName("FREEKICK")
+	stopName := roles.StateName("STOP")
+	haltName := roles.StateName("HALT")
+	prepareKickoffName := roles.StateName("PREPAREKICKOFF")
+	kickOffName := roles.StateName("KICKOFF")
+	ballPlacementName := roles.StateName("BALLPLACEMENT")
+
+	freeKick := &FreeKick{
+		RefereeInfo: RefereeInfo{
+			gi:              gi,
+			activeRobots:    activeRobots,
+			team:            team,
+			name:            freeKickName,
+			activityHandler: activityHandler,
+		},
+	}
+
+	prepareKickoff := &PrepareKickoff{
+		RefereeInfo: RefereeInfo{
+			gi:              gi,
+			activeRobots:    activeRobots,
+			team:            team,
+			name:            prepareKickoffName,
+			activityHandler: activityHandler,
+		},
+	}
+	stop := &Stop{
+		RefereeInfo: RefereeInfo{
+			gi:              gi,
+			activeRobots:    activeRobots,
+			team:            team,
+			name:            stopName,
+			activityHandler: activityHandler,
+		},
+	}
+	ballPlacement := &Stop{
+		RefereeInfo: RefereeInfo{
+			gi:              gi,
+			activeRobots:    activeRobots,
+			team:            team,
+			name:            ballPlacementName,
+			activityHandler: activityHandler,
+		},
+	}
+	halt := &Halt{
+		RefereeInfo: RefereeInfo{
+			gi:              gi,
+			activeRobots:    activeRobots,
+			team:            team,
+			name:            haltName,
+			activityHandler: activityHandler,
+		},
+	}
+	kickOff := &Kickoff{
+		RefereeInfo: RefereeInfo{
+			gi:              gi,
+			activeRobots:    activeRobots,
+			team:            team,
+			name:            kickOffName,
+			activityHandler: activityHandler,
+		},
+	}
+	running := &Running{}
+	uninitialized := &UninitializedRef{}
+
+	// Note that some states are not implemented
+	// e.g. Timeout, ballplacement, PreparePenalty and Penalty
+	// Since it is not required to play a game
+
+	refereeSM := roles.NewStateMachine(uninitialized)
+
+	refereeSM.AddTransition("HALT", STOP, stop)
+	// refereeSM.AddTransition("STOP", "Timeout", timeout)
+
+	refereeSM.AddTransition("STOP", PREPARE_KICKOFF, prepareKickoff)
+	refereeSM.AddTransition("STOP", FREE_KICK, freeKick)
+	refereeSM.AddTransition("STOP", BALL_PLACEMENT, ballPlacement)
+	refereeSM.AddTransition("STOP", FORCE_START, running)
+
+	refereeSM.AddTransition("BALLPLACEMENT", STOP, stop)
+	refereeSM.AddTransition("BALLPLACEMENT", CONTINUE, freeKick)
+
+	refereeSM.AddTransition("PREPAREKICKOFF", NORMAL_START, kickOff)
+
+	refereeSM.AddTransition("KICKOFF", GAME_RUNNING_DETECTED, running)
+	refereeSM.AddTransition("KICKOFF", STOP, stop)
+
+	refereeSM.AddTransition("FREEKICK", GAME_RUNNING_DETECTED, running)
+	refereeSM.AddTransition("FREEKICK", STOP, stop)
+
+	refereeSM.AddTransition("RUNNING", STOP, stop)
+
+	// All states go to halt
+	refereeSM.AddTransition("STOP", HALT, halt)
+	refereeSM.AddTransition("BALLPLACEMENT", HALT, halt)
+	refereeSM.AddTransition("PREPAREKICKOFF", HALT, halt)
+	refereeSM.AddTransition("KICKOFF", HALT, halt)
+	refereeSM.AddTransition("FREEKICK", HALT, halt)
+	refereeSM.AddTransition("RUNNING", HALT, halt)
+
+	// When starting the state is unknown, try parse the latest ref command
+	refereeSM.AddTransition(uninitialized.GetName(), PREPARE_KICKOFF, prepareKickoff)
+	refereeSM.AddTransition(uninitialized.GetName(), STOP, stop)
+	refereeSM.AddTransition(uninitialized.GetName(), HALT, halt)
+	refereeSM.AddTransition(uninitialized.GetName(), NORMAL_START, running)
+	refereeSM.AddTransition(uninitialized.GetName(), TIMEOUT, stop)
+	refereeSM.AddTransition(uninitialized.GetName(), GAME_RUNNING_DETECTED, running)
+	refereeSM.AddTransition(uninitialized.GetName(), FORCE_START, running)
+	refereeSM.AddTransition(uninitialized.GetName(), FREE_KICK, freeKick)
+
+	return &RefereeHandler{gi, refereeSM, activeRobots}
+}
+
 /*
 Returns true if referee is being handeled
 Returns false if game is in running state
@@ -391,14 +463,10 @@ func (s *RefereeHandler) HandleReferee() bool {
 	// Appendix B: Game States https://robocup-ssl.github.io/ssl-rules/sslrules.html
 
 	refereeCommand := s.gi.Status.GetGameEvent().RefCommand
-	// refereeCommandString := refereeCommand.String()
-
-	// fmt.Println(refereeCommandString)
-
 	refEvent := refCommandToEventName(refereeCommand)
 	s.refereeSM.TriggerEvent(roles.EventName(refEvent))
 
-	// fmt.Println(s.refereeSM.CurrentStateName())
+	s.refereeSM.Update()
 	if s.refereeSM.CurrentStateName() == "RUNNING" {
 		return false
 	}

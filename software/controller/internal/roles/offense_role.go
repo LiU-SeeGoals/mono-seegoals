@@ -17,7 +17,7 @@ type OffenseRole struct {
 	team            Team
 }
 
-func NewKickerRole2(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo, team Team) *OffenseRole {
+func NewOffenseRole(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo, team Team) *OffenseRole {
 	return &OffenseRole{
 		id:              robotID,
 		sm:              nil,

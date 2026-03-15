@@ -53,7 +53,6 @@ func (g *GameScenario) getRobotClosestToBall(activeRobots []info.ID) info.ID {
 	for _, id := range activeRobots {
 		robotPos, _ := gi.State.GetRobotPosition(g.team, id)
 		ballrobotDist := ballPos.Dist2d(robotPos)
-		// fmt.Println(id ,ballrobotDist)
 		if ballrobotDist < dist {
 			clostestId = id
 			dist = ballrobotDist
@@ -70,7 +69,7 @@ func (g *GameScenario) run() {
 	gi := <-g.incomingGameInfo
 	refereeHandler := referee.NewRefereeHandler(&gi, activeRobots, g.team, &g.ActivityHandler)
 	for _, id := range activeRobots {
-		kicker := roles.NewKickerRole2(id, g.ActivityHandler, &gi, g.team)
+		kicker := roles.NewOffenseRole(id, g.ActivityHandler, &gi, g.team)
 		kicker.Init()
 		kickers[id] = kicker
 	}
@@ -78,26 +77,12 @@ func (g *GameScenario) run() {
 	fmt.Println(gi.Status)
 
 	for {
-		// ge := gi.Status.GetGameEvent()
-		// fmt.Println(ge.CurrentState)
-		// refereeCommand := gi.Status.GetGameEvent().RefCommand.String()
-		// fmt.Println(refereeCommand)
-		time.Sleep(time.Millisecond * 1)
-
 		handleRef := refereeHandler.HandleReferee()
-		// fmt.Println(handleRef)
 		if handleRef{
+			time.Sleep(time.Millisecond * 1)
 			continue
 		}
-		// trackedBall := gi.State.GetTrackedBall();
-		// ball := gi.State.GetBall();
-		// ballPos, _ := ball.GetPosition()
-		// fmt.Println("Untracked - Tracked: ", ballPos, "\t", trackedBall.Vel);
-
 		// Only coordinate robot roles, trigger ball events
-
-		// time.Sleep(time.Millisecond * 1)
-		// Attack strategy
 
 		closestId := g.getRobotClosestToBall(activeRobots)
 
@@ -112,6 +97,7 @@ func (g *GameScenario) run() {
 		for _, kicker := range kickers {
 			kicker.Run()
 		}
+		time.Sleep(time.Millisecond * 1)
 
 		// Defense strategy
 
