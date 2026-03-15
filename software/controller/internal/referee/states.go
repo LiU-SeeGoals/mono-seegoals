@@ -9,12 +9,30 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
+const (
+	HALT = "Halt"
+	STOP = "Stop"
+	NORMAL_START = "NormalStart"
+	FORCE_START = "ForceStart"
+	PREPARE_KICKOFF = "PrepareKickoff"
+	FREE_KICK = "FreeKick"
+	BALL_PLACEMENT = "BallPlacement"
+	TIMEOUT = "Timeout"
+	CONTINUE = "Continue"
+	UNKNOWN = "Unknown"
+)
+
+const (
+	GAME_RUNNING_DETECTED = "Running"
+)
+
 type RefereeInfo struct {
-	gi              *info.GameInfo
-	activeRobots    []info.ID
-	team            info.Team
-	activityHandler *ai.ActivityHandler
-	name            roles.StateName
+	gi                *info.GameInfo
+	activeRobots      []info.ID
+	team              info.Team
+	activityHandler   *ai.ActivityHandler
+	name              roles.StateName
+	teamWithPossesion info.Team
 }
 
 func (s *RefereeInfo) GetName() roles.StateName {
@@ -162,17 +180,21 @@ func (s *Kickoff) Initialize() {
 
 	recieveName := roles.StateName(fmt.Sprintf("Kickoff recieve ID %d", recieveID))
 
-	kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickOffID}
-	recieve := RecieveIntent{gi: s.gi, team: s.team, id: kickOffID}
+	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
+		// If we dont have possession we should chill or smth
+	} else {
+		kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickOffID}
+		recieve := RecieveIntent{gi: s.gi, team: s.team, id: kickOffID}
 
-	prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
-	kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickName, ActivityHandler: s.activityHandler}
-	reciever := &roles.AlignState{Ctx: &recieve, Gi: s.gi, Team: s.team, RobotId: recieveID, Name: recieveName, ActivityHandler: s.activityHandler}
+		prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
+		kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickName, ActivityHandler: s.activityHandler}
+		reciever := &roles.AlignState{Ctx: &recieve, Gi: s.gi, Team: s.team, RobotId: recieveID, Name: recieveName, ActivityHandler: s.activityHandler}
 
-	s.kickOff = roles.NewStateMachine(prepareKick)
-	s.kickOff.AddTransition(kickPrepareName, "ALIGNED", kick)
+		s.kickOff = roles.NewStateMachine(prepareKick)
+		s.kickOff.AddTransition(kickPrepareName, "ALIGNED", kick)
 
-	s.recieve = roles.NewStateMachine(reciever)
+		s.recieve = roles.NewStateMachine(reciever)
+	}
 }
 
 func (s *Kickoff) Update() roles.EventName {
@@ -191,6 +213,20 @@ func (s *Running) GetName() roles.StateName {
 }
 
 func (s *Running) Update() roles.EventName {
+	return "NONE"
+}
+
+type UninitializedRef struct {
+}
+
+func (s *UninitializedRef) Initialize() {
+}
+
+func (s *UninitializedRef) GetName() roles.StateName {
+	return "UNINITIALIZED"
+}
+
+func (s *UninitializedRef) Update() roles.EventName {
 	return "NONE"
 }
 
@@ -243,6 +279,7 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 			name:         ballPlacementName,
 		},
 	}
+	// Not needed but might be good in the future
 	// timeout := &Stop{
 	// 	RefereeInfo: RefereeInfo{
 	// 		gi: gi,
@@ -268,27 +305,80 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 		},
 	}
 	running := &Running{}
+	uninitialized := &UninitializedRef{}
 
 	// Note that Timeout, ballplacement, PreparePenalty and Penalty are not implemented
-	// Since it is not required
-	refereeSM := roles.NewStateMachine(halt)
+	// Since it is not required to play a match
 
-	refereeSM.AddTransition("HALT", "Stop", stop)
+	refereeSM := roles.NewStateMachine(uninitialized)
+
+	refereeSM.AddTransition("HALT", STOP, stop)
 	// refereeSM.AddTransition("STOP", "Timeout", timeout)
 
-	refereeSM.AddTransition("STOP", "PrepareKickoff", prepareKickoff)
-	refereeSM.AddTransition("STOP", "FreeKick", freeKick)
-	refereeSM.AddTransition("STOP", "BallPlacement", ballPlacement)
+	refereeSM.AddTransition("STOP", PREPARE_KICKOFF, prepareKickoff)
+	refereeSM.AddTransition("STOP", FREE_KICK, freeKick)
+	refereeSM.AddTransition("STOP", BALL_PLACEMENT, ballPlacement)
+	refereeSM.AddTransition("STOP", FORCE_START, running)
 
-	refereeSM.AddTransition("BALLPLACEMENT", "Stop", stop)
-	refereeSM.AddTransition("BALLPLACEMENT", "Continue", freeKick)
+	refereeSM.AddTransition("BALLPLACEMENT", STOP, stop)
+	refereeSM.AddTransition("BALLPLACEMENT", CONTINUE, freeKick)
 
-	refereeSM.AddTransition("PREPAREKICKOFF", "NormalStart", kickOff)
+	refereeSM.AddTransition("PREPAREKICKOFF", NORMAL_START, kickOff)
 
-	refereeSM.AddTransition("KICKOFF", "Running", running)
-	refereeSM.AddTransition("FREEKICK", "Running", running)
+	refereeSM.AddTransition("KICKOFF", GAME_RUNNING_DETECTED, running)
+	refereeSM.AddTransition("FREEKICK", GAME_RUNNING_DETECTED, running)
+
+	refereeSM.AddTransition("RUNNING", STOP, stop)
+
+	// All states go to halt
+	refereeSM.AddTransition("STOP", HALT, halt)
+	refereeSM.AddTransition("BALLPLACEMENT", HALT, halt)
+	refereeSM.AddTransition("PREPAREKICKOFF", HALT, halt)
+	refereeSM.AddTransition("KICKOFF", HALT, halt)
+	refereeSM.AddTransition("FREEKICK", HALT, halt)
+	refereeSM.AddTransition("RUNNING", HALT, halt)
+
+	// When starting the state is unknown, try parse the latest ref command
+	refereeSM.AddTransition(uninitialized.GetName(), PREPARE_KICKOFF, prepareKickoff)
+	refereeSM.AddTransition(uninitialized.GetName(), STOP, stop)
+	refereeSM.AddTransition(uninitialized.GetName(), HALT, halt)
+	refereeSM.AddTransition(uninitialized.GetName(), NORMAL_START, running)
+	refereeSM.AddTransition(uninitialized.GetName(), TIMEOUT, stop)
+	refereeSM.AddTransition(uninitialized.GetName(), GAME_RUNNING_DETECTED, running)
+	refereeSM.AddTransition(uninitialized.GetName(), FORCE_START, running)
 
 	return &RefereeHandler{gi, refereeSM, activeRobots}
+}
+
+func refCommandToEventName(rc info.RefCommand) string {
+	switch rc {
+	case info.HALT:
+		return HALT
+	case info.STOP:
+		return STOP
+	case info.NORMAL_START:
+		return NORMAL_START
+	case info.FORCE_START:
+		return FORCE_START
+	case info.PREPARE_KICKOFF_BLUE:
+		return PREPARE_KICKOFF
+	case info.PREPARE_KICKOFF_YELLOW:
+		return PREPARE_KICKOFF
+	case info.DIRECT_FREE_YELLOW:
+		return FREE_KICK
+	case info.DIRECT_FREE_BLUE:
+		return FREE_KICK
+	case info.TIMEOUT_YELLOW:
+		return TIMEOUT
+	case info.TIMEOUT_BLUE:
+		return TIMEOUT
+	case info.BALL_PLACEMENT_BLUE:
+		return BALL_PLACEMENT
+	case info.BALL_PLACEMENT_YELLOW:
+		return BALL_PLACEMENT
+	default:
+		return UNKNOWN
+	}
 }
 
 /*
@@ -300,8 +390,15 @@ func (s *RefereeHandler) HandleReferee() bool {
 	// Rules to follow are defined in the ssl Rules
 	// Appendix B: Game States https://robocup-ssl.github.io/ssl-rules/sslrules.html
 
-	refereeCommand := s.gi.Status.GetGameEvent().RefCommand.String()
-	fmt.Println(refereeCommand)
+	refereeCommand := s.gi.Status.GetGameEvent().RefCommand
+	// refereeCommandString := refereeCommand.String()
+
+	// fmt.Println(refereeCommandString)
+
+	refEvent := refCommandToEventName(refereeCommand)
+	s.refereeSM.TriggerEvent(roles.EventName(refEvent))
+
+	// fmt.Println(s.refereeSM.CurrentStateName())
 	if s.refereeSM.CurrentStateName() == "RUNNING" {
 		return false
 	}
