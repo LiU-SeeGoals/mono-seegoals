@@ -2,14 +2,21 @@
 #define KICKER_H
 
 #include "main.h"
+#include "stm32h7xx_hal_spi.h"
 
 typedef struct {
     int max_charges_per_kick;
     int charge_wait_us;
-    int discharge_wait_us;
+    int discharge_wait_us_kicker;
+    int discharge_wait_us_chipper;
     int safe_discharge_wait_us;
     int charges_since_last_kick;
 } KICKER_Settings;
+
+typedef enum {
+    KICKER,
+    CHIPPER,
+} KICKER_type;
 
 /**
  * Initalize the kicker subsystem.
@@ -30,7 +37,7 @@ void KICKER_ChargeStop();
 /**
  *
  */
-void KICKER_KickStart();
+void KICKER_KickStart(KICKER_type type);
 
 /**
  *

@@ -136,7 +136,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     /* USER CODE END Callback 0 */
     if (htim->Instance == TIM5) {
         KICKER_ChargeStop();
-        KICKER_KickStart();
+        KICKER_KickStart(CHIPPER);
     }
 
     if (htim->Instance == TIM3) {

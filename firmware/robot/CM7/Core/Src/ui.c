@@ -336,12 +336,16 @@ void parse_key()
             break;
         case 'K': // Kick
             LOG_UI("Kicking\r\n");
-            KICKER_KickStart();
+            KICKER_KickStart(KICKER);
+            break;
+        case 'L': // Chip, L because it is next to K on QWERTY
+            LOG_UI("Chipping\r\n");
+            KICKER_KickStart(CHIPPER);
             break;
         case 'P': // Print vars
         {
             KICKER_Settings* set = KICKER_GetSettings();
-            LOG_UI("Max charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us);
+            LOG_UI("Max charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us_kicker);
         } break;
         case 'E': // Edit vars
             current_state = state_kicker_edit;
@@ -359,7 +363,7 @@ void parse_key()
         case 'D': // Discharge wait
         {
             KICKER_Settings* set = KICKER_GetSettings();
-            LOG_UI("\r\n---\r\nMax charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us);
+            LOG_UI("\r\n---\r\nMax charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us_kicker);
             start_reading_to_buffer();
         } break;
         }
@@ -525,10 +529,10 @@ void finished_reading_to_buffer()
             set->charge_wait_us = atoi(rx_buffer);
             break;
         case 'D':
-            set->discharge_wait_us = atoi(rx_buffer);
+            set->discharge_wait_us_kicker = atoi(rx_buffer);
             break;
         }
-        LOG_UI("\r\n---\r\nMax charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us);
+        LOG_UI("\r\n---\r\nMax charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us_kicker);
     } else if (current_state == state_logs) {
         switch (current_command) {
         case 'M':
