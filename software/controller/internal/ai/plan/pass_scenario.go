@@ -42,18 +42,18 @@ func (m *GameScenario) Init(
 	go m.run()
 }
 
-func (g *GameScenario) getRobotClosestToBall(activeRobots []info.ID) info.ID{
+func (g *GameScenario) getRobotClosestToBall(activeRobots []info.ID) info.ID {
 
 	gi := <-g.incomingGameInfo
-	ballPos,_ := gi.State.GetBall().GetEstimatedPosition()
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 	dist := math.Inf(1)
 
 	clostestId := info.ID(0)
-	for _, id := range activeRobots{
-		robotPos,_ := gi.State.GetRobotPosition(g.team, id)
-		ballrobotDist := ballPos.Dist2d(robotPos) 
+	for _, id := range activeRobots {
+		robotPos, _ := gi.State.GetRobotPosition(g.team, id)
+		ballrobotDist := ballPos.Dist2d(robotPos)
 		// fmt.Println(id ,ballrobotDist)
-		if ballrobotDist < dist{
+		if ballrobotDist < dist {
 			clostestId = id
 			dist = ballrobotDist
 		}
@@ -63,11 +63,11 @@ func (g *GameScenario) getRobotClosestToBall(activeRobots []info.ID) info.ID{
 
 func (g *GameScenario) run() {
 
-	activeRobots := []info.ID {1,3}
+	activeRobots := []info.ID{1, 3}
 	kickers := make(map[info.ID]*roles.OffenseRole)
 
 	gi := <-g.incomingGameInfo
-	for _, id := range activeRobots{
+	for _, id := range activeRobots {
 		kicker := roles.NewKickerRole2(id, g.ActivityHandler, &gi, g.team)
 		kicker.Init()
 		kickers[id] = kicker
@@ -96,19 +96,19 @@ func (g *GameScenario) run() {
 
 		// Only coordinate robot roles, trigger ball events
 
-		time.Sleep(time.Millisecond * 1);
+		time.Sleep(time.Millisecond * 1)
 		// Attack strategy
 
 		closestId := g.getRobotClosestToBall(activeRobots)
 
-		for _, id := range activeRobots{
-			if id != closestId{
+		for _, id := range activeRobots {
+			if id != closestId {
 				kickers[id].TriggerEvent("BALL_LOST")
 			}
 		}
 		kickers[closestId].TriggerEvent("BALL_OWNER")
 
-		for _,kicker := range kickers{
+		for _, kicker := range kickers {
 			kicker.Run()
 		}
 

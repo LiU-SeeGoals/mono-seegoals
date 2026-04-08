@@ -12,7 +12,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
 
-func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl){
+func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
 
 	ball := gameInfo.State.GetBall()
 	ballPos, ballTime, _ := ball.GetPositionTime()
@@ -71,7 +71,7 @@ func FwRealScenario() {
 
 	if config.IsSimulated() {
 		teamYellow := []int{1, 3}
-		teamBlue := []int{7}
+		teamBlue := []int{1, 7}
 
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
