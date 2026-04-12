@@ -7,6 +7,7 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/referee"
@@ -77,9 +78,10 @@ func (g *GameScenario) run() {
 	fmt.Println(gi.Status)
 
 	for {
+		tickStart := time.Now()
 		handleRef := refereeHandler.HandleReferee()
-		if handleRef{
-			time.Sleep(time.Millisecond * 1)
+		if handleRef {
+			helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
 			continue
 		}
 		// Only coordinate robot roles, trigger ball events
@@ -97,10 +99,10 @@ func (g *GameScenario) run() {
 		for _, kicker := range kickers {
 			kicker.Run()
 		}
-		time.Sleep(time.Millisecond * 1)
 
 		// Defense strategy
 
 		// Etc...
+		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
 	}
 }
