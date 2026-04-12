@@ -7,6 +7,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
+	"github.com/LiU-SeeGoals/proto_go/gc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -72,38 +73,38 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 	gi.State.SetTimestamp(ts)
 	gi.State.SetMessageReceivedTime(play_time)
 
-	// for _, robot := range frame.GetRobots() {
-	// 	pos := robot.GetPos()
-	// 	vel := robot.GetVel()
-	// 	robotId := robot.GetRobotId()
-	//
-	// 	p := info.Position{
-	// 		X: float64(pos.GetX()),
-	// 		Y: float64(pos.GetY()),
-	// 		Z: 0,
-	// 		Angle: float64(robot.GetOrientation()),
-	// 	}
-	//
-	// 	v := info.Position{}
-	// 	if vel != nil {
-	// 		v.X = float64(vel.GetX())
-	// 		v.Y = float64(vel.GetY())
-	// 	}
-	//
-	// 	vtheta := float64(robot.GetVelAngular())
-	//
-	// 	var team info.Team
-	// 	switch robotId.GetTeam() {
-	// 	case gc.Team_BLUE:
-	// 		team = info.Blue
-	// 	case gc.Team_YELLOW:
-	// 		team = info.Yellow
-	// 	default:
-	// 		team = info.UNKNOWN
-	// 	}
-	//
-	// 	gi.State.SetTrackedRobot(team, robotId.GetId(), p, v, p.Angle, vtheta, ts)
-	// }
+	for _, robot := range frame.GetRobots() {
+		pos := robot.GetPos()
+		vel := robot.GetVel()
+		robotId := robot.GetRobotId()
+
+		p := info.Position{
+			X: float64(pos.GetX()),
+			Y: float64(pos.GetY()),
+			Z: 0,
+			Angle: float64(robot.GetOrientation()),
+		}
+
+		v := info.Position{}
+		if vel != nil {
+			v.X = float64(vel.GetX())
+			v.Y = float64(vel.GetY())
+		}
+
+		vtheta := float64(robot.GetVelAngular())
+
+		var team info.Team
+		switch robotId.GetTeam() {
+		case gc.Team_BLUE:
+			team = info.Blue
+		case gc.Team_YELLOW:
+			team = info.Yellow
+		default:
+			team = info.UNKNOWN
+		}
+
+		gi.State.SetTrackedRobot(team, robotId.GetId(), p, v, p.Angle, vtheta, ts)
+	}
 
 	balls := frame.GetBalls()
 	if len(balls) > 0 {
@@ -128,35 +129,35 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		gi.State.SetTrackedBall(p, v, ts)
 	}
 
-	// kicked := frame.GetKickedBall()
-	// if kicked != nil {
-	// 	pos := kicked.GetPos()
-	// 	stopPos := kicked.GetStopPos()
-	// 	startTs := kicked.GetStartTimestamp()
-	// 	stopTs := kicked.GetStopTimestamp()
-	// 	rid := kicked.GetRobotId()
-	//
-	// 	var team info.Team
-	// 	switch rid.GetTeam() {
-	// 	case gc.Team_BLUE:
-	// 		team = info.Blue
-	// 	case gc.Team_YELLOW:
-	// 		team = info.Yellow
-	// 	default:
-	// 		team = info.UNKNOWN
-	// 	}
-	//
-	// 	gi.State.SetKickedBall(
-	// 		float64(pos.GetX()),
-	// 		float64(pos.GetY()),
-	// 		startTs,
-	// 		float64(stopPos.GetX()),
-	// 		float64(stopPos.GetY()),
-	// 		stopTs,
-	// 		team,
-	// 		rid.GetId(),
-	// 	)
-	// }
+	kicked := frame.GetKickedBall()
+	if kicked != nil {
+		pos := kicked.GetPos()
+		stopPos := kicked.GetStopPos()
+		startTs := kicked.GetStartTimestamp()
+		stopTs := kicked.GetStopTimestamp()
+		rid := kicked.GetRobotId()
+
+		var team info.Team
+		switch rid.GetTeam() {
+		case gc.Team_BLUE:
+			team = info.Blue
+		case gc.Team_YELLOW:
+			team = info.Yellow
+		default:
+			team = info.UNKNOWN
+		}
+
+		gi.State.SetKickedBall(
+			float64(pos.GetX()),
+			float64(pos.GetY()),
+			startTs,
+			float64(stopPos.GetX()),
+			float64(stopPos.GetY()),
+			stopTs,
+			team,
+			rid.GetId(),
+		)
+	}
 
 	gi.State.SetValid(true)
 }

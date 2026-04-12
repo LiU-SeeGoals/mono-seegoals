@@ -6,6 +6,7 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -43,8 +44,7 @@ func (m *plannerGoalie) Init(
 func (m *plannerGoalie) run() {
 
 	for {
-		// No need for slow brain to be fast
-		time.Sleep(5 * time.Millisecond)
+		tickStart := time.Now()
 
 		//fmt.Println("slow, number of activities:", len(*m.activities))
 
@@ -52,5 +52,7 @@ func (m *plannerGoalie) run() {
 			fmt.Println("done with action: ", m.team)
 			m.ActivityHandler.AddActivity(ai.NewGoalie(m.team, 7))
 		}
+
+		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "planner_goalie")
 	}
 }
