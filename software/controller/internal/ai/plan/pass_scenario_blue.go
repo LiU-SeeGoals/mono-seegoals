@@ -128,6 +128,6 @@ func (g *GameScenario2) run() {
 	// 		kicker.StateMachine(gi, g.team, g, 0)
 	// 	default:
 	// 	}
-		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod)
+		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario_blue")
 	}
 }

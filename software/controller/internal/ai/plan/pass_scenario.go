@@ -81,7 +81,7 @@ func (g *GameScenario) run() {
 		tickStart := time.Now()
 		handleRef := refereeHandler.HandleReferee()
 		if handleRef {
-			helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario") // optional label → print on over-budget
+			helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
 			continue
 		}
 		// Only coordinate robot roles, trigger ball events
@@ -103,6 +103,6 @@ func (g *GameScenario) run() {
 		// Defense strategy
 
 		// Etc...
-		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod)
+		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
 	}
 }

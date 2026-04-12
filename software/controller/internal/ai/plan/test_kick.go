@@ -51,7 +51,7 @@ func (g *TestKick) run() {
 			})
 			g.ActivityHandler.AddActivity(queue)
 		}
-		helper.PaceLoop(tickStart, testKickPlannerLoopPeriod)
+		helper.PaceLoop(tickStart, testKickPlannerLoopPeriod, "test_kick")
 	}
 
 }

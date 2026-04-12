@@ -79,6 +79,6 @@ func (fb *activityExecutor) Run() {
 		// Send actions
 		fb.outgoingActions <- actions
 
-		helper.PaceLoop(tickStart, helper.ExecutorLoopPeriod)
+		helper.PaceLoop(tickStart, helper.ExecutorLoopPeriod, "activity_executor")
 	}
 }

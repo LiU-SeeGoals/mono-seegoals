@@ -74,6 +74,6 @@ func (m *plannerRw) run() {
 			index = (index + 1) % len(way_points)
 		}
 
-		helper.PaceLoop(tickStart, plannerRwLoopPeriod)
+		helper.PaceLoop(tickStart, plannerRwLoopPeriod, "planner_rw")
 	}
 }

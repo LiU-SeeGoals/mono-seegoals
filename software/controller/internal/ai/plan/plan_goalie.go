@@ -53,6 +53,6 @@ func (m *plannerGoalie) run() {
 			m.ActivityHandler.AddActivity(ai.NewGoalie(m.team, 7))
 		}
 
-		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod)
+		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "planner_goalie")
 	}
 }
