@@ -6,6 +6,7 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/helper"
 	// "github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
 	// "github.com/LiU-SeeGoals/controller/internal/roles"
@@ -79,6 +80,7 @@ func (g *GameScenario2) run() {
 	// g.changeBallOwner(kickerID, "start of game")
 
 	for {
+		tickStart := time.Now()
 	// kickerID := info.ID(7)
 	//
 	// kicker := roles.NewKickerRole(kickerID, g)
@@ -126,5 +128,6 @@ func (g *GameScenario2) run() {
 	// 		kicker.StateMachine(gi, g.team, g, 0)
 	// 	default:
 	// 	}
+		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod)
 	}
 }
