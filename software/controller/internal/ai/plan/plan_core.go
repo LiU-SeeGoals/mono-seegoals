@@ -2,6 +2,7 @@ package ai
 
 import (
 	"time"
+
 	. "github.com/LiU-SeeGoals/controller/internal/ai"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )

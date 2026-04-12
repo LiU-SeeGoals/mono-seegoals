@@ -3,9 +3,11 @@ package ai
 import (
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
-	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
 )
@@ -43,6 +45,7 @@ func (fb *activityExecutor) Init(
 func (fb *activityExecutor) Run() {
 	for {
 		gameInfo := <-fb.incomingGameInfo
+		tickStart := time.Now()
 
 		// Make a snapshot of current activities under lock
 		fb.activity_lock.Lock()
@@ -75,5 +78,7 @@ func (fb *activityExecutor) Run() {
 
 		// Send actions
 		fb.outgoingActions <- actions
+
+		helper.PaceLoop(tickStart, helper.ExecutorLoopPeriod, "activity_executor")
 	}
 }
