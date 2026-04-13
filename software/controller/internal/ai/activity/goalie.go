@@ -15,6 +15,7 @@ const (
 	// GOALIE_DIST_FROM_CENTER = 5500 // Distance from center to goalie line
 	GOALIE_DIST_FROM_CENTER = 3500 // Distance from center to goalie line
 	GOAL_BEHIND_DIST        = 4300 // Distance from center to position behind the goal
+	BALL_JITTER_DISTANCE    = 1.0
 )
 
 type Goalie struct {
@@ -49,7 +50,6 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 		fmt.Println("Error getting ball position:", err)
 		return NewMoveToPosition(g.team, g.id, info.Position{X: 0, Y: 0}).GetAction(gi)
 	}
-	printOpponentNearBall(gi, g.team, ballPos)
 
 	// Determine which half we're defending
 	isBlueTeam := g.team == info.Blue
@@ -82,6 +82,9 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 				goalieY = yHit
 			}
 		}
+	} else if yHit, ok := predictBallPathY(ball, goalieX, goalSize); ok {
+		// Otherwise, predict the ball trajectory when it is already moving toward our goal.
+		goalieY = yHit
 	}
 
 	if goalieY > goalSize {
@@ -94,17 +97,6 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 
 	myRobotPos, _ := gi.State.GetTeam(g.team)[g.id].GetPosition()
 	lookAtBall := myRobotPos.AngleToPosition(ballPos)
-
-	// If we have the ball, try a simple straight kick toward opponent goal
-	if ball.GetPossessor() == gi.State.GetTeam(g.team)[g.id] {
-		target := nearestTeammatePos(gi, g.team, g.id)
-		if target == nil {
-			targetX := -goalieX // fallback: opponent goal roughly opposite our own
-			t := info.Position{X: targetX, Y: 0, Z: 0, Angle: 0}
-			return NewKickBall(g.team, g.id, t, ballPos).GetAction(gi)
-		}
-		return NewKickBall(g.team, g.id, *target, ballPos).GetAction(gi)
-	}
 
 	//move := NewMoveToPosition(g.team, g.id, goaliePos)
 	act := action.MoveTo{}
@@ -154,22 +146,47 @@ func predictShotY(opponent info.Position, goalieX float64, goalSize float64, fal
 	return yHit, true
 }
 
-// printOpponentNearBall logs the first opponent found within 300mm of the ball.
-func printOpponentNearBall(gi *info.GameInfo, team info.Team, ballPos info.Position) {
-	opponents := gi.State.GetOtherTeam(team)
-	for id, r := range opponents {
-		if r == nil {
-			continue
-		}
-		pos, err := r.GetPosition()
-		if err != nil {
-			continue
-		}
-		if pos.Distance(ballPos) < 300 {
-			fmt.Printf("Opponent %d near ball\n", id)
-			return
-		}
+// predictBallPathY estimates where the moving ball crosses the goalie's X line.
+// It ignores tiny displacements to avoid reacting to jitter, and only returns true
+// when the current ball path intersects the goal mouth.
+func predictBallPathY(ball *info.Ball, goalieX float64, goalSize float64) (float64, bool) {
+	currentPos, currentTime, previousPos, previousTime, err := ball.GetLatestTwoPositionsTime()
+	if err != nil {
+		return 0, false
 	}
+
+	dt := float64(currentTime - previousTime)
+	if dt <= 0 {
+		return 0, false
+	}
+
+	dx := currentPos.X - previousPos.X
+	dy := currentPos.Y - previousPos.Y
+	displacement := math.Hypot(dx, dy)
+	if displacement < BALL_JITTER_DISTANCE {
+		return 0, false
+	}
+
+	if math.Abs(dx) < 1e-6 {
+		return 0, false
+	}
+
+	velocityX := dx / dt
+	if math.Abs(velocityX) < 1e-6 {
+		return 0, false
+	}
+
+	t := (goalieX - currentPos.X) / dx
+	if t < 0 {
+		return 0, false
+	}
+
+	yHit := currentPos.Y + t*dy
+	if yHit < -goalSize || yHit > goalSize {
+		return 0, false
+	}
+
+	return yHit, true
 }
 
 // nearestTeammatePos returns the position of the closest active teammate to the ball (excluding self).

@@ -3,7 +3,6 @@ package info
 import (
 	"container/list"
 	// "fmt"
-
 )
 
 type Ball struct {
@@ -61,7 +60,7 @@ func (b *Ball) GetVelocity() Position {
 	return sum_deltas.Scale(1 / float64(b.history.Len()-1))
 }
 
-func (b *Ball) GetVelocity2() (Vec2, error){
+func (b *Ball) GetVelocity2() (Vec2, error) {
 
 	return b.rawBall.GetVelocity()
 	// if b.history.Len() < 2 {
@@ -81,6 +80,10 @@ func (b *Ball) GetVelocity2() (Vec2, error){
 	// dPos := ball.pos.Sub(&ball2.pos)
 	//
 	// return Vec2{dPos.X/dt, dPos.Y/dt}, nil
+}
+
+func (b *Ball) GetLatestTwoPositionsTime() (Position, int64, Position, int64, error) {
+	return b.rawBall.GetLatestTwoPositionsTime()
 }
 
 type BallDTO struct {
