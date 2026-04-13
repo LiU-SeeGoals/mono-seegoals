@@ -87,10 +87,10 @@ function App() {
 
   return <div className="app-container">
       {<button onClick={() => setCount(0)}>prev</button>}
-      {<button onClick={() => setCount(count + 1)}>next</button>}
-    {
-      components[count]
-    }
+      {<button onClick={() => setCount(1)}>next</button>}
+      {
+        components[count]
+      }
   </div>
 }
 
