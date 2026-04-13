@@ -42,7 +42,9 @@ func (m *plannerGoalie) Init(
 // This is the main loop of the AI in this slow brain
 func (m *plannerGoalie) run() {
 	goalieID := info.ID(7)
-	clearTarget := info.Position{X: 0, Y: 1000, Z: 0, Angle: 0}
+	receiverID := info.ID(1)
+	receiverTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
+	clearTarget := receiverTarget // fallback if no teammate target is available
 	goalieRole := roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
 	goalieRole.Init()
 
@@ -57,6 +59,7 @@ func (m *plannerGoalie) run() {
 		}
 
 		goalieRole.Run()
+		m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, receiverID, receiverTarget))
 
 		// No need for slow brain to be fast
 		time.Sleep(5 * time.Millisecond)

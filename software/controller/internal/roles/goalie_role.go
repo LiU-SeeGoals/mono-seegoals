@@ -16,12 +16,14 @@ type GoalieRole struct {
 	activityHandler *ai.ActivityHandler
 	gi              *GameInfo
 	team            Team
-	clearTarget     info.Position
+	clearFallback   info.Position
 }
 
 type GoalieClearIntent struct {
-	gi     *GameInfo
-	target info.Position
+	gi       *GameInfo
+	team     Team
+	selfID   info.ID
+	fallback info.Position
 }
 
 func NewGoalieRole(robotID ID, activityHandler ai.ActivityHandler, team Team, clearTarget info.Position) *GoalieRole {
@@ -31,7 +33,7 @@ func NewGoalieRole(robotID ID, activityHandler ai.ActivityHandler, team Team, cl
 		activityHandler: &activityHandler,
 		gi:              &GameInfo{},
 		team:            team,
-		clearTarget:     clearTarget,
+		clearFallback:   clearTarget,
 	}
 }
 
@@ -54,7 +56,39 @@ func (gr *GoalieRole) HasBallControl(radius float64) bool {
 }
 
 func (gc *GoalieClearIntent) getTargetPosition() info.Position {
-	return gc.target
+	ballPos, err := gc.gi.State.GetBall().GetEstimatedPosition()
+	if err != nil {
+		return gc.fallback
+	}
+
+	teamRobots := gc.gi.State.GetTeam(gc.team)
+	bestDist := 0.0
+	var bestPos info.Position
+	found := false
+
+	for id, robot := range teamRobots {
+		if info.ID(id) == gc.selfID || robot == nil {
+			continue
+		}
+
+		pos, err := robot.GetPosition()
+		if err != nil {
+			continue
+		}
+
+		dist := pos.Dist2d(ballPos)
+		if !found || dist < bestDist {
+			bestDist = dist
+			bestPos = pos
+			found = true
+		}
+	}
+
+	if found {
+		return bestPos
+	}
+
+	return gc.fallback
 }
 
 func (gc *GoalieClearIntent) getFromPosition() info.Position {
@@ -68,8 +102,10 @@ func (gr *GoalieRole) Init() {
 	kickName := StateName(fmt.Sprintf("GoalieKickClear ID %d", gr.id))
 
 	clearContext := GoalieClearIntent{
-		gi:     gr.gi,
-		target: gr.clearTarget,
+		gi:       gr.gi,
+		team:     gr.team,
+		selfID:   gr.id,
+		fallback: gr.clearFallback,
 	}
 
 	defend := &GoalieDefendState{
