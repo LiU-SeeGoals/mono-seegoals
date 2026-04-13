@@ -60,26 +60,18 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	if !isDefendingPositiveHalf {
 		xMultiplier = 1.0
 	}
-	// Let the goalie move in both X and Y: mirror the ball Y but also slide along X
-	// between the regular goalie line and a deeper "behind goal" line.
-	absBallX := math.Abs(ballPos.X)
-	clampedX := math.Max(GOALIE_DIST_FROM_CENTER, math.Min(GOAL_BEHIND_DIST, absBallX))
-	// Default goalieX on the line, but try to place between ball and goal within limits
-	goalieX := xMultiplier * clampedX
-	if poss := ball.GetPossessor(); poss != nil && poss.GetTeam() != g.team {
-		// Place goalie between goal line and the ball X, clamped to limits
-		goalLineX := xMultiplier * GOALIE_DIST_FROM_CENTER
-		behindLimitX := xMultiplier * GOAL_BEHIND_DIST
-		targetX := (goalLineX + ballPos.X) / 2.0
-		minX := math.Min(goalLineX, behindLimitX)
-		maxX := math.Max(goalLineX, behindLimitX)
-		if targetX < minX {
-			targetX = minX
-		} else if targetX > maxX {
-			targetX = maxX
-		}
-		goalieX = targetX
+	// Follow the ball in X, but never leave the allowed goalie X interval.
+	goalLineX := xMultiplier * GOALIE_DIST_FROM_CENTER
+	behindLimitX := xMultiplier * GOAL_BEHIND_DIST
+	targetX := ballPos.X
+	minX := math.Min(goalLineX, behindLimitX)
+	maxX := math.Max(goalLineX, behindLimitX)
+	if targetX < minX {
+		targetX = minX
+	} else if targetX > maxX {
+		targetX = maxX
 	}
+	goalieX := targetX
 	goalSize := 1110.0
 	goalieY := ballPos.Y
 
@@ -103,7 +95,6 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	myRobotPos, _ := gi.State.GetTeam(g.team)[g.id].GetPosition()
 	lookAtBall := myRobotPos.AngleToPosition(ballPos)
 
-	// If we have the ball, try to pass to the closest teammate (excluding self).
 	// If we have the ball, try a simple straight kick toward opponent goal
 	if ball.GetPossessor() == gi.State.GetTeam(g.team)[g.id] {
 		target := nearestTeammatePos(gi, g.team, g.id)

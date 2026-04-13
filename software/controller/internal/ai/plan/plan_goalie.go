@@ -1,12 +1,12 @@
 package ai
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
 type plannerGoalie struct {
@@ -41,16 +41,24 @@ func (m *plannerGoalie) Init(
 
 // This is the main loop of the AI in this slow brain
 func (m *plannerGoalie) run() {
+	goalieID := info.ID(7)
+	clearTarget := info.Position{X: 0, Y: 1000, Z: 0, Angle: 0}
+	goalieRole := roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
+	goalieRole.Init()
 
 	for {
+		gi := <-m.incomingGameInfo
+		goalieRole.SetGameInfo(gi)
+
+		if goalieRole.HasBallControl(roles.GoalieBallControlRadius) {
+			goalieRole.TriggerEvent("BALL_OWNER")
+		} else {
+			goalieRole.TriggerEvent("BALL_LOST")
+		}
+
+		goalieRole.Run()
+
 		// No need for slow brain to be fast
 		time.Sleep(5 * time.Millisecond)
-
-		//fmt.Println("slow, number of activities:", len(*m.activities))
-
-		if m.ActivityHandler.Activities[7] == nil {
-			fmt.Println("done with action: ", m.team)
-			m.ActivityHandler.AddActivity(ai.NewGoalie(m.team, 7))
-		}
 	}
 }
