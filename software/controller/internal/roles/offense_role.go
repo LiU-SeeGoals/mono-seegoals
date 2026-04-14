@@ -5,6 +5,7 @@ import (
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
+	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"math"
 	"math/rand"
 )
