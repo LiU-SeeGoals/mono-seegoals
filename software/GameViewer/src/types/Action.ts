@@ -9,4 +9,5 @@ export type Action = {
   DestW: number;
   Dribble: boolean;
   PreviousAction: number;
+  Path?: { X: number; Y: number }[];
 };
