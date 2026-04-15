@@ -7,11 +7,8 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
-	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/controller/internal/referee"
-	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
 type GameScenario struct {
@@ -62,47 +59,33 @@ func (g *GameScenario) getRobotClosestToBall(activeRobots []info.ID) info.ID {
 	return clostestId
 }
 
-func (g *GameScenario) run() {
+func (m *GameScenario) run() {
 
-	activeRobots := []info.ID{1, 3}
-	kickers := make(map[info.ID]*roles.OffenseRole)
-
-	gi := <-g.incomingGameInfo
-	refereeHandler := referee.NewRefereeHandler(&gi, activeRobots, g.team, &g.ActivityHandler)
-	for _, id := range activeRobots {
-		kicker := roles.NewOffenseRole(id, g.ActivityHandler, &gi, g.team)
-		kicker.Init()
-		kickers[id] = kicker
+	way_points := []info.Position{
+		// Triangle
+		{X: -1000, Y: 0, Z: 0, Angle: 0},
+		{X: -2800, Y: 0, Z: 0, Angle: 0},
 	}
+	index := 0
+	robots := []int{4}
 
-	fmt.Println(gi.Status)
+	gameInfo := <-m.incomingGameInfo
+	fmt.Println(gameInfo.Status)
 
 	for {
-		tickStart := time.Now()
-		handleRef := refereeHandler.HandleReferee()
-		if handleRef {
-			helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
-			continue
+		robotPos, _ := gameInfo.State.GetRobotPosition(m.team, 4)
+		fmt.Println(robotPos.Dist2d(way_points[index]))
+		fmt.Println(robotPos)
+		fmt.Println(way_points[index])
+		time.Sleep(50 * time.Millisecond)
+
+		robot := robots[0]
+		m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(robot), way_points[index]))
+
+		if robotPos.Dist2d(way_points[index]) < 50 {
+			fmt.Println(fmt.Sprintf("done with (%d) action (%s)", robot, m.team))
+			fmt.Println("next action: ", way_points[index])
+			index = (index + 1) % len(way_points)
 		}
-		// Only coordinate robot roles, trigger ball events
-
-		closestId := g.getRobotClosestToBall(activeRobots)
-
-		for _, id := range activeRobots {
-			if id != closestId {
-				kickers[id].TriggerEvent("BALL_LOST")
-			}
-		}
-
-		kickers[closestId].TriggerEvent("BALL_OWNER")
-
-		for _, kicker := range kickers {
-			kicker.Run()
-		}
-
-		// Defense strategy
-
-		// Etc...
-		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
 	}
 }
