@@ -164,21 +164,60 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     });
   };
 
+  const getRobotPositionById = (id: number): { x: number; y: number } | null => {
+    const blue = sslFieldUpdate.robotsBlue.find((r) => r.robotId === id);
+    if (blue) return { x: blue.x, y: blue.y };
+    const yellow = sslFieldUpdate.robotsYellow.find((r) => r.robotId === id);
+    if (yellow) return { x: yellow.x, y: yellow.y };
+    return null;
+  };
+
+  const drawPolyline = (
+    context: CanvasRenderingContext2D,
+    points: { x: number; y: number }[],
+    strokeStyle: string,
+    lineWidth: number
+  ) => {
+    if (points.length < 2) return;
+
+    const start = getCanvasCoordinates(points[0].x, points[0].y, context);
+    context.beginPath();
+    context.moveTo(start.canvasX, start.canvasY);
+    for (let i = 1; i < points.length; i++) {
+      const p = getCanvasCoordinates(points[i].x, points[i].y, context);
+      context.lineTo(p.canvasX, p.canvasY);
+    }
+    context.strokeStyle = strokeStyle;
+    context.lineWidth = lineWidth;
+    context.lineJoin = 'round';
+    context.lineCap = 'round';
+    context.stroke();
+  };
+
   const drawActions = (context: CanvasRenderingContext2D) => {
     const actions: Action[] = robotActions;
 
     if (robotActions && robotActions.length > 0) {
       for (const action of robotActions) {
-        if (action.Dest === undefined || (action.Dest.X === undefined || action.Dest.Y === undefined)) {
+        const destX = (action as any).Dest?.X ?? action.DestX;
+        const destY = (action as any).Dest?.Y ?? action.DestY;
+        if (destX === undefined || destY === undefined) {
           console.log("[FootballField.tsx] Got weird robot action", action);
-          return;
+          continue;
         }
 
-        const { canvasX, canvasY } = getCanvasCoordinates(
-          action.Dest.X,
-          action.Dest.Y,
-          context
-        );
+        const { canvasX, canvasY } = getCanvasCoordinates(destX, destY, context);
+
+        // Draw the full planned path (robot -> ...waypoints... -> goal) if present.
+        // We prepend the *observed* robot position so the line starts where the robot is now.
+        const robotPos = getRobotPositionById(action.Id);
+        if (robotPos && action.Path && action.Path.length > 0) {
+          const polyPoints = [
+            robotPos,
+            ...action.Path.map((p) => ({ x: p.X, y: p.Y })),
+          ];
+          drawPolyline(context, polyPoints, 'rgba(255, 255, 255, 0.8)', 2);
+        }
 
         const dotColor = "black";
         context.beginPath();
@@ -296,7 +335,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       canvas.height = height;
       draw(canvas);
     }
-  }, [sslFieldUpdate, width, height, zoomLevel, fieldGeometry]);
+  }, [sslFieldUpdate, robotActions, width, height, zoomLevel, fieldGeometry]);
 
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {

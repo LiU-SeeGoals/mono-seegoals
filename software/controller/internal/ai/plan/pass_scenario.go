@@ -10,7 +10,6 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/controller/internal/referee"
 	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
@@ -68,7 +67,7 @@ func (g *GameScenario) run() {
 	kickers := make(map[info.ID]*roles.OffenseRole)
 
 	gi := <-g.incomingGameInfo
-	refereeHandler := referee.NewRefereeHandler(&gi, activeRobots, g.team, &g.ActivityHandler)
+	// refereeHandler := referee.NewRefereeHandler(&gi, activeRobots, g.team, &g.ActivityHandler)
 	for _, id := range activeRobots {
 		kicker := roles.NewOffenseRole(id, g.ActivityHandler, &gi, g.team)
 		kicker.Init()
@@ -79,11 +78,11 @@ func (g *GameScenario) run() {
 
 	for {
 		tickStart := time.Now()
-		handleRef := refereeHandler.HandleReferee()
-		if handleRef {
-			helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
-			continue
-		}
+		// handleRef := refereeHandler.HandleReferee()
+		// if handleRef {
+		// 	helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
+		// 	continue
+		// }
 		// Only coordinate robot roles, trigger ball events
 
 		closestId := g.getRobotClosestToBall(activeRobots)

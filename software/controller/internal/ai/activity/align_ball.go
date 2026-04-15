@@ -90,7 +90,7 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	// act.Dest = robotTargetPos
 	// act.Dribble = false
 
-	return &act
+	return act
 }
 
 func (m *AlignBall) Achieved(gi *info.GameInfo) bool {

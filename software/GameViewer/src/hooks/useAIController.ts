@@ -32,10 +32,8 @@ export const useAIController = (
         if (!event.data) return;
         const parsedData: Action[] = JSON.parse(event.data);
         if (!parsedData) return;
-        setRobotActions((prevActions) => {
-          const updatedActions = [...prevActions, ...parsedData];
-          return updatedActions.slice(-10);
-        });
+        // Each message is a "tick" snapshot; replace actions so we draw the latest plan.
+        setRobotActions(parsedData);
       } catch (e) {
         console.error('Error parsing message JSON', e);
       }

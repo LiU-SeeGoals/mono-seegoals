@@ -92,10 +92,10 @@ func (m *MoveToPosition) AvoidBall(avoid bool) {
 func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
 	moveToAction := m.GetMoveToAction(gi)
 	m.gi = gi
-	return &moveToAction
+	return moveToAction
 }
 
-func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
+func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	myRobot := gi.State.GetTeam(m.team)[m.id]
 	myPos, _ := myRobot.GetPosition()
 
@@ -143,13 +143,18 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) action.MoveTo {
 	}
 
 	// Create move action to the current target
-	act := action.MoveTo{}
+	act := &action.MoveTo{}
 	act.Id = int(m.id)
 	act.Team = m.team
 	act.Pos = myPos
 	act.Dest = targetPos
 	act.Dest.Angle = targetPos.Angle
 	act.Dribble = false
+	// Include the full planned path for visualization in the GameViewer.
+	// Note: this is a copy so UI serialization can't race on m.path.
+	if len(m.path) > 0 {
+		act.Path = append([]info.Position(nil), m.path...)
+	}
 	return act
 }
 

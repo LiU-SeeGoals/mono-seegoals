@@ -60,7 +60,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		move := NewMoveToPosition(kp.team, kp.id, lineUpPos)
 		move.AvoidBall(true)
 		moveAction := move.GetMoveToAction(gi)
-		return &moveAction
+		return moveAction
 	}
 
 	// Robot is in possesion of the ball, but is not facing the target

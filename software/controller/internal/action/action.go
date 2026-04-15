@@ -35,4 +35,13 @@ type ActionDTO struct {
 	DestW float32 `json:"DestW"`
 	// Decides if the robot should dribble while moving
 	Dribble bool `json:"Dribble"`
+
+	// Planned path waypoints (e.g. from RRT/RRT*), in field coordinates (mm).
+	// Optional: only present for actions that support it (e.g. MoveTo).
+	Path []WaypointDTO `json:"Path,omitempty"`
+}
+
+type WaypointDTO struct {
+	X float64 `json:"X"`
+	Y float64 `json:"Y"`
 }
