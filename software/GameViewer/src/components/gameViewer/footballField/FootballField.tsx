@@ -25,12 +25,45 @@ const COLOR_MAP: Record<string, string> = {
   white: 'rgba(255, 255, 255, 1)',
 };
 
-            
-function sendMouseClick(e, canvas, container, width, controllerSend){
-  const coords = getWorldFromMouseEvent(e, canvas, container, width);
+function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
 
-  console.log(coords);
-  controllerSend(coords);
+function findClosestRobot(robots: any[], posX, posY, threshold: number) {
+  let closest = null;
+  let minDist = Infinity;
+
+  for (const robot of robots) {
+
+    // console.log(robot)
+    // console.log(posX,posY)
+    const dist = distance(robot, {x:posX, y:posY});
+
+    if (dist < minDist && dist < threshold) {
+      minDist = dist;
+      closest = robot;
+    }
+  }
+
+  return closest;
+}
+            
+function sendMouseClick(e, canvas, container, rotation, controllerSend, sslFieldUpdate){
+  const coords = getWorldFromMouseEvent(e, canvas, container, rotation);
+
+  const robotYellow = findClosestRobot(sslFieldUpdate.robotsYellow, coords.worldX, coords.worldY, 200)
+  const robotBlue = findClosestRobot(sslFieldUpdate.robotsBlue, coords.worldX, coords.worldY, 200)
+
+  const moveCommand = {"commandType":"MoveRobot",
+    posX:coords.worldX, 
+    posY:coords.worldY, 
+    Id:robotYellow?.robotId}
+
+  console.log(moveCommand);
+  console.log(JSON.stringify(moveCommand));
+  controllerSend(moveCommand);
 };
 
 const withAlpha = (color: string, alpha: number): string => {
@@ -75,6 +108,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   const minimumWidthForVertical = 810;
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
 
   const drawField = (context: CanvasRenderingContext2D, geometry: SSL_GeometryFieldSize) => {
     context.fillStyle = '#1a5f1a';
@@ -129,6 +163,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
 
     context.save();
     context.translate(context.canvas.width / 2, context.canvas.height / 2);
+    // context.scale(zoomLevel, zoomLevel);
     context.translate(-context.canvas.width / 2, -context.canvas.height / 2);
 
     if (fieldGeometry) {
@@ -342,7 +377,23 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       canvas.height = height;
       draw(canvas);
     }
-  }, [sslFieldUpdate, robotActions, width, height, fieldGeometry]);
+  }, [sslFieldUpdate, robotActions, width, height, zoomLevel, fieldGeometry]);
+
+  useEffect(() => {
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const newZoomLevel = zoomLevel + event.deltaY * -0.001;
+      setZoomLevel(Math.max(0.5, Math.min(2, newZoomLevel)));
+    };
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.addEventListener('wheel', handleWheel);
+      return () => {
+        canvas.removeEventListener('wheel', handleWheel);
+      };
+    }
+  }, [zoomLevel]);
 
   return (
     <div
@@ -351,7 +402,8 @@ const FootballField: React.FC<FootBallFieldProps> = ({
         height: height,
         width: width,
         transform: `
-          ${width <= minimumWidthForVertical ? "rotate(90deg)" : ""}`,
+          ${width <= minimumWidthForVertical ? "rotate(90deg)" : ""}
+        `,
       }}
       ref={containerRef}
     >
@@ -366,7 +418,8 @@ const FootballField: React.FC<FootBallFieldProps> = ({
             canvasRef.current,
             containerRef.current,
             width <= minimumWidthForVertical ? 90 : 0,
-            controllerSend
+            controllerSend,
+            sslFieldUpdate
           )
         }
       />
