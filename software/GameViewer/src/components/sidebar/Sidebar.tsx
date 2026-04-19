@@ -38,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   sslFieldUpdate,
   sidebarWidth,
   setSidebarWidth,
+  controllerSend,
 }) => {
   const resizerWidth = 5;
   const { value: resizerValue, startResizing, isHidden } = useResizeSidebar(false, sidebarWidth);
@@ -122,6 +123,42 @@ const Sidebar: React.FC<SidebarProps> = ({
               sslFieldUpdate={sslFieldUpdate}
             />
           </div>
+          <button
+            style={{
+              margin: '10px 15px',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              const change_mode = {"Command":"CHANGE_SCENARIO", "Type":"Game"}
+              console.log('Mode changed');
+              controllerSend(change_mode)
+            }}
+          >
+          Manual
+          </button>
+          <button
+            style={{
+              margin: '10px 15px',
+              padding: '8px 12px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: '#2196F3',
+              color: 'white',
+              cursor: 'pointer'
+            }}
+            onClick={() => {
+              const change_mode = {"Command":"CHANGE_SCENARIO", "Type":"Manual"}
+              console.log('Mode changed');
+              controllerSend(change_mode)
+            }}
+          >
+          Game
+          </button>
         </div>
       </div>
       <div

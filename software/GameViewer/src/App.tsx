@@ -67,6 +67,7 @@ function App() {
         sslFieldUpdate={sslFieldUpdate}
         sidebarWidth={sidebarWidth}
         setSidebarWidth={setSidebarWidth}
+        controllerSend={controllerSend}
       />
       <GameViewer
         sslFieldUpdate={sslFieldUpdate}

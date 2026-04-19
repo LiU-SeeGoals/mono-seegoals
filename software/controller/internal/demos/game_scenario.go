@@ -8,6 +8,7 @@ import (
 	plan "github.com/LiU-SeeGoals/controller/internal/ai/plan"
 	"github.com/LiU-SeeGoals/controller/internal/client"
 	"github.com/LiU-SeeGoals/controller/internal/config"
+	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
@@ -47,6 +48,7 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	}
 }
 
+
 func GameScenario() {
 	gameInfo := info.NewGameInfo(10)
 
@@ -61,7 +63,9 @@ func GameScenario() {
 
 	slowBrainYellow := plan.NewGameScenario(info.Yellow)
 	slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
-	//slowBrainBlue := plan.NewGameScenario2(info.Blue)
+
+	manualMovementYellow := plan.NewPlannerManualMovement(info.Yellow)
+	manualMovementBlue := plan.NewPlannerManualMovement(info.Blue)
 
 	fastBrainYellow := ai.NewActivityExecutor()
 	fastBrainBlue := ai.NewActivityExecutor()
@@ -95,6 +99,19 @@ func GameScenario() {
 		sslClientRaw.UpdateState(gameInfo, playTime)
 		sslClientTracked.UpdateState(gameInfo, playTime)
 
+
+		command := client.GetCommand(helper.CHANGE_SCENARIO)
+
+		if command != nil{
+			if command.Type == "Game"{
+				aiYellow = ai.NewAi(info.Yellow, manualMovementYellow, fastBrainYellow)
+				aiBlue = ai.NewAi(info.Blue, manualMovementBlue, fastBrainBlue)
+			} else if command.Type == "Manual"{
+				aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
+				aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
+			}
+		}
+
 		if !gameInfo.HasField() || !gameInfo.State.IsValid() {
 			continue
 		}
@@ -104,6 +121,7 @@ func GameScenario() {
 
 		client.BroadcastActions(actionsYellow)
 		client.BroadcastActions(actionsBlue)
+
 
 		if config.IsSimulated() {
 			simClientYellow.SendActions(actionsYellow)

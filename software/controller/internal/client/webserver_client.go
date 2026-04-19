@@ -10,6 +10,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/config"
+	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/gorilla/websocket"
@@ -30,7 +31,8 @@ type WebServer struct {
 	logQueueMutex  sync.Mutex
 
 	gameStatePacketQueue []([]byte)
-	incomingActions      []action.ActionDTO
+	incomingData         []helper.GameViewerCommand
+	dataLookup           map[string]*helper.GameViewerCommand
 	gameStateQueueMutex  sync.Mutex
 	// broadcastThreadMutex sync.Mutex
 	receivedDataMutex sync.Mutex
@@ -51,6 +53,7 @@ func getInstance() *WebServer {
 func startWebServer() {
 	webserverInstance = &WebServer{
 		gameStatePacketQueue: make([]([]byte), 0),
+		dataLookup:           make(map[string]*helper.GameViewerCommand),
 	}
 
 	webserverInstance.websocketupgrader = webserverInstance.getUpgrader()
@@ -83,7 +86,7 @@ func (server *WebServer) handleGameStateRequest(w http.ResponseWriter, r *http.R
 	server.websocketConnectionsMutex.Lock()
 	defer server.websocketConnectionsMutex.Unlock() // unlock after function returns
 	server.websocketConnections = append(server.websocketConnections, ws)
-    fmt.Println("Client connected")
+	fmt.Println("Client connected")
 	Logger.Info("Client connected")
 }
 
@@ -144,10 +147,10 @@ func (server *WebServer) sendGameState() {
 func (server *WebServer) sendActions() {
 	var gameStateJSON []byte
 	for {
-        fmt.Println("Went into sendActions")
+		fmt.Println("Went into sendActions")
 		if len(server.gameStatePacketQueue) == 0 {
 			time.Sleep(time.Millisecond * 10) // Sleep for a short period
-            break
+			break
 		}
 		server.gameStateQueueMutex.Lock()
 		gameStateJSON = server.gameStatePacketQueue[0]
@@ -157,7 +160,7 @@ func (server *WebServer) sendActions() {
 		// Creating a copy of the connections. This prevents locking other threads if the connection takes too long
 		server.websocketConnectionsMutex.Lock()
 		connectionsCopy := make([]*websocket.Conn, len(server.websocketConnections))
-        fmt.Println("websockets", len(server.websocketConnections))
+		fmt.Println("websockets", len(server.websocketConnections))
 		copy(connectionsCopy, server.websocketConnections)
 		server.websocketConnectionsMutex.Unlock()
 
@@ -188,7 +191,7 @@ func (server *WebServer) receiveData() {
 				continue
 			}
 
-			var receivedData action.ActionDTO
+			var receivedData helper.GameViewerCommand
 			err_unmarshal := json.Unmarshal(message, &receivedData)
 			if err_unmarshal != nil {
 				log.Println("Error unmarshalling message:", err_unmarshal)
@@ -196,7 +199,8 @@ func (server *WebServer) receiveData() {
 			} else {
 				server.receivedDataMutex.Lock()
 				log.Println("Received data:", receivedData)
-				server.incomingActions = append(server.incomingActions, receivedData)
+				server.incomingData = append(server.incomingData, receivedData)
+				server.dataLookup[receivedData.CommandType] = &receivedData
 				server.receivedDataMutex.Unlock()
 			}
 			validConnections = append(validConnections, ws)
@@ -244,15 +248,29 @@ func actionsToJson(actions []action.Action) []byte {
 }
 
 // Returns a list of all new incoming actions
-func GetIncoming() []action.ActionDTO {
+func GetAllIncoming() []helper.GameViewerCommand {
 	webserver := getInstance()
 	webserver.receivedDataMutex.Lock()
 	defer webserver.receivedDataMutex.Unlock()
 	// Return a copy of the incomingActions slice
-	actionsCopy := make([]action.ActionDTO, len(webserver.incomingActions))
-	copy(actionsCopy, webserver.incomingActions)
-	webserver.incomingActions = nil // Empty the incomingActions slice
+	actionsCopy := make([]helper.GameViewerCommand, len(webserver.incomingData))
+	copy(actionsCopy, webserver.incomingData)
+	webserver.incomingData = nil // Empty the incomingActions slice
 	return actionsCopy
+}
+
+// Returns a list of all new incoming actions
+func GetCommand(commandName string) *helper.GameViewerCommand {
+	webserver := getInstance()
+	webserver.receivedDataMutex.Lock()
+	defer webserver.receivedDataMutex.Unlock()
+	// Return a copy of the incomingActions slice
+	command, ok := webserver.dataLookup[commandName]
+	if !ok{
+		return nil
+	}
+	delete(webserver.dataLookup, commandName)
+	return command
 }
 
 func UpdateWebLog(logs []byte) {
@@ -275,8 +293,8 @@ func BroadcastGameState(message WebsiteDTO) {
 }
 
 func BroadcastActions(actions []action.Action) {
-    actionsJson := actionsToJson(actions)
-    webserver := getInstance()
+	actionsJson := actionsToJson(actions)
+	webserver := getInstance()
 	webserver.gameStateQueueMutex.Lock()
 	webserver.gameStatePacketQueue = append(webserver.gameStatePacketQueue, actionsJson)
 	webserver.gameStateQueueMutex.Unlock()

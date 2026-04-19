@@ -50,19 +50,25 @@ function findClosestRobot(robots: any[], posX, posY, threshold: number) {
   return closest;
 }
             
-function sendMouseClick(e, canvas, container, rotation, controllerSend, sslFieldUpdate){
+function sendMouseClick(e, canvas, container, rotation, controllerSend, sslFieldUpdate, selectedRobot, setSelectedRobot){
   const coords = getWorldFromMouseEvent(e, canvas, container, rotation);
 
   const robotYellow = findClosestRobot(sslFieldUpdate.robotsYellow, coords.worldX, coords.worldY, 200)
   const robotBlue = findClosestRobot(sslFieldUpdate.robotsBlue, coords.worldX, coords.worldY, 200)
 
-  const moveCommand = {"commandType":"MoveRobot",
-    posX:coords.worldX, 
-    posY:coords.worldY, 
-    Id:robotYellow?.robotId}
+  
+  if (robotYellow != null)
+  {
+    setSelectedRobot(robotYellow.robotId);
+    selectedRobot = robotYellow.robotId;
+  }
+
+  const moveCommand = {"Command":"MOVE_ROBOT",
+    x:parseInt(coords.worldX), 
+    y:parseInt(coords.worldY), 
+    Id: selectedRobot}
 
   console.log(moveCommand);
-  console.log(JSON.stringify(moveCommand));
   controllerSend(moveCommand);
 };
 
@@ -109,6 +115,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [selectedRobot, setSelectedRobot] = useState(0);
 
   const drawField = (context: CanvasRenderingContext2D, geometry: SSL_GeometryFieldSize) => {
     context.fillStyle = '#1a5f1a';
@@ -419,7 +426,9 @@ const FootballField: React.FC<FootBallFieldProps> = ({
             containerRef.current,
             width <= minimumWidthForVertical ? 90 : 0,
             controllerSend,
-            sslFieldUpdate
+            sslFieldUpdate,
+            selectedRobot,
+            setSelectedRobot
           )
         }
       />
