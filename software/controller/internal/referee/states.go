@@ -126,7 +126,12 @@ type KickOffIntent struct {
 }
 
 func (s *KickOffIntent) GetTargetPosition() info.Position {
-	return info.Position{X: 0, Y: 1000, Z: 0, Angle: 0}
+	receiverID := info.ID(2)
+	pos, err := s.gi.State.GetRobotPosition(s.team, receiverID)
+	if err != nil {
+		return info.Position{X: 0, Y: 1000, Z: 0, Angle: 0}
+	}
+	return pos
 }
 
 func (s *KickOffIntent) GetFromPosition() info.Position {
@@ -212,7 +217,7 @@ func (s *PrepareKickoff) Update() EventName {
 func (s *Kickoff) Initialize() {
 
 	kickOffID := info.ID(1)
-	recieveID := info.ID(3)
+	recieveID := info.ID(2)
 
 	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kickOffID))
 	kickName := StateName(fmt.Sprintf("Kick ID %d", kickOffID))
@@ -227,7 +232,7 @@ func (s *Kickoff) Initialize() {
 	s.originalBallPos = originalBallPos
 
 	kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickOffID}
-	recieve := RecieveIntent{gi: s.gi, team: s.team, id: kickOffID}
+	recieve := RecieveIntent{gi: s.gi, team: s.team, id: recieveID}
 
 	prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
 	kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickName, ActivityHandler: s.activityHandler}

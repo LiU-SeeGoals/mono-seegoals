@@ -60,5 +60,5 @@ func main() {
 		fmt.Println("Running scenario... Press Ctrl+C to stop.")
 	}
 
-	demos.GameScenario()
+	demos.Defence2BotScenario()
 }
