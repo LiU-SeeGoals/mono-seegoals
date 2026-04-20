@@ -31,6 +31,8 @@ type AlignBall struct {
 	to         info.Position
 	from       info.Position
 	AlignAngle float64
+	useRRT     bool
+	avoidBall  bool
 }
 
 func (m *AlignBall) String() string {
@@ -44,12 +46,29 @@ func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) 
 		to,
 		from,
 		0,
+		true,
+		true,
 	}
 }
-
+func NewDirectAlign(team info.Team, id info.ID, to info.Position, from info.Position) *AlignBall {
+    align := NewAlign(team, id, to, from)
+    align.useRRT = false
+    align.avoidBall = false
+    return align
+}
 func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 
-	ballV2 := info.Vec2{X: m.from.X, Y: m.from.Y}
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
+
+	if ok && ballVel.Norm2d() > 0.3 {
+		lookahead := 0.8
+		ballPos.X += ballVel.X * 1000 * lookahead
+		ballPos.Y += ballVel.Y * 1000 * lookahead
+	}
+
+
+	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
 
 	goalPos := info.Vec2{X: m.to.X, Y: m.to.Y}
 
@@ -66,21 +85,24 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 
 	robotTargetPos := m.getTargetPos(gi)
-	myRobotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
-	if err != nil {
-		fmt.Println(err)
-	}
-	ball := gi.State.GetTrackedBall()
-	//ballPos, err := ball.GetTrackedPosition()
-	ballVel, _ := ball.GetTrackedVelocity()
+	// myRobotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+	// ball := gi.State.GetTrackedBall()
+	// //ballPos, err := ball.GetTrackedPosition()
+	// ballVel, _ := ball.GetTrackedVelocity()
 
-	speed := ballVel.Norm2d()
+	// speed := ballVel.Norm2d()
 
-	if speed > 0.3 {
-		robotTargetPos = myRobotPos
-	}
+	// if speed > 0.3 {
+	// 	robotTargetPos = myRobotPos
+	// }
 
-	act := NewMoveToPosition(m.team, m.id, robotTargetPos).GetMoveToAction(gi)
+	moveTo := NewMoveToPosition(m.team, m.id, robotTargetPos)
+	moveTo.SetUseRRT(m.useRRT)
+	moveTo.AvoidBall(m.avoidBall)
+	act := moveTo.GetMoveToAction(gi)
 	act.Dest.Angle = robotTargetPos.Angle
 
 	// act := action.MoveTo{}

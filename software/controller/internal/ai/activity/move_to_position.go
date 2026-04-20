@@ -33,6 +33,7 @@ type MoveToPosition struct {
 	avoidBall         bool
 	lastPosition      info.Position // Last position to detect lack of movement
 	stuckThreshold    int           // Number of cycles to consider robot as stuck
+	useRRT             bool          // Flag to enable/disable RRT-based collision avoidance
 }
 
 // rrtConfiguration holds parameters for the RRT algorithm
@@ -64,7 +65,7 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 	// Initialize with reasonable RRT parameters
 	rrtConfig := rrtConfiguration{
 		maxIterations:      1000,
-		stepSize:           50.0,   // mm per step (increased for more aggressive exploration)
+		stepSize:           10.0,   // mm per step (increased for more aggressive exploration)
 		goalBias:           0.05,   // 20% chance of sampling the goal directly (increased for more direct paths)
 		waypointThreshold:  600.0,  // mm to consider waypoint reached
 		fieldWidth:         9000.0, // Standard SSL field width in mm
@@ -81,7 +82,13 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 		planningInterval:  50 * time.Millisecond, // Replan more frequently (50ms instead of 100ms)
 		previousObstacles: []info.Position{},
 		significantChange: true, // Force initial planning
+		useRRT:            true, // Enable RRT by default
+		avoidBall:         true, // Enable ball avoidance by default
 	}
+}
+
+func (m *MoveToPosition) SetUseRRT(use bool) {
+	m.useRRT = use
 }
 
 func (m *MoveToPosition) AvoidBall(avoid bool) {
@@ -101,7 +108,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 
 	var targetPos info.Position
 
-	if RRT {
+	if m.useRRT {
 		m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), m.rrtConfig.stepSize)
 		// fmt.Println(m.rrtConfig.stepSize)
 		// fmt.Println(m.final_destination)

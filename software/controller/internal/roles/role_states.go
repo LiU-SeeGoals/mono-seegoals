@@ -27,10 +27,36 @@ func (s *AlignState) Initialize() {
 func (s *AlignState) GetName() sm.StateName {
 	return s.Name
 }
+func enemyCloseToBall(gi *info.GameInfo, team info.Team, ballPos info.Position, radius float64) bool {
+    enemies := gi.State.GetOtherTeam(team)
 
+    for _, enemy := range enemies {
+        enemyPos,err := enemy.GetPosition()
+
+		if err != nil {
+			continue
+		}
+
+        if ballPos.Dist2d(enemyPos) < radius {
+            return true
+        }
+    }
+
+    return false
+}
 func (s *AlignState) Update() sm.EventName{
 
-	activity := act.NewAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
+	targetPos := s.Ctx.GetTargetPosition()
+	fromPos := s.Ctx.GetFromPosition()
+
+	var activity act.Activity
+
+	if enemyCloseToBall(s.Gi, s.Team, fromPos, 1000) {
+		activity = act.NewDirectAlign(s.Team, s.RobotId, targetPos, fromPos)
+	} else {
+		activity = act.NewAlign(s.Team, s.RobotId, targetPos, fromPos)
+	}
+	//activity := act.NewAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
 	s.ActivityHandler.AddActivity(activity)
 	achieved := activity.Achieved(s.Gi)
 	if achieved {

@@ -43,27 +43,56 @@ func (m *GameScenario) Init(
 	go m.run()
 }
 
-func (g *GameScenario) getRobotClosestToBall(activeRobots []info.ID) info.ID {
+func (g *GameScenario) getRobotClosestToPosition(
+	gi *info.GameInfo,
+	activeRobots []info.ID,
+	target info.Position,
+) info.ID {
+	if len(activeRobots) == 0 {
+		return info.ID(0)
+	}
 
-	gi := <-g.incomingGameInfo
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	dist := math.Inf(1)
+	closestId := activeRobots[0]
+	bestDist := math.Inf(1)
 
-	clostestId := info.ID(0)
 	for _, id := range activeRobots {
-		robotPos, _ := gi.State.GetRobotPosition(g.team, id)
-		ballrobotDist := ballPos.Dist2d(robotPos)
-		if ballrobotDist < dist {
-			clostestId = id
-			dist = ballrobotDist
+		robotPos, err := gi.State.GetRobotPosition(g.team, id)
+		if err != nil {
+			continue
+		}
+
+		dist := robotPos.Dist2d(target)
+		if dist < bestDist {
+			bestDist = dist
+			closestId = id
 		}
 	}
-	return clostestId
+
+	return closestId
 }
+
+
+func (g *GameScenario) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID) info.ID {
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
+
+	targetPos := ballPos
+
+	if ok && ballVel.Norm2d() > 0.3 {
+		lookaheadSeconds := 0.5
+
+		targetPos.X = ballPos.X + ballVel.X*1000*lookaheadSeconds
+		targetPos.Y = ballPos.Y + ballVel.Y*1000*lookaheadSeconds
+	}
+
+	return g.getRobotClosestToPosition(gi, activeRobots, targetPos)
+}
+
+
 
 func (g *GameScenario) run() {
 
-	activeRobots := []info.ID{1, 3}
+	activeRobots := []info.ID{1, 2, 3, 4, 5, 6}
 	kickers := make(map[info.ID]*roles.OffenseRole)
 
 	gi := <-g.incomingGameInfo
@@ -78,6 +107,8 @@ func (g *GameScenario) run() {
 
 	for {
 		tickStart := time.Now()
+
+		gi = <-g.incomingGameInfo
 		// handleRef := refereeHandler.HandleReferee()
 		// if handleRef {
 		// 	helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
@@ -85,7 +116,7 @@ func (g *GameScenario) run() {
 		// }
 		// Only coordinate robot roles, trigger ball events
 
-		closestId := g.getRobotClosestToBall(activeRobots)
+		closestId := g.getRobotForBall(&gi, activeRobots)
 
 		for _, id := range activeRobots {
 			if id != closestId {

@@ -2,12 +2,12 @@ package roles
 
 import (
 	"fmt"
+	"math"
+
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
+	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
-	"math"
-	"math/rand"
 )
 
 type OffenseRole struct {
@@ -103,36 +103,83 @@ type SupportAttackIntent struct {
 	id   ID
 }
 
-func randVal(interval float64) float64 {
-	randVal := (float64(rand.Int31())/math.Pow(2, 31)*2.0 - 1.0) * interval
-	return randVal
+type supportOffset struct {
+	forward float64
+	lateral float64
+}
+
+var supportOffsets = []supportOffset{
+	{forward: 900, lateral: -900},
+	{forward: 900, lateral: 900},
+	{forward: 1500, lateral: -1400},
+	{forward: 1500, lateral: 1400},
+	{forward: 2200, lateral: -500},
+	{forward: 2200, lateral: 500},
+}
+
+func clamp(value, minValue, maxValue float64) float64 {
+	return math.Max(minValue, math.Min(maxValue, value))
+}
+
+func (kr *SupportAttackIntent) supportCandidate(ballPos, goalPos info.Position, offset supportOffset) info.Position {
+	field := kr.gi.FieldSize()
+	margin := 400.0
+	halfX := field.X/2 - margin
+	halfY := field.Y/2 - margin
+
+	toGoalX := goalPos.X - ballPos.X
+	toGoalY := goalPos.Y - ballPos.Y
+	dist := math.Sqrt(toGoalX*toGoalX + toGoalY*toGoalY)
+	if dist < 1 {
+		pos, _ := kr.gi.State.GetRobotPosition(kr.team, kr.id)
+		return pos
+	}
+
+	forwardX := toGoalX / dist
+	forwardY := toGoalY / dist
+	lateralX := -forwardY
+	lateralY := forwardX
+
+	x := ballPos.X + forwardX*offset.forward + lateralX*offset.lateral
+	y := ballPos.Y + forwardY*offset.forward + lateralY*offset.lateral
+	target := info.Position{
+		X: x,
+		Y: y,
+		Z: 0,
+	}
+	target.X = clamp(target.X, -halfX, halfX)
+	target.Y = clamp(target.Y, -halfY, halfY)
+	target.Angle = target.AngleToPosition(ballPos)
+	return target
 }
 
 func (kr *SupportAttackIntent) GetFromPosition() info.Position {
 
 	// Some smarter way of selecting tactical positions should be done
 	// here in order to help the main offensive player
-	field := kr.gi.FieldSize()
-
-	pos, _ := kr.gi.State.GetRobotPosition(kr.team, kr.id)
-
-	if isGoalShotAvailable(kr.team, pos, kr.gi) {
-		return pos
+	currentPos, err := kr.gi.State.GetRobotPosition(kr.team, kr.id)
+	if err != nil {
+		return info.Position{}
 	}
 
-	xmax := field.X
-	ymax := field.Y
-	for i := 0; i < 10; i++ {
-		x := randVal(xmax)
-		y := randVal(ymax)
+	ballPos, err := kr.gi.State.GetBall().GetEstimatedPosition()
+	if err != nil {
+		return currentPos
+	}
 
-		pos := info.Position{X: x, Y: y, Z: 0, Angle: 0}
-		if isGoalShotAvailable(kr.team, pos, kr.gi) {
-			return pos
+	goalPos := kr.gi.EnemyGoalCenter(kr.team)
+	slot := int(kr.id) % len(supportOffsets)
+	fallback := kr.supportCandidate(ballPos, goalPos, supportOffsets[slot])
+
+	for i := 0; i < len(supportOffsets); i++ {
+		offset := supportOffsets[(slot+i)%len(supportOffsets)]
+		candidate := kr.supportCandidate(ballPos, goalPos, offset)
+		if isGoalShotAvailable(kr.team, candidate, kr.gi) {
+			return candidate
 		}
 	}
 
-	return pos
+	return fallback
 }
 
 func (kr *SupportAttackIntent) GetTargetPosition() info.Position {
@@ -142,7 +189,7 @@ func (kr *SupportAttackIntent) GetTargetPosition() info.Position {
 }
 
 func (kr *OffenseRole) Init() {
-	awaitName := StateName(fmt.Sprintf("Align ID %d", kr.id))
+	awaitName := StateName(fmt.Sprintf("Support ID %d", kr.id))
 	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kr.id))
 	kickName := StateName(fmt.Sprintf("Kick ID %d", kr.id))
 
