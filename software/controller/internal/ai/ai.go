@@ -7,6 +7,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
@@ -60,6 +61,8 @@ func NewAi(team info.Team, planner planner, executor executor) *Ai {
 	// Initialize plan and executor with the shared resources
 	planner.Init(gameInfoReceiverSB, activities, lock, team)
 	executor.Init(gameInfoReceiverFB, activities, lock, actionReceiver, team)
+
+	ai.SetPathService(team, pathplanner.New())
 
 	// Construct the AI object
 	ai := &Ai{
