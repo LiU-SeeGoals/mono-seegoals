@@ -15,7 +15,6 @@ const plannerManualMovementLoopPeriod = 100 * time.Millisecond
 
 type plannerManualMovement struct {
 	plannerCore
-	at_state int
 	start    time.Time
 	max_time time.Duration
 }
@@ -39,6 +38,7 @@ func (m *plannerManualMovement) Init(
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.start = time.Now()
+	m.Active = true
 
 	go m.run()
 }
@@ -48,7 +48,7 @@ func (m *plannerManualMovement) run() {
 	gameInfo := <-m.incomingGameInfo
 	fmt.Println(gameInfo.Status)
 
-	for {
+	for m.Active {
 		command := client.GetCommand(helper.MOVE_ROBOT)
 		// fmt.Println(len(commands))
 		tickStart := time.Now()
@@ -62,4 +62,9 @@ func (m *plannerManualMovement) run() {
 
 		helper.PaceLoop(tickStart, plannerManualMovementLoopPeriod, "planner_rw")
 	}
+}
+
+func (m *plannerManualMovement) Kill() {
+	fmt.Println("Exiting manual movement planner")
+	m.Active = false
 }

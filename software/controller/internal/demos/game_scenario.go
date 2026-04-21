@@ -65,7 +65,7 @@ func GameScenario() {
 	slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
 
 	manualMovementYellow := plan.NewPlannerManualMovement(info.Yellow)
-	manualMovementBlue := plan.NewPlannerManualMovement(info.Blue)
+	// manualMovementBlue := plan.NewPlannerManualMovement(info.Blue)
 
 	fastBrainYellow := ai.NewActivityExecutor()
 	fastBrainBlue := ai.NewActivityExecutor()
@@ -103,12 +103,12 @@ func GameScenario() {
 		command := client.GetCommand(helper.CHANGE_SCENARIO)
 
 		if command != nil{
-			if command.Type == "Game"{
-				aiYellow = ai.NewAi(info.Yellow, manualMovementYellow, fastBrainYellow)
-				aiBlue = ai.NewAi(info.Blue, manualMovementBlue, fastBrainBlue)
-			} else if command.Type == "Manual"{
-				aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
-				aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
+			if command.Type == "Manual"{
+				aiYellow.HotswapPlanner(info.Yellow, manualMovementYellow)
+				// aiBlue.HotswapPlanner(info.Blue, manualMovementBlue)
+			} else if command.Type == "Game"{
+				aiYellow.HotswapPlanner(info.Yellow, slowBrainYellow)
+				aiBlue.HotswapPlanner(info.Blue, slowBrainBlue)
 			}
 		}
 

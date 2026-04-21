@@ -139,7 +139,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               controllerSend(change_mode)
             }}
           >
-          Manual
+          Game
           </button>
           <button
             style={{
@@ -157,7 +157,7 @@ const Sidebar: React.FC<SidebarProps> = ({
               controllerSend(change_mode)
             }}
           >
-          Game
+          Manual
           </button>
         </div>
       </div>
