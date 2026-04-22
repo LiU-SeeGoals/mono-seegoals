@@ -60,15 +60,22 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-
+	ballV2 := info.Vec2{X: m.from.X, Y: m.from.Y}
 	if ok && ballVel.Norm2d() > 0.3 {
 		lookahead := 0.8
 		ballPos.X += ballVel.X * 1000 * lookahead
 		ballPos.Y += ballVel.Y * 1000 * lookahead
+		ballV2 = info.Vec2{X: ballPos.X, Y: ballPos.Y}
+
+		// if we are in line with the ball don't lookahead, it just makes us miss the ball
+		if math.Abs(info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), ballPos.Angle)) < 10*math.Pi/180 {
+			ballV2 = info.Vec2{X: ballPos.X, Y: ballPos.Y}
+		}
+
 	}
 
-
-	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
+	
+	
 
 	goalPos := info.Vec2{X: m.to.X, Y: m.to.Y}
 
@@ -103,7 +110,18 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	moveTo.SetUseRRT(m.useRRT)
 	moveTo.AvoidBall(m.avoidBall)
 	act := moveTo.GetMoveToAction(gi)
-	act.Dest.Angle = robotTargetPos.Angle
+	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
+    if ok && ballVel.Norm2d() > 0.3 {
+        // Ball is moving face the ball to receive it
+        ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+        myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+        if err == nil {
+            act.Dest.Angle = myPos.AngleToPosition(ballPos)
+        }
+    } else {
+        // Ball is slow align to kick direction
+        act.Dest.Angle = robotTargetPos.Angle
+    }
 
 	// act := action.MoveTo{}
 	// act.Id = int(m.id)

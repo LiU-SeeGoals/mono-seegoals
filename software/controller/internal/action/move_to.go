@@ -73,7 +73,7 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
         mv.simAllocated = true
     }
 
-    const maxLinearSpeed = 1.25
+    const maxLinearSpeed = 0.65
     const slowdownDistance = 1000.0
     const minLinearSpeed = 0.02
     const angleKp = 1.0
