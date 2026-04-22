@@ -29,26 +29,6 @@ type BaseStationClient struct {
 }
 
 func NewBaseStationClient(address string) *BaseStationClient {
-	// If a specific address is provided, prefer unicast UDP to that destination.
-	// This is useful for tests and local setups that don't use multicast/config.
-	if address != "" {
-		remoteAddr, err := net.ResolveUDPAddr("udp", address)
-		if err != nil {
-			panic(err)
-		}
-
-		conn, err := net.DialUDP("udp", nil, remoteAddr)
-		if err != nil {
-			panic(err)
-		}
-
-		return &BaseStationClient{
-			connections:   []Connection{conn},
-			address:       address,
-			queue:         make([]*robot_action.Command, 0),
-			hasBeenInited: false,
-		}
-	}
 
 	multicastIP := config.GetBasestationAdress()
 	multicastPort := config.GetBasestationPort()
