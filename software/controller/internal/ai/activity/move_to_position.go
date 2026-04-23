@@ -16,7 +16,7 @@ const RRT = true
 const RobotSafetyRadius = 240.0 // mm - increased for better safety margin
 const BallSafetyRadius = 150.0  // mm - increased for better safety margin
 const PlanningRadius = 400.0    // mm - increased for better safety margin
-const MotionRadius = 100.0      // mm - increased for better safety margin
+const MotionRadius = 200.0      // mm - increased for better safety margin
 
 // MoveToPositionWithCollisionAvoidance handles collision avoidance using RRT
 type MoveToPosition struct {
@@ -298,6 +298,16 @@ func (m *MoveToPosition) RunRRT(nodes []*RRTNode, obstacles []Obstacle) *RRTNode
 
 	for i := 0; i < m.rrtConfig.maxIterations; i++ {
 		// Sample a random point with goal bias
+
+		if m.IsPathClear(nodes[len(nodes) - 1].position, m.final_destination, obstacles, PlanningRadius) {
+			goalNode := &RRTNode{
+				position: m.final_destination,
+				parent:   nodes[len(nodes) - 1],
+				cost:     nodes[len(nodes) - 1].cost + distanceBetween(nodes[len(nodes) - 1].position, m.final_destination),
+			}
+			return goalNode
+		}
+
 		var randomPoint info.Position
 		if rand.Float64() < m.rrtConfig.goalBias {
 			randomPoint = m.final_destination
@@ -425,25 +435,36 @@ func (m *MoveToPosition) IsNodeValid(position info.Position, obstacles []Obstacl
 	return true
 }
 
-// IsPathClear checks if the path between two positions is clear of obstacles
 func (m *MoveToPosition) IsPathClear(start, end info.Position, obstacles []Obstacle, extraMargin float64) bool {
-	// Check several points along the path
-	const numChecks = 10
+	dx := end.X - start.X
+	dy := end.Y - start.Y
 
-	for i := 0; i <= numChecks; i++ {
-		t := float64(i) / float64(numChecks)
-		checkPos := info.Position{
-			X:     start.X + t*(end.X-start.X),
-			Y:     start.Y + t*(end.Y-start.Y),
-			Angle: start.Angle, // Angle doesn't matter here
+	dd := dx*dx + dy*dy
+	if dd < 1e-6 {
+		return true
+	}
+
+	for _, obs := range obstacles {
+		fx := obs.position.X - start.X
+		fy := obs.position.Y - start.Y
+
+		t := (fx*dx + fy*dy) / dd
+
+		if t < 0 {
+			t = 0
+		} else if t > 1 {
+			t = 1
 		}
 
-		// Skip the first point (which is the start position)
-		if i == 0 {
-			continue
-		}
+		closestX := start.X + t*dx
+		closestY := start.Y + t*dy
 
-		if !m.IsNodeValid(checkPos, obstacles, false) {
+		distX := obs.position.X - closestX
+		distY := obs.position.Y - closestY
+
+		distSq := distX*distX + distY*distY
+
+		if distSq <= obs.size*obs.size {
 			return false
 		}
 	}
