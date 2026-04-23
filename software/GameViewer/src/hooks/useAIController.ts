@@ -1,48 +1,87 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Action } from '../types/Action';
 
 export const useAIController = (
   setRobotActions: React.Dispatch<React.SetStateAction<Action[]>>
 ) => {
   const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef(null);
 
   useEffect(() => {
-    const ai_address = import.meta.env.VITE_AI_CONTROLLER_WS_ADDR;
-    const ai_port = import.meta.env.VITE_AI_CONTROLLER_WS_PORT;
+    const ai_address = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_ADDR;
+    const ai_port = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_PORT;
     console.log(`[useAIController.ts] connecting to ws://${ai_address}:${ai_port}`);
 
-    const ws = new WebSocket(`ws://${ai_address}:${ai_port}`);
+    let retryTimeout: NodeJS.Timeout | null = null;
+    let isMounted = true;
 
-    ws.onopen = () => {
-      setIsConnected(true);
-      console.log(`[useAIController.ts] connected on ${ws.url}!`);
+    const connectToAI = () => {
+      wsRef.current?.close();
+
+      const ws = new WebSocket(`ws://${ai_address}:${ai_port}/ws`);
+      wsRef.current = ws;
+
+      ws.onerror = (err) => {
+        if (!isMounted) return;
+        console.error(`[useAIController.ts] error: ${err}`);
+        setIsConnected(false);
+      };
+
+      ws.onopen = () => {
+        if (!isMounted || !ws) return;
+        setIsConnected(true);
+        console.log(`[useAIController.ts] connected on ${ws.url}!`);
+        if (retryTimeout) {
+          clearTimeout(retryTimeout);
+          retryTimeout = null;
+        }
+      };
+
+      ws.onclose = () => {
+        if (!isMounted || !ws) return;
+        setIsConnected(false);
+        console.log(`[useAIController.ts] closed ${ws.url}, retrying in 100 ms...`);
+
+        if (!retryTimeout) {
+          retryTimeout = setTimeout(() => {
+            retryTimeout = null;
+            connectToAI();
+          }, 100);
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          if (!event.data) return;
+          const parsedData: Action[] = JSON.parse(event.data);
+          if (!parsedData) return;
+          setRobotActions((prevActions) => {
+            const updatedActions = [...prevActions, ...parsedData];
+            return updatedActions.slice(-10);
+          });
+        } catch (e) {
+          console.error('Error parsing message JSON', e);
+        }
+      };
     };
 
-    ws.onerror = (err) => {
-      console.error(`[useAIController.ts] error: ${err}`);
-      setIsConnected(false);
-    };
-
-    ws.onclose = () => {
-      setIsConnected(false);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        if (!event.data) return;
-        const parsedData: Action[] = JSON.parse(event.data);
-        if (!parsedData) return;
-        // Each message is a "tick" snapshot; replace actions so we draw the latest plan.
-        setRobotActions(parsedData);
-      } catch (e) {
-        console.error('Error parsing message JSON', e);
-      }
-    };
+    connectToAI();
 
     return () => {
-      ws.close();
+      isMounted = false;
+      wsRef.current?.close();
+      if (retryTimeout) clearTimeout(retryTimeout);
     };
   }, [setRobotActions]);
 
-  return { isConnected };
+  const controllerSend = (data: any) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data));
+    } else {
+      console.warn("WebSocket not connected");
+    }
+  };
+
+
+  return { isConnected, controllerSend };
 };

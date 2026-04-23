@@ -26,6 +26,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
   vectorSettingYellow,
   sidebarWidth,
   fieldGeometry,
+  controllerSend,
 }) => {
   const startHeightResizer = 1000;
   const resizerWidth = 5;
@@ -51,6 +52,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
         vectorSettingBlue={vectorSettingBlue}
         vectorSettingYellow={vectorSettingYellow}
         fieldGeometry={fieldGeometry}
+        controllerSend={controllerSend}
       />
 
       <div

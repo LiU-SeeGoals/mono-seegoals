@@ -12,7 +12,6 @@ import (
 
 type plannerGoalie struct {
 	plannerCore
-	at_state int
 	start    time.Time
 	max_time time.Duration
 }
@@ -36,6 +35,7 @@ func (m *plannerGoalie) Init(
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.start = time.Now()
+	m.Active = true
 
 	go m.run()
 }
@@ -43,7 +43,7 @@ func (m *plannerGoalie) Init(
 // This is the main loop of the AI in this slow brain
 func (m *plannerGoalie) run() {
 
-	for {
+	for m.Active {
 		tickStart := time.Now()
 
 		//fmt.Println("slow, number of activities:", len(*m.activities))
@@ -55,4 +55,9 @@ func (m *plannerGoalie) run() {
 
 		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "planner_goalie")
 	}
+}
+
+func (m *plannerGoalie) Kill() {
+	fmt.Println("Exiting goalie planner")
+	m.Active = false
 }

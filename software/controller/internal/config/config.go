@@ -5,7 +5,6 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"sync"
 
 	"github.com/caarlos0/env/v10"
@@ -75,8 +74,8 @@ type ConfigReal struct {
 }
 
 type ConfigGameViewer struct {
-	Address string `env:"AI_ACTIONS_MULTICAST_ADDR,required"`
-	Port    string `env:"AI_ACTIONS_MULTICAST_PORT,required"`
+	Address string `env:"VITE_AI_GAME_VIEWER_SOCKET_ADDR,required"`
+	Port    string `env:"VITE_AI_GAME_VIEWER_SOCKET_PORT,required"`
 }
 
 type ConfigBasestation struct {
@@ -226,16 +225,13 @@ func GetAIMulticastInterface() string {
 
 func GetGameViewerAdress() string {
 	cfg := GetInstance()
+	println(cfg.GW.Address)
 	return cfg.GW.Address
 }
 
-func GetGameViewerPort() int {
+func GetGameViewerPort() string {
 	cfg := GetInstance()
-	num, err := strconv.Atoi(cfg.GW.Port)
-	if err != nil {
-		panic(err)
-	}
-	return num
+	return ":" + cfg.GW.Port
 }
 
 func GetBasestationAdress() string {

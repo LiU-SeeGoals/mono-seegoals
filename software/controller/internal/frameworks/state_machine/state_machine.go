@@ -43,7 +43,11 @@ func (sm *StateMachine) TriggerEvent(event EventName) {
 	if !ok {
 		return
 	}
-	fmt.Println(event, sm.currentState.GetName(), "->", newState.GetName())
+	debug := false
+
+	if debug{
+		fmt.Println(event, sm.currentState.GetName(), "->", newState.GetName())
+	}
 	sm.ChangeState(newState)
 }
 

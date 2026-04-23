@@ -12,5 +12,5 @@ type plannerCore struct {
 	incomingGameInfo <-chan info.GameInfo
 	start            time.Time
 	ActivityHandler  ActivityHandler
+	Active           bool
 }
-
