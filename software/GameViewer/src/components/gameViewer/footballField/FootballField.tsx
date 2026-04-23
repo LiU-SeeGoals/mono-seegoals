@@ -25,6 +25,53 @@ const COLOR_MAP: Record<string, string> = {
   white: 'rgba(255, 255, 255, 1)',
 };
 
+function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
+  const dx = a.x - b.x;
+  const dy = a.y - b.y;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function findClosestRobot(robots: any[], posX, posY, threshold: number) {
+  let closest = null;
+  let minDist = Infinity;
+
+  for (const robot of robots) {
+
+    // console.log(robot)
+    // console.log(posX,posY)
+    const dist = distance(robot, {x:posX, y:posY});
+
+    if (dist < minDist && dist < threshold) {
+      minDist = dist;
+      closest = robot;
+    }
+  }
+
+  return closest;
+}
+            
+function sendMouseClick(e, canvas, container, rotation, controllerSend, sslFieldUpdate, selectedRobot, setSelectedRobot){
+  const coords = getWorldFromMouseEvent(e, canvas, container, rotation);
+
+  const robotYellow = findClosestRobot(sslFieldUpdate.robotsYellow, coords.worldX, coords.worldY, 200)
+  const robotBlue = findClosestRobot(sslFieldUpdate.robotsBlue, coords.worldX, coords.worldY, 200)
+
+  
+  if (robotYellow != null)
+  {
+    setSelectedRobot(robotYellow.robotId);
+    selectedRobot = robotYellow.robotId;
+  }
+
+  const moveCommand = {"Command":"MOVE_ROBOT",
+    x:parseInt(coords.worldX), 
+    y:parseInt(coords.worldY), 
+    Id: selectedRobot}
+
+  console.log(moveCommand);
+  controllerSend(moveCommand);
+};
+
 const withAlpha = (color: string, alpha: number): string => {
   if (color.startsWith('#')) {
     const r = parseInt(color.slice(1, 3), 16);
@@ -62,11 +109,13 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   vectorSettingBlue,
   vectorSettingYellow,
   fieldGeometry,
+  controllerSend,
 }) => {
   const minimumWidthForVertical = 810;
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [selectedRobot, setSelectedRobot] = useState(0);
 
   const drawField = (context: CanvasRenderingContext2D, geometry: SSL_GeometryFieldSize) => {
     context.fillStyle = '#1a5f1a';
@@ -92,7 +141,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     context.moveTo(x1, y1);
     context.lineTo(x2, y2);
     context.strokeStyle = 'white';
-    context.lineWidth = line.thickness * getScaler(context);
+    context.lineWidth = line.thickness * getScaler(context.canvas.width, context.canvas.height);
     context.lineCap = 'butt';
     context.stroke();
   };
@@ -102,12 +151,12 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     arc: any
   ) => {
     const { canvasX, canvasY } = getCanvasCoordinates(arc.center.x, arc.center.y, context);
-    const radius = arc.radius * getScaler(context);
+    const radius = arc.radius * getScaler(context.canvas.width, context.canvas.height);
   
     context.beginPath();
     context.arc(canvasX, canvasY, radius, arc.a1, arc.a2, false);
     context.strokeStyle = 'white';
-    context.lineWidth = arc.thickness * getScaler(context);
+    context.lineWidth = arc.thickness * getScaler(context.canvas.width, context.canvas.height);
     context.stroke();
   };
 
@@ -121,7 +170,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
 
     context.save();
     context.translate(context.canvas.width / 2, context.canvas.height / 2);
-    context.scale(zoomLevel, zoomLevel);
+    // context.scale(zoomLevel, zoomLevel);
     context.translate(-context.canvas.width / 2, -context.canvas.height / 2);
 
     if (fieldGeometry) {
@@ -254,7 +303,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       robot.y,
       context
     );
-    const canvasRadius = ROBOT_RADIUS * getScaler(context);
+    const canvasRadius = ROBOT_RADIUS * getScaler(context.canvas.width, context.canvas.height);
     const flatStartFrontAngle = (45 * Math.PI) / 180;
     const robotOrientation =
       robot.orientation !== undefined ? robot.orientation : 0;
@@ -321,7 +370,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       robot.y,
       context
     );
-    context.font = `bold ${FONT_SIZE * getScaler(context)}px Arial`;
+    context.font = `bold ${FONT_SIZE * getScaler(context.canvas.width, context.canvas.height)}px Arial`;
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillStyle = textColor;
@@ -361,7 +410,6 @@ const FootballField: React.FC<FootBallFieldProps> = ({
         width: width,
         transform: `
           ${width <= minimumWidthForVertical ? "rotate(90deg)" : ""}
-          scale(${zoomLevel})
         `,
       }}
       ref={containerRef}
@@ -370,6 +418,19 @@ const FootballField: React.FC<FootBallFieldProps> = ({
         className="football-field-canvas"
         ref={canvasRef}
         style={{ height: height, width: width }}
+        tabIndex='0'
+        onMouseDown={(e) =>
+          sendMouseClick(
+            e,
+            canvasRef.current,
+            containerRef.current,
+            width <= minimumWidthForVertical ? 90 : 0,
+            controllerSend,
+            sslFieldUpdate,
+            selectedRobot,
+            setSelectedRobot
+          )
+        }
       />
     </div>
   );
@@ -380,15 +441,51 @@ function getCanvasCoordinates(
   y: number,
   context: CanvasRenderingContext2D
 ) {
-  const scaler = getScaler(context);
+  const scaler = getScaler(context.canvas.width, context.canvas.height);
   const canvasX = x * scaler + context.canvas.width / 2;
   const canvasY = context.canvas.height / 2 - y * scaler;
   return { canvasX, canvasY };
 }
 
-function getScaler(context: CanvasRenderingContext2D) {
-  const widthScale = context.canvas.width / REAL_WIDTH_FIELD;
-  const heightScale = context.canvas.height / REAL_WIDTH_FIELD;
+function getWorldFromMouseEvent(
+  e: React.MouseEvent,
+  canvas: HTMLCanvasElement,
+  container: HTMLDivElement,
+  rotationDeg: number,
+) {
+  const rect = canvas.getBoundingClientRect();
+
+  let x = e.clientX - rect.left;
+  let y = e.clientY - rect.top;
+
+  const w = rect.width;
+  const h = rect.height;
+
+  let canvasX: number;
+  let canvasY: number;
+
+  if (rotationDeg === 90) {
+    canvasX = y;
+    canvasY = w - x;
+  } else if (rotationDeg === -90) {
+    canvasX = h - y;
+    canvasY = x;
+  } else {
+    canvasX = x;
+    canvasY = y;
+  }
+
+  const scale = getScaler(canvas.width, canvas.height);
+
+  const worldX = (canvasX - canvas.width / 2) / scale;
+  const worldY = (canvas.height / 2 - canvasY) / scale;
+
+  return { worldX, worldY };
+}
+
+function getScaler(width, height) {
+  const widthScale = width / REAL_WIDTH_FIELD;
+  const heightScale = height / REAL_WIDTH_FIELD;
   return Math.min(widthScale, heightScale);
 }
 
