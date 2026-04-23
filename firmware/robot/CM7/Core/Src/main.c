@@ -32,6 +32,7 @@
 #include "pos_follow.h"
 #include "common.h"
 #include "state_estimator.h"
+#include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_gpio.h"
 #include "stm32h7xx_it.h"
 #include "ui.h"
@@ -56,6 +57,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 
+I2C_HandleTypeDef hi2c3;
 I2C_HandleTypeDef hi2c4;
 
 SPI_HandleTypeDef hspi1;
@@ -103,6 +105,7 @@ static void MX_TIM5_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM7_Init(void);
 static void MX_SPI6_Init(void);
+static void MX_I2C3_Init(void);
 /* USER CODE BEGIN PFP */
 
 static void I2C4_Init(void);
@@ -230,6 +233,7 @@ int main(void)
   MX_TIM3_Init();
   MX_TIM7_Init();
   MX_SPI6_Init();
+  MX_I2C3_Init();
   /* USER CODE BEGIN 2 */
 
     // Initialise modules
@@ -243,7 +247,7 @@ int main(void)
     POS_Init();
     NAV_Init(&htim7, &htim1, &htim15);
     HAL_TIM_Base_Start_IT(&htim4);
-    MOTOR_Init(&htim1);
+    MOTOR_Init(&htim1, &hi2c3);
     DATA_Init(&hspi6);
     KICKER_Init(&htim5, &htim3);
     IMU_Init(&hi2c4);
@@ -264,6 +268,13 @@ int main(void)
         KICKER_KickSafe();
         HAL_Delay(60);
     }
+
+    while (true) {
+        LOG_INFO("test\r\n");
+        MOTOR_get_encoder_rpms();
+        HAL_Delay(1000);
+    }
+
 
     STATE_calibrate_imu_gyr();
     HAL_TIM_Base_Start_IT(&htim12);
@@ -299,11 +310,6 @@ int main(void)
         }
 
     /* USER CODE END WHILE */
-
-    // NAV_wheelToBody(out);
-    // LOG_INFO("x: %f y: %f angle: %f\r\n", STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle());
-    // LOG_INFO("x: %f y: %f angle: %f\r\n", out[0], out[1], out[2]);
-    // LOG_INFO("x: %f y: %f angle: %f\r\n", out[0], out[1], out[2]);
 
     /* USER CODE BEGIN 3 */
     }
@@ -367,6 +373,54 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief I2C3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C3_Init(void)
+{
+
+  /* USER CODE BEGIN I2C3_Init 0 */
+
+  /* USER CODE END I2C3_Init 0 */
+
+  /* USER CODE BEGIN I2C3_Init 1 */
+
+  /* USER CODE END I2C3_Init 1 */
+  hi2c3.Instance = I2C3;
+  hi2c3.Init.Timing = 0x009034B6;
+  hi2c3.Init.OwnAddress1 = 0;
+  hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c3.Init.OwnAddress2 = 0;
+  hi2c3.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c3.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c3.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c3, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c3, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C3_Init 2 */
+
+  /* USER CODE END I2C3_Init 2 */
+
 }
 
 /**
@@ -989,9 +1043,9 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
 
@@ -1034,20 +1088,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BTN_USER_GPIO_Port, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : BATT1_Pin BATT2_Pin BATT3_Pin BATT4_Pin
-                           BATT5_Pin */
-  GPIO_InitStruct.Pin = BATT1_Pin|BATT2_Pin|BATT3_Pin|BATT4_Pin
-                          |BATT5_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : BATT6_Pin */
-  GPIO_InitStruct.Pin = BATT6_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(BATT6_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : MOTOR4_ENCODER_Pin */
   GPIO_InitStruct.Pin = MOTOR4_ENCODER_Pin;

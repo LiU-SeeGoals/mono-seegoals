@@ -17,12 +17,13 @@ panic-probe = { version = "1", features = ["print-defmt"] }
 #rp-pico2 = "0.9" # TODO: Do we have that crate already ?
 
 # If you're not going to use a Board Support Package you'll need these:
-rp235x-hal = { version = "0.3", features = [
+rp235x-hal = { version = "0.4", features = [
     "rt",
     "critical-section-impl",
     "binary-info",
 ] }
 pico-encoder = { path = "/home/lexa/repos/roche-limit-firmware/pico-encoder" }
+heapless = "0.9.2"
 
 # cargo build/run
 [profile.dev]

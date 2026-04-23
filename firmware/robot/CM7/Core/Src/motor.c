@@ -3,10 +3,15 @@
 /* Private includes */
 #include "data_logging.h"
 #include "log.h"
+#include "stm32h7xx_hal_i2c.h"
+#include <stdint.h>
 
 /* Private variables */
 static LOG_Module internal_log_mod;
 extern float CONTROL_FREQ;
+
+/* Handle for encoder i2c bus */
+static I2C_HandleTypeDef* enc_i2c_handle;
 
 /*
  Averages motor speed ticks
@@ -30,8 +35,18 @@ float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor)
     return cur / ((float)MOTOR_TICK_BUF_SIZE);
 }
 
-void MOTOR_Init(TIM_HandleTypeDef* pwm_htim)
+void MOTOR_get_encoder_rpms()
 {
+    LOG_INFO("Weeee\r\n");
+    uint8_t message = 0x1;
+    HAL_I2C_Master_Transmit(enc_i2c_handle, 0x01, &message, 1, 1000);
+    uint8_t reader_1_buf[16] = { 0 };
+    HAL_I2C_Master_Receive(enc_i2c_handle, 0x1, reader_1_buf, 0x11, 1000);
+}
+
+void MOTOR_Init(TIM_HandleTypeDef* pwm_htim, I2C_HandleTypeDef* enc_i2c)
+{
+    enc_i2c_handle = enc_i2c;
     LOG_InitModule(&internal_log_mod, "MOTOR", LOG_LEVEL_TRACE, 0);
     HAL_TIM_Base_Start(pwm_htim);
 }

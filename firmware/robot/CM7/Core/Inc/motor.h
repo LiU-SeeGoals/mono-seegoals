@@ -3,6 +3,8 @@
 
 #include "stm32h7xx_hal.h"
 #include "data_logging.h"
+
+#include "stm32h7xx_hal_i2c.h"
 // Tick buffer of 100 with 5000hz update is 0.05 second filter on motor
 #define MOTOR_TICK_BUF_SIZE 50
 typedef struct {
@@ -22,8 +24,10 @@ typedef struct {
 
 /**
  * Initialize motor
+ * @param pwm_htim The timer hadle for the motor control handle
+ * @param enc_i2c Handle for the i2c bus with the encoder counters
  */
-void MOTOR_Init(TIM_HandleTypeDef* htim);
+void MOTOR_Init(TIM_HandleTypeDef* pwm_htim, I2C_HandleTypeDef* enc_i2c);
 
 /**
   * Get sign for motor direction
@@ -87,5 +91,7 @@ int setDirection(MotorPWM* motor, float speed);
  * @returns float of speed
  */
 float MOTOR_ReadTicksPerSecond(MotorPWM* motor);
+
+void MOTOR_get_encoder_rpms();
 
 #endif
