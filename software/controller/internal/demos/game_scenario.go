@@ -8,7 +8,6 @@ import (
 	plan "github.com/LiU-SeeGoals/controller/internal/ai/plan"
 	"github.com/LiU-SeeGoals/controller/internal/client"
 	"github.com/LiU-SeeGoals/controller/internal/config"
-	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
@@ -100,7 +99,7 @@ func GameScenario() {
 		sslClientTracked.UpdateState(gameInfo, playTime)
 
 
-		command := client.GetCommand(helper.CHANGE_SCENARIO)
+		command := client.GetCommand(client.CHANGE_SCENARIO)
 
 		if command != nil{
 			if command.Type == "Manual"{
