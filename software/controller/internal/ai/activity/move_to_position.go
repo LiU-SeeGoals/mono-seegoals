@@ -152,17 +152,12 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 
 	if RRT {
 		m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), m.rrtConfig.stepSize)
-		// fmt.Println(m.rrtConfig.stepSize)
-		// fmt.Println(m.final_destination)
-		// fmt.Println(myPos)
 
 		m.AvoidBall(true)
 		targetPos = myPos
 
 		m.PlanPath(gi, myPos)
 
-
-		fmt.Println(len(m.path))
 		if len(m.path) > 0 {
 			bestPoint := m.final_destination
 			lookahead := m.rrtConfig.waypointThreshold
