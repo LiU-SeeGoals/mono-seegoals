@@ -13,9 +13,10 @@ const (
 	// Goalie position constraints - these will be adjusted based on team half
 	GOALIE_LINE_WIDTH = 1000 // Width of the goalie's movement range (500 to each side)
 	// GOALIE_DIST_FROM_CENTER = 5500 // Distance from center to goalie line
-	GOALIE_DIST_FROM_CENTER = 3500 // Distance from center to goalie line
+	GOALIE_DIST_FROM_CENTER = 4000 // Distance from center to goalie line
 	GOAL_BEHIND_DIST        = 4300 // Distance from center to position behind the goal
 	BALL_JITTER_DISTANCE    = 1.0
+	SHOT_THREAT_DISTANCE    = 350.0
 )
 
 type Goalie struct {
@@ -72,12 +73,13 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 		targetX = maxX
 	}
 	goalieX := targetX
-	goalSize := 1110.0
+	goalSize := 800.0
 	goalieY := ballPos.Y
 
-	// If an opponent has the ball, predict where they are aiming on our goal line.
-	if poss := ball.GetPossessor(); poss != nil && poss.GetTeam() != g.team {
-		if oppPos, err := poss.GetPosition(); err == nil {
+	// If an opponent has the ball, or is still close enough to be the likely shooter,
+	// predict where they are aiming on our goal line.
+	if shooter := threateningOpponent(gi, g.team, ballPos); shooter != nil {
+		if oppPos, err := shooter.GetPosition(); err == nil {
 			if yHit, ok := predictShotY(oppPos, goalieX, goalSize, ballPos.Y); ok {
 				goalieY = yHit
 			}
@@ -120,6 +122,35 @@ func (g *Goalie) Achieved(*info.GameInfo) bool {
 
 func (m *Goalie) GetID() info.ID {
 	return m.id
+}
+
+//Predict the opponent while oppponent is close enough to the ball
+//Returns the opponent that should be treated as the ball possessor
+func threateningOpponent(gi *info.GameInfo, team info.Team, ballPos info.Position) *info.Robot {
+	ball := gi.State.GetBall()
+	if poss := ball.GetPossessor(); poss != nil && poss.GetTeam() != team {
+		return poss
+	}
+
+	opponents := gi.State.GetOtherTeam(team)
+	var best *info.Robot
+	bestDist := math.Inf(1)
+
+	for _, robot := range opponents {
+		if robot == nil || !robot.IsActive() {
+			continue
+		}
+
+		dist := ballPos.Distance(robot.DribblerPos())
+		if dist > SHOT_THREAT_DISTANCE || dist >= bestDist {
+			continue
+		}
+
+		best = robot
+		bestDist = dist
+	}
+
+	return best
 }
 
 // predictShotY estimates where the opponent's aim line hits our goal line.

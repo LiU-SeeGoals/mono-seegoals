@@ -2,6 +2,7 @@ package roles
 
 import (
 	"fmt"
+	"math"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
@@ -16,6 +17,15 @@ const (
 
 type ReceiverRole struct {
 	*RobotRole
+}
+
+func receiverHomePosition(team Team) Position {
+	pos := Position{X: 1000, Y: 1500, Z: 0, Angle: 0}
+	if team == Yellow {
+		return pos.Rotate(math.Pi)
+	}
+
+	return pos
 }
 
 func NewReceiverRole(robotID ID, gameScenario interface{}) *ReceiverRole {
@@ -86,7 +96,7 @@ func (rr *ReceiverRole) ReceiverStateMachine(gi GameInfo, team Team, g GameScena
 		case RECEIVER_POSITION:
 			switch rr.state {
 			case 0: // STATE_START
-				wantedPos := Position{X: 1000, Y: 1500, Z: 0, Angle: 0}
+				wantedPos := receiverHomePosition(team)
 				activity = ai.NewMoveToPosition(team, rr.robotID, wantedPos)
 				rr.NextState(rr)
 			case 1: // STATE_EXECUTING
