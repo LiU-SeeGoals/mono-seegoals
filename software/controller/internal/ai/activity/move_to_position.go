@@ -66,7 +66,7 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 		maxIterations:      1000,
 		stepSize:           50.0,   // mm per step (increased for more aggressive exploration)
 		goalBias:           0.05,   // 20% chance of sampling the goal directly (increased for more direct paths)
-		waypointThreshold:  600.0,  // mm to consider waypoint reached
+		waypointThreshold:  600.0,  // mm to lookahead when choosing destination point
 		fieldWidth:         9000.0, // Standard SSL field width in mm
 		fieldHeight:        6000.0, // Standard SSL field height in mm
 		completionDistance: 50.0,   // mm to consider the goal reached
@@ -88,6 +88,55 @@ func (m *MoveToPosition) AvoidBall(avoid bool) {
 	m.avoidBall = avoid
 }
 
+func circleSegmentIntersection(
+	a, b info.Position,
+	center info.Position,
+	radius float64,
+) (info.Position, bool) {
+
+	dx := b.X - a.X
+	dy := b.Y - a.Y
+
+	fx := a.X - center.X
+	fy := a.Y - center.Y
+
+	A := dx*dx + dy*dy
+	B := 2 * (fx*dx + fy*dy)
+	C := fx*fx + fy*fy - radius*radius
+
+	discriminant := B*B - 4*A*C
+	if discriminant < 0 {
+		return info.Position{}, false // no intersection
+	}
+
+	discriminant = math.Sqrt(discriminant)
+
+	t1 := (-B - discriminant) / (2 * A)
+	t2 := (-B + discriminant) / (2 * A)
+
+	var t float64
+	found := false
+
+	if t2 >= 0 && t2 <= 1 {
+		t = t2
+		found = true
+	} else if t1 >= 0 && t1 <= 1 {
+		t = t1
+		found = true
+	}
+
+	if !found {
+		return info.Position{}, false
+	}
+
+	return info.Position{
+		X:     a.X + t*dx,
+		Y:     a.Y + t*dy,
+		Z:     center.Z,
+		Angle: center.Angle,
+	}, true
+}
+
 // GetAction returns an action for the robot with RRT-based collision avoidance
 func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
 	moveToAction := m.GetMoveToAction(gi)
@@ -103,37 +152,34 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 
 	if RRT {
 		m.rrtConfig.stepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), m.rrtConfig.stepSize)
-		// fmt.Println(m.rrtConfig.stepSize)
-		// fmt.Println(m.final_destination)
-		// fmt.Println(myPos)
 
 		m.AvoidBall(true)
 		targetPos = myPos
 
 		m.PlanPath(gi, myPos)
 
-		// fmt.Println(len(m.path))
 		if len(m.path) > 0 {
 			bestPoint := m.final_destination
-			bestPointDist := 100000000.0
-			if distanceBetween(m.path[len(m.path)-1], myPos) < m.rrtConfig.waypointThreshold &&
-				m.IsPathClear(myPos, m.path[len(m.path)-1], m.GetObstaclePositions(gi), MotionRadius) ||
-				len(m.path) == 1 {
+			lookahead := m.rrtConfig.waypointThreshold
+			obstacles := m.GetObstaclePositions(gi)
 
-				bestPoint = m.path[len(m.path)-1]
-			} else {
-				for i := 0; i < len(m.path)-1; i++ {
-					a := info.Vec2{X: m.path[i].X, Y: m.path[i].Y}
-					b := info.Vec2{X: m.path[i+1].X, Y: m.path[i+1].Y}
-					p := info.Vec2{X: myPos.X, Y: myPos.Y}
-					pointOnLine := info.PointToLineSegment(a, b, p)
-					distToPathSegment := info.DistToLineSegment(a,b,p)
-					distanceToThreshold := math.Abs(distToPathSegment - m.rrtConfig.waypointThreshold)
-					if distanceToThreshold < float64(bestPointDist) && m.IsPathClear(myPos, info.Position{X: pointOnLine.X, Y: pointOnLine.Y, Z: 0, Angle: 0}, m.GetObstaclePositions(gi), MotionRadius) {
-						bestPointDist = distanceToThreshold
+			bestPoint = m.path[len(m.path)-1] // fallback
 
-						bestPoint = info.Position{X: pointOnLine.X, Y: pointOnLine.Y, Z: myPos.Z, Angle: myPos.Angle}
-					}
+			for i := 0; i < len(m.path)-1; i++ {
+				point, ok := circleSegmentIntersection(
+					m.path[i],
+					m.path[i+1],
+					myPos,
+					lookahead,
+				)
+
+				if !ok {
+					continue
+				}
+
+				if m.IsPathClear(myPos, point, obstacles, MotionRadius) {
+					bestPoint = point
+					break
 				}
 			}
 			targetPos = bestPoint
