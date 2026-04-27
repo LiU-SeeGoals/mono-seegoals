@@ -142,7 +142,7 @@ void NAV_wheelToBody(float* res)
 
     // wheel to body psudeo inverse https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
     // TODO: measure real wheel radius and chasis radius
-    float r = 0.025;
+    float r = 0.0275;
     float R = 0.09;
 
     float psi = PI * 31.f / 180.0f;
