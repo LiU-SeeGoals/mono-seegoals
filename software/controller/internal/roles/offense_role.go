@@ -16,6 +16,19 @@ type OffenseRole struct {
 	activityHandler *ai.ActivityHandler
 	gi              *GameInfo
 	team            Team
+	intent          *AttemptGoalIntent
+	receiveTarget   info.Position
+}
+
+type PassTarget struct {
+	ReceiverID info.ID
+	Position   info.Position
+}
+type KickDecision struct {
+	Target     info.Position
+	From       info.Position
+	ReceiverID info.ID
+	IsPass     bool
 }
 
 func NewOffenseRole(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo, team Team) *OffenseRole {
@@ -28,27 +41,12 @@ func NewOffenseRole(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo
 	}
 }
 
-func (kr *AttemptGoalIntent) GetBestHomiePos() info.Position {
-
-	// TODO implement some smarter way of kicking to best homie
-	// For example one that has free sight of the goal
-	homieId := 1
-	if kr.id == 1 {
-		homieId = 3
-	}
-
-	pos, err := kr.gi.State.GetRobotPosition(kr.team, ID(homieId))
-	if err != nil {
-		fmt.Println("Could not get best homies pos")
-	}
-
-	return pos
-}
-
 type AttemptGoalIntent struct {
-	gi   *GameInfo
-	team Team
-	id   ID
+	gi       *GameInfo
+	team     Team
+	id       ID
+	frozen   bool
+	decision KickDecision
 }
 
 func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool {
@@ -73,28 +71,101 @@ func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool 
 	return true
 }
 
-func (kr *AttemptGoalIntent) GetTargetPosition() info.Position {
+func (kr *AttemptGoalIntent) bestReceiverID() info.ID {
+	bestID := info.ID(0)
+	bestScore := math.Inf(-1)
 
-	// Try to shoot goal if the sight is clear
-	// Otherwise pass to a homie
+	ballPos, _ := kr.gi.State.GetBall().GetEstimatedPosition()
+	goal := kr.gi.EnemyGoalCenter(kr.team)
+
+	for _, id := range []info.ID{1, 2, 3} {
+		if id == kr.id {
+			continue
+		}
+
+		pos, err := kr.gi.State.GetRobotPosition(kr.team, id)
+		if err != nil {
+			continue
+		}
+
+		distFromBall := ballPos.Dist2d(pos)
+		progressTowardGoal := -pos.Dist2d(goal)
+		passLengthPenalty := 0.2 * distFromBall
+
+		score := progressTowardGoal - passLengthPenalty
+		if score > bestScore {
+			bestScore = score
+			bestID = id
+		}
+	}
+
+	return bestID
+}
+
+func (kr *AttemptGoalIntent) chooseKickDecision() KickDecision {
+	ballPos, _ := kr.gi.State.GetBall().GetEstimatedPosition()
 	goalPosition := kr.gi.EnemyGoalCenter(kr.team)
 	robotPos, err := kr.gi.State.GetRobotPosition(kr.team, kr.id)
 
+	// Try to shoot goal if the sight is clear
 	if err != nil {
 		fmt.Println("failed robot pos")
 	}
 
 	if isGoalShotAvailable(kr.team, robotPos, kr.gi) {
-		return goalPosition
-	} else {
-		return kr.GetBestHomiePos()
+		return KickDecision{
+			Target: goalPosition,
+			From:   ballPos,
+			IsPass: false,
+		}
+	}
+
+	receiverID := kr.bestReceiverID()
+	receiverPos, err := kr.gi.State.GetRobotPosition(kr.team, receiverID)
+	if err != nil {
+		return KickDecision{
+			Target: goalPosition,
+			From:   ballPos,
+			IsPass: false,
+		}
+	}
+
+	return KickDecision{
+		Target:     receiverPos,
+		From:       ballPos,
+		ReceiverID: receiverID,
+		IsPass:     true,
 	}
 }
 
-func (kr *AttemptGoalIntent) GetFromPosition() info.Position {
-	pos, _ := kr.gi.State.GetBall().GetEstimatedPosition()
+func (kr *AttemptGoalIntent) FreezeTarget() {
+	if kr.frozen {
+		return
+	}
 
-	return pos
+	kr.decision = kr.chooseKickDecision()
+	kr.frozen = true
+}
+
+func (kr *AttemptGoalIntent) ResetTarget() {
+	kr.frozen = false
+	kr.decision = KickDecision{}
+}
+
+func (kr *AttemptGoalIntent) CurrentDecision() KickDecision {
+	if !kr.frozen {
+		return kr.chooseKickDecision()
+	}
+
+	return kr.decision
+}
+
+func (kr *AttemptGoalIntent) GetTargetPosition() info.Position {
+	return kr.CurrentDecision().Target
+}
+
+func (kr *AttemptGoalIntent) GetFromPosition() info.Position {
+	return kr.CurrentDecision().From
 }
 
 type SupportAttackIntent struct {
@@ -192,22 +263,48 @@ func (kr *OffenseRole) Init() {
 	awaitName := StateName(fmt.Sprintf("Support ID %d", kr.id))
 	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kr.id))
 	kickName := StateName(fmt.Sprintf("Kick ID %d", kr.id))
+	receiveName := StateName(fmt.Sprintf("ReceivePass ID %d", kr.id))
+	interceptName := StateName(fmt.Sprintf("InterceptBall ID %d", kr.id))
 
-	offenseContext := AttemptGoalIntent{gi: kr.gi, team: kr.team, id: kr.id}
+	offenseContext := &AttemptGoalIntent{gi: kr.gi, team: kr.team, id: kr.id}
 	supportContext := SupportAttackIntent{gi: kr.gi, team: kr.team, id: kr.id}
+	kr.intent = offenseContext
 
 	awaitBall := &SupportState{ctx: &supportContext, gi: kr.gi, team: kr.team, robotId: kr.id, name: awaitName, activityHandler: kr.activityHandler}
-	prepareKick := &AlignState{Ctx: &offenseContext, Gi: kr.gi, Team: kr.team, RobotId: kr.id, Name: kickPrepareName, ActivityHandler: kr.activityHandler}
-	kick := &KickState{Ctx: &offenseContext, Name: kickName, Gi: kr.gi, Team: kr.team, RobotId: kr.id, ActivityHandler: kr.activityHandler}
+	prepareKick := &AlignState{Ctx: offenseContext, Gi: kr.gi, Team: kr.team, RobotId: kr.id, Name: kickPrepareName, ActivityHandler: kr.activityHandler}
+	kick := &KickState{Ctx: offenseContext, Name: kickName, Gi: kr.gi, Team: kr.team, RobotId: kr.id, ActivityHandler: kr.activityHandler}
+	intercept := &InterceptBallState{
+		gi:              kr.gi,
+		robotId:         kr.id,
+		team:            kr.team,
+		name:            interceptName,
+		activityHandler: kr.activityHandler,
+	}
+	receivePass := &ReceivePassState{
+		gi:              kr.gi,
+		robotId:         kr.id,
+		team:            kr.team,
+		name:            receiveName,
+		target:          &kr.receiveTarget,
+		activityHandler: kr.activityHandler,
+	}
 
 	sm := NewStateMachine(awaitBall)
 
 	sm.AddTransition(awaitName, "BALL_OWNER", prepareKick)
+	sm.AddTransition(awaitName, "BALL_APPROACHING", intercept)
+	sm.AddTransition(awaitName, "PASS_TARGETED", receivePass)
+
+	sm.AddTransition(interceptName, "BALL_OWNER", prepareKick)
+	sm.AddTransition(interceptName, "BALL_LOST", awaitBall)
 
 	sm.AddTransition(kickPrepareName, "ALIGNED", kick)
 	sm.AddTransition(kickPrepareName, "BALL_LOST", awaitBall)
 	sm.AddTransition(kickName, "KICKED", prepareKick)
 	sm.AddTransition(kickName, "BALL_LOST", awaitBall)
+	sm.AddTransition(receiveName, "BALL_OWNER", prepareKick)
+	sm.AddTransition(receiveName, "BALL_RECEIVED", prepareKick)
+	sm.AddTransition(receiveName, "BALL_LOST", awaitBall)
 
 	kr.sm = sm
 }
@@ -217,5 +314,22 @@ func (kr *OffenseRole) Run() {
 }
 
 func (kr *OffenseRole) TriggerEvent(event EventName) {
+	if event == "BALL_LOST" && kr.intent != nil {
+		kr.intent.ResetTarget()
+	}
+
 	kr.sm.TriggerEvent(event)
+}
+
+func (kr *OffenseRole) CurrentDecision() KickDecision {
+	if kr.intent == nil {
+		return KickDecision{}
+	}
+
+	return kr.intent.CurrentDecision()
+}
+
+func (kr *OffenseRole) ReceivePass(target info.Position) {
+	kr.receiveTarget = target
+	kr.sm.TriggerEvent("PASS_TARGETED")
 }

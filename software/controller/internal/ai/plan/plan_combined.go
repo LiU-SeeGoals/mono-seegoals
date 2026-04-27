@@ -103,7 +103,7 @@ func (m *CombinedPlan) getAttackerPosition(gi *GameInfo) (Position, bool) {
 	}
 	return closestPos, found
 }
-.
+
 func (m *CombinedPlan) calcWallPositions(attackerPos Position) (Position, Position, Position) {
 	shotVec := blueGoalCenter.Sub(&attackerPos)
 	shotVecNorm := shotVec.Normalize2d()
@@ -145,17 +145,58 @@ func (m *CombinedPlan) run() {
 		defenders[id] = defender
 	}
 
+	var activeReceiver info.ID
+	var activeReceiverStart time.Time
+	hasActiveReceiver := false
+
 	for {
 		tickStart := time.Now()
 		gi = <-m.incomingGameInfo
 
-		closestId := m.getRobotForBall(&gi, offenseRobots)
-		for _, id := range offenseRobots {
-			if id != closestId {
-				kickers[id].TriggerEvent("BALL_LOST")
+		possessor := gi.State.GetBall().GetPossessor()
+
+		if possessor != nil && possessor.GetTeam() == m.team {
+			ownerID := possessor.GetID()
+			owner, ok := kickers[ownerID]
+			if ok {
+				hasActiveReceiver = false
+				for _, id := range offenseRobots {
+					if id != ownerID {
+						kickers[id].TriggerEvent("BALL_LOST")
+					}
+				}
+
+				owner.TriggerEvent("BALL_OWNER")
+				decision := owner.CurrentDecision()
+				if decision.IsPass && decision.ReceiverID != ownerID {
+					receiver, ok := kickers[decision.ReceiverID]
+					if ok {
+						activeReceiver = decision.ReceiverID
+						activeReceiverStart = time.Now()
+						hasActiveReceiver = true
+						receiver.ReceivePass(decision.Target)
+					}
+				}
+			}
+		} else {
+			if hasActiveReceiver && time.Since(activeReceiverStart) < 2*time.Second {
+				for _, id := range offenseRobots {
+					if id != activeReceiver {
+						kickers[id].TriggerEvent("BALL_LOST")
+					}
+				}
+			} else {
+				hasActiveReceiver = false
+				interceptorID := m.getRobotForBall(&gi, offenseRobots)
+				for _, id := range offenseRobots {
+					if id != interceptorID {
+						kickers[id].TriggerEvent("BALL_LOST")
+					}
+				}
+				kickers[interceptorID].TriggerEvent("BALL_APPROACHING")
 			}
 		}
-		kickers[closestId].TriggerEvent("BALL_OWNER")
+
 		for _, kicker := range kickers {
 			kicker.Run()
 		}

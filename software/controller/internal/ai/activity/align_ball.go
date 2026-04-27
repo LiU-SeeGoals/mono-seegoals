@@ -21,7 +21,7 @@ func GetAlignConfig() AlignConfig {
 	return AlignConfig{
 		robotBallClearence: 200,
 		doneDist:           50,
-		angleError:         4.0 * math.Pi / 180,
+		angleError:         3.0 * math.Pi / 180,
 	}
 }
 

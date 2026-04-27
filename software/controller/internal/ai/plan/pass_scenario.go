@@ -71,7 +71,6 @@ func (g *GameScenario) getRobotClosestToPosition(
 	return closestId
 }
 
-
 func (g *GameScenario) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID) info.ID {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
@@ -88,8 +87,6 @@ func (g *GameScenario) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID
 	return g.getRobotClosestToPosition(gi, activeRobots, targetPos)
 }
 
-
-
 func (g *GameScenario) run() {
 
 	activeRobots := []info.ID{1, 2, 3, 4, 5, 6}
@@ -105,6 +102,10 @@ func (g *GameScenario) run() {
 
 	fmt.Println(gi.Status)
 
+	var activeReceiver info.ID
+	var activeReceiverStart time.Time
+	hasActiveReceiver := false
+
 	for {
 		tickStart := time.Now()
 
@@ -116,15 +117,50 @@ func (g *GameScenario) run() {
 		// }
 		// Only coordinate robot roles, trigger ball events
 
-		closestId := g.getRobotForBall(&gi, activeRobots)
+		possessor := gi.State.GetBall().GetPossessor()
 
-		for _, id := range activeRobots {
-			if id != closestId {
-				kickers[id].TriggerEvent("BALL_LOST")
+		if possessor != nil && possessor.GetTeam() == g.team {
+			ownerID := possessor.GetID()
+			owner, ok := kickers[ownerID]
+			if ok {
+				hasActiveReceiver = false
+				for _, id := range activeRobots {
+					if id != ownerID {
+						kickers[id].TriggerEvent("BALL_LOST")
+					}
+				}
+
+				owner.TriggerEvent("BALL_OWNER")
+				decision := owner.CurrentDecision()
+				if decision.IsPass && decision.ReceiverID != ownerID {
+					receiver, ok := kickers[decision.ReceiverID]
+					if ok {
+						activeReceiver = decision.ReceiverID
+						activeReceiverStart = time.Now()
+						hasActiveReceiver = true
+						receiver.ReceivePass(decision.Target)
+					}
+				}
+			}
+		} else {
+			if hasActiveReceiver && time.Since(activeReceiverStart) < 2*time.Second {
+				for _, id := range activeRobots {
+					if id != activeReceiver {
+						kickers[id].TriggerEvent("BALL_LOST")
+					}
+				}
+			} else {
+				hasActiveReceiver = false
+				interceptorID := g.getRobotForBall(&gi, activeRobots)
+
+				for _, id := range activeRobots {
+					if id != interceptorID {
+						kickers[id].TriggerEvent("BALL_LOST")
+					}
+				}
+				kickers[interceptorID].TriggerEvent("BALL_APPROACHING")
 			}
 		}
-
-		kickers[closestId].TriggerEvent("BALL_OWNER")
 
 		for _, kicker := range kickers {
 			kicker.Run()
