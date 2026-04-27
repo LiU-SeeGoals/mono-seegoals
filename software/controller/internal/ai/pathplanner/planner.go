@@ -2,11 +2,8 @@
 package pathplanner
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,13 +18,16 @@ const (
 	MotionRadius      = 100.0
 )
 
-// Defaults for persistent replan gating (used when the corresponding RRTConfig field is zero).
+// Defaults for persistent path reuse (used when the corresponding RRTConfig field is zero).
 const (
-	defaultMaxPlanAge        = 2 * time.Second
-	defaultPathDeviationMax  = 100.0 // mm, perpendicular to stored polyline (replan, do not just trim)
-	defaultLocalCheckRadius  = 2000.0
-	defaultObstacleMoveDelta = 50.0 // mm, any key in snapshot
-	defaultGoalChangeEpsilon = 10.0 // mm, goal “same” if closer than this
+	defaultCloseRobotMaxPlanAge = 250 * time.Millisecond
+	defaultFarRobotMaxPlanAge   = 2 * time.Second
+	defaultNearRobotDistance    = 1000.0 // mm, other robot close enough to require young paths
+	defaultGoalMatchEpsilon     = 10.0   // mm, goal “same” if closer than this
+
+	defaultGoalProximityDistance          = 1000.0 // mm, near goal requires young paths
+	defaultBallGoalProximityDistance      = 500.0  // mm, ball close enough to the final goal
+	defaultBallApproachRobotIgnoreDistance = 500.0 // mm, robot close enough to accept robot contact
 )
 
 // RRTConfig holds parameters for the RRT algorithm and optional persistence gating.
@@ -39,44 +39,59 @@ type RRTConfig struct {
 	FieldWidth         float64
 	FieldHeight        float64
 	CompletionDistance float64
-	// Persistence / replan (zero = use package defaults for that field)
-	MaxPlanAge        time.Duration
-	PathDeviationMax  float64
-	LocalCheckRadius  float64
-	ObstacleMoveDelta float64
-	GoalChangeEpsilon float64
+	// Persistence / replan (zero = use package defaults for that field).
+	CloseRobotMaxPlanAge time.Duration
+	FarRobotMaxPlanAge   time.Duration
+	NearRobotDistance    float64
+	GoalMatchEpsilon     float64
+
+	GoalProximityDistance           float64
+	BallGoalProximityDistance       float64
+	BallApproachRobotIgnoreDistance float64
 }
 
 type resolvedPersistence struct {
-	maxPlanAge        time.Duration
-	pathDeviationMax  float64
-	localR            float64
-	obstacleMoveDelta float64
-	goalChangeEpsilon float64
+	closeRobotMaxPlanAge time.Duration
+	farRobotMaxPlanAge   time.Duration
+	nearRobotDistance    float64
+	goalMatchEpsilon     float64
+
+	goalProximityDistance           float64
+	ballGoalProximityDistance       float64
+	ballApproachRobotIgnoreDistance float64
 }
 
 func (c RRTConfig) persistence() resolvedPersistence {
 	r := resolvedPersistence{
-		maxPlanAge:        c.MaxPlanAge,
-		pathDeviationMax:  c.PathDeviationMax,
-		localR:            c.LocalCheckRadius,
-		obstacleMoveDelta: c.ObstacleMoveDelta,
-		goalChangeEpsilon: c.GoalChangeEpsilon,
+		closeRobotMaxPlanAge: c.CloseRobotMaxPlanAge,
+		farRobotMaxPlanAge:   c.FarRobotMaxPlanAge,
+		nearRobotDistance:    c.NearRobotDistance,
+		goalMatchEpsilon:     c.GoalMatchEpsilon,
+
+		goalProximityDistance:           c.GoalProximityDistance,
+		ballGoalProximityDistance:       c.BallGoalProximityDistance,
+		ballApproachRobotIgnoreDistance: c.BallApproachRobotIgnoreDistance,
 	}
-	if r.maxPlanAge == 0 {
-		r.maxPlanAge = defaultMaxPlanAge
+	if r.closeRobotMaxPlanAge == 0 {
+		r.closeRobotMaxPlanAge = defaultCloseRobotMaxPlanAge
 	}
-	if r.pathDeviationMax == 0 {
-		r.pathDeviationMax = defaultPathDeviationMax
+	if r.farRobotMaxPlanAge == 0 {
+		r.farRobotMaxPlanAge = defaultFarRobotMaxPlanAge
 	}
-	if r.localR == 0 {
-		r.localR = defaultLocalCheckRadius
+	if r.nearRobotDistance == 0 {
+		r.nearRobotDistance = defaultNearRobotDistance
 	}
-	if r.obstacleMoveDelta == 0 {
-		r.obstacleMoveDelta = defaultObstacleMoveDelta
+	if r.goalMatchEpsilon == 0 {
+		r.goalMatchEpsilon = defaultGoalMatchEpsilon
 	}
-	if r.goalChangeEpsilon == 0 {
-		r.goalChangeEpsilon = defaultGoalChangeEpsilon
+	if r.goalProximityDistance == 0 {
+		r.goalProximityDistance = defaultGoalProximityDistance
+	}
+	if r.ballGoalProximityDistance == 0 {
+		r.ballGoalProximityDistance = defaultBallGoalProximityDistance
+	}
+	if r.ballApproachRobotIgnoreDistance == 0 {
+		r.ballApproachRobotIgnoreDistance = defaultBallApproachRobotIgnoreDistance
 	}
 	return r
 }
@@ -96,11 +111,9 @@ type Obstacle struct {
 
 // robotPathState is per-robot cached plan + metadata for persistence.
 type robotPathState struct {
-	path          []info.Position
-	plannedAt     time.Time
-	goal          info.Position
-	planStart     info.Position
-	localSnapshot map[string]info.Position
+	path      []info.Position
+	plannedAt time.Time
+	goal      info.Position
 }
 
 // Planner stores per-robot path state. One instance per team is expected.
@@ -140,7 +153,7 @@ func (p *Planner) GetPath(id info.ID) []info.Position {
 	return append([]info.Position(nil), st.path...)
 }
 
-// PlanPath runs RRT or returns a cached path when replanning is not warranted.
+// PlanPath runs RRT or returns a cached path while it is valid and young enough.
 func (p *Planner) PlanPath(
 	team info.Team,
 	id info.ID,
@@ -154,11 +167,11 @@ func (p *Planner) PlanPath(
 	}
 	perm := cfg.persistence()
 	myPos, _ := gi.State.GetTeam(team)[id].GetPosition()
-	obstacles := ObstaclesForRobot(team, id, avoidBall, gi)
+	obstacles := planningObstacles(team, id, myPos, finalDestination, avoidBall, gi, perm)
 
 	// Inflated “collision”: escape this tick only. Do not commit: overwriting the
 	// session with a 1-point path is common near the goal in traffic and made the
-	// full plan appear to “vanish” until MaxPlanAge forced a replan.
+	// full plan appear to “vanish” until age-based replanning created a new path.
 	robotsNearby, nearest := collisionTarget(myPos, obstacles)
 	if robotsNearby {
 		return makeEscapePath(myPos, nearest)
@@ -169,10 +182,7 @@ func (p *Planner) PlanPath(
 	p.mu.Unlock()
 
 	if st != nil && len(st.path) > 0 {
-		// No prefix trimming: keep the full polyline. move_to / look-ahead uses the path
-		// from the current pose; dropping vertices behind the robot caused flicker and
-		// shortcutting against replan gating.
-		if !shouldReplan(st, myPos, finalDestination, gi, team, id, avoidBall, perm) {
+		if !shouldCreateNewPath(st, myPos, finalDestination, obstacles, gi, team, id, perm) {
 			return p.copyPath(id)
 		}
 	}
@@ -183,21 +193,15 @@ func (p *Planner) PlanPath(
 	goalNode := runRRT(nodes, obstacles, finalDestination, cfg)
 	if goalNode == nil {
 		p.mu.Lock()
-		prev := p.session[id]
-		if prev == nil || len(prev.path) == 0 {
-			p.session[id] = newCommittedState(
-				[]info.Position{finalDestination},
-				myPos, finalDestination, team, id, avoidBall, gi, perm,
-			)
-		}
+		delete(p.session, id)
 		p.mu.Unlock()
-		return p.copyPath(id)
+		return nil
 	}
 	path := []info.Position{}
 	for cur := goalNode; cur != nil; cur = cur.parent {
 		path = append([]info.Position{cur.position}, path...)
 	}
-	p.commit(id, path, myPos, finalDestination, team, id, avoidBall, gi, perm)
+	p.commit(id, path, finalDestination)
 	return p.copyPath(id)
 }
 
@@ -213,19 +217,12 @@ func (p *Planner) copyPath(id info.ID) []info.Position {
 
 func newCommittedState(
 	path []info.Position,
-	robotPos, goal info.Position,
-	team info.Team,
-	selfID info.ID,
-	avoidBall bool,
-	gi *info.GameInfo,
-	perm resolvedPersistence,
+	goal info.Position,
 ) *robotPathState {
 	s := &robotPathState{
-		path:          append([]info.Position(nil), path...),
-		plannedAt:     time.Now(),
-		goal:          goal,
-		planStart:     robotPos,
-		localSnapshot: makeLocalSnapshot(robotPos, team, selfID, avoidBall, gi, perm.localR),
+		path:      append([]info.Position(nil), path...),
+		plannedAt: time.Now(),
+		goal:      goal,
 	}
 	return s
 }
@@ -233,135 +230,67 @@ func newCommittedState(
 func (p *Planner) commit(
 	id info.ID,
 	path []info.Position,
-	robotPos, goal info.Position,
-	team info.Team,
-	selfID info.ID,
-	avoidBall bool,
-	gi *info.GameInfo,
-	perm resolvedPersistence,
+	goal info.Position,
 ) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.session[id] = newCommittedState(path, robotPos, goal, team, selfID, avoidBall, gi, perm)
+	p.session[id] = newCommittedState(path, goal)
 }
 
-func makeLocalSnapshot(
-	robotPos info.Position,
-	team info.Team,
-	selfID info.ID,
-	avoidBall bool,
-	gi *info.GameInfo,
-	radius float64,
-) map[string]info.Position {
-	m := make(map[string]info.Position)
-	if avoidBall {
-		ballPos, _ := gi.State.Ball.GetPosition()
-		if distanceBetween(robotPos, ballPos) < radius {
-			m[ballKey] = ballPos
-		}
-	}
-	for _, t := range []info.Team{info.Blue, info.Yellow} {
-		for i := 0; i < int(info.TEAM_SIZE); i++ {
-			oid := info.ID(i)
-			if t == team && oid == selfID {
-				continue
-			}
-			robot := gi.State.GetTeam(t)[oid]
-			pos, rototTime, err := robot.GetPositionTime()
-			if err != nil {
-				continue
-			}
-			if time.Now().UnixMilli()-rototTime > 200 {
-				continue
-			}
-			if distanceBetween(robotPos, pos) < radius {
-				m[robotKey(t, oid)] = pos
-			}
-		}
-	}
-	return m
-}
-
-const ballKey = "ball"
-
-func robotKey(oteam info.Team, oid info.ID) string {
-	return fmt.Sprintf("%d:%d", oteam, oid)
-}
-
-func shouldReplan(
+func shouldCreateNewPath(
 	st *robotPathState,
 	myPos, goal info.Position,
+	obstacles []Obstacle,
 	gi *info.GameInfo,
 	team info.Team,
 	selfID info.ID,
-	avoidBall bool,
 	perm resolvedPersistence,
 ) bool {
 	if st == nil || len(st.path) == 0 {
 		return true
 	}
-	if distanceBetween(st.goal, goal) > perm.goalChangeEpsilon {
+	if !isStoredPathValid(st, myPos, goal, obstacles, perm.goalMatchEpsilon) {
 		return true
 	}
-	if time.Since(st.plannedAt) > perm.maxPlanAge {
-		return true
-	}
-	if pathDeviation(myPos, st.path) > perm.pathDeviationMax {
-		return true
-	}
-	if localNeighborhoodChanged(myPos, st.localSnapshot, team, selfID, avoidBall, perm, gi) {
+	if time.Since(st.plannedAt) > maxPlanAgeForContext(myPos, goal, team, selfID, gi, perm) {
 		return true
 	}
 	return false
 }
 
-// pathDeviation is min distance to the polyline in XY.
-func pathDeviation(robot info.Position, path []info.Position) float64 {
-	if len(path) == 0 {
-		return 0
+// isStoredPathValid checks whether the cached polyline can still be used now.
+func isStoredPathValid(
+	st *robotPathState,
+	myPos, goal info.Position,
+	obstacles []Obstacle,
+	goalMatchEpsilon float64,
+) bool {
+	if st == nil || len(st.path) == 0 {
+		return false
 	}
-	if len(path) == 1 {
-		return distanceBetween(robot, path[0])
+	if distanceBetween(st.goal, goal) > goalMatchEpsilon {
+		return false
 	}
-	best := math.MaxFloat64
-	for i := 0; i < len(path)-1; i++ {
-		a := info.Vec2{X: path[i].X, Y: path[i].Y}
-		b := info.Vec2{X: path[i+1].X, Y: path[i+1].Y}
-		p := info.Vec2{X: robot.X, Y: robot.Y}
-		d := info.DistToLineSegment(a, b, p)
-		if d < best {
-			best = d
+	if !IsPathClear(myPos, st.path[0], obstacles, PlanningRadius) {
+		return false
+	}
+	for i := 0; i < len(st.path)-1; i++ {
+		if !IsPathClear(st.path[i], st.path[i+1], obstacles, PlanningRadius) {
+			return false
 		}
 	}
-	return best
+	return true
 }
 
-// localNeighborhoodChanged returns true if a new disc entered R around the robot, an in–R
-// agent moved more than the threshold, or any agent that was in the last snapshot has moved
-// by more than the threshold in world space (prefer to replan a bit too often).
-func localNeighborhoodChanged(
-	myPos info.Position,
-	oldSnap map[string]info.Position,
+func maxPlanAgeForContext(
+	myPos, goal info.Position,
 	team info.Team,
 	selfID info.ID,
-	avoidBall bool,
-	perm resolvedPersistence,
 	gi *info.GameInfo,
-) bool {
-	R := perm.localR
-	delta := perm.obstacleMoveDelta
-	// (a) In R of me now: new key, or moved vs snapshot for that key
-	if avoidBall {
-		ballPos, _ := gi.State.Ball.GetPosition()
-		if distanceBetween(myPos, ballPos) < R {
-			old, ok := oldSnap[ballKey]
-			if !ok {
-				return true
-			}
-			if distanceBetween(old, ballPos) > delta {
-				return true
-			}
-		}
+	perm resolvedPersistence,
+) time.Duration {
+	if distanceBetween(myPos, goal) < perm.goalProximityDistance {
+		return perm.closeRobotMaxPlanAge
 	}
 	for _, t := range []info.Team{info.Blue, info.Yellow} {
 		for i := 0; i < int(info.TEAM_SIZE); i++ {
@@ -377,71 +306,43 @@ func localNeighborhoodChanged(
 			if time.Now().UnixMilli()-rototTime > 200 {
 				continue
 			}
-			k := robotKey(t, oid)
-			if distanceBetween(myPos, pos) < R {
-				old, ok := oldSnap[k]
-				if !ok {
-					return true
-				}
-				if distanceBetween(old, pos) > delta {
-					return true
-				}
+			if distanceBetween(myPos, pos) < perm.nearRobotDistance {
+				return perm.closeRobotMaxPlanAge
 			}
 		}
 	}
-	// (b) Anything we tracked in the last snapshot: large displacement
-	if oldSnap == nil {
-		return false
-	}
-	for k, oldP := range oldSnap {
-		newP, ok := currentPositionForKey(k, team, selfID, avoidBall, gi)
-		if !ok {
-			continue
-		}
-		if distanceBetween(oldP, newP) > delta {
-			return true
-		}
-	}
-	return false
+	return perm.farRobotMaxPlanAge
 }
 
-func currentPositionForKey(
-	k string,
+func planningObstacles(
 	team info.Team,
-	selfID info.ID,
+	id info.ID,
+	myPos, finalDestination info.Position,
 	avoidBall bool,
 	gi *info.GameInfo,
-) (info.Position, bool) {
-	if k == ballKey {
-		if !avoidBall {
-			return info.Position{}, false
-		}
+	perm resolvedPersistence,
+) []Obstacle {
+	if ignoreRobotObstaclesForBallApproach(myPos, finalDestination, avoidBall, gi, perm) {
 		ballPos, _ := gi.State.Ball.GetPosition()
-		return ballPos, true
+		return []Obstacle{{Position: ballPos, Size: BallSafetyRadius}}
 	}
-	parts := strings.Split(k, ":")
-	if len(parts) != 2 {
-		return info.Position{}, false
+	return ObstaclesForRobot(team, id, avoidBall, gi)
+}
+
+func ignoreRobotObstaclesForBallApproach(
+	myPos, finalDestination info.Position,
+	avoidBall bool,
+	gi *info.GameInfo,
+	perm resolvedPersistence,
+) bool {
+	if !avoidBall {
+		return false
 	}
-	tt, err1 := strconv.ParseInt(parts[0], 10, 8)
-	oid, err2 := strconv.Atoi(parts[1])
-	if err1 != nil || err2 != nil {
-		return info.Position{}, false
+	if distanceBetween(myPos, finalDestination) > perm.ballApproachRobotIgnoreDistance {
+		return false
 	}
-	ot := info.Team(tt)
-	oid2 := info.ID(oid)
-	if ot == team && oid2 == selfID {
-		return info.Position{}, false
-	}
-	robot := gi.State.GetTeam(ot)[oid2]
-	pos, rototTime, err := robot.GetPositionTime()
-	if err != nil {
-		return info.Position{}, false
-	}
-	if time.Now().UnixMilli()-rototTime > 200 {
-		return info.Position{}, false
-	}
-	return pos, true
+	ballPos, _ := gi.State.Ball.GetPosition()
+	return distanceBetween(ballPos, finalDestination) <= perm.ballGoalProximityDistance
 }
 
 func collisionTarget(myPos info.Position, obstacles []Obstacle) (bool, Obstacle) {

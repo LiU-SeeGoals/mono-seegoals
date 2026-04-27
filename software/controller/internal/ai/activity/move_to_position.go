@@ -179,7 +179,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	act.Dest.Angle = targetPos.Angle
 	act.Dribble = false
 	if len(m.path) > 0 {
-		act.Path = append([]info.Position(nil), m.path...)
+		act.Path = pathFromRobotProjection(myPos, m.path)
 	}
 	return act
 }
@@ -332,6 +332,30 @@ func pointAtArclength(path []info.Position, cum []float64, s float64) info.Posit
 		}
 	}
 	return path[n-1]
+}
+
+func pathFromRobotProjection(robot info.Position, path []info.Position) []info.Position {
+	if len(path) == 0 {
+		return nil
+	}
+	if len(path) == 1 {
+		return append([]info.Position(nil), path...)
+	}
+	cum := pathVertexCumulative(path)
+	arc, ok := projectRobotArcLength(robot, path, cum)
+	if !ok {
+		return append([]info.Position(nil), path...)
+	}
+	out := make([]info.Position, 0, len(path))
+	for i := 1; i < len(path); i++ {
+		if cum[i] > arc+1e-6 {
+			out = append(out, path[i])
+		}
+	}
+	if len(out) == 0 {
+		out = append(out, path[len(path)-1])
+	}
+	return out
 }
 
 // lookAheadAlongPathArclength walks forward by lookMm from the robot’s projection on the path.
