@@ -10,13 +10,13 @@ export const useAIController = (
   useEffect(() => {
     const ai_address = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_ADDR;
     const ai_port = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_PORT;
-    console.log(`[useAIController.ts] connecting to ws://${ai_address}:${ai_port}`);
 
     let retryTimeout: NodeJS.Timeout | null = null;
     let isMounted = true;
 
     const connectToAI = () => {
       wsRef.current?.close();
+      console.log(`[useAIController.ts] connecting to ws://${ai_address}:${ai_port}`);
 
       const ws = new WebSocket(`ws://${ai_address}:${ai_port}/ws`);
       wsRef.current = ws;

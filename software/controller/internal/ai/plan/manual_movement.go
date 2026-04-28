@@ -49,7 +49,7 @@ func (m *plannerManualMovement) run() {
 	fmt.Println(gameInfo.Status)
 
 	for m.Active {
-		command := client.GetCommand(helper.MOVE_ROBOT)
+		command := client.GetCommand(client.MOVE_ROBOT)
 		// fmt.Println(len(commands))
 		tickStart := time.Now()
 
