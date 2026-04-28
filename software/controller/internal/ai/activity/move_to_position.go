@@ -76,55 +76,6 @@ func (m *MoveToPosition) AvoidBall(avoid bool) {
 	m.avoidBall = avoid
 }
 
-func circleSegmentIntersection(
-	a, b info.Position,
-	center info.Position,
-	radius float64,
-) (info.Position, bool) {
-
-	dx := b.X - a.X
-	dy := b.Y - a.Y
-
-	fx := a.X - center.X
-	fy := a.Y - center.Y
-
-	A := dx*dx + dy*dy
-	B := 2 * (fx*dx + fy*dy)
-	C := fx*fx + fy*fy - radius*radius
-
-	discriminant := B*B - 4*A*C
-	if discriminant < 0 {
-		return info.Position{}, false // no intersection
-	}
-
-	discriminant = math.Sqrt(discriminant)
-
-	t1 := (-B - discriminant) / (2 * A)
-	t2 := (-B + discriminant) / (2 * A)
-
-	var t float64
-	found := false
-
-	if t2 >= 0 && t2 <= 1 {
-		t = t2
-		found = true
-	} else if t1 >= 0 && t1 <= 1 {
-		t = t1
-		found = true
-	}
-
-	if !found {
-		return info.Position{}, false
-	}
-
-	return info.Position{
-		X:     a.X + t*dx,
-		Y:     a.Y + t*dy,
-		Z:     center.Z,
-		Angle: center.Angle,
-	}, true
-}
-
 // GetAction returns an action for the robot with RRT-based collision avoidance
 func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
 	moveToAction := m.GetMoveToAction(gi)

@@ -25,9 +25,9 @@ const (
 	defaultNearRobotDistance    = 1000.0 // mm, other robot close enough to require young paths
 	defaultGoalMatchEpsilon     = 10.0   // mm, goal “same” if closer than this
 
-	defaultGoalProximityDistance          = 1000.0 // mm, near goal requires young paths
-	defaultBallGoalProximityDistance      = 500.0  // mm, ball close enough to the final goal
-	defaultBallApproachRobotIgnoreDistance = 500.0 // mm, robot close enough to accept robot contact
+	defaultGoalProximityDistance           = 1000.0 // mm, near goal requires young paths
+	defaultBallGoalProximityDistance       = 500.0  // mm, ball close enough to the final goal
+	defaultBallApproachRobotIgnoreDistance = 500.0  // mm, robot close enough to accept robot contact
 )
 
 // RRTConfig holds parameters for the RRT algorithm and optional persistence gating.
@@ -137,20 +137,6 @@ func (p *Planner) Clear(id info.ID) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	delete(p.session, id)
-}
-
-// GetPath returns a copy of the last planned path for id, or nil if none.
-func (p *Planner) GetPath(id info.ID) []info.Position {
-	if p == nil {
-		return nil
-	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	st := p.session[id]
-	if st == nil || len(st.path) == 0 {
-		return nil
-	}
-	return append([]info.Position(nil), st.path...)
 }
 
 // PlanPath runs RRT or returns a cached path while it is valid and young enough.
