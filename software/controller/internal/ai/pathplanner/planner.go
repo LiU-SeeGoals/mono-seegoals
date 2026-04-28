@@ -402,6 +402,16 @@ func runRRT(
 ) *RRTNode {
 	rand.Seed(time.Now().UnixNano())
 
+	startNode := nodes[0]
+	if isNodeValid(finalDestination, obstacles, false) &&
+		IsPathClear(startNode.position, finalDestination, obstacles, PlanningRadius) {
+		return &RRTNode{
+			position: finalDestination,
+			parent:   startNode,
+			cost:     distanceBetween(startNode.position, finalDestination),
+		}
+	}
+
 	for i := 0; i < cfg.MaxIterations; i++ {
 		var randomPoint info.Position
 		if rand.Float64() < cfg.GoalBias {
