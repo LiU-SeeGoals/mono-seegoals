@@ -39,6 +39,7 @@ func (m *GameScenario) Init(
 	m.ActivityHandler.Activities = activities
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
+	m.Active = true
 
 	go m.run()
 }
@@ -171,4 +172,9 @@ func (g *GameScenario) run() {
 		// Etc...
 		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
 	}
+}
+
+func (m *GameScenario) Kill() {
+	fmt.Println("Killing planner goalie")
+	m.Active = false
 }

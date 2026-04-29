@@ -27,17 +27,17 @@ type MoveTo struct {
 
 	KickSpeed int
 	// Pre-allocated protobuf objects to avoid repeated heap allocations
-    simCmd       simulation.RobotCommand
-    simMoveCmd   simulation.RobotMoveCommand
-    simLocalVel  simulation.MoveLocalVelocity
-    simAllocated bool
-    // Pre-allocated scalar fields (protobuf needs pointers)
-    simId            uint32
-    simForward       float32
-    simLeft          float32
-    simAngular       float32
-    simDribblerSpeed float32
-    simKickSpeed     float32
+	simCmd       simulation.RobotCommand
+	simMoveCmd   simulation.RobotMoveCommand
+	simLocalVel  simulation.MoveLocalVelocity
+	simAllocated bool
+	// Pre-allocated scalar fields (protobuf needs pointers)
+	simId            uint32
+	simForward       float32
+	simLeft          float32
+	simAngular       float32
+	simDribblerSpeed float32
+	simKickSpeed     float32
 }
 
 func convAngle(angle float64) float64 {
@@ -52,26 +52,26 @@ func convAngle(angle float64) float64 {
 }
 
 func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
-    // Initialize pre-allocated structs on first call
-    if !mv.simAllocated {
-        mv.simId = uint32(mv.Id)
-        mv.simLocalVel = simulation.MoveLocalVelocity{
-            Forward: &mv.simForward,
-            Left:    &mv.simLeft,
-            Angular: &mv.simAngular,
-        }
-        mv.simMoveCmd = simulation.RobotMoveCommand{
-            Command: &simulation.RobotMoveCommand_LocalVelocity{
-                LocalVelocity: &mv.simLocalVel,
-            },
-        }
-        mv.simCmd = simulation.RobotCommand{
-            Id:            &mv.simId,
-            MoveCommand:   &mv.simMoveCmd,
-            DribblerSpeed: &mv.simDribblerSpeed,
-        }
-        mv.simAllocated = true
-    }
+	// Initialize pre-allocated structs on first call
+	if !mv.simAllocated {
+		mv.simId = uint32(mv.Id)
+		mv.simLocalVel = simulation.MoveLocalVelocity{
+			Forward: &mv.simForward,
+			Left:    &mv.simLeft,
+			Angular: &mv.simAngular,
+		}
+		mv.simMoveCmd = simulation.RobotMoveCommand{
+			Command: &simulation.RobotMoveCommand_LocalVelocity{
+				LocalVelocity: &mv.simLocalVel,
+			},
+		}
+		mv.simCmd = simulation.RobotCommand{
+			Id:            &mv.simId,
+			MoveCommand:   &mv.simMoveCmd,
+			DribblerSpeed: &mv.simDribblerSpeed,
+		}
+		mv.simAllocated = true
+	}
 
     const maxLinearSpeed = 0.65
     const slowdownDistance = 1000.0
@@ -103,28 +103,26 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
         left = float32(speed * (unitX*math.Sin(-mv.Pos.Angle) + unitY*math.Cos(-mv.Pos.Angle)))
     }
 
-    // Update pre-allocated scalar values in place (pointers already wired up)
-    mv.simForward = forward
-    mv.simLeft = left
-    mv.simAngular = angleCtrl
+	// Update pre-allocated scalar values in place (pointers already wired up)
+	mv.simForward = forward
+	mv.simLeft = left
+	mv.simAngular = angleCtrl
 
-    if mv.Dribble {
-        mv.simDribblerSpeed = 100
-    } else {
-        mv.simDribblerSpeed = 0
-    }
+	if mv.Dribble {
+		mv.simDribblerSpeed = 100
+	} else {
+		mv.simDribblerSpeed = 0
+	}
 
-    if mv.KickSpeed != 0 {
-        mv.simKickSpeed = float32(mv.KickSpeed)
-        mv.simCmd.KickSpeed = &mv.simKickSpeed
-    } else {
-        mv.simCmd.KickSpeed = nil
-    }
+	if mv.KickSpeed != 0 {
+		mv.simKickSpeed = float32(mv.KickSpeed)
+		mv.simCmd.KickSpeed = &mv.simKickSpeed
+	} else {
+		mv.simCmd.KickSpeed = nil
+	}
 
-    return &mv.simCmd
+	return &mv.simCmd
 }
-
-
 
 func (mv *MoveTo) TranslateSim() *simulation.RobotCommand {
 	return mv.simulateRealMovement()

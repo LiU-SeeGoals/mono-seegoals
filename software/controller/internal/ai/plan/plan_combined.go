@@ -32,6 +32,7 @@ func (m *CombinedPlan) Init(
 	m.ActivityHandler.Activities = activities
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
+	m.Active = true
 
 	go m.run()
 }
@@ -179,7 +180,7 @@ func (m *CombinedPlan) run() {
 	var activeReceiverStart time.Time
 	hasActiveReceiver := false
 
-	for {
+	for m.Active {
 		tickStart := time.Now()
 		gi = <-m.incomingGameInfo
 
@@ -264,4 +265,8 @@ func (m *CombinedPlan) run() {
 
 		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "combined_plan")
 	}
+}
+
+func (m *CombinedPlan) Kill() {
+	m.Active = false
 }

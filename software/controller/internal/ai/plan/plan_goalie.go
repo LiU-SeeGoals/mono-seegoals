@@ -38,6 +38,7 @@ func (m *plannerGoalie) Init(
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.start = time.Now()
+	m.Active = true
 
 	go m.run()
 }
@@ -100,4 +101,9 @@ func (m *plannerGoalie) run() {
 		// No need for slow brain to be fast
 		time.Sleep(5 * time.Millisecond)
 	}
+}
+
+func (m *plannerGoalie) Kill() {
+	fmt.Println("Exiting goalie planner")
+	m.Active = false
 }

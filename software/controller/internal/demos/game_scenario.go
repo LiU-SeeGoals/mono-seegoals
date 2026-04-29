@@ -49,6 +49,7 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 
 func GameScenario() {
 	gameInfo := info.NewGameInfo(10)
+	client.StartGameViewerServer()
 
 	var sslClientTracked *client.SSLTrackedClient
 	var sslClientRaw *client.SSLClient
@@ -61,6 +62,9 @@ func GameScenario() {
 
 	slowBrainYellow := plan.NewCombinedPlan(info.Yellow)
 	slowBrainBlue := plan.NewCombinedPlan(info.Blue)
+
+	manualMovementYellow := plan.NewPlannerManualMovement(info.Yellow)
+	// manualMovementBlue := plan.NewPlannerManualMovement(info.Blue)
 
 	fastBrainYellow := ai.NewActivityExecutor()
 	fastBrainBlue := ai.NewActivityExecutor()
@@ -96,6 +100,18 @@ func GameScenario() {
 
 		sslClientRaw.UpdateState(gameInfo, playTime)
 		sslClientTracked.UpdateState(gameInfo, playTime)
+
+		command := client.GetCommand(client.CHANGE_SCENARIO)
+
+		if command != nil {
+			if command.Type == "Manual" {
+				aiYellow.HotswapPlanner(info.Yellow, manualMovementYellow)
+				// aiBlue.HotswapPlanner(info.Blue, manualMovementBlue)
+			} else if command.Type == "Game" {
+				aiYellow.HotswapPlanner(info.Yellow, slowBrainYellow)
+				aiBlue.HotswapPlanner(info.Blue, slowBrainBlue)
+			}
+		}
 
 		if !gameInfo.HasField() || !gameInfo.State.IsValid() {
 			continue

@@ -2,13 +2,11 @@ import './GameViewer.css';
 import { SSL_GeometryFieldSize } from '../../proto/ssl_vision_geometry';
 import useResizeSidebar from '../../hooks/useResizeSidebar';
 import FootballField from './footballField/FootballField';
-import BottomBar from './bottomBar/BottomBar';
 
 interface gameViewerProps {
   sslFieldUpdate: SSLFieldUpdate;
   aiRobotUpdate: AIRobotUpdate;
   robotActions: Action[];
-  terminalLog: string[];
   errorOverlay: string;
   vectorSettingBlue: boolean[];
   vectorSettingYellow: boolean[];
@@ -20,12 +18,12 @@ const GameViewer: React.FC<gameViewerProps> = ({
   sslFieldUpdate,
   aiRobotUpdate,
   robotActions,
-  terminalLog,
   errorOverlay,
   vectorSettingBlue,
   vectorSettingYellow,
   sidebarWidth,
   fieldGeometry,
+  controllerSend,
 }) => {
   const startHeightResizer = 1000;
   const resizerWidth = 5;
@@ -35,10 +33,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
     startHeightResizer
   );
   const width: number = window.innerWidth - sidebarWidth;
-  const bottomBarHeight: number = isHidden ? 0 : window.innerHeight - resizerValue;
-  const footballFieldHeight: number = isHidden
-    ? window.innerHeight
-    : window.innerHeight - bottomBarHeight;
+  const footballFieldHeight: number = window.innerHeight
   return (
     <div className="game-viewer">
       <FootballField
@@ -51,6 +46,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
         vectorSettingBlue={vectorSettingBlue}
         vectorSettingYellow={vectorSettingYellow}
         fieldGeometry={fieldGeometry}
+        controllerSend={controllerSend}
       />
 
       <div
@@ -61,13 +57,6 @@ const GameViewer: React.FC<gameViewerProps> = ({
         }}
         onMouseDown={startResizing}
       />
-
-      {!isHidden && (
-        <BottomBar
-          style={{ zIndex: 10, height: bottomBarHeight }}
-          terminalLog={terminalLog}
-        />
-      )}
     </div>
   );
 };
