@@ -12,7 +12,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
 
-func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl){
+func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
 
 	ball := gameInfo.State.GetBall()
 	ballPos, ballTime, _ := ball.GetPositionTime()
@@ -60,8 +60,7 @@ func GameScenario() {
 	var simClientBlue *client.SimClient
 
 	slowBrainYellow := plan.NewCombinedPlan(info.Yellow)
-	//slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
-	slowBrainBlue := plan.NewGameScenario(info.Blue)
+	slowBrainBlue := plan.NewCombinedPlan(info.Blue)
 
 	fastBrainYellow := ai.NewActivityExecutor()
 	fastBrainBlue := ai.NewActivityExecutor()
@@ -70,8 +69,8 @@ func GameScenario() {
 	aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
 	if config.IsSimulated() {
-		teamYellow := []int{1, 2, 3 , 4, 5, 6}
-		teamBlue := []int{1,2,3,4,5}
+		teamYellow := []int{1, 2, 3, 4, 5, 6}
+		teamBlue := []int{1, 2, 3, 4, 5, 6}
 
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
@@ -82,7 +81,7 @@ func GameScenario() {
 		simController = simulator.NewSimControl()
 		simController.TeleportBall(0, 1000)
 		simController.SetPresentRobots(teamYellow, teamBlue)
-		
+
 	} else {
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddressReal())
@@ -92,7 +91,7 @@ func GameScenario() {
 	}
 	simController.TeleportBall(0, 1000)
 	for {
-		
+
 		playTime := time.Now().UnixMilli()
 
 		sslClientRaw.UpdateState(gameInfo, playTime)

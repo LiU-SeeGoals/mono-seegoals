@@ -83,6 +83,9 @@ func (b *Ball) GetVelocity2() (Vec2, error){
 	// return Vec2{dPos.X/dt, dPos.Y/dt}, nil
 }
 
+func (b *Ball) GetLatestTwoPositionsTime() (Position, int64, Position, int64, error) {
+	return b.rawBall.GetLatestTwoPositionsTime()
+}
 type BallDTO struct {
 	PosX float64
 	PosY float64

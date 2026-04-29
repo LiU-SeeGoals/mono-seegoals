@@ -127,6 +127,9 @@ func (s *ReceivePassState) Update() sm.EventName {
 	}
 
 	activity := act.NewMoveToPosition(s.team, s.robotId, target)
+	activity.SetUseRRT(false)
+	activity.AvoidBall(false)
+	activity.SetDribble(true)
 	s.activityHandler.AddActivity(activity)
 
 	possessor := s.gi.State.GetBall().GetPossessor()

@@ -31,9 +31,10 @@ type MoveToPosition struct {
 	significantChange bool             // Flag to indicate if obstacles have moved significantly
 	gi                *info.GameInfo
 	avoidBall         bool
+	dribble           bool
 	lastPosition      info.Position // Last position to detect lack of movement
 	stuckThreshold    int           // Number of cycles to consider robot as stuck
-	useRRT             bool          // Flag to enable/disable RRT-based collision avoidance
+	useRRT            bool          // Flag to enable/disable RRT-based collision avoidance
 }
 
 // rrtConfiguration holds parameters for the RRT algorithm
@@ -95,6 +96,10 @@ func (m *MoveToPosition) AvoidBall(avoid bool) {
 	m.avoidBall = avoid
 }
 
+func (m *MoveToPosition) SetDribble(dribble bool) {
+	m.dribble = dribble
+}
+
 // GetAction returns an action for the robot with RRT-based collision avoidance
 func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
 	moveToAction := m.GetMoveToAction(gi)
@@ -114,7 +119,6 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 		// fmt.Println(m.final_destination)
 		// fmt.Println(myPos)
 
-		m.AvoidBall(true)
 		targetPos = myPos
 
 		m.PlanPath(gi, myPos)
@@ -134,7 +138,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 					b := info.Vec2{X: m.path[i+1].X, Y: m.path[i+1].Y}
 					p := info.Vec2{X: myPos.X, Y: myPos.Y}
 					pointOnLine := info.PointToLineSegment(a, b, p)
-					distToPathSegment := info.DistToLineSegment(a,b,p)
+					distToPathSegment := info.DistToLineSegment(a, b, p)
 					distanceToThreshold := math.Abs(distToPathSegment - m.rrtConfig.waypointThreshold)
 					if distanceToThreshold < float64(bestPointDist) && m.IsPathClear(myPos, info.Position{X: pointOnLine.X, Y: pointOnLine.Y, Z: 0, Angle: 0}, m.GetObstaclePositions(gi), MotionRadius) {
 						bestPointDist = distanceToThreshold
@@ -155,8 +159,8 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	act.Team = m.team
 	act.Pos = myPos
 	act.Dest = targetPos
-	act.Dest.Angle = targetPos.Angle
-	act.Dribble = false
+	act.Dest.Angle = m.final_destination.Angle
+	act.Dribble = m.dribble
 	// Include the full planned path for visualization in the GameViewer.
 	// Note: this is a copy so UI serialization can't race on m.path.
 	if len(m.path) > 0 {

@@ -56,6 +56,13 @@ func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool 
 
 	goalPosition := gi.EnemyGoalCenter(team)
 
+	// check that the goal is in range
+	if from.Dist2d(goalPosition) > 2000 { // TODO: I have no idea what a reasonable shooting distance is
+		return false
+	}
+
+	// check that there are no enemies in the way
+
 	enemies := gi.State.GetOtherTeam(team)
 	for i := 0; i < int(TEAM_SIZE); i++ {
 		enemyPos, err := enemies[i].GetPosition()

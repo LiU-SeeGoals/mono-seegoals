@@ -11,11 +11,20 @@ import (
 
 const coverYClamp = 1500.0
 
-const pressMinX = 1000.0 
+const pressMinX = 1000.0
 
 var neutralHoldPos = info.Position{X: 1000, Y: 0, Z: 0, Angle: 0}
 
 var clearTarget = info.Position{X: 0, Y: 0, Z: 0, Angle: 0}
+
+func defenseXSign(gi *info.GameInfo, team info.Team) float64 {
+	isBlueTeam := team == info.Blue
+	isBlueOnPositiveHalf := gi.Status.GetBlueTeamOnPositiveHalf()
+	if (isBlueTeam && isBlueOnPositiveHalf) || (!isBlueTeam && !isBlueOnPositiveHalf) {
+		return 1.0
+	}
+	return -1.0
+}
 
 type DefensePressState struct {
 	gi              *info.GameInfo
@@ -24,8 +33,8 @@ type DefensePressState struct {
 	name            StateName
 	activityHandler *ai.ActivityHandler
 	isPrimary       bool
-	coverDepth      float64             
-	kickActivity    *act.KickAtPosition 
+	coverDepth      float64
+	kickActivity    *act.KickAtPosition
 }
 
 func (s *DefensePressState) Initialize() {
@@ -39,11 +48,14 @@ func (s *DefensePressState) GetName() StateName {
 }
 
 func (s *DefensePressState) Update() EventName {
+	xSign := defenseXSign(s.gi, s.team)
+
 	if s.isPrimary {
 		ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
 
-		if ballPos.X < pressMinX {
+		if xSign*ballPos.X < pressMinX {
 			hold := neutralHoldPos
+			hold.X *= xSign
 			hold.Angle = hold.AngleToPosition(ballPos) // face the ball
 			s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, hold))
 		} else {
@@ -51,7 +63,7 @@ func (s *DefensePressState) Update() EventName {
 		}
 	} else {
 		ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
-		target := info.Position{X: s.coverDepth, Y: ballPos.Y, Z: 0, Angle: 0}
+		target := info.Position{X: xSign * s.coverDepth, Y: ballPos.Y, Z: 0, Angle: 0}
 		if target.Y > coverYClamp {
 			target.Y = coverYClamp
 		}
@@ -70,7 +82,7 @@ type DefenseWallState struct {
 	team            info.Team
 	name            StateName
 	activityHandler *ai.ActivityHandler
-	wallPos         *info.Position 
+	wallPos         *info.Position
 }
 
 func (s *DefenseWallState) Initialize() {}
@@ -91,7 +103,7 @@ type DefenseRole struct {
 	activityHandler *ai.ActivityHandler
 	gi              *info.GameInfo
 	team            info.Team
-	wallPosition    info.Position 
+	wallPosition    info.Position
 }
 
 func NewDefenseRole(robotID info.ID, activityHandler ai.ActivityHandler, gi *info.GameInfo, team info.Team) *DefenseRole {
@@ -130,7 +142,7 @@ func (dr *DefenseRole) Init() {
 		team:            dr.team,
 		name:            wallName,
 		activityHandler: dr.activityHandler,
-		wallPos:         &dr.wallPosition, 
+		wallPos:         &dr.wallPosition,
 	}
 
 	sm := NewStateMachine(pressState)

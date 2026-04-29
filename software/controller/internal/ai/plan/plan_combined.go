@@ -81,7 +81,7 @@ func (m *CombinedPlan) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID
 }
 
 func (m *CombinedPlan) getAttackerPosition(gi *GameInfo) (Position, bool) {
-	yellowTeam := gi.State.GetTeam(Yellow)
+	opponents := gi.State.GetOtherTeam(m.team)
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 
 	minDist := math.Inf(1)
@@ -90,7 +90,7 @@ func (m *CombinedPlan) getAttackerPosition(gi *GameInfo) (Position, bool) {
 
 	var i ID
 	for i = 0; i < TEAM_SIZE; i++ {
-		robotPos, err := yellowTeam[i].GetPosition()
+		robotPos, err := opponents[i].GetPosition()
 		if err != nil {
 			continue
 		}
@@ -104,11 +104,34 @@ func (m *CombinedPlan) getAttackerPosition(gi *GameInfo) (Position, bool) {
 	return closestPos, found
 }
 
-func (m *CombinedPlan) calcWallPositions(attackerPos Position) (Position, Position, Position) {
-	shotVec := blueGoalCenter.Sub(&attackerPos)
+func (m *CombinedPlan) defendsPositiveHalf(gi *GameInfo) bool {
+	isBlueTeam := m.team == Blue
+	isBlueOnPositiveHalf := gi.Status.GetBlueTeamOnPositiveHalf()
+	return (isBlueTeam && isBlueOnPositiveHalf) || (!isBlueTeam && !isBlueOnPositiveHalf)
+}
+
+func (m *CombinedPlan) defenseXSign(gi *GameInfo) float64 {
+	if m.defendsPositiveHalf(gi) {
+		return 1.0
+	}
+	return -1.0
+}
+
+func (m *CombinedPlan) defendedGoalCenter(gi *GameInfo) Position {
+	goalCenter := blueGoalCenter
+	goalCenter.X = m.defenseXSign(gi) * math.Abs(blueGoalCenter.X)
+	return goalCenter
+}
+
+func (m *CombinedPlan) attackerIsThreatening(gi *GameInfo, attackerPos Position) bool {
+	return m.defenseXSign(gi)*attackerPos.X > attackerThreatX
+}
+
+func (m *CombinedPlan) calcWallPositions(attackerPos Position, goalCenter Position) (Position, Position, Position) {
+	shotVec := goalCenter.Sub(&attackerPos)
 	shotVecNorm := shotVec.Normalize2d()
 
-	mid := attackerPos.Add(&blueGoalCenter)
+	mid := attackerPos.Add(&goalCenter)
 	mid.Div2d(2.0)
 
 	perpVec := Position{X: -shotVecNorm.Y, Y: shotVecNorm.X, Z: 0, Angle: 0}
@@ -126,8 +149,9 @@ func (m *CombinedPlan) calcWallPositions(attackerPos Position) (Position, Positi
 }
 
 func (m *CombinedPlan) run() {
-	offenseRobots := []info.ID{1, 2, 3}
-	defenseRobots := []info.ID{4, 5, 6}
+	offenseRobots := []info.ID{1, 2}
+	defenseRobots := []info.ID{3, 4, 5}
+	goalieID := info.ID(6)
 
 	gi := <-m.incomingGameInfo
 
@@ -145,6 +169,12 @@ func (m *CombinedPlan) run() {
 		defenders[id] = defender
 	}
 
+	// Goalie setup
+	clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
+
+	goalieRole := roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
+	goalieRole.Init()
+
 	var activeReceiver info.ID
 	var activeReceiverStart time.Time
 	hasActiveReceiver := false
@@ -155,10 +185,12 @@ func (m *CombinedPlan) run() {
 
 		possessor := gi.State.GetBall().GetPossessor()
 
+		handledByOffense := false
 		if possessor != nil && possessor.GetTeam() == m.team {
 			ownerID := possessor.GetID()
 			owner, ok := kickers[ownerID]
 			if ok {
+				handledByOffense = true
 				hasActiveReceiver = false
 				for _, id := range offenseRobots {
 					if id != ownerID {
@@ -178,7 +210,9 @@ func (m *CombinedPlan) run() {
 					}
 				}
 			}
-		} else {
+		}
+
+		if !handledByOffense {
 			if hasActiveReceiver && time.Since(activeReceiverStart) < 2*time.Second {
 				for _, id := range offenseRobots {
 					if id != activeReceiver {
@@ -202,11 +236,11 @@ func (m *CombinedPlan) run() {
 		}
 
 		attackerPos, found := m.getAttackerPosition(&gi)
-		if found && attackerPos.X > attackerThreatX {
-			bot4Pos, bot5Pos, bot6Pos := m.calcWallPositions(attackerPos)
+		if found && m.attackerIsThreatening(&gi, attackerPos) {
+			bot3Pos, bot4Pos, bot5Pos := m.calcWallPositions(attackerPos, m.defendedGoalCenter(&gi))
+			defenders[3].SetWallPosition(bot3Pos)
 			defenders[4].SetWallPosition(bot4Pos)
 			defenders[5].SetWallPosition(bot5Pos)
-			defenders[6].SetWallPosition(bot6Pos)
 			for _, d := range defenders {
 				d.TriggerEvent("ATTACKER_NEAR")
 			}
@@ -218,6 +252,15 @@ func (m *CombinedPlan) run() {
 		for _, d := range defenders {
 			d.Run()
 		}
+
+		// Goalie logic
+		goalieRole.SetGameInfo(gi)
+		if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
+			goalieRole.TriggerEvent("BALL_OWNER")
+		} else {
+			goalieRole.TriggerEvent("BALL_LOST")
+		}
+		goalieRole.Run()
 
 		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "combined_plan")
 	}
