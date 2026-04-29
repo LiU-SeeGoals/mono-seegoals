@@ -3,9 +3,9 @@ package roles
 import (
 	"fmt"
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
+	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"math"
 	"math/rand"
 )
@@ -120,15 +120,17 @@ func (kr *SupportAttackIntent) GetFromPosition() info.Position {
 		return pos
 	}
 
-	xmax := field.X
-	ymax := field.Y
+	xmax := field.X / 2
+	ymax := field.Y / 2
 	for i := 0; i < 10; i++ {
 		x := randVal(xmax)
 		y := randVal(ymax)
 
-		pos := info.Position{X: x, Y: y, Z: 0, Angle: 0}
-		if isGoalShotAvailable(kr.team, pos, kr.gi) {
-			return pos
+		candidate := info.Position{X: x, Y: y, Z: 0, Angle: 0}
+		if isGoalShotAvailable(kr.team, candidate, kr.gi) {
+			// Keep the candidate sampling as a tactical placeholder, but do not
+			// command RRT to random support points until this has stable scoring.
+			break
 		}
 	}
 

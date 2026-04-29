@@ -54,9 +54,12 @@ func startWebServer() {
 	webserverInstance.websocketupgrader = webserverInstance.getUpgrader()
 
 	http.HandleFunc("/ws", webserverInstance.handleGameStateRequest)
-	go http.ListenAndServe(config.GetGameViewerPort(), nil)
+	go func() {
+		if err := http.ListenAndServe(config.GetGameViewerPort(), nil); err != nil {
+			Logger.Errorw("Webserver stopped", "error", err)
+		}
+	}()
 	go webserverInstance.sendGameState()
-	go webserverInstance.receiveData()
 	fmt.Println("Gameviewer socket online at", config.GetGameViewerPort())
 	Logger.Info("Webserver online at", config.GetGameViewerPort())
 }
@@ -81,17 +84,20 @@ func (server *WebServer) handleGameStateRequest(w http.ResponseWriter, r *http.R
 	defer server.websocketConnectionsMutex.Unlock() // unlock after function returns
 	server.websocketConnections = append(server.websocketConnections, ws)
 	fmt.Println("Gameviewer client connected")
+
+	go server.receiveData(ws)
 }
 
 func (server *WebServer) sendGameState() {
 	var gameStateJSON []byte
 	for {
+		server.gameStateQueueMutex.Lock()
 		if len(server.gameStatePacketQueue) == 0 {
+			server.gameStateQueueMutex.Unlock()
 			time.Sleep(time.Millisecond * 10)
 			continue
 		}
 
-		server.gameStateQueueMutex.Lock()
 		gameStateJSON = server.gameStatePacketQueue[0]
 		server.gameStatePacketQueue = server.gameStatePacketQueue[1:]
 		server.gameStateQueueMutex.Unlock()
@@ -103,50 +109,52 @@ func (server *WebServer) sendGameState() {
 		server.websocketConnectionsMutex.Unlock()
 
 		for _, ws := range connectionsCopy {
-			ws.WriteMessage(websocket.TextMessage, gameStateJSON)
+			if err := ws.WriteMessage(websocket.TextMessage, gameStateJSON); err != nil {
+				fmt.Println(err)
+				server.removeConnection(ws)
+			}
 		}
 	}
 }
 
 // Method to receive data from all connected clients
-func (server *WebServer) receiveData() {
-	var validConnections []*websocket.Conn
+func (server *WebServer) receiveData(ws *websocket.Conn) {
+	defer func() {
+		server.removeConnection(ws)
+		ws.Close()
+	}()
+
 	for {
-		validConnections = validConnections[:0] // reset list
-
-		// Creating a copy of the connections. This prevents locking other threads if the connection takes too long
-		server.websocketConnectionsMutex.Lock()
-		connectionsCopy := make([]*websocket.Conn, len(server.websocketConnections))
-		copy(connectionsCopy, server.websocketConnections)
-		server.websocketConnectionsMutex.Unlock()
-
-		for _, ws := range connectionsCopy {
-			_, message, err := ws.ReadMessage()
-			if err != nil {
-				ws.Close()
-				fmt.Println(err)
-				continue
-			}
-
-			var receivedData GameViewerCommand
-			err_unmarshal := json.Unmarshal(message, &receivedData)
-			if err_unmarshal != nil {
-				log.Println("Error unmarshalling message:", err_unmarshal)
-				continue
-			} else {
-				server.receivedDataMutex.Lock()
-				log.Println("Received data:", receivedData)
-				server.incomingData = append(server.incomingData, receivedData)
-				server.dataLookup[receivedData.CommandType] = &receivedData
-				server.receivedDataMutex.Unlock()
-			}
-			validConnections = append(validConnections, ws)
+		_, message, err := ws.ReadMessage()
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
 
-		server.websocketConnectionsMutex.Lock()
-		// Remove invalid connections
-		server.websocketConnections = validConnections
-		server.websocketConnectionsMutex.Unlock()
+		var receivedData GameViewerCommand
+		err_unmarshal := json.Unmarshal(message, &receivedData)
+		if err_unmarshal != nil {
+			log.Println("Error unmarshalling message:", err_unmarshal)
+			continue
+		}
+
+		server.receivedDataMutex.Lock()
+		log.Println("Received data:", receivedData)
+		server.incomingData = append(server.incomingData, receivedData)
+		server.dataLookup[receivedData.CommandType] = &receivedData
+		server.receivedDataMutex.Unlock()
+	}
+}
+
+func (server *WebServer) removeConnection(ws *websocket.Conn) {
+	server.websocketConnectionsMutex.Lock()
+	defer server.websocketConnectionsMutex.Unlock()
+
+	for i, connection := range server.websocketConnections {
+		if connection == ws {
+			server.websocketConnections = append(server.websocketConnections[:i], server.websocketConnections[i+1:]...)
+			return
+		}
 	}
 }
 
@@ -167,6 +175,10 @@ func actionsToJson(actions []action.Action) []byte {
 	return output
 }
 
+func StartGameViewerServer() {
+	getInstance()
+}
+
 // Returns a list of all new incoming actions
 func GetAllIncoming() []GameViewerCommand {
 	webserver := getInstance()
@@ -185,7 +197,7 @@ func GetCommand(commandName string) *GameViewerCommand {
 	webserver.receivedDataMutex.Lock()
 	defer webserver.receivedDataMutex.Unlock()
 	command, ok := webserver.dataLookup[commandName]
-	if !ok{
+	if !ok {
 		return nil
 	}
 	delete(webserver.dataLookup, commandName)

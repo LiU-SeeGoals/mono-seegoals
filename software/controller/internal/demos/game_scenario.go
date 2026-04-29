@@ -47,9 +47,9 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	}
 }
 
-
 func GameScenario() {
 	gameInfo := info.NewGameInfo(10)
+	client.StartGameViewerServer()
 
 	var sslClientTracked *client.SSLTrackedClient
 	var sslClientRaw *client.SSLClient
