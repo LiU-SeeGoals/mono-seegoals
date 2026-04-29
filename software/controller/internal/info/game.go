@@ -3,6 +3,7 @@ package info
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
@@ -57,8 +58,16 @@ func (gi GameInfo) PrintField() {
 // field_arcs:{name:"CenterCircle" center:{x:0 y:0} radius:500 a1:0 a2:6.2831855 thickness:10}
 
 func (gi GameInfo) GetFieldLine(line string) *ssl_vision.SSL_FieldLineSegment {
-	for i := range gi.field.FieldLines{
-		if *gi.field.FieldLines[i].Name == "CenterLine"{
+	if gi.field == nil {
+		return nil
+	}
+
+	for i := range gi.field.FieldLines {
+		if gi.field.FieldLines[i] == nil || gi.field.FieldLines[i].Name == nil {
+			continue
+		}
+
+		if strings.EqualFold(*gi.field.FieldLines[i].Name, line) {
 			return gi.field.FieldLines[i]
 		}
 	}
@@ -75,9 +84,13 @@ func (gi GameInfo) EnemyGoalLine(team Team) []Position {
 
 	// x := float64(gi.field.GetFieldLength()/2 - gi.field.GetGoalWidth())
 
-	center_line := gi.GetFieldLine("centerline").GetP1()
+	centerLine := gi.GetFieldLine("CenterLine")
+	if centerLine == nil {
+		return []Position{{}, {}}
+	}
+	centerPoint := centerLine.GetP1()
 
-	x := float64(*center_line.X)
+	x := float64(centerPoint.GetX())
 	y := float64(gi.field.GetGoalWidth() / 2)
 
 	upper := Position{X: x, Y: y, Z: 0, Angle: 0}
@@ -110,6 +123,14 @@ func (gi GameInfo) HomeGoalDefPos(team Team) Position {
 	pos := Position{X: x, Y: 0, Z: 0, Angle: 0}
 
 	return correctedPosition(team, pos)
+}
+
+func (gi GameInfo) GoalWidth() float64 {
+	if gi.field == nil {
+		return 0
+	}
+
+	return float64(gi.field.GetGoalWidth())
 }
 
 func (gi GameInfo) HasField() bool {
