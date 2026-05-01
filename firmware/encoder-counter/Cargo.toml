@@ -38,7 +38,8 @@ debug = 2
 debug-assertions = false
 lto = 'fat'
 opt-level = 2
-overflow-checks = false
+# I personaly like having over flow checks (Lexa_te)
+overflow-checks = true
 
 # do not optimize proc-macro crates = faster builds from scratch
 [profile.dev.build-override]

@@ -4,6 +4,7 @@
 #include "stm32h7xx_hal.h"
 #include "data_logging.h"
 
+#include "stm32h7xx_hal_def.h"
 #include "stm32h7xx_hal_i2c.h"
 // Tick buffer of 100 with 5000hz update is 0.05 second filter on motor
 #define MOTOR_TICK_BUF_SIZE 50
@@ -92,6 +93,6 @@ int setDirection(MotorPWM* motor, float speed);
  */
 float MOTOR_ReadTicksPerSecond(MotorPWM* motor);
 
-void MOTOR_get_encoder_rpms();
+HAL_StatusTypeDef MOTOR_get_encoder_rpms();
 
 #endif

@@ -240,9 +240,9 @@ int main(void)
     LOG_Init(&huart3);
     LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO, 0);
     if (COM_Get_ID() == 255) {
-        LOG_INFO("ID is unknown (%i, serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+     // LOG_INFO("ID is unknown (%i, serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
     } else {
-        LOG_INFO("ID is %i (serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
+     // LOG_INFO("ID is %i (serial %li %li %li)\r\n", COM_Get_ID(), HAL_GetUIDw0(), HAL_GetUIDw1(), HAL_GetUIDw2());
     }
     POS_Init();
     NAV_Init(&htim7, &htim1, &htim15);
@@ -260,13 +260,13 @@ int main(void)
 
     for (int i = 0; i < DISCHARGE_AMNT; i++)
     {
-        if (i % 20 == 0)
-        {
-            LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
-        }
+     if (i % 20 == 0)
+     {
+         LOG_INFO("Discharging %d of %d\r\n",i, DISCHARGE_AMNT - 1);
+     }
 
-        KICKER_KickSafe();
-        HAL_Delay(60);
+     KICKER_KickSafe();
+     HAL_Delay(60);
     }
 
     while (true) {
@@ -391,7 +391,7 @@ static void MX_I2C3_Init(void)
 
   /* USER CODE END I2C3_Init 1 */
   hi2c3.Instance = I2C3;
-  hi2c3.Init.Timing = 0x009034B6;
+  hi2c3.Init.Timing = 0x10C0ECFF;
   hi2c3.Init.OwnAddress1 = 0;
   hi2c3.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
   hi2c3.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;

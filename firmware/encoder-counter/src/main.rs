@@ -4,12 +4,12 @@
 #![no_std]
 #![no_main]
 
-use defmt::{todo, *};
+use defmt::*;
 use defmt_rtt as _;
-use embedded_hal::digital::OutputPin;
+use embedded_hal::digital::{InputPin, OutputPin};
 use panic_probe as _;
 use rp235x_hal::clocks::init_clocks_and_plls;
-use rp235x_hal::gpio::{FunctionI2C, Pin, PullNone, PullUp};
+use rp235x_hal::gpio::{FunctionI2C, Pin, PullNone};
 use rp235x_hal::i2c::peripheral::Event;
 use rp235x_hal::pio::PIOExt;
 use rp235x_hal::{self as hal, entry};
@@ -62,14 +62,35 @@ fn main() -> ! {
 
     let mut led_pin = pins.gpio25.into_push_pull_output();
 
+    let mut i2c_id_pin = pins.gpio22.into_floating_input();
+
+    // If gpio 22 is low this is pico0 else it is pico1
+    let i2c_id: u8 = if i2c_id_pin.is_low().unwrap() {
+        0x5
+    } else {
+        0x6
+    };
+
+    // Init SPI
+    let sda_pin: Pin<_, FunctionI2C, PullNone> = pins.gpio0.reconfigure();
+    let slc_pin: Pin<_, FunctionI2C, PullNone> = pins.gpio1.reconfigure();
+
+    let mut i2c = hal::I2C::new_peripheral_event_iterator(
+        pac.I2C0,
+        sda_pin, // SDA
+        slc_pin, // SCL
+        &mut pac.RESETS,
+        i2c_id,
+    );
+
     // Init encoder 0
     let (mut pio0, sm0_0, ..) = pac.PIO0.split(&mut pac.RESETS);
 
     let mut enc0 = Encoder::program_init(
         &mut pio0,
         sm0_0,
-        pins.gpio4,
-        pins.gpio5,
+        pins.gpio2,
+        pins.gpio3,
         timer,
         &clocks.system_clock,
         // The default mode of the AS5047P is 4000 clicks per rotation
@@ -92,17 +113,6 @@ fn main() -> ! {
     info!("##### Program loop #####");
     led_pin.set_high().unwrap();
 
-    let sda_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio0.reconfigure();
-    let slc_pin: Pin<_, FunctionI2C, PullUp> = pins.gpio1.reconfigure();
-
-    let mut i2c = hal::I2C::new_peripheral_event_iterator(
-        pac.I2C0,
-        sda_pin, // SDA
-        slc_pin, // SCL
-        &mut pac.RESETS,
-        0x01u8,
-    );
-
     loop {
         enc0.update();
         enc1.update();
@@ -113,16 +123,22 @@ fn main() -> ! {
                 // The controller has requested data so we should send the
                 // speeds
                 Event::TransferRead => {
+                    info!("Transfer Read");
                     let speed0 = enc0.get_raw_encoder_state().get_speed();
                     let speed1 = enc1.get_raw_encoder_state().get_speed();
+                    info!("Speed0: {}, Speed1: {}", speed0, speed1);
                     i2c.write(&compose_message(speed0, speed1));
                 }
                 Event::TransferWrite => {
-                    let mut buf = [0; 256];
+                    info!("Transfer write");
+                    let mut buf = [0; 32];
                     i2c.read(&mut buf);
-                    info!("{:?}", buf[0..10]);
+                    // info!("{:?}", buf);
                 }
-                _ => continue,
+                // Event::Start => info!("Start"),
+                // Event::Restart => info!("Restart"),
+                // Event::Stop => info!("Stop"),
+                _ => {}
             }
         }
 
@@ -133,11 +149,11 @@ fn main() -> ! {
         //     enc.get_steps()
         // );
 
-        delay.delay_ms(100);
+        delay.delay_ms(20);
     }
 }
 
-const CRC_TABLE: [u8; 256] = [
+static CRC_TABLE: [u8; 256] = [
     0, 94, 188, 226, 97, 63, 221, 131, 194, 156, 126, 32, 163, 253, 31, 65, 157, 195, 33, 127, 252,
     162, 64, 30, 95, 1, 227, 189, 62, 96, 130, 220, 35, 125, 159, 193, 66, 28, 254, 160, 225, 191,
     93, 3, 128, 222, 60, 98, 190, 224, 2, 92, 223, 129, 99, 61, 124, 34, 192, 158, 29, 67, 161,
@@ -166,9 +182,9 @@ fn compose_message(speed0: i32, speed1: i32) -> [u8; 11] {
     // STX, Unwrap because this should not be able to fail
     message.push(0x2).unwrap();
     // Speed_0
-    message.extend(speed0.to_le_bytes());
+    message.extend(speed0.to_be_bytes());
     // Speed_1
-    message.extend(speed1.to_le_bytes());
+    message.extend(speed1.to_be_bytes());
     // CRC
     let crc = calc_crc(&message, 1);
     // This will always have availible space so unwrap.
