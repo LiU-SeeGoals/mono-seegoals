@@ -7,15 +7,9 @@ CortexM7.IPs=CORTEX_M7\:I,DEBUG\:I,FATFS_M7\:I,FREERTOS_M7\:I,IWDG1\:I,OPENAMP_M
 CortexM7.Pins=PE2,PE6,PC13,PA0,PA1,PA2,PA3,PA4,PB0,PB2,PE7,PE8,PE12,PE15,PB10,PB11,PB12,PB13,PB14,PB15,PD12,PD13,PC6,PA11,PA12,PD1,PD2,PD3,PD4,PD5,PD6,PD7,PB6,PB8,PE0,PE1
 File.Version=6
 GPIO.groupedBy=Group By Peripherals
-<<<<<<< HEAD
 I2C3.I2C_Speed_Mode=I2C_Standard
 I2C3.IPParameters=Timing,I2C_Speed_Mode
 I2C3.Timing=0x10C0ECFF
-=======
-I2C3.I2C_Speed_Mode=I2C_Fast
-I2C3.IPParameters=Timing,I2C_Speed_Mode
-I2C3.Timing=0x009034B6
->>>>>>> 53c58c4 (First version of the encoder counter code)
 I2C4.I2C_Speed_Mode=I2C_Fast
 I2C4.IPParameters=Timing,I2C_Speed_Mode
 I2C4.Timing=0x009034B6
