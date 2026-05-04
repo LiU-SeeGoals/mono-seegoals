@@ -117,7 +117,7 @@ func (m *TwoBotDefence) run() {
 
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 
-		// Dynamic role assignment: sort defenders by distance to ball each frame.
+		
 		type defDist struct {
 			id   info.ID
 			dist float64
@@ -135,7 +135,6 @@ func (m *TwoBotDefence) run() {
 			return sorted[i].dist < sorted[j].dist
 		})
 
-		// Closest → Press, second → Central, third/fourth → Wide (opposite wings), rest → Support
 		type roleAssignment struct {
 			role    roles.RoleType
 			yOffset float64
