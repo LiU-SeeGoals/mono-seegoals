@@ -42,6 +42,7 @@ func handleDefenceBall(gameInfo *info.GameInfo, simController *simulator.SimCont
 
 func Defence2BotScenario() {
 	gameInfo := info.NewGameInfo(10)
+	client.StartGameViewerServer()
 
 	var sslClientTracked *client.SSLTrackedClient
 	var sslClientRaw *client.SSLClient
@@ -56,11 +57,12 @@ func Defence2BotScenario() {
 	aiYellow = ai.NewAi(info.Yellow, plan.NewGameScenario(info.Yellow), ai.NewActivityExecutor())
 
 	// Blue: 3-bot defense wall (robots 5, 6, 7) — no goalie in this scenario
-	aiBlueDefense = ai.NewAi(info.Blue, plan.NewTwoBotDefence(info.Blue), ai.NewActivityExecutor())
+	// Bot 5 = presser, bot 6 = deep defender, bot 7 = second defender
+	aiBlueDefense = ai.NewAi(info.Blue, plan.NewTwoBotDefence(info.Blue, []info.ID{5, 6, 7, 8, 9}), ai.NewActivityExecutor())
 
 	if config.IsSimulated() {
-		teamYellow := []int{1, 2, 3}
-		teamBlue := []int{5, 6, 7}
+		teamYellow := []int{1, 2, 3, 4, 10}
+		teamBlue := []int{5, 6, 7, 8, 9}
 
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())

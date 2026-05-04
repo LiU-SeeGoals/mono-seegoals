@@ -74,8 +74,8 @@ type ConfigReal struct {
 }
 
 type ConfigGameViewer struct {
-	Address string `env:"VITE_AI_GAME_VIEWER_SOCKET_ADDR,required"`
-	Port    string `env:"VITE_AI_GAME_VIEWER_SOCKET_PORT,required"`
+	Address string `env:"VITE_AI_GAME_VIEWER_SOCKET_ADDR"`
+	Port    string `env:"VITE_AI_GAME_VIEWER_SOCKET_PORT"`
 }
 
 type ConfigBasestation struct {

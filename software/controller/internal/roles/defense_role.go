@@ -2,6 +2,7 @@ package roles
 
 import (
 	"fmt"
+	"math"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
@@ -9,13 +10,33 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
-const coverYClamp = 1500.0
+type RoleType int
 
 const pressMinX = 1000.0
 
-var neutralHoldPos = info.Position{X: 1000, Y: 0, Z: 0, Angle: 0}
+const (
+	RolePress   RoleType = iota // closest to ball — actively presses
+	RoleCentral                  // second — covers ball-to-goal line
+	RoleWide                     // third/fourth — wide flank coverage
+	RoleSupport                  // remaining — midfield cover
+)
 
-var clearTarget = info.Position{X: 0, Y: 0, Z: 0, Angle: 0}
+const (
+	coverYClamp       = 2500.0 // mm — ~0.8× half field width
+	centralCoverDepth = 2800.0 // mm from own goal along ball-goal line
+	wideCoverDepth    = 2000.0
+	supportCoverDepth = 1200.0
+)
+
+func clampF(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
 
 func defenseXSign(gi *info.GameInfo, team info.Team) float64 {
 	isBlueTeam := team == info.Blue
@@ -32,15 +53,15 @@ type DefensePressState struct {
 	team            info.Team
 	name            StateName
 	activityHandler *ai.ActivityHandler
-	isPrimary       bool
-	coverDepth      float64
-	kickActivity    *act.KickAtPosition
+	role            RoleType
+	// yOffset is fixed per rank so bots never stack — +600 left wing, -600 right wing, 0 center
+	yOffset      float64
+	kickActivity *act.KickAtPosition
 }
 
 func (s *DefensePressState) Initialize() {
-	if s.isPrimary {
-		s.kickActivity = act.NewKickAtPosition(s.team, s.robotId, clearTarget)
-	}
+	clearTarget := info.Position{X: 0, Y: 0, Z: 0, Angle: 0}
+	s.kickActivity = act.NewKickAtPosition(s.team, s.robotId, clearTarget)
 }
 
 func (s *DefensePressState) GetName() StateName {
@@ -48,31 +69,59 @@ func (s *DefensePressState) GetName() StateName {
 }
 
 func (s *DefensePressState) Update() EventName {
-	xSign := defenseXSign(s.gi, s.team)
+	enemyGoalX := s.gi.EnemyGoalCenter(s.team).X
+	ownGoalX := -enemyGoalX
+	sign := math.Copysign(1.0, ownGoalX)
 
-	if s.isPrimary {
-		ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
+	ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
+	ownGoalCenter := info.Position{X: ownGoalX, Y: 0, Z: 0, Angle: 0}
 
-		if xSign*ballPos.X < pressMinX {
-			hold := neutralHoldPos
-			hold.X *= xSign
-			hold.Angle = hold.AngleToPosition(ballPos) // face the ball
-			s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, hold))
-		} else {
+	robotPos, err := s.gi.State.GetRobotPosition(s.team, s.robotId)
+	if err != nil {
+		return "NONE"
+	}
+
+	switch s.role {
+	case RolePress:
+		// Kick clear when ball enters our half, otherwise chase ball
+		if ballPos.X*sign > 1000.0 {
 			s.activityHandler.AddActivity(s.kickActivity)
+		} else {
+			target := ballPos
+			target.Angle = robotPos.AngleToPosition(ballPos)
+			s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, target))
 		}
-	} else {
-		ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
-		target := info.Position{X: xSign * s.coverDepth, Y: ballPos.Y, Z: 0, Angle: 0}
-		if target.Y > coverYClamp {
-			target.Y = coverYClamp
+
+	case RoleCentral:
+		// Position on line from own goal toward ball at centralCoverDepth from goal
+		goalToBall := ballPos.Sub(&ownGoalCenter)
+		if goalToBall.Norm2d() < 1.0 {
+			target := info.Position{X: ownGoalX - sign*centralCoverDepth, Y: 0, Z: 0, Angle: 0}
+			target.Angle = target.AngleToPosition(ballPos)
+			s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, target))
+		} else {
+			norm := goalToBall.Normalize2d()
+			scaled := norm.Scale(centralCoverDepth)
+			target := ownGoalCenter.Add(&scaled)
+			target.Angle = target.AngleToPosition(ballPos)
+			s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, target))
 		}
-		if target.Y < -coverYClamp {
-			target.Y = -coverYClamp
-		}
+
+	case RoleWide:
+		// Fixed Y offset from ball — rank determines which wing this bot covers
+		targetY := clampF(ballPos.Y+s.yOffset, -coverYClamp, coverYClamp)
+		target := info.Position{X: sign * wideCoverDepth, Y: targetY, Z: 0, Angle: 0}
+		target.Angle = target.AngleToPosition(ballPos)
+		s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, target))
+
+	case RoleSupport:
+		// Fixed Y offset from ball at midfield depth
+		targetY := clampF(ballPos.Y+s.yOffset, -coverYClamp, coverYClamp)
+		target := info.Position{X: sign * supportCoverDepth, Y: targetY, Z: 0, Angle: 0}
 		target.Angle = target.AngleToPosition(ballPos)
 		s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, target))
 	}
+
 	return "NONE"
 }
 
@@ -92,8 +141,7 @@ func (s *DefenseWallState) GetName() StateName {
 }
 
 func (s *DefenseWallState) Update() EventName {
-	activity := act.NewMoveToPosition(s.team, s.robotId, *s.wallPos)
-	s.activityHandler.AddActivity(activity)
+	s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, *s.wallPos))
 	return "NONE"
 }
 
@@ -104,6 +152,7 @@ type DefenseRole struct {
 	gi              *info.GameInfo
 	team            info.Team
 	wallPosition    info.Position
+	pressState      *DefensePressState
 }
 
 func NewDefenseRole(robotID info.ID, activityHandler ai.ActivityHandler, gi *info.GameInfo, team info.Team) *DefenseRole {
@@ -120,21 +169,16 @@ func (dr *DefenseRole) Init() {
 	pressName := StateName(fmt.Sprintf("DefensePress ID %d", dr.id))
 	wallName := StateName(fmt.Sprintf("DefenseWall ID %d", dr.id))
 
-	isPrimary := dr.id == 5
-	coverDepth := 3200.0
-	if dr.id == 7 {
-		coverDepth = 3700.0
-	}
-
 	pressState := &DefensePressState{
 		gi:              dr.gi,
 		robotId:         dr.id,
 		team:            dr.team,
 		name:            pressName,
 		activityHandler: dr.activityHandler,
-		isPrimary:       isPrimary,
-		coverDepth:      coverDepth,
+		role:            RoleSupport,
+		yOffset:         0,
 	}
+	dr.pressState = pressState
 
 	wallState := &DefenseWallState{
 		gi:              dr.gi,
@@ -150,6 +194,13 @@ func (dr *DefenseRole) Init() {
 	sm.AddTransition(wallName, "ATTACKER_FAR", pressState)
 
 	dr.sm = sm
+}
+
+// SetRole assigns the bot's role and Y offset for this frame.
+// yOffset is fixed per rank so bots on the same line don't stack.
+func (dr *DefenseRole) SetRole(r RoleType, yOffset float64) {
+	dr.pressState.role = r
+	dr.pressState.yOffset = yOffset
 }
 
 func (dr *DefenseRole) Run() {

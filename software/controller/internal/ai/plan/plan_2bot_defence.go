@@ -1,7 +1,9 @@
 package ai
 
 import (
+	"fmt"
 	"math"
+	"sort"
 	"sync"
 	"time"
 
@@ -11,24 +13,24 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
-// attackerThreatX — x threshold (mm) at which the wall formation is triggered.
-// Set to 2800 so the wall forms when the attacker enters Blue's half.
-const attackerThreatX = 2800.0
-
 const wallSpacing = 200.0 // mm — spacing between adjacent wall bots
-
-var blueGoalCenter = Position{X: 4500, Y: 0, Z: 0, Angle: 0}
 
 type TwoBotDefence struct {
 	plannerCore
+	activeBots []info.ID
 }
 
-func NewTwoBotDefence(team info.Team) *TwoBotDefence {
+func NewTwoBotDefence(team info.Team, activeBots []info.ID) *TwoBotDefence {
 	return &TwoBotDefence{
 		plannerCore: plannerCore{
 			team: team,
 		},
+		activeBots: activeBots,
 	}
+}
+
+func (m *TwoBotDefence) Kill() {
+	fmt.Println("Killing TwoBotDefence planner")
 }
 
 func (m *TwoBotDefence) Init(
@@ -45,9 +47,9 @@ func (m *TwoBotDefence) Init(
 	go m.run()
 }
 
-// getAttackerPosition finds the yellow robot closest to the ball
+// getAttackerPosition finds the opponent robot closest to the ball.
 func (m *TwoBotDefence) getAttackerPosition(gi *GameInfo) (Position, bool) {
-	yellowTeam := gi.State.GetTeam(Yellow)
+	opponents := gi.State.GetOtherTeam(m.team)
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 
 	minDist := math.Inf(1)
@@ -56,7 +58,7 @@ func (m *TwoBotDefence) getAttackerPosition(gi *GameInfo) (Position, bool) {
 
 	var i ID
 	for i = 0; i < TEAM_SIZE; i++ {
-		robotPos, err := yellowTeam[i].GetPosition()
+		robotPos, err := opponents[i].GetPosition()
 		if err != nil {
 			continue
 		}
@@ -70,71 +72,124 @@ func (m *TwoBotDefence) getAttackerPosition(gi *GameInfo) (Position, bool) {
 	return closestPos, found
 }
 
-// calcWallPositions returns wall positions for bots 5, 6, and 7.
-// The three bots are placed perpendicular to the shot line, centered at the
-// midpoint between attacker and goal, spaced wallSpacing apart.
-func (m *TwoBotDefence) calcWallPositions(attackerPos Position) (Position, Position, Position) {
-	// Shot vector: attacker → goal, normalized
-	shotVec := blueGoalCenter.Sub(&attackerPos)
+// calcWallPositions returns n positions perpendicular to the shot line,
+// centered at the midpoint between attacker and own goal.
+func (m *TwoBotDefence) calcWallPositions(attackerPos Position, ownGoalCenter Position, n int) []Position {
+	shotVec := ownGoalCenter.Sub(&attackerPos)
 	shotVecNorm := shotVec.Normalize2d()
 
-	// Midpoint between attacker and goal — wall forms here
-	mid := attackerPos.Add(&blueGoalCenter)
+	mid := attackerPos.Add(&ownGoalCenter)
 	mid.Div2d(2.0)
 
-	// Perpendicular to shot line (rotate 90°)
 	perpVec := Position{X: -shotVecNorm.Y, Y: shotVecNorm.X, Z: 0, Angle: 0}
 
-	// Three bots: center, +wallSpacing, -wallSpacing
-	offset := perpVec.Scale(wallSpacing)
-	bot5Pos := mid.Sub(&offset) // one side
-	bot6Pos := mid              // center
-	bot7Pos := mid.Add(&offset) // other side
-
-	// All bots face the attacker
-	bot5Pos.Angle = bot5Pos.AngleToPosition(attackerPos)
-	bot6Pos.Angle = bot6Pos.AngleToPosition(attackerPos)
-	bot7Pos.Angle = bot7Pos.AngleToPosition(attackerPos)
-
-	return bot5Pos, bot6Pos, bot7Pos
+	positions := make([]Position, n)
+	for i := 0; i < n; i++ {
+		offsetMult := float64(i) - float64(n-1)/2.0
+		scaledOffset := perpVec.Scale(offsetMult * wallSpacing)
+		pos := mid.Add(&scaledOffset)
+		pos.Angle = pos.AngleToPosition(attackerPos)
+		positions[i] = pos
+	}
+	return positions
 }
 
 func (m *TwoBotDefence) run() {
-	activeRobots := []info.ID{5, 6, 7}
 	defenders := make(map[info.ID]*roles.DefenseRole)
 
 	gi := <-m.incomingGameInfo
 
-	for _, id := range activeRobots {
+	for _, id := range m.activeBots {
 		defender := roles.NewDefenseRole(id, m.ActivityHandler, &gi, m.team)
 		defender.Init()
 		defenders[id] = defender
 	}
 
+	// isNear: attacker entered our defensive half — engage wall mode.
+	// Hysteresis: enter at 2800mm, exit at 2400mm.
+	var isNear bool
+
 	for {
 		gi = <-m.incomingGameInfo
+		enemyGoal := gi.EnemyGoalCenter(m.team)
+		ownGoalCenter := Position{X: -enemyGoal.X, Y: 0, Z: 0, Angle: 0}
+		sign := math.Copysign(1.0, -enemyGoal.X)
 
-		attackerPos, found := m.getAttackerPosition(&gi)
+		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 
-		if found && attackerPos.X > attackerThreatX {
-			// Attacker is in Blue's half — form the 3-bot wall
-			bot5Pos, bot6Pos, bot7Pos := m.calcWallPositions(attackerPos)
-			defenders[5].SetWallPosition(bot5Pos)
-			defenders[6].SetWallPosition(bot6Pos)
-			defenders[7].SetWallPosition(bot7Pos)
-
-			for _, d := range defenders {
-				d.TriggerEvent("ATTACKER_NEAR")
+		// Dynamic role assignment: sort defenders by distance to ball each frame.
+		type defDist struct {
+			id   info.ID
+			dist float64
+		}
+		sorted := make([]defDist, 0, len(m.activeBots))
+		for _, id := range m.activeBots {
+			pos, err := gi.State.GetRobotPosition(m.team, id)
+			if err != nil {
+				sorted = append(sorted, defDist{id, math.Inf(1)})
+				continue
 			}
-		} else {
-			// Attacker is in Yellow's half — press and cover
-			for _, d := range defenders {
-				d.TriggerEvent("ATTACKER_FAR")
+			sorted = append(sorted, defDist{id, ballPos.Dist2d(pos)})
+		}
+		sort.Slice(sorted, func(i, j int) bool {
+			return sorted[i].dist < sorted[j].dist
+		})
+
+		// Closest → Press, second → Central, third/fourth → Wide (opposite wings), rest → Support
+		type roleAssignment struct {
+			role    roles.RoleType
+			yOffset float64
+		}
+		roleOrder := []roleAssignment{
+			{roles.RolePress, 0},
+			{roles.RoleCentral, 0},
+			{roles.RoleWide, +600},
+			{roles.RoleWide, -600},
+			{roles.RoleSupport, 0},
+		}
+		for i, d := range sorted {
+			ra := roleAssignment{roles.RoleSupport, 0}
+			if i < len(roleOrder) {
+				ra = roleOrder[i]
+			}
+			defenders[d.id].SetRole(ra.role, ra.yOffset)
+		}
+
+		// Attacker threat detection with hysteresis
+		attackerPos, found := m.getAttackerPosition(&gi)
+		if found {
+			attackerSignedX := attackerPos.X * sign
+			if !isNear && attackerSignedX > 2800 {
+				isNear = true
+			} else if isNear && attackerSignedX < 2400 {
+				isNear = false
 			}
 		}
 
-		for _, d := range defenders {
-			d.Run()
+		if isNear && found && len(sorted) >= 1 {
+			
+			numWall := 2
+			if len(sorted) < numWall {
+				numWall = len(sorted)
+			}
+			wallPositions := m.calcWallPositions(attackerPos, ownGoalCenter, numWall)
+			for i := 0; i < numWall; i++ {
+				id := sorted[i].id
+				defenders[id].SetWallPosition(wallPositions[i])
+				defenders[id].TriggerEvent("ATTACKER_NEAR")
+			}
+			// Support bots hold formation, do not join the wall
+			for i := numWall; i < len(sorted); i++ {
+				defenders[sorted[i].id].TriggerEvent("ATTACKER_FAR")
+			}
+		} else {
+			for _, id := range m.activeBots {
+				defenders[id].TriggerEvent("ATTACKER_FAR")
+			}
+		}
+
+		for _, id := range m.activeBots {
+			defenders[id].Run()
 		}
 
 		time.Sleep(time.Millisecond * 1)

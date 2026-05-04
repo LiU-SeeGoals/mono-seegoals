@@ -123,7 +123,7 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
         act.Dest.Angle = robotTargetPos.Angle
     }
 
-	return &act
+	return act
 }
 
 func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
