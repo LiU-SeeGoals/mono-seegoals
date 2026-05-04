@@ -26,7 +26,7 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	switch currentState {
 	case info.STATE_KICKOFF_PREPARATION:
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
-			fmt.Println("teleported ball (new kickoff)")
+			// fmt.Println("teleported ball (new kickoff)")
 			simController.TeleportBall(0, 0)
 		}
 	case info.STATE_FREE_KICK:

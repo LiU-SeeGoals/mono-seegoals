@@ -49,6 +49,7 @@ const (
 	// Equivalent to STOP, but the blue team must pick up the ball and drop
 	// it in the Designated Position.
 	BALL_PLACEMENT_BLUE
+	UNINITIALIZED
 )
 
 // RefState represents the current state of the game based on referee commands
@@ -83,7 +84,7 @@ type GameEvent struct {
 
 func NewGameEvent() *GameEvent {
 	return &GameEvent{
-		RefCommand:   HALT,
+		RefCommand:   UNINITIALIZED,
 		CurrentState: STATE_HALTED,
 		PreviousState: STATE_HALTED,
 		// TeamWithPossession will have its zero value
