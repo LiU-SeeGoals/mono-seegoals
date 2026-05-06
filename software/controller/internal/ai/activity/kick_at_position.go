@@ -30,7 +30,7 @@ func NewKickAtPosition(team info.Team, id info.ID, targetPosition info.Position)
 }
 
 func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
-	const accuracy = 0.1 // Magic number warning
+	const accuracy = 0.01 // Magic number warning
 
 	robot := gi.State.GetRobot(kp.id, kp.team)
 	ball := gi.State.GetBall()

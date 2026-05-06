@@ -7,7 +7,7 @@ import (
 
 const (
 	// PlannerLoopPeriod is the default target period for slow-brain planner ticks.
-	PlannerLoopPeriod = 50 * time.Millisecond
+	PlannerLoopPeriod = 20 * time.Millisecond
 	// ExecutorLoopPeriod is the default target period for the activity executor (fast brain).
 	ExecutorLoopPeriod = 10 * time.Millisecond
 )

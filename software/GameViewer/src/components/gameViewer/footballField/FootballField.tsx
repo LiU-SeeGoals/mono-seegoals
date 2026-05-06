@@ -49,23 +49,21 @@ function findClosestRobot(robots: any[], posX, posY, threshold: number) {
 
   return closest;
 }
-            
 function sendMouseClick(e, canvas, container, rotation, controllerSend, sslFieldUpdate, selectedRobot, setSelectedRobot){
   const coords = getWorldFromMouseEvent(e, canvas, container, rotation);
 
   const robotYellow = findClosestRobot(sslFieldUpdate.robotsYellow, coords.worldX, coords.worldY, 200)
   const robotBlue = findClosestRobot(sslFieldUpdate.robotsBlue, coords.worldX, coords.worldY, 200)
 
-  
-  if (robotYellow != null)
+ if (robotYellow != null)
   {
     setSelectedRobot(robotYellow.robotId);
     selectedRobot = robotYellow.robotId;
   }
 
   const moveCommand = {"Command":"MOVE_ROBOT",
-    x:parseInt(coords.worldX), 
-    y:parseInt(coords.worldY), 
+    x:parseInt(coords.worldX),
+    y:parseInt(coords.worldY),
     Id: selectedRobot}
 
   console.log(moveCommand);

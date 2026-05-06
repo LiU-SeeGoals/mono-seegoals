@@ -60,7 +60,9 @@ func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 
 	// Assume the robot was aligned prior to kicking
 	// Meaning we should keep the same angle when driving into the ball
-	kickAngle := robotPos.Angle
+	targetV2 := info.Vec2{X: m.to.X, Y: m.to.Y}
+	ballToTarget := info.Sub(targetV2, ballV2)
+	kickAngle := ballToTarget.Angle()
 
 	ballRobotTangent := info.Sub(ballV2, robotV2)
 	ballRobotTangent.DivNorm()

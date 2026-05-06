@@ -53,12 +53,12 @@ func (m *plannerManualMovement) run() {
 		// fmt.Println(len(commands))
 		tickStart := time.Now()
 
-		if command != nil{
+		if command != nil {
 			fmt.Println("changing command")
-			pos := info.Position{X: float64(command.X), Y: float64(command.Y), Z:0,Angle: 0}
+			pos := info.Position{X: float64(command.X), Y: float64(command.Y), Z: 0, Angle: 0}
 
 			m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(command.Id), pos))
-		}	
+		}
 
 		helper.PaceLoop(tickStart, plannerManualMovementLoopPeriod, "planner_rw")
 	}

@@ -46,6 +46,10 @@ type MoveToPosition struct {
 	rrtConfig         pathplanner.RRTConfig
 	gi                *info.GameInfo
 	avoidBall         bool
+	dribble           bool
+	lastPosition      info.Position // Last position to detect lack of movement
+	stuckThreshold    int           // Number of cycles to consider robot as stuck
+	useRRT            bool          // Flag to enable/disable RRT-based collision avoidance
 	// Sticky look-ahead (avoids flicker from per-tick reprojection)
 	stickyDest   info.Position
 	stickySet    bool
@@ -69,11 +73,21 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 		final_destination: dest,
 		path:              []info.Position{},
 		rrtConfig:         rrtConfig,
+		useRRT:            true, // Enable RRT by default
+		avoidBall:         true, // Enable ball avoidance by default
 	}
+}
+
+func (m *MoveToPosition) SetUseRRT(use bool) {
+	m.useRRT = use
 }
 
 func (m *MoveToPosition) AvoidBall(avoid bool) {
 	m.avoidBall = avoid
+}
+
+func (m *MoveToPosition) SetDribble(dribble bool) {
+	m.dribble = dribble
 }
 
 // GetAction returns an action for the robot with RRT-based collision avoidance
@@ -100,9 +114,12 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 
 	var targetPos info.Position
 
-	if RRT {
+	if m.useRRT {
 		m.rrtConfig.StepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), m.rrtConfig.StepSize)
-		m.AvoidBall(true)
+		// fmt.Println(m.rrtConfig.StepSize)
+		// fmt.Println(m.final_destination)
+		// fmt.Println(myPos)
+
 		targetPos = myPos
 
 		ps := getPathService(m.team)
@@ -127,8 +144,10 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	act.Team = m.team
 	act.Pos = myPos
 	act.Dest = targetPos
-	act.Dest.Angle = targetPos.Angle
-	act.Dribble = false
+	act.Dest.Angle = m.final_destination.Angle
+	act.Dribble = m.dribble
+	// Include the full planned path for visualization in the GameViewer.
+	// Note: this is a copy so UI serialization can't race on m.path.
 	if len(m.path) > 0 {
 		act.Path = pathFromRobotProjection(myPos, m.path)
 	}

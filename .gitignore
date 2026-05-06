@@ -1,2 +1,6 @@
 software/GameController/config/state-store.json.stream
 software/controller/cmd/cpu.prof
+software/.vscode/settings.json
+software/controller/internal/ui/joystick_controll.go
+software/GameController/config/**
+software/controller/internal/ui/test_controller.go

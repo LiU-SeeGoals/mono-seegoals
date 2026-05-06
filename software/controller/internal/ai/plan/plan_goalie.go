@@ -6,14 +6,17 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
-	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
 type plannerGoalie struct {
 	plannerCore
-	start    time.Time
-	max_time time.Duration
+	at_state          int
+	start             time.Time
+	max_time          time.Duration
+	ballOwner         info.ID
+	previousBallOwner info.ID
 }
 
 func NewPlannerGoalie(team info.Team) *plannerGoalie {
@@ -40,20 +43,63 @@ func (m *plannerGoalie) Init(
 	go m.run()
 }
 
+func (m *plannerGoalie) changeBallOwner(newOwner info.ID, reason string) {
+	if m.ballOwner != newOwner {
+		fmt.Printf("Ball Owner: %d -> %d (%s)\n", m.ballOwner, newOwner, reason)
+		m.previousBallOwner = m.ballOwner
+		m.ballOwner = newOwner
+	}
+}
+
+func (m *plannerGoalie) AddActivity(activity ai.Activity) {
+	m.ActivityHandler.AddActivity(activity)
+}
+
+func (m *plannerGoalie) GetActivity(id info.ID) ai.Activity {
+	return m.ActivityHandler.GetActivity(id)
+}
+
+func (m *plannerGoalie) GetBallOwner() info.ID {
+	return m.ballOwner
+}
+
+func (m *plannerGoalie) GetPreviousBallOwner() info.ID {
+	return m.previousBallOwner
+}
+
+func (m *plannerGoalie) ChangeBallOwner(robotID info.ID, reason string) {
+	m.changeBallOwner(robotID, reason)
+}
+
+func (m *plannerGoalie) GetTeam() info.Team {
+	return m.team
+}
+
 // This is the main loop of the AI in this slow brain
 func (m *plannerGoalie) run() {
+	goalieID := info.ID(6)
+	clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
+	goalieRole := roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
+	goalieRole.Init()
 
-	for m.Active {
-		tickStart := time.Now()
+	for {
+		gi := <-m.incomingGameInfo
+		goalieRole.SetGameInfo(gi)
 
-		//fmt.Println("slow, number of activities:", len(*m.activities))
-
-		if m.ActivityHandler.Activities[7] == nil {
-			fmt.Println("done with action: ", m.team)
-			m.ActivityHandler.AddActivity(ai.NewGoalie(m.team, 7))
+		if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
+			m.changeBallOwner(goalieID, "goalie has ball control")
+			goalieRole.TriggerEvent("BALL_OWNER")
+		} else {
+			if m.ballOwner == goalieID {
+				m.changeBallOwner(0, "goalie lost ball control")
+			}
+			goalieRole.TriggerEvent("BALL_LOST")
 		}
 
-		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "planner_goalie")
+		goalieRole.Run()
+
+		// No need for slow brain to be fast
+		time.Sleep(5 * time.Millisecond)
 	}
 }
 
