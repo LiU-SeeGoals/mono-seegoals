@@ -168,7 +168,12 @@ func (server *WebServer) removeConnection(ws *websocket.Conn) {
 // and the functions under handles all of it so multiple instances are not created
 
 func actionsToJson(actions []action.Action) []byte {
-	output, err := json.Marshal(actions)
+	actionDTOs := make([]action.ActionDTO, 0, len(actions))
+	for _, action := range actions {
+		actionDTOs = append(actionDTOs, action.ToDTO())
+	}
+
+	output, err := json.Marshal(actionDTOs)
 	if err != nil {
 		Logger.Error("The action packet could not be marshalled to JSON.")
 	}
