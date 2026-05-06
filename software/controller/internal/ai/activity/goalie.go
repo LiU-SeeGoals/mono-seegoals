@@ -9,7 +9,6 @@ import (
 )
 
 const (
-	BALL_JITTER_DISTANCE   = 1.0
 	SHOT_THREAT_DISTANCE   = 350.0
 	TRACKED_BALL_MIN_SPEED = 0.05
 )
@@ -117,7 +116,7 @@ func (m *Goalie) GetID() info.ID {
 	return m.id
 }
 
-func goalieFieldBounds(gi *info.GameInfo, goaliePos info.Position) (goalLineX float64, defendLimitX float64, goalHalfWidth float64, ok bool) {
+func goalieFieldBounds(gi *info.GameInfo, goaliePos info.Position) (goalLineX float64, defendLimitX float64, goalWidth float64, ok bool) {
 	leftGoalLine := gi.GetFieldLine("LeftGoalLine")
 	rightGoalLine := gi.GetFieldLine("RightGoalLine")
 	leftPenaltyLine := gi.GetFieldLine("LeftPenaltyStretch")
@@ -139,12 +138,12 @@ func goalieFieldBounds(gi *info.GameInfo, goaliePos info.Position) (goalLineX fl
 		defendLimitX = rightPenaltyX
 	}
 
-	goalHalfWidth = gi.GoalWidth() / 2.0
-	if goalHalfWidth <= 0 {
+	goalWidth = gi.GoalWidth()
+	if goalWidth <= 0 {
 		return 0, 0, 0, false
 	}
 
-	return goalLineX, defendLimitX, goalHalfWidth, true
+	return goalLineX, defendLimitX, goalWidth, true
 }
 
 // Predict the opponent while oppponent is close enough to the ball.

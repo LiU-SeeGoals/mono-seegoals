@@ -63,7 +63,7 @@ func (g *GameScenario) getRobotClosestToBall(activeRobots []info.ID) info.ID {
 
 func (g *GameScenario) run() {
 
-	activeRobots := []info.ID{1, 3}
+	activeRobots := []info.ID{4}
 	kickers := make(map[info.ID]*roles.OffenseRole)
 
 	gi := <-g.incomingGameInfo

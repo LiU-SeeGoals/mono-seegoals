@@ -102,7 +102,7 @@ func FwRealScenario() {
 	aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
 	if config.IsSimulated() {
-		teamYellow := []int{1, 3}
+		teamYellow := []int{4}
 		teamBlue := []int{1, 7}
 
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
