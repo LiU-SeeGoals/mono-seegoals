@@ -27,9 +27,9 @@ func NewGameInfo(capacity int) *GameInfo {
 // which side we are on we can use the same coordinate system
 func correctedPosition(team Team, pos Position) Position {
 
-	if team == Yellow {
+	if team == Blue {
 		return pos.Rotate(math.Pi)
-	} else if team == Blue {
+	} else if team == Yellow {
 		return pos
 	} else {
 		panic(fmt.Sprintf("Incorrect team given %v", team))
