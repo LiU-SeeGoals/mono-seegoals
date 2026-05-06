@@ -198,6 +198,7 @@ func (m *MoveTo) ToDTO() ActionDTO {
 	return ActionDTO{
 		Action:  robot_action.ActionType_MOVE_TO_ACTION,
 		Id:      m.Id,
+		Team:    int(m.Team),
 		PosX:    int32(m.Pos.X),
 		PosY:    int32(m.Pos.Y),
 		PosW:    float32(m.Pos.Angle),

@@ -5,8 +5,8 @@ import { actionToStr } from '../../../helper/defaultValues';
 import { SSL_GeometryFieldSize } from '../../../proto/ssl_vision_geometry';
 
 const TEAM_IDS = Object.freeze({
-  YELLOW: 0,
-  BLUE: 1,
+  YELLOW: 1,
+  BLUE: 2,
 });
 
 const REAL_WIDTH_FIELD: number = 9600;
@@ -211,7 +211,17 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     });
   };
 
-  const getRobotPositionById = (id: number): { x: number; y: number } | null => {
+  const getRobotPositionById = (id: number, team?: number): { x: number; y: number } | null => {
+    if (team === TEAM_IDS.BLUE) {
+      const blue = sslFieldUpdate.robotsBlue.find((r) => r.robotId === id);
+      return blue ? { x: blue.x, y: blue.y } : null;
+    }
+
+    if (team === TEAM_IDS.YELLOW) {
+      const yellow = sslFieldUpdate.robotsYellow.find((r) => r.robotId === id);
+      return yellow ? { x: yellow.x, y: yellow.y } : null;
+    }
+
     const blue = sslFieldUpdate.robotsBlue.find((r) => r.robotId === id);
     if (blue) return { x: blue.x, y: blue.y };
     const yellow = sslFieldUpdate.robotsYellow.find((r) => r.robotId === id);
@@ -257,7 +267,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
 
         // Draw the full planned path (robot -> ...waypoints... -> goal) if present.
         // We prepend the *observed* robot position so the line starts where the robot is now.
-        const robotPos = getRobotPositionById(action.Id);
+        const robotPos = getRobotPositionById(action.Id, action.Team);
         if (robotPos && action.Path && action.Path.length > 0) {
           const polyPoints = [
             robotPos,
