@@ -46,6 +46,7 @@ type MoveToPosition struct {
 	rrtConfig         pathplanner.RRTConfig
 	gi                *info.GameInfo
 	avoidBall         bool
+	avoidGoallines    bool
 	// Sticky look-ahead (avoids flicker from per-tick reprojection)
 	stickyDest   info.Position
 	stickySet    bool
@@ -75,6 +76,9 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 func (m *MoveToPosition) AvoidBall(avoid bool) {
 	m.avoidBall = avoid
 }
+func (m *MoveToPosition) AvoidGoallines(avoid bool) {
+	m.avoidGoallines = avoid
+}
 
 // GetAction returns an action for the robot with RRT-based collision avoidance
 func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
@@ -103,17 +107,18 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	if RRT {
 		m.rrtConfig.StepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), m.rrtConfig.StepSize)
 		m.AvoidBall(true)
+		m.AvoidGoallines(true)
 		targetPos = myPos
 
 		ps := getPathService(m.team)
 		if ps != nil {
 			cfg := m.rrtConfig
-			m.path = ps.PlanPath(m.team, m.id, m.final_destination, m.avoidBall, gi, cfg)
+			m.path = ps.PlanPath(m.team, m.id, m.final_destination, m.avoidBall, m.avoidGoallines, gi, cfg)
 		} else {
 			m.path = []info.Position{m.final_destination}
 		}
 
-		obstacles := pathplanner.ObstaclesForRobot(m.team, m.id, m.avoidBall, gi)
+		obstacles := pathplanner.ObstaclesForRobot(m.team, m.id, m.avoidBall, m.avoidGoallines, gi)
 		if len(m.path) > 0 {
 			cand := m.pickLookAheadTarget(myPos, obstacles)
 			targetPos = m.applyStickyLookAhead(myPos, cand)
