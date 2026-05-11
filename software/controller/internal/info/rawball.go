@@ -87,3 +87,24 @@ func (b *rawBall) GetPosition() (Position, error) {
 
 	return pos, err
 }
+
+
+func (b *rawBall) GetLatestTwoPositionsTime() (Position, int64, Position, int64, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if b.history.Len() < 2 {
+		return Position{}, 0, Position{}, 0, errors.New("Not enough ball history")
+	}
+
+	currentElement := b.history.Front()
+	previousElement := currentElement.Next()
+	if previousElement == nil {
+		return Position{}, 0, Position{}, 0, errors.New("Missing previous ball position")
+	}
+
+	current := currentElement.Value.(*rawBallPos)
+	previous := previousElement.Value.(*rawBallPos)
+
+	return current.pos, current.time, previous.pos, previous.time, nil
+}

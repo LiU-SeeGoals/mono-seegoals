@@ -12,12 +12,12 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
 
-func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl){
+func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
 
 	ball := gameInfo.State.GetBall()
 	ballPos, ballTime, _ := ball.GetPositionTime()
 	if ballPos.Y > 3000 || ballPos.Y < -3000 || ballPos.X > 4500 || ballPos.X < -4500 || time.Now().UnixMilli()-ballTime > 5000 {
-		simController.TeleportBall(0, 0)
+		simController.TeleportBall(0, 1)
 	}
 
 	ge := gameInfo.Status.GetGameEvent()
@@ -27,7 +27,7 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	case info.STATE_KICKOFF_PREPARATION:
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
 			// fmt.Println("teleported ball (new kickoff)")
-			simController.TeleportBall(0, 0)
+			simController.TeleportBall(0, 1000)
 		}
 	case info.STATE_FREE_KICK:
 	case info.STATE_HALTED, info.STATE_STOPPED:
@@ -60,8 +60,8 @@ func GameScenario() {
 	var simClientYellow *client.SimClient
 	var simClientBlue *client.SimClient
 
-	slowBrainYellow := plan.NewGameScenario(info.Yellow)
-	slowBrainBlue := plan.NewPlannerGoalie(info.Blue)
+	slowBrainYellow := plan.NewCombinedPlan(info.Yellow)
+	slowBrainBlue := plan.NewCombinedPlan(info.Blue)
 
 	manualMovementYellow := plan.NewPlannerManualMovement(info.Yellow)
 	// manualMovementBlue := plan.NewPlannerManualMovement(info.Blue)
@@ -73,8 +73,8 @@ func GameScenario() {
 	aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
 	if config.IsSimulated() {
-		teamYellow := []int{1, 3}
-		teamBlue := []int{7}
+		teamYellow := []int{1, 2, 3, 4, 5, 6}
+		teamBlue := []int{1, 2, 3, 4, 5, 6}
 
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
@@ -83,7 +83,9 @@ func GameScenario() {
 		simClientBlue = client.NewSimClient(config.GetSimBlueTeamAddress(), gameInfo)
 
 		simController = simulator.NewSimControl()
+		simController.TeleportBall(0, 1000)
 		simController.SetPresentRobots(teamYellow, teamBlue)
+
 	} else {
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddressReal())
@@ -91,21 +93,21 @@ func GameScenario() {
 		basestationClient = client.NewBaseStationClient(config.GetBasestationAddress())
 		basestationClient.Init()
 	}
-
+	simController.TeleportBall(0, 1000)
 	for {
+
 		playTime := time.Now().UnixMilli()
 
 		sslClientRaw.UpdateState(gameInfo, playTime)
 		sslClientTracked.UpdateState(gameInfo, playTime)
 
-
 		command := client.GetCommand(client.CHANGE_SCENARIO)
 
-		if command != nil{
-			if command.Type == "Manual"{
+		if command != nil {
+			if command.Type == "Manual" {
 				aiYellow.HotswapPlanner(info.Yellow, manualMovementYellow)
 				// aiBlue.HotswapPlanner(info.Blue, manualMovementBlue)
-			} else if command.Type == "Game"{
+			} else if command.Type == "Game" {
 				aiYellow.HotswapPlanner(info.Yellow, slowBrainYellow)
 				aiBlue.HotswapPlanner(info.Blue, slowBrainBlue)
 			}
@@ -120,7 +122,6 @@ func GameScenario() {
 
 		client.BroadcastActions(actionsYellow)
 		client.BroadcastActions(actionsBlue)
-
 
 		if config.IsSimulated() {
 			simClientYellow.SendActions(actionsYellow)

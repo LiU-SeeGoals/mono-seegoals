@@ -73,24 +73,35 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
 		mv.simAllocated = true
 	}
 
-	const distKp = 0.0000005
-	const angleKp = 1.0
-	mv.Dest.Angle = convAngle(mv.Dest.Angle)
-	mv.Pos.Angle = convAngle(mv.Pos.Angle)
+    const maxLinearSpeed = 0.65
+    const slowdownDistance = 1000.0
+    const minLinearSpeed = 0.02
+    const angleKp = 1.0
+    mv.Dest.Angle = convAngle(mv.Dest.Angle)
+    mv.Pos.Angle = convAngle(mv.Pos.Angle)
 
-	dx := mv.Dest.X - mv.Pos.X
-	dy := mv.Dest.Y - mv.Pos.Y
-	angleDiff := info.NormalizeAngleDelta(mv.Dest.Angle, mv.Pos.Angle)
-	distance := math.Sqrt(dx*dx + dy*dy)
-	maxSpeed := float64(0.5)
+    dx := mv.Dest.X - mv.Pos.X
+    dy := mv.Dest.Y - mv.Pos.Y
+    angleDiff := info.NormalizeAngleDelta(mv.Dest.Angle, mv.Pos.Angle)
+    distance := math.Sqrt(dx*dx + dy*dy)
 
-	speedCtrl := math.Max(math.Min(maxSpeed, distKp*distance), 0.002)
+    speed := 0.0
+    if distance > 1 {
+        speed = math.Min(maxLinearSpeed, maxLinearSpeed/slowdownDistance*distance)
+        speed = math.Max(speed, minLinearSpeed)
+    }
 
-	maxAngleSpeed := 3.0
-	angleCtrl := float32(math.Min(maxAngleSpeed, angleKp*float64(angleDiff)))
+    maxAngleSpeed := 3.0
+    angleCtrl := float32(math.Max(-maxAngleSpeed, math.Min(maxAngleSpeed, angleKp*float64(angleDiff))))
 
-	forward := float32(speedCtrl * (dx*math.Cos(-mv.Pos.Angle) - dy*math.Sin(-mv.Pos.Angle)))
-	left := float32(speedCtrl * (dx*math.Sin(-mv.Pos.Angle) + dy*math.Cos(-mv.Pos.Angle)))
+    forward := float32(0)
+    left := float32(0)
+    if distance > 1 {
+        unitX := dx / distance
+        unitY := dy / distance
+        forward = float32(speed * (unitX*math.Cos(-mv.Pos.Angle) - unitY*math.Sin(-mv.Pos.Angle)))
+        left = float32(speed * (unitX*math.Sin(-mv.Pos.Angle) + unitY*math.Cos(-mv.Pos.Angle)))
+    }
 
 	// Update pre-allocated scalar values in place (pointers already wired up)
 	mv.simForward = forward
@@ -187,6 +198,7 @@ func (m *MoveTo) ToDTO() ActionDTO {
 	return ActionDTO{
 		Action:  robot_action.ActionType_MOVE_TO_ACTION,
 		Id:      m.Id,
+		Team:    int(m.Team),
 		PosX:    int32(m.Pos.X),
 		PosY:    int32(m.Pos.Y),
 		PosW:    float32(m.Pos.Angle),

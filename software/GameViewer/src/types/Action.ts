@@ -1,5 +1,6 @@
 export type Action = {
   Id: number;
+  Team?: number;
   Action: number;
   PosX: number;
   PosY: number;
