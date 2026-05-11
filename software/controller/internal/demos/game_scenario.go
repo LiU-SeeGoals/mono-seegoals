@@ -73,8 +73,8 @@ func GameScenario() {
 	aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
 	if config.IsSimulated() {
-		teamYellow := []int{1, 2, 3, 4, 5, 6}
-		teamBlue := []int{1, 2, 3, 4, 5, 6}
+		teamYellow := []int{1}
+		teamBlue := []int{}
 
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())

@@ -150,8 +150,8 @@ func (m *CombinedPlan) calcWallPositions(attackerPos Position, goalCenter Positi
 }
 
 func (m *CombinedPlan) run() {
-	offenseRobots := []info.ID{1, 2}
-	defenseRobots := []info.ID{3, 4, 5}
+	offenseRobots := []info.ID{1}
+	// defenseRobots := []info.ID{}
 	goalieID := info.ID(6)
 
 	gi := <-m.incomingGameInfo
@@ -163,12 +163,12 @@ func (m *CombinedPlan) run() {
 		kickers[id] = kicker
 	}
 
-	defenders := make(map[info.ID]*roles.DefenseRole)
-	for _, id := range defenseRobots {
-		defender := roles.NewDefenseRole(id, m.ActivityHandler, &gi, m.team)
-		defender.Init()
-		defenders[id] = defender
-	}
+	// defenders := make(map[info.ID]*roles.DefenseRole)
+	// for _, id := range defenseRobots {
+	// 	defender := roles.NewDefenseRole(id, m.ActivityHandler, &gi, m.team)
+	// 	defender.Init()
+	// 	defenders[id] = defender
+	// }
 
 	// Goalie setup
 	clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
@@ -236,23 +236,23 @@ func (m *CombinedPlan) run() {
 			kicker.Run()
 		}
 
-		attackerPos, found := m.getAttackerPosition(&gi)
-		if found && m.attackerIsThreatening(&gi, attackerPos) {
-			bot3Pos, bot4Pos, bot5Pos := m.calcWallPositions(attackerPos, m.defendedGoalCenter(&gi))
-			defenders[3].SetWallPosition(bot3Pos)
-			defenders[4].SetWallPosition(bot4Pos)
-			defenders[5].SetWallPosition(bot5Pos)
-			for _, d := range defenders {
-				d.TriggerEvent("ATTACKER_NEAR")
-			}
-		} else {
-			for _, d := range defenders {
-				d.TriggerEvent("ATTACKER_FAR")
-			}
-		}
-		for _, d := range defenders {
-			d.Run()
-		}
+		// attackerPos, found := m.getAttackerPosition(&gi)
+		// if found && m.attackerIsThreatening(&gi, attackerPos) {
+		// 	bot3Pos, bot4Pos, bot5Pos := m.calcWallPositions(attackerPos, m.defendedGoalCenter(&gi))
+		// 	defenders[3].SetWallPosition(bot3Pos)
+		// 	defenders[4].SetWallPosition(bot4Pos)
+		// 	defenders[5].SetWallPosition(bot5Pos)
+		// 	for _, d := range defenders {
+		// 		d.TriggerEvent("ATTACKER_NEAR")
+		// 	}
+		// } else {
+		// 	for _, d := range defenders {
+		// 		d.TriggerEvent("ATTACKER_FAR")
+		// 	}
+		// }
+		// for _, d := range defenders {
+		// 	d.Run()
+		// }
 
 		// Goalie logic
 		goalieRole.SetGameInfo(gi)
