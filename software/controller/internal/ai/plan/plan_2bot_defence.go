@@ -129,8 +129,19 @@ func (m *TwoBotDefence) calculateCentralCoverPos(ballPos, ownGoalCenter Position
 	return target
 }
 
-func (m *TwoBotDefence) calculatePressPos(ballPos Position) Position {
-	return ballPos
+const pressStandoffDist = 350.0 // mm from ball toward own goal
+
+func (m *TwoBotDefence) calculatePressPos(ballPos, ownGoalCenter Position) Position {
+	goalToBall := ballPos.Sub(&ownGoalCenter)
+	dir := normalizeSafe(goalToBall)
+	if dir.Norm2d() < 1e-6 {
+		return ballPos
+	}
+	// Stand pressStandoffDist mm in front of the ball (between ball and own goal)
+	offset := dir.Scale(-pressStandoffDist)
+	pos := ballPos.Add(&offset)
+	pos.Angle = pos.AngleToPosition(ballPos)
+	return pos
 }
 
 func (m *TwoBotDefence) calculateWidePos(ballPos Position, ownGoalCenter Position, side float64) Position {
@@ -264,7 +275,7 @@ type roleCandidate struct {
 func (m *TwoBotDefence) buildRoleTargets(ballPos, ownGoalCenter Position, gi *GameInfo) map[candidateRole]Position {
 	return map[candidateRole]Position{
 		candCentral:   m.calculateCentralCoverPos(ballPos, ownGoalCenter),
-		candPress:     m.calculatePressPos(ballPos),
+		candPress:     m.calculatePressPos(ballPos, ownGoalCenter),
 		candWideLeft:  m.calculateWidePos(ballPos, ownGoalCenter, +1),
 		candWideRight: m.calculateWidePos(ballPos, ownGoalCenter, -1),
 		candSupport:   m.calculateSupportPos(ballPos, ownGoalCenter, gi),

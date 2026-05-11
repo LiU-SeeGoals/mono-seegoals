@@ -12,6 +12,10 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
+const attackerThreatX = 2800.0
+
+var blueGoalCenter = Position{X: 4500, Y: 0, Z: 0, Angle: 0}
+
 type CombinedPlan struct {
 	plannerCore
 }

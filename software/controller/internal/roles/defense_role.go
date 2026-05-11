@@ -87,9 +87,12 @@ func (s *DefensePressState) Update() EventName {
 		if ballPos.X*sign > 1000.0 {
 			s.activityHandler.AddActivity(s.kickActivity)
 		} else {
-			chase := ballPos
-			chase.Angle = robotPos.AngleToPosition(ballPos)
-			s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, chase))
+			pressTarget := target
+			if pressTarget.Norm2d() < 1e-6 {
+				pressTarget = ballPos
+				pressTarget.Angle = robotPos.AngleToPosition(ballPos)
+			}
+			s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, pressTarget))
 		}
 
 	case RoleCentral:
