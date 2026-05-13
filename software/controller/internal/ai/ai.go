@@ -107,6 +107,12 @@ func (m *ActivityHandler) ClearActivities() {
 	*m.Activities = [info.TEAM_SIZE]ai.Activity{}
 }
 
+func (m *ActivityHandler) ClearActivity(id info.ID) {
+	m.Activity_lock.Lock()
+	defer m.Activity_lock.Unlock()
+	m.Activities[id] = nil
+}
+
 func (m *ActivityHandler) AddActivity(activity ai.Activity) {
 	// m.activity_lock.Lock()
 	// defer m.activity_lock.Unlock()
