@@ -1,3 +1,6 @@
+[workspace]
+members = ["pico-encoder"]
+
 [package]
 edition = "2024"
 name = "encoder-counter"
@@ -22,7 +25,7 @@ rp235x-hal = { version = "0.4", features = [
     "critical-section-impl",
     "binary-info",
 ] }
-pico-encoder = { path = "/home/lexa/repos/roche-limit-firmware/pico-encoder" }
+pico-encoder = { path = "pico-encoder" }
 heapless = "0.9.2"
 
 # cargo build/run
