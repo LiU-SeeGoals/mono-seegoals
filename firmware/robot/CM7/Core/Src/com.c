@@ -248,9 +248,6 @@ uint8_t COM_Get_ID()
     if (w0 == 4522048 && w1 == 892490001 && w2 == 842217265) {
         return 6;
     }
-    if (w0 == 3801132 && w1 == 892490001 && w2 == 842217265) {
-        return 1;
-    }
     if (w0 == 2293800 && w1 == 858935561 && w2 == 808727605) {
         return 8;
     }
@@ -258,9 +255,15 @@ uint8_t COM_Get_ID()
         return 3;
     }
 
-    if (w0 == 3080240 && w1 == 842223876 && w2 == 842544439)
-    {
-        return 7;
+    // The following are the robots for the 2026 robocup competition
+    if (w0 == 3080240 && w1 == 842223876 && w2 == 842544439) {
+        return 1;
+    }
+    if (w0 == 3801132 && w1 == 892490001 && w2 == 842217265) {
+        return 2;
+    }
+    if (w0 == 4128804 && w1 == 842223876 && w2 == 842544439) {
+        return 3;
     }
     LOG_ERROR("Failed ID lookup for robot ID: %d %d %d\r\n", w0, w1, w2);
     return 255;
