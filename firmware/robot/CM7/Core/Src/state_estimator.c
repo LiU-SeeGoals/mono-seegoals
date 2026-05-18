@@ -249,7 +249,7 @@ void EKFInit(EKF* pKF, uint16_t numStates, uint16_t numCtrl, uint16_t numSensors
 
 void STATE_Init()
 {
-    LOG_InitModule(&internal_log_mod, "STATE", LOG_LEVEL_TRACE, 0);
+    LOG_InitModule(&internal_log_mod, "STATE", LOG_LEVEL_DEBUG, 0);
     initEKF();
 
     /*LagElementPT1Init(&fusionEKF.lagAccel[0], 1.0f, fusionEKF.pConfig->emaAccelT, STATE_DELTA_T);*/
@@ -408,7 +408,6 @@ void STATE_FusionEKFVisionUpdate(float posx, float posy, float posw)
 {
     // VISION
     DATA_log_vision(posx, posy, posw);
-    LOG_INFO("x: %f y: %f angle: %f\r\n", posx, posy, posw);
 
     float pos[3] = {posx, posy, posw};
 
