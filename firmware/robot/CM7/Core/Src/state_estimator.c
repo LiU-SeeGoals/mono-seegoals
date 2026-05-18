@@ -94,6 +94,7 @@ void EKFUpdate(EKF* pKF)
     pKF->tmp1.numRows = pKF->h;
     pKF->tmp1.numCols = pKF->h;
     arm_status invStat;
+
     switch (pKF->h) {
     case 1:
         if (pKF->tmp3.pData[0] == 0.0f) {
@@ -113,7 +114,9 @@ void EKFUpdate(EKF* pKF)
         invStat = arm_mat_inverse_f32(&pKF->tmp3, &pKF->tmp1);
         break;
     }
-    /*if(invStat != ARM_MATH_SUCCESS)*/
+    if(invStat != ARM_MATH_SUCCESS){
+        return;// skip update on failure to invert
+    }
     /*	LogErrorC("Matrix inverse error", invStat);*/
     // K = tmp2*tmp1 (f x h)
     arm_mat_mult_f32(&pKF->tmp2, &pKF->tmp1, &pKF->K);
@@ -246,7 +249,7 @@ void EKFInit(EKF* pKF, uint16_t numStates, uint16_t numCtrl, uint16_t numSensors
 
 void STATE_Init()
 {
-    LOG_InitModule(&internal_log_mod, "STATE", LOG_LEVEL_TRACE, 0);
+    LOG_InitModule(&internal_log_mod, "STATE", LOG_LEVEL_DEBUG, 0);
     initEKF();
 
     /*LagElementPT1Init(&fusionEKF.lagAccel[0], 1.0f, fusionEKF.pConfig->emaAccelT, STATE_DELTA_T);*/
@@ -258,21 +261,6 @@ void STATE_Init()
     fusionEKF.ekf_lock = 0;
     fusionEKF.bias.is_calibrated = -1;
     /*LagElementPT1Init(&fusionEKF.dribbler.lagCurrent, 1.0f, 0.005f, STATE_DELTA_T);*/
-}
-
-/*
- *  Print a 4x4 matrix
- */
-void STATE_logm44(const float32_t* m44)
-{
-    // clang-format off
-  LOG_DEBUG("Matrix 4x4 \r\n%0.2f %0.2f %0.2f %0.2f\r\n%0.2f %0.2f %0.2f %0.2f\r\n%0.2f %0.2f %0.2f %0.2f\r\n%0.2f %0.2f %0.2f %0.2f end\r\n",
-      m44[0*4], m44[0*4 + 1], m44[0*4 + 2], m44[0*4 + 3],
-      m44[1*4], m44[1*4 + 1], m44[1*4 + 2], m44[1*4 + 3],
-      m44[2*4], m44[2*4 + 1], m44[2*4 + 2], m44[2*4 + 3],
-      m44[3*4], m44[3*4 + 1], m44[3*4 + 2], m44[3*4 + 3]
-      );
-    // clang-format on
 }
 
 /*
@@ -305,8 +293,8 @@ static void ekfStateJacobianFunc(const arm_matrix_instance_f32* pX, const arm_ma
 
     arm_mat_identity_f32(pF);
 
-    MAT_ELEMENT(*pF, 0, 2) = (-vx*sin(pw) - vy*cos(pw)) * dt;
-    MAT_ELEMENT(*pF, 1, 2) = (vx*cos(pw)-vy*sin(pw))*dt;
+    MAT_ELEMENT(*pF, 0, 2) = (-vx*sinf(pw) - vy*cosf(pw)) * dt;
+    MAT_ELEMENT(*pF, 1, 2) = (vx*cosf(pw)-vy*sinf(pw))*dt;
 }
 
 static void ekfMeasFunc(const arm_matrix_instance_f32* pX, arm_matrix_instance_f32* pY)
@@ -420,7 +408,6 @@ void STATE_FusionEKFVisionUpdate(float posx, float posy, float posw)
 {
     // VISION
     DATA_log_vision(posx, posy, posw);
-    LOG_INFO("x: %f y: %f angle: %f\r\n", posx, posy, posw);
 
     float pos[3] = {posx, posy, posw};
 
@@ -459,8 +446,8 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     float body_speed[3];
     NAV_wheelToBody(body_speed);
     gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
-    gyrAcc[1] = 0;
-    gyrAcc[2] = 0;
+    gyrAcc[1] = body_speed[0];
+    gyrAcc[2] = body_speed[1];
 
     // Cache bias-corrected gyro for use in controllers
     fusionEKF.gyro_z = gyrAcc[0];
@@ -478,56 +465,6 @@ void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
     }
     memcpy(fusionEKF.ekf.u.pData, gyrAcc, sizeof(float) * 3);
     EKFPredict(&fusionEKF.ekf);
-}
-
-void STATE_Test()
-{
-    arm_matrix_instance_f32 A;   /* Matrix A Instance */
-    arm_matrix_instance_f32 B;   /* Matrix B Instance */
-    arm_matrix_instance_f32 AmB; /* Matrix A mutliplied with B */
-
-    const uint32_t srcRows = 4;
-    const uint32_t srcColumns = 4;
-    arm_status status;
-    arm_status test_status = ARM_MATH_SUCCESS;
-
-    // Result buffer
-    float32_t AmB_f32[16];
-
-    /* Initialise A Matrix Instance with numRows, numCols and data array(A_f32) */
-    arm_mat_init_f32(&A, srcRows, srcColumns, (float32_t*)A_f32);
-    arm_mat_init_f32(&B, srcRows, srcColumns, (float32_t*)B_f32);
-    arm_mat_init_f32(&AmB, srcRows, srcColumns, (float32_t*)AmB_f32);
-    status = arm_mat_mult_f32(&A, &B, &AmB);
-
-    // Sanity test check that we understand how the mult works
-    if (status != ARM_MATH_SUCCESS || AmB_f32[0 * 4 + 3] != 2 || AmB_f32[1 * 4 + 3] != 1 || AmB_f32[2 * 4 + 3] != 1 || AmB_f32[3 * 4 + 3] != 1) {
-        test_status = ARM_MATH_TEST_FAILURE;
-    }
-
-    if (test_status != ARM_MATH_SUCCESS) {
-        LOG_DEBUG("Test %d failed glhf\r\n", 1);
-    }
-
-    // More tests here.....
-
-    // This test is tricky because of the low pass filter... Seems to work though
-    initEKF();
-    IMU_AccelVec3 acc = {0, 1, 0};
-    IMU_GyroVec3 gyr = {0, 0, 0};
-    STATE_FusionEKFIntertialUpdate(acc, gyr);
-
-    float posx = MAT_ELEMENT(fusionEKF.ekf.x, 0, 0);
-    float posy = MAT_ELEMENT(fusionEKF.ekf.x, 1, 0);
-    float posw = MAT_ELEMENT(fusionEKF.ekf.x, 2, 0);
-    float velx = MAT_ELEMENT(fusionEKF.ekf.x, 3, 0);
-    float vely = MAT_ELEMENT(fusionEKF.ekf.x, 4, 0);
-
-    LOG_DEBUG("Got from fusion (px,py,pw,vx,vy) %f %f %f %f %f\r\n", posx, posy, posw, velx, vely);
-
-    if (test_status == ARM_MATH_SUCCESS) {
-        LOG_DEBUG("Tjoho all test passed\r\n");
-    }
 }
 
 float STATE_get_posx() { return MAT_ELEMENT(fusionEKF.ekf.x, 0, 0); }
