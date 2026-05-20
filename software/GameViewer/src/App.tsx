@@ -20,6 +20,10 @@ import {
 } from './helper/defaultValues';
 import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
 
+function fotballFieldClick(event){
+
+}
+
 function App() {
   const [sslFieldUpdate, setSSLFieldUpdate] = useState(getDefaultSSLFieldUpdate());
   const [aiRobotUpdate, setAIUpdate] = useState(getDefaultAIRobotUpdate());
@@ -39,7 +43,7 @@ function App() {
     setFieldGeometry
   );
 
-  const { isConnected: isConnectedToAI } = useAIController(setRobotActions);
+  const { isConnected: isConnectedToAI, controllerSend } = useAIController(setRobotActions);
 
   const { isConnected: isConnectedToGameController } = useGameController();
   useEffect(() => {
@@ -63,6 +67,7 @@ function App() {
         sslFieldUpdate={sslFieldUpdate}
         sidebarWidth={sidebarWidth}
         setSidebarWidth={setSidebarWidth}
+        controllerSend={controllerSend}
       />
       <GameViewer
         sslFieldUpdate={sslFieldUpdate}
@@ -74,6 +79,7 @@ function App() {
         vectorSettingYellow={vectorSettingYellow}
         sidebarWidth={sidebarWidth}
         fieldGeometry={fieldGeometry}
+        controllerSend={controllerSend}
       />
     </div>
   );

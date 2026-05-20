@@ -1,5 +1,6 @@
 export type Action = {
   Id: number;
+  Team?: number;
   Action: number;
   PosX: number;
   PosY: number;
@@ -9,4 +10,5 @@ export type Action = {
   DestW: number;
   Dribble: boolean;
   PreviousAction: number;
+  Path?: { X: number; Y: number }[];
 };

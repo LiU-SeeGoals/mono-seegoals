@@ -1,6 +1,7 @@
 #include "nav.h"
 #include "common.h"
 #include "kicker.h"
+#include "data_logging.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
 
@@ -141,40 +142,53 @@ void NAV_wheelToBody(float* res)
 
     // wheel to body psudeo inverse https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
     // TODO: measure real wheel radius and chasis radius
-    float r = 1.f;
-    float R = 1.f;
+    float r = 0.0275;
+    float R = 0.09;
 
     float psi = PI * 31.f / 180.0f;
     float theta = PI * 45.f / 180.0f;
 
-    float wrf = MOTOR_get_motor_ticks_per_iteration(&motors[0]);
-    float wrb = MOTOR_get_motor_ticks_per_iteration(&motors[1]);
-    float wlb = MOTOR_get_motor_ticks_per_iteration(&motors[2]);
-    float wlf = MOTOR_get_motor_ticks_per_iteration(&motors[3]);
+    float wrf = MOTOR_GetMotorSign(&motors[0]) * MOTOR_ReadTicksPerSecond(&motors[0]) / 48.f * 2.0f * PI;
+    float wlf = MOTOR_GetMotorSign(&motors[1]) * MOTOR_ReadTicksPerSecond(&motors[1]) / 48.f * 2.0f * PI;
+    float wlb = MOTOR_GetMotorSign(&motors[2]) * MOTOR_ReadTicksPerSecond(&motors[2]) / 48.f * 2.0f * PI;
+    float wrb = MOTOR_GetMotorSign(&motors[3]) * MOTOR_ReadTicksPerSecond(&motors[3]) / 48.f * 2.0f * PI;
+
+    // motors[0].speed = wrf;
+    // motors[1].speed = wlf;
+    // motors[2].speed = wlb;
+    // motors[3].speed = wrb;
 
     float cos_psi = arm_cos_f32(psi);
     float cos_theta = arm_cos_f32(theta);
     float sin_psi = arm_sin_f32(psi);
     float sin_theta = arm_sin_f32(theta);
 
-    float m11 = r * (cos_psi / (2.0f * (cos_psi * cos_psi + cos_theta * cos_theta)));
-    float m12 = m11;
-    float m13 = -m11;
-    float m14 = -m11;
+    float denom1 = 2.0f * (cos_psi * cos_psi + cos_theta * cos_theta);
 
-    float m21 = r * (1.0 / (2.0f * (sin_psi + sin_theta)));
-    float m22 = -m21;
-    float m23 = -m21;
-    float m24 = m21;
+    float m11 = r * cos_psi / denom1;
+    float m12 = r * cos_theta / denom1;
+    float m13 = r * -cos_theta / denom1;
+    float m14 = r * -cos_psi / denom1;
 
-    float m31 = r * (sin_theta / (2.0f * R * (sin_psi + sin_theta)));
-    float m32 = m31;
-    float m33 = m31;
-    float m34 = m31;
+    float denom2 = 2.0f * (sin_psi + sin_theta);
+
+    float m21 = r * 1.f / denom2;
+    float m22 = r * -1.f / denom2;
+    float m23 = r * -1.f / denom2;
+    float m24 = r * 1.f / denom2;
+
+    float denom3 = 2 * R * (sin_psi + sin_theta);
+
+    float m31 = sin_theta / denom3;
+    float m32 = sin_psi / denom3;
+    float m33 = sin_psi / denom3;
+    float m34 = sin_theta / denom3;
 
     float u = wrf * m11 + wrb * m12 + wlb * m13 + wlf * m14;
     float v = wrf * m21 + wrb * m22 + wlb * m23 + wlf * m24;
     float w = wrf * m31 + wrb * m32 + wlb * m33 + wlf * m34;
+
+    DATA_log_odometry(u, v, w);
     res[0] = u;
     res[1] = v;
     res[2] = w;
@@ -203,6 +217,21 @@ void NAV_steer(float u, float v, float w)
     float wrb = 1.0 / r * (u * arm_cos_f32(theta) - v * arm_sin_f32(theta) + w * R);
     float wlb = 1.0 / r * (-u * arm_cos_f32(theta) - v * arm_sin_f32(theta) + w * R);
     float wlf = 1.0 / r * (-u * arm_cos_f32(psi) + v * arm_sin_f32(psi) + w * R);
+
+    // Wheel-space saturation: scale all wheels proportionally to preserve velocity ratio
+    const float WHEEL_MAX = 400.0f;
+    float max_wheel = fabsf(wrf);
+    if (fabsf(wrb) > max_wheel) max_wheel = fabsf(wrb);
+    if (fabsf(wlb) > max_wheel) max_wheel = fabsf(wlb);
+    if (fabsf(wlf) > max_wheel) max_wheel = fabsf(wlf);
+
+    if (max_wheel > WHEEL_MAX) {
+        float scale = WHEEL_MAX / max_wheel;
+        wrf *= scale;
+        wrb *= scale;
+        wlb *= scale;
+        wlf *= scale;
+    }
 
     motors[0].speed = wrf;
     motors[1].speed = wlf;
@@ -309,9 +338,11 @@ void NAV_HandleCommand(Command* cmd)
 
 void NAV_GoToAction(Command* cmd)
 {
-    static int32_t prev_nav_x = 2147483647;
-    static int32_t prev_nav_y = 2147483647;
-    static int32_t prev_nav_w = 2147483647;
+    // Only initialised on first run since static
+    // Large values to always respect first vision data received
+    static int32_t prev_cam_x = 2147483647;
+    static int32_t prev_cam_y = 2147483647;
+    static int32_t prev_cam_w = 2147483647;
 
     const int32_t nav_x = cmd->dest->x;
     const int32_t nav_y = cmd->dest->y;
@@ -321,7 +352,7 @@ void NAV_GoToAction(Command* cmd)
     const int32_t cam_y = cmd->pos->y;
     const int32_t cam_w = cmd->pos->w;
 
-    // Hax to cange to to float meter rep just for testing first time... hehe
+    // Within the robot we work in meters
     // Angle is scaled by 1000 before sent to robot.
     const float f_nav_x = ((float)nav_x) / 1000.f;
     const float f_nav_y = ((float)nav_y) / 1000.f;
@@ -337,16 +368,22 @@ void NAV_GoToAction(Command* cmd)
 
     // -- Vision update --
 
-    if (abs(prev_nav_x - nav_x + prev_nav_y - nav_y + prev_nav_w - nav_w) == 0) {
+    int32_t diff = prev_cam_x - cam_x + prev_cam_y - cam_y + prev_cam_w - cam_w;
+
+    if (abs(diff) < 2) {
         // If the vision position is exactly the same as last time it is likely not updated information.
         // Ignore old information
+        // LOG_INFO("ignoring vision %d\r\n", diff);
         return;
     }
 
 
-    prev_nav_x = f_cam_x;
-    prev_nav_y = f_cam_y;
-    prev_nav_w = f_cam_w;
+    // LOG_INFO("diff %d\r\n", diff);
+
+
+    prev_cam_x = cam_x;
+    prev_cam_y = cam_y;
+    prev_cam_w = cam_w;
 
     STATE_FusionEKFVisionUpdate(f_cam_x, f_cam_y, f_cam_w);
 }

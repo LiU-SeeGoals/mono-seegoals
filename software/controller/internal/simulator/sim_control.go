@@ -6,7 +6,6 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/client"
 	"github.com/LiU-SeeGoals/controller/internal/config"
-	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/proto_go/gc"
@@ -37,6 +36,15 @@ func (sc *SimControl) TurnOnCameraRealism() {
 	Logger.Error("TurnOnCameraRealism not yet implemented")
 }
 
+func Contains(slice []int, num int) bool {
+	for _, item := range slice {
+		if item == num {
+			return true
+		}
+	}
+	return false
+}
+
 func centerCircle(number int, radius float32) (float32, float32) {
 	total_slots := 11 * 2
 	angle_step := 2 * math.Pi / float64(total_slots)
@@ -58,7 +66,7 @@ func (sc *SimControl) SetPresentRobots(presentYellow []int, presentBlue []int) {
 
 	for i := 0; i < TOTAL_ROBOTS; i++ {
 		present := false
-		if helper.Contains(presentYellow, i) { // all robots after the number we want --> set to not present
+		if Contains(presentYellow, i) { // all robots after the number we want --> set to not present
 			present = true
 		}
 
@@ -87,7 +95,7 @@ func (sc *SimControl) SetPresentRobots(presentYellow []int, presentBlue []int) {
 
 	for i := 0; i < TOTAL_ROBOTS; i++ {
 		present := false
-		if helper.Contains(presentBlue, i) { // all robots after the number we want --> set to not present
+		if Contains(presentBlue, i) { // all robots after the number we want --> set to not present
 			present = true
 		}
 
@@ -231,8 +239,7 @@ func (sc *SimControl) TeleportRobot(x float32, y float32, id uint32, team info.T
 func (sc *SimControl) TeleportBall(x float32, y float32) {
 	// Set default values for orientation and velocities
 	zero := float32(0.0)
-	x = x / 1000.0
-	y = y / 1000.0
+
 	teleball := &simulation.TeleportBall{
 		X:  &x,
 		Y:  &y,

@@ -118,11 +118,11 @@ typedef enum
 } EKF_LOCK;
 
 typedef struct _FusionEKF {
-    // EKF state vector: [ px py pw vx vy ]
+    // EKF state vector: [ px py pw]
     // input vector: [ gyr_w acc_x acc_y ]
     // measurement vector: [ px py pw ]
     EKF ekf;
-    float ekfData[EKF_DATA_SIZE(5, 3, 3, 5)];
+    float ekfData[EKF_DATA_SIZE(3, 3, 3, 3)];
     EKF_LOCK ekf_lock;
     /*float imu_dt;*/
 
@@ -136,6 +136,9 @@ typedef struct _FusionEKF {
         uint16_t is_calibrated;
 
     } bias;
+
+    // Cached sensor values (bias-corrected)
+    float gyro_z;
 
     /*float encGyrPos[3];*/
 
@@ -239,6 +242,11 @@ float STATE_get_vx();
  * Gets the estimated velocity in the y field direction
  */
 float STATE_get_vy();
+
+/**
+ * Gets the cached bias-corrected gyro z reading (rad/s)
+ */
+float STATE_get_gyro_z();
 
 /**
  * Output the current estimated state to the log

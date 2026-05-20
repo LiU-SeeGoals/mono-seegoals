@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const MAX_SEND_SIZE = 2048
+const MAX_SEND_SIZE = 32
 
 type Connection interface {
 	Write(b []byte) (n int, err error)
@@ -29,6 +29,7 @@ type BaseStationClient struct {
 }
 
 func NewBaseStationClient(address string) *BaseStationClient {
+
 	multicastIP := config.GetBasestationAdress()
 	multicastPort := config.GetBasestationPort()
 	remoteAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", multicastIP, multicastPort))

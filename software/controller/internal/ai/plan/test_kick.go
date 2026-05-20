@@ -5,8 +5,11 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
+
+const testKickPlannerLoopPeriod = 100 * time.Millisecond
 
 type TestKick struct {
 	plannerCore
@@ -30,28 +33,25 @@ func (m *TestKick) Init(
 	team info.Team,
 ) {
 	m.incomingGameInfo = incoming
-	m.activities = activities // store pointer directly
-	m.activity_lock = lock
+	m.ActivityHandler.Activities = activities // store pointer directly
+	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.start = time.Now()
 
 	go m.run()
 }
 
-func wait(ms time.Duration) {
-	time.Sleep(ms)
-}
-
 func (g *TestKick) run() {
 	for {
-		wait(100 * time.Millisecond)
-		if g.activities[3] == nil {
+		tickStart := time.Now()
+		if g.ActivityHandler.Activities[3] == nil {
 			queue := ai.NewActivityQueue(3, []ai.Activity{
 				ai.NewMoveToBall(g.team, 3),
 				ai.NewKickAtPosition(g.team, 3, info.Position{X: 2900, Y: 100}),
 			})
-			g.AddActivity(queue)
+			g.ActivityHandler.AddActivity(queue)
 		}
+		helper.PaceLoop(tickStart, testKickPlannerLoopPeriod, "test_kick")
 	}
 
 }

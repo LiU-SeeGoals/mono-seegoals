@@ -18,8 +18,6 @@ type GCConnection struct {
 	addr *net.UDPAddr
 	// Read buffer
 	buff []byte
-	// SSL lets not heap allocate this every time
-	packet gc.Referee
 }
 
 // Create a new SSL vision receiver.
@@ -62,14 +60,14 @@ func (r *GCConnection) Receive(packetChan chan *gc.Referee) {
 			continue
 		}
 
-		err = proto.Unmarshal(r.buff[:sz], &r.packet)
+		packet := &gc.Referee{}
+		err = proto.Unmarshal(r.buff[:sz], packet)
 		if err != nil {
 			fmt.Printf("Unable to unmarshal packet: %s", err)
 			continue
 		}
 
-		helper.NB_Send[gc.Referee](packetChan, &r.packet)
-
+		helper.NB_Send[gc.Referee](packetChan, packet)
 	}
 }
 
@@ -91,14 +89,13 @@ func (receiver *SSLRefereeClient) Connect() {
 func NewSSLRefereeClient(sslReceiverAddress string) *SSLRefereeClient {
 	receiver := &SSLRefereeClient{
 		gc:         NewGCConnection(sslReceiverAddress),
-		gc_channel: make(chan *gc.Referee),
+		gc_channel: make(chan *gc.Referee, 1),
 	}
 	receiver.Connect()
 	return receiver
 }
 
 func (receiver *SSLRefereeClient) handlePacket(packet *gc.Referee, ok bool, gi *info.GameInfo) {
-
 	if !ok {
 		fmt.Println("GC Channel closed")
 		return

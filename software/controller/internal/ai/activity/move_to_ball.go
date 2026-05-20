@@ -47,7 +47,9 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 	}
 
 	target := info.Position{X: ballPos.X, Y: ballPos.Y, Z: 0, Angle: angleToBall}
-	moveAction := NewMoveToPosition(m.team, m.id, target).GetMoveToAction(gi)
+	move := NewMoveToPosition(m.team, m.id, target)
+	move.AvoidBall(false)
+	moveAction := move.GetMoveToAction(gi)
 	moveAction.Dest.Angle = angleToBall
 	act := action.MoveTo{
 		Id:   int(m.id),
@@ -56,6 +58,8 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 		Dest: moveAction.Dest,
 
 		Dribble: dribble,
+		// Visualization only: keep the planned path without changing motion behavior.
+		Path: moveAction.Path,
 	}
 
 	return &act

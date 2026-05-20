@@ -157,7 +157,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         float w = NAV_GetNavW();
         DATA_log_imu_data(gyr.x,gyr.y,gyr.z);
 
-        POS_go_to_position(x,y,w);
+        POS_go_to_position_lqr(x,y,w);
     }
 
     /* USER CODE BEGIN Callback 1 */
@@ -288,6 +288,7 @@ int main(void)
     bool on = false;
 
     NAV_StopDribbler();
+    float out[3];
     while (1) {
 
         DATA_log_state(STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle());
@@ -298,6 +299,11 @@ int main(void)
         }
 
     /* USER CODE END WHILE */
+
+    // NAV_wheelToBody(out);
+    // LOG_INFO("x: %f y: %f angle: %f\r\n", STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle());
+    // LOG_INFO("x: %f y: %f angle: %f\r\n", out[0], out[1], out[2]);
+    // LOG_INFO("x: %f y: %f angle: %f\r\n", out[0], out[1], out[2]);
 
     /* USER CODE BEGIN 3 */
     }

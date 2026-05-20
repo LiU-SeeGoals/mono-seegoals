@@ -18,6 +18,14 @@ typedef struct
 
 typedef struct
 {
+    uint32_t timestamp;
+    float u;
+    float v;
+    float w;
+} Odometry;
+
+typedef struct
+{
     float px;
     float py;
     float pw;
@@ -69,6 +77,9 @@ typedef struct
 
     Vision vision[DOUBLE_BUFFER];
     uint8_t vision_write_idx;
+
+    Odometry odometry[DOUBLE_BUFFER];
+    uint8_t odometry_write_idx;
 
     volatile bool mutex; // volatile bools are atomic
 } DataLog;
@@ -167,6 +178,12 @@ static bool pack_spi_packet()
     msg.vision.z = data.vision[vision_idx].w;
     msg.vision.timestamp = data.vision[vision_idx].timestamp;
 
+    int odometry_idx = get_read_idx(&data.odometry_write_idx);
+    msg.odometry.x = data.odometry[odometry_idx].u;
+    msg.odometry.y = data.odometry[odometry_idx].v;
+    msg.odometry.z = data.odometry[odometry_idx].w;
+    msg.odometry.timestamp = data.odometry[odometry_idx].timestamp;
+
     msg.has_gyro = true;
     msg.has_state = true;
     msg.has_vision = true;
@@ -178,6 +195,7 @@ static bool pack_spi_packet()
     msg.has_pos_y = true;
     msg.has_pos_angle = true;
     msg.has_vision = true;
+    msg.has_odometry = true;
 
     // Skip the first byte to place message length there
     pb_ostream_t stream = pb_ostream_from_buffer(protobuf_buf + 1, sizeof(protobuf_buf) - 1);
@@ -208,6 +226,16 @@ void DATA_log_imu_data(float x, float y, float z)
     data.imu[data.imu_write_idx].y = y;
     data.imu[data.imu_write_idx].z = z;
     data.imu[data.imu_write_idx].timestamp = timestamp;
+    buffer_swap(&data.imu_write_idx);
+}
+
+void DATA_log_odometry(float u, float v, float w)
+{
+    uint32_t timestamp = HAL_GetTick();
+    data.odometry[data.odometry_write_idx].u = u;
+    data.odometry[data.odometry_write_idx].v = v;
+    data.odometry[data.odometry_write_idx].w = w;
+    data.odometry[data.odometry_write_idx].timestamp = timestamp;
     buffer_swap(&data.imu_write_idx);
 }
 

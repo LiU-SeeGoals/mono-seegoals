@@ -5,7 +5,6 @@ import (
 	"log"
 	"path/filepath"
 	"runtime"
-	"strconv"
 	"sync"
 
 	"github.com/caarlos0/env/v10"
@@ -22,7 +21,8 @@ type Config struct {
 	Env string `env:"ENVIRONMENT,required"`
 
 	// SSL vision config
-	SSLVision ConfigSSLVision
+	SSLVision        ConfigSSLVision
+	SSLTrackedVision ConfigSSLTrackedVision
 
 	Real ConfigReal
 
@@ -56,14 +56,26 @@ type ConfigSSLVision struct {
 	VizPort string `env:"SSL_VISION_VIZ_PORT,required"`
 }
 
+type ConfigSSLTrackedVision struct {
+	// Multicast address.
+	Address string `env:"SSL_VISION_MULTICAST_ADDR,required"`
+
+	// Tracker, detection, and geometry packets.
+	Port      string `env:"SSL_TRACKER_PORT,required"`
+	Port_real string `env:"SSL_TRACKER_PORT,required"`
+
+	// Visualization packets.
+	VizPort string `env:"SSL_VISION_VIZ_PORT,required"`
+}
+
 type ConfigReal struct {
 	BASESTATION_ADDR string `env:"BASESTATION_ADDR,required"`
 	BASESTATION_PORT string `env:"BASESTATION_PORT,required"`
 }
 
 type ConfigGameViewer struct {
-	Address string `env:"AI_ACTIONS_MULTICAST_ADDR,required"`
-	Port    string `env:"AI_ACTIONS_MULTICAST_PORT,required"`
+	Address string `env:"VITE_AI_GAME_VIEWER_SOCKET_ADDR,required"`
+	Port    string `env:"VITE_AI_GAME_VIEWER_SOCKET_PORT,required"`
 }
 
 type ConfigBasestation struct {
@@ -201,6 +213,11 @@ func GetSSLClientAddressReal() string {
 	return fmt.Sprintf("%s:%s", cfg.SSLVision.Address, cfg.SSLVision.Port_real)
 }
 
+func GetSSLTrackedClientAddressReal() string {
+	cfg := GetInstance()
+	return fmt.Sprintf("%s:%s", cfg.SSLTrackedVision.Address, cfg.SSLTrackedVision.Port_real)
+}
+
 func GetAIMulticastInterface() string {
 	cfg := GetInstance()
 	return cfg.AI.Interface
@@ -208,16 +225,13 @@ func GetAIMulticastInterface() string {
 
 func GetGameViewerAdress() string {
 	cfg := GetInstance()
+	println(cfg.GW.Address)
 	return cfg.GW.Address
 }
 
-func GetGameViewerPort() int {
+func GetGameViewerPort() string {
 	cfg := GetInstance()
-	num, err := strconv.Atoi(cfg.GW.Port)
-	if err != nil {
-		panic(err)
-	}
-	return num
+	return ":" + cfg.GW.Port
 }
 
 func GetBasestationAdress() string {
@@ -228,4 +242,9 @@ func GetBasestationAdress() string {
 func GetBasestationPort() string {
 	cfg := GetInstance()
 	return cfg.BS.Port
+}
+
+func IsSimulated() bool {
+	cfg := GetInstance()
+	return cfg.Env == "simulation"
 }

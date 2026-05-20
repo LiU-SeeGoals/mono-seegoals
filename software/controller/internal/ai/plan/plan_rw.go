@@ -6,8 +6,11 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
+
+const plannerRwLoopPeriod = 100 * time.Millisecond
 
 type plannerRw struct {
 	plannerCore
@@ -31,8 +34,8 @@ func (m *plannerRw) Init(
 	team info.Team,
 ) {
 	m.incomingGameInfo = incoming
-	m.activities = activities // store pointer directly
-	m.activity_lock = lock
+	m.ActivityHandler.Activities = activities // store pointer directly
+	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.start = time.Now()
 
@@ -61,14 +64,16 @@ func (m *plannerRw) run() {
 	fmt.Println(gameInfo.Status)
 
 	for {
-		time.Sleep(100 * time.Millisecond)
+		tickStart := time.Now()
 
 		robot := robots[0]
-		if m.activities[robot] == nil {
+		if m.ActivityHandler.Activities[robot] == nil {
 			fmt.Println(fmt.Sprintf("done with (%d) action (%s)", robot, m.team))
 			fmt.Println("next action: ", way_points[index])
-			m.AddActivity(ai.NewMoveToPosition(m.team, info.ID(robot), way_points[index]))
+			m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(robot), way_points[index]))
 			index = (index + 1) % len(way_points)
 		}
+
+		helper.PaceLoop(tickStart, plannerRwLoopPeriod, "planner_rw")
 	}
 }

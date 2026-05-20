@@ -3,29 +3,34 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"net"
+	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/config"
-	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/gorilla/websocket"
 )
 
-type WebServer struct {
-	multicastConns []*net.UDPConn
-	multicastAddr  *net.UDPAddr
+//----------------------------------------------------------------------------------------------
+// Start of WebServer class
+//----------------------------------------------------------------------------------------------
 
-	logPacketQueue []([]byte)
-	logQueueMutex  sync.Mutex
+// Define the WebServer class
+type WebServer struct {
+	websocketConnections      []*websocket.Conn
+	websocketConnectionsMutex sync.Mutex
+
+	websocketupgrader *websocket.Upgrader
 
 	gameStatePacketQueue []([]byte)
-	incomingActions      []action.ActionDTO
+	incomingData         []GameViewerCommand
+	dataLookup           map[string]*GameViewerCommand
 	gameStateQueueMutex  sync.Mutex
-	receivedDataMutex    sync.Mutex
+	// broadcastThreadMutex sync.Mutex
+	receivedDataMutex sync.Mutex
 }
 
 var (
@@ -33,74 +38,30 @@ var (
 	Once              sync.Once
 )
 
+// Method to get the singleton instance of the WebServer class
 func getInstance() *WebServer {
 	Once.Do(startWebServer)
 	return webserverInstance
 }
 
+// Constructor for the WebServer class
 func startWebServer() {
-	multicastIP := config.GetGameViewerAdress()
-	multicastPort := config.GetGameViewerPort()
-
-	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", multicastIP, multicastPort))
-	if err != nil {
-		panic(err)
-	}
-
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		panic(err)
-	}
-
-	foundInterface := false;
-
-	var connections []*net.UDPConn
-	for _, iface := range ifaces {
-		if config.GetAIMulticastInterface() != "" && config.GetAIMulticastInterface() != iface.Name {
-			continue
-		}
-
-		foundInterface = true;
-
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagMulticast == 0 {
-			continue
-		}
-
-		addrs, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-
-		for _, ifaceAddr := range addrs {
-			ipnet, ok := ifaceAddr.(*net.IPNet)
-			if !ok || ipnet.IP.To4() == nil {
-				continue
-			}
-
-			localAddr := &net.UDPAddr{IP: ipnet.IP, Port: 0}
-			conn, err := net.DialUDP("udp", localAddr, addr)
-			if err != nil {
-				continue
-			}
-
-			fmt.Printf("Multicast from %s via %s to %s:%d (GameViewer)\n",
-				ipnet.IP, iface.Name, multicastIP, multicastPort)
-			connections = append(connections, conn)
-		}
-	}
-
-	if len(connections) == 0 || foundInterface == false {
-		panic("no suitable interfaces found")
-	}
-
 	webserverInstance = &WebServer{
-		multicastConns:       connections,
-		multicastAddr:        addr,
-		gameStatePacketQueue: make([][]byte, 0),
-		logPacketQueue:       make([][]byte, 0),
+		gameStatePacketQueue: make([]([]byte), 0),
+		dataLookup:           make(map[string]*GameViewerCommand),
 	}
 
+	webserverInstance.websocketupgrader = webserverInstance.getUpgrader()
+
+	http.HandleFunc("/ws", webserverInstance.handleGameStateRequest)
+	go func() {
+		if err := http.ListenAndServe(config.GetGameViewerPort(), nil); err != nil {
+			Logger.Errorw("Webserver stopped", "error", err)
+		}
+	}()
 	go webserverInstance.sendGameState()
+	fmt.Println("Gameviewer socket online at", config.GetGameViewerPort())
+	Logger.Info("Webserver online at", config.GetGameViewerPort())
 }
 
 func (server *WebServer) getUpgrader() *websocket.Upgrader {
@@ -111,71 +72,141 @@ func (server *WebServer) getUpgrader() *websocket.Upgrader {
 	}
 }
 
+func (server *WebServer) handleGameStateRequest(w http.ResponseWriter, r *http.Request) {
+	// Upgrade initial GET request to a WebSocket
+	ws, err := server.websocketupgrader.Upgrade(w, r, nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	server.websocketConnectionsMutex.Lock()
+	defer server.websocketConnectionsMutex.Unlock() // unlock after function returns
+	server.websocketConnections = append(server.websocketConnections, ws)
+	fmt.Println("Gameviewer client connected")
+
+	go server.receiveData(ws)
+}
+
 func (server *WebServer) sendGameState() {
+	var gameStateJSON []byte
 	for {
+		server.gameStateQueueMutex.Lock()
 		if len(server.gameStatePacketQueue) == 0 {
+			server.gameStateQueueMutex.Unlock()
 			time.Sleep(time.Millisecond * 10)
 			continue
 		}
 
-		server.gameStateQueueMutex.Lock()
-		gameStateJSON := server.gameStatePacketQueue[0]
+		gameStateJSON = server.gameStatePacketQueue[0]
 		server.gameStatePacketQueue = server.gameStatePacketQueue[1:]
 		server.gameStateQueueMutex.Unlock()
 
-		for _, conn := range server.multicastConns {
-			conn.Write(gameStateJSON)
+		// Creating a copy of the connections. This prevents locking other threads if the connection takes too long
+		server.websocketConnectionsMutex.Lock()
+		connectionsCopy := make([]*websocket.Conn, len(server.websocketConnections))
+		copy(connectionsCopy, server.websocketConnections)
+		server.websocketConnectionsMutex.Unlock()
+
+		for _, ws := range connectionsCopy {
+			if err := ws.WriteMessage(websocket.TextMessage, gameStateJSON); err != nil {
+				fmt.Println(err)
+				server.removeConnection(ws)
+			}
 		}
 	}
 }
 
-type WebsiteDTO struct {
-	RobotPositions [2 * info.TEAM_SIZE]info.RobotDTO
-	BallPosition   info.BallDTO
-	RobotActions   []action.ActionDTO
-	TerminalLog    []string
+// Method to receive data from all connected clients
+func (server *WebServer) receiveData(ws *websocket.Conn) {
+	defer func() {
+		server.removeConnection(ws)
+		ws.Close()
+	}()
+
+	for {
+		_, message, err := ws.ReadMessage()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		var receivedData GameViewerCommand
+		err_unmarshal := json.Unmarshal(message, &receivedData)
+		if err_unmarshal != nil {
+			log.Println("Error unmarshalling message:", err_unmarshal)
+			continue
+		}
+
+		server.receivedDataMutex.Lock()
+		log.Println("Received data:", receivedData)
+		server.incomingData = append(server.incomingData, receivedData)
+		server.dataLookup[receivedData.CommandType] = &receivedData
+		server.receivedDataMutex.Unlock()
+	}
 }
 
-func toJson(input WebsiteDTO) []byte {
-	output, err := json.Marshal(input)
-	if err != nil {
-		Logger.Error("The WebsiteDTO packet could not be marshalled to JSON.")
+func (server *WebServer) removeConnection(ws *websocket.Conn) {
+	server.websocketConnectionsMutex.Lock()
+	defer server.websocketConnectionsMutex.Unlock()
+
+	for i, connection := range server.websocketConnections {
+		if connection == ws {
+			server.websocketConnections = append(server.websocketConnections[:i], server.websocketConnections[i+1:]...)
+			return
+		}
 	}
-	return output
 }
+
+//----------------------------------------------------------------------------------------------
+// End of WebServer class
+//----------------------------------------------------------------------------------------------
+
+// How to use the WebServer class:
+// Only use the functions under this comment to interact with the WebServer class
+// The WebServer class is a singleton class, so you can only have one instance of it,
+// and the functions under handles all of it so multiple instances are not created
 
 func actionsToJson(actions []action.Action) []byte {
-	output, err := json.Marshal(actions)
+	actionDTOs := make([]action.ActionDTO, 0, len(actions))
+	for _, action := range actions {
+		actionDTOs = append(actionDTOs, action.ToDTO())
+	}
+
+	output, err := json.Marshal(actionDTOs)
 	if err != nil {
-		Logger.Error("The WebsiteDTO packet could not be marshalled to JSON.")
+		Logger.Error("The action packet could not be marshalled to JSON.")
 	}
 	return output
 }
 
-func GetIncoming() []action.ActionDTO {
+func StartGameViewerServer() {
+	getInstance()
+}
+
+// Returns a list of all new incoming actions
+func GetAllIncoming() []GameViewerCommand {
 	webserver := getInstance()
 	webserver.receivedDataMutex.Lock()
 	defer webserver.receivedDataMutex.Unlock()
-	actionsCopy := make([]action.ActionDTO, len(webserver.incomingActions))
-	copy(actionsCopy, webserver.incomingActions)
-	webserver.incomingActions = nil
+	// Return a copy of the incomingActions slice
+	actionsCopy := make([]GameViewerCommand, len(webserver.incomingData))
+	copy(actionsCopy, webserver.incomingData)
+	webserver.incomingData = nil // Empty the incomingActions slice
 	return actionsCopy
 }
 
-func UpdateWebLog(logs []byte) {
-	Logger.Info("Updating web log")
+// Returns a list of all new incoming actions
+func GetCommand(commandName string) *GameViewerCommand {
 	webserver := getInstance()
-	webserver.logQueueMutex.Lock()
-	webserver.logPacketQueue = append(webserver.logPacketQueue, []byte(logs))
-	webserver.logQueueMutex.Unlock()
-}
-
-func BroadcastGameState(message WebsiteDTO) {
-	gameStateJson := toJson(message)
-	webserver := getInstance()
-	webserver.gameStateQueueMutex.Lock()
-	webserver.gameStatePacketQueue = append(webserver.gameStatePacketQueue, gameStateJson)
-	webserver.gameStateQueueMutex.Unlock()
+	webserver.receivedDataMutex.Lock()
+	defer webserver.receivedDataMutex.Unlock()
+	command, ok := webserver.dataLookup[commandName]
+	if !ok {
+		return nil
+	}
+	delete(webserver.dataLookup, commandName)
+	return command
 }
 
 func BroadcastActions(actions []action.Action) {
@@ -186,17 +217,17 @@ func BroadcastActions(actions []action.Action) {
 	webserver.gameStateQueueMutex.Unlock()
 }
 
-func UpdateWebGUI(gs *info.GameState, actions []action.Action, terminal_messages []string) {
-	var gamestate_DTO = gs.ToDTO()
-	var actionTDO = make([]action.ActionDTO, len(actions))
-	for i, obj := range actions {
-		actionTDO[i] = obj.ToDTO()
-	}
-	var websiteMessage = WebsiteDTO{
-		RobotPositions: gamestate_DTO.RobotPositions,
-		BallPosition:   gamestate_DTO.BallPosition,
-		RobotActions:   actionTDO,
-		TerminalLog:    terminal_messages,
-	}
-	BroadcastGameState(websiteMessage)
+// Command types that are recieved from gameviewer
+
+const (
+	CHANGE_SCENARIO = "CHANGE_SCENARIO"
+	MOVE_ROBOT      = "MOVE_ROBOT"
+)
+
+type GameViewerCommand struct {
+	CommandType string `json:"Command"`
+	X           int32  `json:"x"`
+	Y           int32  `json:"y"`
+	Id          int    `json:"Id"`
+	Type        string `json:"Type"`
 }

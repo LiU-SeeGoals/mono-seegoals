@@ -27,4 +27,5 @@ message data_sample {
   control_signal pos_angle = 10;
   int32 pos_timestamp = 11;
   vec3 vision = 12;
+  vec3 odometry = 13;
 }
