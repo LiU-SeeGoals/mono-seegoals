@@ -257,14 +257,16 @@ func withoutRobot(robots []info.ID, excluded info.ID) []info.ID {
 }
 
 func (m *CombinedPlan) chooseGoalie(gi *GameInfo, activeRobots []info.ID) (info.ID, bool) {
-	if containsRobot(activeRobots, preferredGoalieID) {
-		return preferredGoalieID, true
-	}
-	if len(activeRobots) == 0 {
-		return 0, false
-	}
+	return 0, false
 
-	return m.getRobotClosestToPosition(gi, activeRobots, m.defendedGoalCenter(gi)), true
+	// if containsRobot(activeRobots, preferredGoalieID) {
+	// 	return preferredGoalieID, true
+	// }
+	// if len(activeRobots) == 0 {
+	// 	return 0, false
+	// }
+	//
+	// return m.getRobotClosestToPosition(gi, activeRobots, m.defendedGoalCenter(gi)), true
 }
 
 func attackerCount(total int, ratio float64) int {

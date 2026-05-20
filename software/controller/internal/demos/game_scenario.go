@@ -54,37 +54,38 @@ func GameScenario() {
 	var sslClientTracked *client.SSLTrackedClient
 	var sslClientRaw *client.SSLClient
 	var aiYellow *ai.Ai
-	var aiBlue *ai.Ai
+	// var aiBlue *ai.Ai
 	var basestationClient *client.BaseStationClient
 	var simController *simulator.SimControl
 	var simClientYellow *client.SimClient
-	var simClientBlue *client.SimClient
+	// var simClientBlue *client.SimClient
 
 	slowBrainYellow := plan.NewCombinedPlan(info.Yellow)
-	slowBrainBlue := plan.NewCombinedPlan(info.Blue)
+	// slowBrainBlue := plan.NewCombinedPlan(info.Blue)
 
 	manualMovementYellow := plan.NewPlannerManualMovement(info.Yellow)
 	// manualMovementBlue := plan.NewPlannerManualMovement(info.Blue)
 
 	fastBrainYellow := ai.NewActivityExecutor()
-	fastBrainBlue := ai.NewActivityExecutor()
+	// fastBrainBlue := ai.NewActivityExecutor()
 
 	aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
-	aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
+	// aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
 
 	if config.IsSimulated() {
-		teamYellow := []int{1, 2, 3, 4, 5, 6}
-		teamBlue := []int{1, 2, 3, 4, 5, 6}
+		teamYellow := []int{1,3}
+		// teamBlue := []int{1, 2, 3, 4, 5, 6}
 
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
 
 		simClientYellow = client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
-		simClientBlue = client.NewSimClient(config.GetSimBlueTeamAddress(), gameInfo)
+		// simClientBlue = client.NewSimClient(config.GetSimBlueTeamAddress(), gameInfo)
 
 		simController = simulator.NewSimControl()
 		simController.TeleportBall(0, 1000)
-		simController.SetPresentRobots(teamYellow, teamBlue)
+		// simController.SetPresentRobots(teamYellow, teamBlue)
+		simController.SetPresentRobots(teamYellow, nil)
 
 	} else {
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
@@ -93,7 +94,7 @@ func GameScenario() {
 		basestationClient = client.NewBaseStationClient(config.GetBasestationAddress())
 		basestationClient.Init()
 	}
-	simController.TeleportBall(0, 1000)
+	// simController.TeleportBall(0, 1000)
 	for {
 
 		playTime := time.Now().UnixMilli()
@@ -109,7 +110,7 @@ func GameScenario() {
 				// aiBlue.HotswapPlanner(info.Blue, manualMovementBlue)
 			} else if command.Type == "Game" {
 				aiYellow.HotswapPlanner(info.Yellow, slowBrainYellow)
-				aiBlue.HotswapPlanner(info.Blue, slowBrainBlue)
+				// aiBlue.HotswapPlanner(info.Blue, slowBrainBlue)
 			}
 		}
 
@@ -118,19 +119,19 @@ func GameScenario() {
 		}
 
 		actionsYellow := aiYellow.GetActions(gameInfo)
-		actionsBlue := aiBlue.GetActions(gameInfo)
+		// actionsBlue := aiBlue.GetActions(gameInfo)
 
 		client.BroadcastActions(actionsYellow)
-		client.BroadcastActions(actionsBlue)
+		// client.BroadcastActions(actionsBlue)
 
 		if config.IsSimulated() {
 			simClientYellow.SendActions(actionsYellow)
-			simClientBlue.SendActions(actionsBlue)
+			// simClientBlue.SendActions(actionsBlue)
 
 			handleSimulatedBall(gameInfo, simController)
 		} else {
 			basestationClient.SendActions(actionsYellow)
-			basestationClient.SendActions(actionsBlue)
+			// basestationClient.SendActions(actionsBlue)
 		}
 	}
 }
