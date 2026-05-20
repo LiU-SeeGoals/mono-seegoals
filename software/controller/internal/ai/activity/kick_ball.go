@@ -2,30 +2,41 @@ package ai
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
 type KickBall struct {
-	team           info.Team
-	id             info.ID
-	orignalBallPos info.Position
-	inited         bool
-	to             info.Position
+	team                 info.Team
+	id                   info.ID
+	orignalBallPos       info.Position
+	inited               bool
+	to                   info.Position
+	closeApproachReached bool
 }
 
 type KickConfig struct {
 	driveThrough    float64
 	doneDist        float64
 	ballAbortRadius float64
+	// Stop shortly behind the ball before kicking, so the final drive-through starts slow.
+	closeApproachClearance float64
+	closeApproachDoneDist  float64
+	closeApproachAngleErr  float64
+	movingBallHoldSpeed    float64
 }
 
 func GetKickConfig() KickConfig {
 	return KickConfig{
-		driveThrough:    30,
-		doneDist:        20,
-		ballAbortRadius: 200,
+		driveThrough:           30,
+		doneDist:               20,
+		ballAbortRadius:        200,
+		closeApproachClearance: 120,
+		closeApproachDoneDist:  25,
+		closeApproachAngleErr:  5.0 * math.Pi / 180,
+		movingBallHoldSpeed:    0.05,
 	}
 }
 
@@ -36,45 +47,55 @@ func (m *KickBall) String() string {
 func NewKickBall(team info.Team, id info.ID, to, ballPos info.Position) *KickBall {
 	// fmt.Println("New kick ball")
 	return &KickBall{
-		team,
-		id,
-		ballPos,
-		false,
-		to,
+		team:           team,
+		id:             id,
+		orignalBallPos: ballPos,
+		to:             to,
 	}
 }
 
-func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
+func (m *KickBall) kickDirection(ballPos info.Position) (info.Vec2, float64) {
+	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
+	targetV2 := info.Vec2{X: m.to.X, Y: m.to.Y}
+	ballToTarget := info.Sub(targetV2, ballV2)
+	if ballToTarget.Norm() < 1 {
+		return info.Vec2{X: 1, Y: 0}, 0
+	}
 
+	kickAngle := ballToTarget.Angle()
+	ballToTarget.DivNorm()
+	return ballToTarget, kickAngle
+}
+
+func (m *KickBall) GetCloseApproachPos(gi *info.GameInfo) info.Position {
+	ball := gi.State.GetBall()
+	ballPos, _ := ball.GetEstimatedPosition()
+	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
+	kickDir, kickAngle := m.kickDirection(ballPos)
+
+	robotXY := info.Sub(ballV2, kickDir.Mult(GetKickConfig().closeApproachClearance))
+	return info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: kickAngle}
+}
+
+func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 	ball := gi.State.GetBall()
 	ballPos, _ := ball.GetEstimatedPosition()
 	// fmt.Println("new pos", ballPos, m.orignalBallPos, ballPos.Norm2d(m.orignalBallPos))
 	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
+	kickDir, kickAngle := m.kickDirection(ballPos)
 
-	robotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
-	if err != nil {
-		fmt.Println(err)
-	}
+	robotXY := info.Add(ballV2, kickDir.Mult(GetKickConfig().driveThrough))
+	return info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: kickAngle}
+}
 
-	robotV2 := info.Vec2{X: robotPos.X, Y: robotPos.Y}
-
-	// Assume the robot was aligned prior to kicking
-	// Meaning we should keep the same angle when driving into the ball
-	targetV2 := info.Vec2{X: m.to.X, Y: m.to.Y}
-	ballToTarget := info.Sub(targetV2, ballV2)
-	kickAngle := ballToTarget.Angle()
-
-	ballRobotTangent := info.Sub(ballV2, robotV2)
-	ballRobotTangent.DivNorm()
-
-	robotXY := info.Add(ballV2, ballRobotTangent.Mult(GetKickConfig().driveThrough))
-	robotTargetPos := info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: kickAngle}
-	return robotTargetPos
+func (m *KickBall) closeApproachAchieved(robotPos, targetPos info.Position) bool {
+	cfg := GetKickConfig()
+	angleErr := info.NormalizeAngleDelta(targetPos.Angle, robotPos.Angle)
+	return robotPos.Dist2d(targetPos) < cfg.closeApproachDoneDist &&
+		math.Abs(angleErr) < cfg.closeApproachAngleErr
 }
 
 func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
-	robotTargetPos := m.GetTargetPos(gi)
-
 	robotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
 	if err != nil {
 		fmt.Println(err)
@@ -88,10 +109,17 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	ball := gi.State.GetTrackedBall()
 	//ballPos, err := ball.GetTrackedPosition()
 	ballVel, _ := ball.GetTrackedVelocity()
-
 	speed := ballVel.Norm2d()
-	if speed > 0.05 {
+
+	robotTargetPos := m.GetCloseApproachPos(gi)
+	if speed > GetKickConfig().movingBallHoldSpeed {
+		m.closeApproachReached = false
 		robotTargetPos = robotPos
+	} else if !m.closeApproachReached && m.closeApproachAchieved(robotPos, robotTargetPos) {
+		m.closeApproachReached = true
+	}
+	if m.closeApproachReached {
+		robotTargetPos = m.GetTargetPos(gi)
 	}
 
 	act := action.MoveTo{}
@@ -100,10 +128,14 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	act.Pos = robotPos
 	act.Dest = robotTargetPos
 
-	if robotPos.Dist2d(ballUntracked) > 200 {
+	if !m.closeApproachReached {
 		act.Dribble = true
-	} else {
+	} else if robotPos.Dist2d(ballUntracked) > GetKickConfig().ballAbortRadius {
+		act.Dribble = true
+	} else if speed <= GetKickConfig().movingBallHoldSpeed {
 		act.KickSpeed = 2
+	} else {
+		act.Dribble = true
 	}
 
 	return &act

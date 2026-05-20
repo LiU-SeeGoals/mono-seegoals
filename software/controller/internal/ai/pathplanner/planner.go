@@ -12,8 +12,8 @@ import (
 
 // Field/planning constants (mm) — same semantics as the former move_to_position locals.
 const (
-	RobotSafetyRadius = 340.0
-	BallSafetyRadius  = 350.0
+	RobotSafetyRadius = 240.0
+	BallSafetyRadius  = 250.0
 	PlanningRadius    = 400.0
 	MotionRadius      = 100.0
 )
