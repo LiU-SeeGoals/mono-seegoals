@@ -20,11 +20,13 @@ type Goalie struct {
 	Activity
 }
 
+// String returns a short debug label containing the goalie's team and robot id.
 func (g *Goalie) String() string {
 	return fmt.Sprintf("Goalie(%d, %d)", g.team, g.id)
 }
 
-// NewGoalie creates a new Goalie struct.
+// NewGoalie creates a goalie activity for one robot.
+// It stores the team and id that later are used to read robot state and emit actions.
 func NewGoalie(team info.Team, id info.ID) *Goalie {
 	return &Goalie{
 		GenericComposition: GenericComposition{
@@ -36,6 +38,10 @@ func NewGoalie(team info.Team, id info.ID) *Goalie {
 	}
 }
 
+// GetAction computes one defensive move command for the goalie.
+// It uses the goalie's current position, the estimated ball position, field lines from
+// GameInfo, and either shooter orientation or tracked ball velocity to choose where the
+// goalie should stand on its defensive line.
 func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	ball := gi.State.GetBall()
 	myRobotPos, err := gi.State.GetTeam(g.team)[g.id].GetPosition()
@@ -112,10 +118,14 @@ func (g *Goalie) Achieved(*info.GameInfo) bool {
 	return false
 }
 
+// GetID returns the robot id that owns this activity.
 func (m *Goalie) GetID() info.ID {
 	return m.id
 }
 
+// goalieFieldBounds finds the goal line and penalty line for the side the goalie is
+// currently closest to. It uses field geometry from GameInfo and returns the X bounds
+// the goalie is allowed to move within, plus the reported goal width for Y clamping.
 func goalieFieldBounds(gi *info.GameInfo, goaliePos info.Position) (goalLineX float64, defendLimitX float64, goalWidth float64, ok bool) {
 	leftGoalLine := gi.GetFieldLine("LeftGoalLine")
 	rightGoalLine := gi.GetFieldLine("RightGoalLine")
@@ -146,8 +156,9 @@ func goalieFieldBounds(gi *info.GameInfo, goaliePos info.Position) (goalLineX fl
 	return goalLineX, defendLimitX, goalWidth, true
 }
 
-// Predict the opponent while oppponent is close enough to the ball.
-// Returns the opponent that should be treated as the ball possessor.
+// threateningOpponent picks the opponent that should be treated as the current shooter.
+// It first checks the official possessor from the ball state, and otherwise finds the
+// nearest active opponent whose dribbler is within SHOT_THREAT_DISTANCE of the ball.
 func threateningOpponent(gi *info.GameInfo, team info.Team, ballPos info.Position) *info.Robot {
 	ball := gi.State.GetBall()
 	if poss := ball.GetPossessor(); poss != nil && poss.GetTeam() != team {
@@ -175,8 +186,9 @@ func threateningOpponent(gi *info.GameInfo, team info.Team, ballPos info.Positio
 	return best
 }
 
-// predictShotY estimates where the opponent's aim line hits our goal line.
-// Returns yHit and a boolean indicating if the prediction was valid.
+// predictShotY projects a shooter's facing direction onto the goalie's current X line.
+// It uses the opponent position and angle, and returns the predicted Y intercept if the
+// shot is moving toward the goalie line and the direction vector is numerically valid.
 func predictShotY(opponent info.Position, goalieX float64, goalSize float64, fallbackY float64) (float64, bool) {
 	x0, y0, theta := opponent.X, opponent.Y, opponent.Angle
 	dx := math.Cos(theta)
@@ -199,9 +211,10 @@ func predictShotY(opponent info.Position, goalieX float64, goalSize float64, fal
 	return yHit, true
 }
 
-// predictBallPathY estimates where the tracked ball velocity crosses the goalie's X line.
-// It uses tracked velocity for faster reaction and only returns true when the current
-// ball path intersects the goal mouth.
+// predictBallPathY projects the tracked ball velocity onto the goalie's current X line.
+// It uses tracked velocity and tracked position from GameInfo for faster reaction than
+// position-history based prediction, and only returns true when the moving ball is headed
+// toward the goalie line and would cross within the goal mouth.
 func predictBallPathY(gi *info.GameInfo, fallbackPos info.Position, goalieX float64, goalSize float64) (float64, bool) {
 	trackedBall := gi.State.GetTrackedBall()
 	ballVel, ok := trackedBall.GetTrackedVelocity()

@@ -12,42 +12,11 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
 
-const (
-	ballStillnessTimeoutMs = 10000
-	ballStillnessRadius    = 20.0
-)
-
-var (
-	lastMovingBallPos   info.Position
-	lastMovingBallTime  int64
-	hasMovingBallSample bool
-)
-
-func resetBallStillnessTracker(pos info.Position, now int64) {
-	lastMovingBallPos = pos
-	lastMovingBallTime = now
-	hasMovingBallSample = true
-}
-
 func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
 	ball := gameInfo.State.GetBall()
 	ballPos, ballTime, _ := ball.GetPositionTime()
-	now := time.Now().UnixMilli()
-
-	if !hasMovingBallSample {
-		resetBallStillnessTracker(ballPos, now)
-	} else if ballPos.Dist2d(lastMovingBallPos) > ballStillnessRadius {
-		resetBallStillnessTracker(ballPos, now)
-	}
-
-	if ballPos.Y > 3000 ||
-		ballPos.Y < -3000 ||
-		ballPos.X > 4500 ||
-		ballPos.X < -4500 ||
-		now-ballTime > 5000 ||
-		now-lastMovingBallTime > ballStillnessTimeoutMs {
+	if ballPos.Y > 3000 || ballPos.Y < -3000 || ballPos.X > 4500 || ballPos.X < -4500 || time.Now().UnixMilli()-ballTime > 5000 {
 		simController.TeleportBall(0, 0)
-		resetBallStillnessTracker(info.Position{X: 0, Y: 0, Z: 0, Angle: 0}, now)
 	}
 
 	ge := gameInfo.Status.GetGameEvent()
@@ -58,7 +27,6 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
 			fmt.Println("teleported ball (new kickoff)")
 			simController.TeleportBall(0, 0)
-			resetBallStillnessTracker(info.Position{X: 0, Y: 0, Z: 0, Angle: 0}, now)
 		}
 	case info.STATE_FREE_KICK:
 	case info.STATE_HALTED, info.STATE_STOPPED:
@@ -73,7 +41,6 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 			finalY := ball.Y - toY
 			fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", toX, toY, ge.GetTeamWithPossession())
 			simController.TeleportBall(float32(finalX), float32(finalY))
-			resetBallStillnessTracker(info.Position{X: toX, Y: toY, Z: 0, Angle: 0}, now)
 		}
 	default:
 	}
