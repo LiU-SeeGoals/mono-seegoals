@@ -26,9 +26,6 @@ const float CONTROL_TIM_FREQ = 200000000;
 float CONTROL_FREQ; // set in init
 static int queued = 0;
 
-/* Private functions declarations */
-void set_motors(float m1, float m2, float m3, float m4);
-
 /*
  * Public function implementations
  */
@@ -57,8 +54,8 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[1].speed = 0.f;
     motors[1].prev_tick = 0;
     motors[1].channel = TIM_CHANNEL_2;
-    motors[2].breakPinPort = MOTOR2_BREAK_GPIO_Port;
-    motors[2].breakPin = MOTOR2_BREAK_Pin;
+    motors[1].breakPinPort = MOTOR2_BREAK_GPIO_Port;
+    motors[1].breakPin = MOTOR2_BREAK_Pin;
     motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
     motors[1].reversePin = MOTOR2_REVERSE_Pin;
     motors[1].dir = 1;
@@ -90,7 +87,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     MOTOR_PWMStart(&motors[2]);
     MOTOR_PWMStart(&motors[3]);
 
-    // memset did not work, idc
+    // memset did not work
     for (int i = 0; i < 4; i++) {
         motors[i].cur_tick_idx = 0;
         motors[i].cur_tick_idx = 0;
@@ -114,6 +111,7 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
 void NAV_update_motor_state()
 {
 
+    // TODO: This pointer can be written to while reading...
     int* motor_ticks = ITR_GetMotorTicks();
 
     for (int i = 0; i < 4; i++) {
@@ -152,11 +150,6 @@ void NAV_wheelToBody(float* res)
     float wlf = MOTOR_GetMotorSign(&motors[1]) * MOTOR_ReadTicksPerSecond(&motors[1]) / 48.f * 2.0f * PI;
     float wlb = MOTOR_GetMotorSign(&motors[2]) * MOTOR_ReadTicksPerSecond(&motors[2]) / 48.f * 2.0f * PI;
     float wrb = MOTOR_GetMotorSign(&motors[3]) * MOTOR_ReadTicksPerSecond(&motors[3]) / 48.f * 2.0f * PI;
-
-    // motors[0].speed = wrf;
-    // motors[1].speed = wlf;
-    // motors[2].speed = wlb;
-    // motors[3].speed = wrb;
 
     float cos_psi = arm_cos_f32(psi);
     float cos_theta = arm_cos_f32(theta);
@@ -267,8 +260,6 @@ void NAV_Stop()
 
 float speed = 0;
 
-void NAV_TestMovement() { NAV_steer(1, 0, 0); }
-
 void NAV_DisableMovement() { robot_cmd.movement_enabled = 0; }
 
 void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
@@ -372,14 +363,8 @@ void NAV_GoToAction(Command* cmd)
 
     if (abs(diff) < 2) {
         // If the vision position is exactly the same as last time it is likely not updated information.
-        // Ignore old information
-        // LOG_INFO("ignoring vision %d\r\n", diff);
         return;
     }
-
-
-    // LOG_INFO("diff %d\r\n", diff);
-
 
     prev_cam_x = cam_x;
     prev_cam_y = cam_y;
@@ -423,36 +408,15 @@ void NAV_TEST_TireTest()
     }
 }
 
-void set_motors(float m1, float m2, float m3, float m4)
+void NAV_StopDribbler()
 {
-    motors[0].speed = m1 * 100.f;
-    motors[1].speed = m2 * 100.f;
-    motors[2].speed = m3 * 100.f;
-    motors[3].speed = m4 * 100.f;
+    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET);
 }
 
-void NAV_StopDribbler() {
-    // LOG_DEBUG("stop dirbling\r\n");
-    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
-
-void NAV_RunDribbler() {
+void NAV_RunDribbler()
+{
     // LOG_DEBUG("dirbling\r\n");
-    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
-
-void NAV_TestDribbler()
-{
-    NAV_RunDribbler();
-    HAL_Delay(2000);
-    NAV_StopDribbler();
-}
-
-void NAV_TEST_pwm()
-{
-    float speed = 0.15;
-    MOTOR_SendPWM(&motors[0], speed);
-    MOTOR_SendPWM(&motors[1], speed);
-    MOTOR_SendPWM(&motors[2], speed);
-    MOTOR_SendPWM(&motors[3], speed);
+    HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET);
 }
 
 void NAV_TEST_Set_robot_cmd(float x, float y, float w)

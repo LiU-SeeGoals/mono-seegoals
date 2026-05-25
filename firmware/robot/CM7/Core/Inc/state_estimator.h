@@ -119,12 +119,11 @@ typedef enum
 
 typedef struct _FusionEKF {
     // EKF state vector: [ px py pw]
-    // input vector: [ gyr_w acc_x acc_y ]
+    // input vector: [ gyr_w v_x v_y ]
     // measurement vector: [ px py pw ]
     EKF ekf;
     float ekfData[EKF_DATA_SIZE(3, 3, 3, 3)];
     EKF_LOCK ekf_lock;
-    /*float imu_dt;*/
 
     struct {
         float acc_x;
@@ -139,40 +138,17 @@ typedef struct _FusionEKF {
 
     // Cached sensor values (bias-corrected)
     float gyro_z;
-
-    /*float encGyrPos[3];*/
+    float odometry_x;
+    float odometry_y;
 
     struct {
         uint16_t online;
-        /*uint32_t timeLastValidSample;*/
-        /*int32_t turns;*/
-        /*float lastOrient;*/
-        /*uint32_t numLateMeasurements;*/
     } vision;
 
     FusionEKFConfig* pConfig;
 
-    /*FusionEKFTimeSlot timeSlots[FUSION_EKF_MAX_DELAY];*/
-    /*uint32_t timeSlotNow;*/
-
-    /*ModelEnc modelEnc;*/
-
     LagElementPT1 lagAccel[2];
 
-    /*struct*/
-    /*{*/
-    /*	LagElementPT1 lagCurrent;*/
-    /**/
-    /*	uint8_t isStrongDribbling;*/
-    /*	uint32_t strongTicks;*/
-    /**/
-    /*	FusionEKFDribblerIdleCurTable idleCurrentTable;*/
-    /*	FlashFile* pIdleCurrentFile;*/
-    /*} dribbler;*/
-
-    /*float ballPosGlobal[2];*/
-    /*float ballVelGlobal[2];*/
-    /*uint32_t ballLastDetectedTimestamp;*/
 } FusionEKF;
 
 // Public functions

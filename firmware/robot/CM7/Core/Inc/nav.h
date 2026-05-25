@@ -47,7 +47,6 @@ void NAV_update_motor_state();
  */
 void NAV_steer(float vx, float vy, float w);
 
-void NAV_TEST_pwm();
 /**
  * Stops all movement
  */
@@ -66,11 +65,6 @@ void NAV_HandleCommand(Command* cmd);
 void NAV_StopMovement();
 
 /**
- * Set robot speed to one unit forward
- */
-void NAV_TestMovement();
-
-/**
  * Write stop signal on dribbler pin
  */
 void NAV_StopDribbler();
@@ -79,11 +73,6 @@ void NAV_StopDribbler();
  * Write stop signal on dribbler pin
  */
 void NAV_RunDribbler();
-
-/**
- * Start dribbler, wait 2 seconds, stop dribbler
- */
-void NAV_TestDribbler();
 
 /**
  * Run one wheel at a time from first to last first forward in two seconds

@@ -300,11 +300,6 @@ int main(void)
 
     /* USER CODE END WHILE */
 
-    // NAV_wheelToBody(out);
-    // LOG_INFO("x: %f y: %f angle: %f\r\n", STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle());
-    // LOG_INFO("x: %f y: %f angle: %f\r\n", out[0], out[1], out[2]);
-    // LOG_INFO("x: %f y: %f angle: %f\r\n", out[0], out[1], out[2]);
-
     /* USER CODE BEGIN 3 */
     }
   /* USER CODE END 3 */

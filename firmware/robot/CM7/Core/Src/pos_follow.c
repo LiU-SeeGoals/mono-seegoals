@@ -12,11 +12,26 @@ static float DELTA_T = 0.001;
 
 static LOG_Module internal_log_mod;
 
-static float K[3][3] = {
-    {2.0f, 0.0f, 0.0f},
-    {0.0f, 2.0f, 0.0f},
-    {0.0f, 0.0f, 5.0f}
-};
+// Constant derived from infinite horizon LQR
+// run lqr.py to create new constants based on tuning
+const float k11 = 0.009993;
+const float k12 = 0.000000;
+const float k13 = 0.000000;
+const float k14 = 0.142126;
+const float k15 = 0.000000;
+const float k16 = 0.000000;
+const float k21 = 0.000000;
+const float k22 = 0.009993;
+const float k23 = 0.000000;
+const float k24 = 0.000000;
+const float k25 = 0.142126;
+const float k26 = 0.000000;
+const float k31 = 0.000000;
+const float k32 = 0.000000;
+const float k33 = 0.444880;
+const float k34 = 0.000000;
+const float k35 = 0.000000;
+const float k36 = 1.045146;
 
 static float vel_max_xy = 1.0f;
 static float vel_max_w = 4.0f;
@@ -45,13 +60,12 @@ void POS_Init() {
     LOG_InitModule(&internal_log_mod, "POS", LOG_LEVEL_ERROR, 0);
 }
 
-float angle_error(float angle, float desired)
+float angle_error(float a, float b)
 {
     // TODO make sure returned sign is correct for the desired direction
 
-    float delta = desired - angle;
+    float delta = a - b;
     return atan2f(sinf(delta), cosf(delta));
-
 }
 
 float standard_error(float current, float desired) { return desired - current; }
@@ -68,43 +82,66 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     const float cur_x = STATE_get_posx();
     const float cur_y = STATE_get_posy();
     const float cur_w = STATE_get_robot_angle();
+    const float cur_vx = STATE_get_vx();
+    const float cur_vy = STATE_get_vy();
+    const float cur_omega = STATE_get_gyro_z();
 
-    // Compute errors in world frame
+    float ex_world = cur_x - dest_x;
+    float ey_world = cur_y - dest_y;
+    float ew = angle_error(cur_w, dest_w);
 
-    float ex = dest_x - cur_x;
-    float ey = dest_y - cur_y;
-    float ew = angle_error(cur_w, dest_w);  // Wrapped to [-pi, pi]
-    float Ix = i_dist_x + (DELTA_T / 5.5) * ex;
-    float Iy = i_dist_y + (DELTA_T / 5.5) * ey;
+    float cos_w = arm_cos_f32(cur_w);
+    float sin_w = arm_sin_f32(cur_w);
 
-    float vx_world = K[0][0] * (ex + Ix);
-    float vy_world = K[1][1] * (ey + Iy);
-    float omega  = K[2][2] * ew;
+    float ex = ex_world * cos_w + ey_world * sin_w;
+    float ey = -ex_world * sin_w + ey_world * cos_w;
+
+    float evx = cur_vx * cos_w + cur_vy * sin_w;
+    float evy = -cur_vx * sin_w + cur_vy * cos_w;
+    float eomega = cur_omega;
+
+    float vx_robot = -(
+        k11 * ex +
+        k12 * ey +
+        k13 * ew +
+        k14 * evx +
+        k15 * evy +
+        k16 * eomega
+    );
+
+    float vy_robot = -(
+        k21 * ex +
+        k22 * ey +
+        k23 * ew +
+        k24 * evx +
+        k25 * evy +
+        k26 * eomega
+    );
+
+    float omega = -(
+        k31 * ex +
+        k32 * ey +
+        k33 * ew +
+        k34 * evx +
+        k35 * evy +
+        k36 * eomega
+    );
 
     // Add gyro-based damping to reduce angular oscillations
     // Essentialy makes it PD loop
     float gyro_z = STATE_get_gyro_z();
     omega = omega - Kd_omega * gyro_z;
 
-    float vel_xy = sqrtf(vx_world * vx_world + vy_world * vy_world);
+    float vel_xy = sqrtf(vx_robot * vx_robot + vx_robot * vx_robot);
 
     if (vel_xy > vel_max_xy) {
         float scale = vel_max_xy / vel_xy;
-        vx_world *= scale;
-        vy_world *= scale;
+        vx_robot *= scale;
+        vy_robot *= scale;
     }
-    else{
-        i_dist_y = Iy;
-        i_dist_x = Ix;
-    }
+
     if (omega > vel_max_w) omega = vel_max_w;
     if (omega < -vel_max_w) omega = -vel_max_w;
-
-    // Transform world frame velocity to robot frame
-    float cos_w = arm_cos_f32(cur_w);
-    float sin_w = arm_sin_f32(cur_w);
-    float vx_robot = vx_world * cos_w + vy_world * sin_w;
-    float vy_robot = -vx_world * sin_w + vy_world * cos_w;
 
     const float vel_to_motor_scale = 250.0f;
     float cmd_x = vx_robot * vel_to_motor_scale;

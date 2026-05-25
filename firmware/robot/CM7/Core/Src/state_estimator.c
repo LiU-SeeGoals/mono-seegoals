@@ -1,20 +1,21 @@
 #include "state_estimator.h"
 #include "arm_mat_util_f32.h"
 #include "arm_math.h"
-#include "imu.h"
-#include "nav.h"
-#include "lag_element.h"
 #include "data_logging.h"
+#include "imu.h"
+#include "lag_element.h"
+#include "nav.h"
 
 #include "log.h"
 #include <string.h>
 
-static const float STATE_DELTA_T  = 0.001;
+static const float STATE_DELTA_T = 0.001;
 
 static LOG_Module internal_log_mod;
 
 // NOTE: Assume 1000hz loop
 
+static const float velocity_xy[3];
 FusionEKF fusionEKF;
 
 void release_ekf_lock() { fusionEKF.ekf_lock = FREE; }
@@ -22,25 +23,6 @@ void release_ekf_lock() { fusionEKF.ekf_lock = FREE; }
 void set_ekf_lock() { fusionEKF.ekf_lock = LOCKED; }
 
 uint8_t get_ekf_lock() { return fusionEKF.ekf_lock; }
-
-// clang-format off
-const float32_t A_f32[16] =
-{
-  /* Const,   numTaps,   blockSize,   numTaps*blockSize */
-  1.0,     0.0,     0.0,     1.0,
-  0.0,     1.0,     0.0,     0.0,
-  0.0,     0.0,     1.0,     0.0,
-  0.0,     0.0,     0.0,     1.0,
-};
-
-const float32_t B_f32[16] =
-{
-  1.0,     0.0,     0.0,     1.0,
-  0.0,     1.0,     0.0,     1.0,
-  0.0,     0.0,     1.0,     1.0,
-  0.0,     0.0,     0.0,     1.0,
-};
-// clang-format on
 
 // Improvements: Detect when vision loses us and rely on encoders
 
@@ -114,8 +96,8 @@ void EKFUpdate(EKF* pKF)
         invStat = arm_mat_inverse_f32(&pKF->tmp3, &pKF->tmp1);
         break;
     }
-    if(invStat != ARM_MATH_SUCCESS){
-        return;// skip update on failure to invert
+    if (invStat != ARM_MATH_SUCCESS) {
+        return; // skip update on failure to invert
     }
     /*	LogErrorC("Matrix inverse error", invStat);*/
     // K = tmp2*tmp1 (f x h)
@@ -293,8 +275,8 @@ static void ekfStateJacobianFunc(const arm_matrix_instance_f32* pX, const arm_ma
 
     arm_mat_identity_f32(pF);
 
-    MAT_ELEMENT(*pF, 0, 2) = (-vx*sinf(pw) - vy*cosf(pw)) * dt;
-    MAT_ELEMENT(*pF, 1, 2) = (vx*cosf(pw)-vy*sinf(pw))*dt;
+    MAT_ELEMENT(*pF, 0, 2) = (-vx * sinf(pw) - vy * cosf(pw)) * dt;
+    MAT_ELEMENT(*pF, 1, 2) = (vx * cosf(pw) - vy * sinf(pw)) * dt;
 }
 
 static void ekfMeasFunc(const arm_matrix_instance_f32* pX, arm_matrix_instance_f32* pY)
@@ -311,15 +293,6 @@ void ekfMeasJacobianFunc(const arm_matrix_instance_f32* pX, arm_matrix_instance_
     MAT_ELEMENT(*pH, 1, 1) = 1.0f;
     MAT_ELEMENT(*pH, 2, 2) = 1.0f;
 }
-
-// static inline float wrapToPi(float angle)
-// {
-//     while (angle > M_PI)
-//         angle -= 2.0f * M_PI;
-//     while (angle < -M_PI)
-//         angle += 2.0f * M_PI;
-//     return angle;
-// }
 
 static void ekfStateFunc(arm_matrix_instance_f32* pX, const arm_matrix_instance_f32* pU)
 {
@@ -372,9 +345,7 @@ static FusionEKFConfig configFusionEKF = {
 
 int STATE_vision_initialized() { return fusionEKF.vision.online; }
 
-static void loadNoiseCovariancesFromConfig()
-{
-}
+static void loadNoiseCovariancesFromConfig() {}
 
 static void initEKF()
 {
@@ -386,6 +357,10 @@ static void initEKF()
     fusionEKF.ekf.pStateJacobian = &ekfStateJacobianFunc;
     fusionEKF.ekf.pMeas = &ekfMeasFunc;
     fusionEKF.ekf.pMeasJacobian = &ekfMeasJacobianFunc;
+
+    fusionEKF.odometry_x = 0;
+    fusionEKF.odometry_y = 0;
+    fusionEKF.gyro_z = 0;
 
     arm_mat_identity_f32(&fusionEKF.ekf.Ex);
     arm_mat_identity_f32(&fusionEKF.ekf.Ez);
@@ -415,12 +390,11 @@ void STATE_FusionEKFVisionUpdate(float posx, float posy, float posw)
         fusionEKF.vision.online = 1;
 
         // Make sure EKF jumps immediately to new position in first measurement.
-
-        // TODO: We can be smart here and track when vision loses
-        // the robot and rely on encoders instead (as tigers do hehe).
+        // Should also have a vision timeout that makes it jump
         memcpy(fusionEKF.ekf.x.pData, pos, sizeof(float) * 3);
     } else {
         // Move vision data to ekf measurement vector and do the measurement update
+        // TODO: This is racing with STATE_FusionEKFIntertialUpdate
         set_ekf_lock();
         memcpy(fusionEKF.ekf.z.pData, pos, sizeof(float) * 3);
         EKFUpdate(&fusionEKF.ekf);
@@ -434,36 +408,23 @@ void STATE_FusionEKFVisionUpdate(float posx, float posy, float posw)
 
 void STATE_FusionEKFIntertialUpdate(IMU_AccelVec3 acc, IMU_GyroVec3 gyr)
 {
-
-    // GYRO + ACCELEROMETER
-    float linear_acc_x = acc.x - fusionEKF.bias.acc_x;
-    float linear_acc_y = acc.y - fusionEKF.bias.acc_y;
-    // Turn off acc for now.. to hard to handle
-    linear_acc_x = 0;
-    linear_acc_y = 0;
-
-    float gyrAcc[3];
+    float gyrVel[3];
     float body_speed[3];
     NAV_wheelToBody(body_speed);
-    gyrAcc[0] = gyr.z - fusionEKF.bias.gyr_z;
-    gyrAcc[1] = body_speed[0];
-    gyrAcc[2] = body_speed[1];
+    gyrVel[0] = gyr.z - fusionEKF.bias.gyr_z;
+    gyrVel[1] = body_speed[0];
+    gyrVel[2] = body_speed[1];
 
-    // Cache bias-corrected gyro for use in controllers
-    fusionEKF.gyro_z = gyrAcc[0];
-    // TODO: if using accelerometer we can lowpass noisy accelerometer
-    /*gyrAcc[1] = LagElementPT1Process(&fusionEKF.lagAccel[0], linear_acc_x);*/
-    /*gyrAcc[2] = LagElementPT1Process(&fusionEKF.lagAccel[1], linear_acc_y);*/
-    // gyrAcc[1] = 0;
-    // gyrAcc[2] = 0;
+    // Store raw sensor readings for use in controllers
+    // TODO: upgrade these to state in state estimation?
+    fusionEKF.gyro_z = gyrVel[0];
+    fusionEKF.odometry_x = gyrVel[1];
+    fusionEKF.odometry_y = gyrVel[2];
 
-    // TODO: Add odometry
-
-    // INERTIAL NAVIGATION SYSTEM (INS)
     if (get_ekf_lock() == LOCKED) {
         return;
     }
-    memcpy(fusionEKF.ekf.u.pData, gyrAcc, sizeof(float) * 3);
+    memcpy(fusionEKF.ekf.u.pData, gyrVel, sizeof(float) * 3);
     EKFPredict(&fusionEKF.ekf);
 }
 
@@ -478,9 +439,9 @@ float STATE_get_robot_angle()
     return angle;
 }
 
-float STATE_get_vx() { return MAT_ELEMENT(fusionEKF.ekf.x, 3, 0); }
+float STATE_get_vx() { return fusionEKF.odometry_x; }
 
-float STATE_get_vy() { return MAT_ELEMENT(fusionEKF.ekf.x, 4, 0); }
+float STATE_get_vy() { return fusionEKF.odometry_y; }
 
 float STATE_get_gyro_z() { return fusionEKF.gyro_z; }
 
@@ -529,7 +490,6 @@ void STATE_calibrate_imu_gyr()
 
     fusionEKF.bias.is_calibrated = 1;
     LOG_INFO("Done calibrating\r\n");
-
 }
 
 uint16_t STATE_is_calibrated() { return fusionEKF.bias.is_calibrated; }
