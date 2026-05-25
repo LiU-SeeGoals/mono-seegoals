@@ -119,6 +119,9 @@ func (g *GameScenario) run() {
 		// Only coordinate robot roles, trigger ball events
 
 		possessor := gi.State.GetBall().GetPossessor()
+		for _, kicker := range kickers {
+			kicker.SetPassCandidates(activeRobots)
+		}
 
 		if possessor != nil && possessor.GetTeam() == g.team {
 			ownerID := possessor.GetID()

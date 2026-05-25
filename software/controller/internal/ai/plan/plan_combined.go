@@ -24,8 +24,9 @@ const (
 	tacticalModeAttack tacticalMode = "attack"
 	tacticalModeDefend tacticalMode = "defend"
 
-	attackModeAttackerRatio = 0.50
-	defendModeAttackerRatio = 0.20
+	attackModeAttackerRatio    = 0.50
+	defendModeAttackerRatio    = 0.20
+	minAttackModeOffenseRobots = 2
 
 	roleSwitchMinDuration    = 750 * time.Millisecond
 	tacticalModeSwitchDelay  = 500 * time.Millisecond
@@ -284,6 +285,14 @@ func attackerCount(total int, ratio float64) int {
 	return count
 }
 
+func desiredOffenseCount(total int, mode tacticalMode, ratio float64) int {
+	count := attackerCount(total, ratio)
+	if mode == tacticalModeAttack && total >= minAttackModeOffenseRobots && count < minAttackModeOffenseRobots {
+		return minAttackModeOffenseRobots
+	}
+	return count
+}
+
 func (m *CombinedPlan) desiredMode(gi *GameInfo, fallback tacticalMode) tacticalMode {
 	possessor := gi.State.GetBall().GetPossessor()
 	if possessor == nil {
@@ -500,11 +509,18 @@ func (m *CombinedPlan) run() {
 			attackerRatio = defendModeAttackerRatio
 		}
 
-		offenseRobots := m.selectOffenseRobots(&gi, fieldRobots, attackerCount(len(fieldRobots), attackerRatio))
+		offenseRobots := m.selectOffenseRobots(
+			&gi,
+			fieldRobots,
+			desiredOffenseCount(len(fieldRobots), mode, attackerRatio),
+		)
 		defenseRobots := splitRoles(fieldRobots, offenseRobots)
 		roleManager.applyAssignments(offenseRobots, defenseRobots, tickStart)
 		offenseRobots = roleManager.offenseIDs()
 		defenseRobots = roleManager.defenseIDs()
+		for _, kicker := range roleManager.kickers {
+			kicker.SetPassCandidates(offenseRobots)
+		}
 
 		possessor := gi.State.GetBall().GetPossessor()
 
