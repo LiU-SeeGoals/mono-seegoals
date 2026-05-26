@@ -85,6 +85,9 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 	detect := packet.GetDetection()
 	gi.State.SetMessageReceivedTime(play_time)
 
+	seenBlue := [info.TEAM_SIZE]bool{}
+	seenYellow := [info.TEAM_SIZE]bool{}
+
 	for _, robot := range detect.GetRobotsBlue() {
 		x := float64(robot.GetX())
 		y := float64(robot.GetY())
@@ -92,6 +95,9 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 		//fmt.Println("Robot", robot.GetRobotId(), "x:", x, "y:", y, "angle:", angle)
 
 		gi.State.SetBlueRobot(robot.GetRobotId(), x, y, angle, play_time)
+		if robot.GetRobotId() < uint32(info.TEAM_SIZE) {
+			seenBlue[robot.GetRobotId()] = true
+		}
 	}
 
 	for _, robot := range detect.GetRobotsYellow() {
@@ -100,11 +106,18 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 		y := float64(robot.GetY())
 		angle := float64(robot.GetOrientation())
 		gi.State.SetYellowRobot(robot.GetRobotId(), x, y, angle, play_time)
+		if robot.GetRobotId() < uint32(info.TEAM_SIZE) {
+			seenYellow[robot.GetRobotId()] = true
+		}
 
 	}
 
+	gi.State.HoldMissingRobotPositions(info.Blue, seenBlue, play_time)
+	gi.State.HoldMissingRobotPositions(info.Yellow, seenYellow, play_time)
+
 	// TOOD: Here we loop over all balls, setting the one last in the list
 	// meaning error balls have 100% chance of fing it up!
+	seenBall := false
 	if detect.GetBalls() != nil {
 		for _, ball := range detect.GetBalls() {
 			//fmt.Println("Ball", ball.GetX(), ball.GetY(), ball.GetZ())
@@ -113,7 +126,11 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 			z := float64(ball.GetZ())
 
 			gi.State.SetBall(x, y, z, play_time)
+			seenBall = true
 		}
+	}
+	if !seenBall {
+		gi.State.HoldLastKnownBall(play_time)
 	}
 
 	gi.State.SetValid(true)

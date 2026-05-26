@@ -9,6 +9,8 @@ import (
 
 const TEAM_SIZE ID = 16
 
+const LastKnownVisionHoldMillis int64 = 500
+
 type KickedBallInfo struct {
 	StartX    float64
 	StartY    float64
@@ -103,7 +105,11 @@ func (gs *GameState) Update() {
 		// robot.Update()
 	}
 
-	latestBallPos, _ := gs.Ball.GetPosition()
+	latestBallPos, err := gs.Ball.GetPosition()
+	if err != nil {
+		gs.Ball.SetPossessor(nil)
+		return
+	}
 	newPossessor := gs.FindBallPossessor()
 	gs.Ball.SetPossessor(newPossessor)
 
@@ -171,6 +177,51 @@ func (gs *GameState) SetBall(x, y, z float64, time int64) {
 	gs.Ball.SetPositionTime(x, y, z, time)
 }
 
+func (gs *GameState) HoldLastKnownBall(time int64) bool {
+	return gs.HoldLastKnownBallFor(time, LastKnownVisionHoldMillis)
+}
+
+func (gs *GameState) HoldLastKnownBallFor(time int64, maxAgeMillis int64) bool {
+	pos, lastSeen, err := gs.Ball.GetPositionTime()
+	if err != nil {
+		return false
+	}
+	if time-lastSeen > maxAgeMillis {
+		return false
+	}
+
+	gs.SetBall(pos.X, pos.Y, pos.Z, time)
+	return true
+}
+
+func (gs *GameState) HoldMissingRobotPositions(team Team, seen [TEAM_SIZE]bool, time int64) {
+	gs.HoldMissingRobotPositionsFor(team, seen, time, LastKnownVisionHoldMillis)
+}
+
+func (gs *GameState) HoldMissingRobotPositionsFor(
+	team Team,
+	seen [TEAM_SIZE]bool,
+	time int64,
+	maxAgeMillis int64,
+) {
+	robots := gs.GetTeam(team)
+	for id, robot := range robots {
+		if seen[id] {
+			continue
+		}
+
+		pos, lastSeen, err := robot.GetPositionTime()
+		if err != nil {
+			continue
+		}
+		if time-lastSeen > maxAgeMillis {
+			continue
+		}
+
+		robot.SetPositionTime(pos.X, pos.Y, pos.Angle, time)
+	}
+}
+
 func (gs *GameState) SetMessageReceivedTime(time int64) {
 	gs.MessageReceived = time
 }
@@ -194,6 +245,21 @@ func (gs *GameState) SetTrackedRobot(team Team, id uint32, pos Position, vel Pos
 
 func (gs *GameState) SetTrackedBall(pos Position, vel Position, ts float64) {
 	gs.TrackedBall.SetTracked(pos, vel, ts)
+}
+
+func (gs *GameState) HoldTrackedBall(ts float64) bool {
+	if gs.TrackedBall.Valid {
+		gs.TrackedBall.SetTracked(gs.TrackedBall.Pos, Position{}, ts)
+		return true
+	}
+
+	pos, err := gs.Ball.GetPosition()
+	if err != nil {
+		return false
+	}
+
+	gs.TrackedBall.SetTracked(pos, Position{}, ts)
+	return true
 }
 
 func (gs *GameState) GetTrackedRobot(team Team, id uint32) *TrackedRobot {

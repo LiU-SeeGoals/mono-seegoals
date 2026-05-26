@@ -6,8 +6,8 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
 	"github.com/LiU-SeeGoals/proto_go/gc"
+	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -79,9 +79,9 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		robotId := robot.GetRobotId()
 
 		p := info.Position{
-			X: float64(pos.GetX()),
-			Y: float64(pos.GetY()),
-			Z: 0,
+			X:     float64(pos.GetX()),
+			Y:     float64(pos.GetY()),
+			Z:     0,
 			Angle: float64(robot.GetOrientation()),
 		}
 
@@ -113,9 +113,9 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		vel := b.GetVel()
 
 		p := info.Position{
-			X: float64(pos.GetX()*1000),
-			Y: float64(pos.GetY()*1000),
-			Z: float64(pos.GetZ()*1000),
+			X:     float64(pos.GetX() * 1000),
+			Y:     float64(pos.GetY() * 1000),
+			Z:     float64(pos.GetZ() * 1000),
 			Angle: 0,
 		}
 
@@ -127,6 +127,8 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		}
 
 		gi.State.SetTrackedBall(p, v, ts)
+	} else {
+		gi.State.HoldTrackedBall(ts)
 	}
 
 	kicked := frame.GetKickedBall()
@@ -193,4 +195,3 @@ func NewSSLTrackedVisionClient(addr string) *SSLTrackedVisionClient {
 	receiver.ConnectTracked()
 	return receiver
 }
-
