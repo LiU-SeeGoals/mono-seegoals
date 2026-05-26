@@ -66,7 +66,7 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 }
 
 func (m *MoveToBall) Achieved(gi *info.GameInfo) bool {
-	return gi.State.GetBall().GetPossessor() == gi.State.GetRobot(m.id, m.team)
+	return robotHasBallControl(gi, m.team, m.id)
 }
 
 func (m *MoveToBall) GetID() info.ID {

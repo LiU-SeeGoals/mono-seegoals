@@ -31,6 +31,13 @@ type KickDecision struct {
 	IsPass     bool
 }
 
+const (
+	minPassDistance        = 1500.0
+	maxPassDistance        = 4500.0
+	minPassForwardProgress = 300.0
+	passLaneRobotMargin    = 200.0
+)
+
 func NewOffenseRole(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo, team Team) *OffenseRole {
 	return &OffenseRole{
 		id:              robotID,
@@ -79,6 +86,35 @@ func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool 
 	return true
 }
 
+func passLaneIsClear(team info.Team, from info.Position, to info.Position, gi *GameInfo) bool {
+	enemies := gi.State.GetOtherTeam(team)
+	for i := 0; i < int(TEAM_SIZE); i++ {
+		enemyPos, err := enemies[i].GetPosition()
+		if err != nil {
+			continue
+		}
+		dist := info.DistToLineSegment(to.ToV2(), from.ToV2(), enemyPos.ToV2())
+		if dist < passLaneRobotMargin {
+			return false
+		}
+	}
+
+	return true
+}
+
+func viablePassTarget(team info.Team, ballPos info.Position, receiverPos info.Position, goal info.Position, gi *GameInfo) bool {
+	passDistance := ballPos.Dist2d(receiverPos)
+	if passDistance < minPassDistance || passDistance > maxPassDistance {
+		return false
+	}
+
+	if receiverPos.Dist2d(goal) > ballPos.Dist2d(goal)-minPassForwardProgress {
+		return false
+	}
+
+	return passLaneIsClear(team, ballPos, receiverPos, gi)
+}
+
 func (kr *AttemptGoalIntent) SetPassCandidates(ids []info.ID) {
 	kr.passCandidates = append(kr.passCandidates[:0], ids...)
 }
@@ -98,6 +134,9 @@ func (kr *AttemptGoalIntent) bestReceiverID() (info.ID, bool) {
 
 		pos, err := kr.gi.State.GetRobotPosition(kr.team, id)
 		if err != nil {
+			continue
+		}
+		if !viablePassTarget(kr.team, ballPos, pos, goal, kr.gi) {
 			continue
 		}
 

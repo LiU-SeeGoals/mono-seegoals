@@ -57,3 +57,30 @@ func TestBestReceiverIDDoesNotUseRobotsOutsidePassCandidates(t *testing.T) {
 		t.Fatal("bestReceiverID found a receiver even though no teammate candidate was configured")
 	}
 }
+
+func TestBestReceiverIDIgnoresShortPassTargets(t *testing.T) {
+	gi := testGameInfoWithRobots()
+	gi.State.SetYellowRobot(3, 500, 0, 0, 1)
+	intent := &AttemptGoalIntent{gi: gi, team: info.Yellow, id: 1}
+	intent.SetPassCandidates([]info.ID{1, 3})
+
+	_, ok := intent.bestReceiverID()
+	if ok {
+		t.Fatal("bestReceiverID found a receiver for a pass target that is too close to the ball")
+	}
+}
+
+func TestChooseKickDecisionFallsBackToGoalWhenPassIsNotViable(t *testing.T) {
+	gi := testGameInfoWithRobots()
+	gi.State.SetYellowRobot(3, 500, 0, 0, 1)
+	intent := &AttemptGoalIntent{gi: gi, team: info.Yellow, id: 1}
+	intent.SetPassCandidates([]info.ID{1, 3})
+
+	decision := intent.chooseKickDecision()
+	if decision.IsPass {
+		t.Fatalf("chooseKickDecision chose pass to %d, want goal kick fallback", decision.ReceiverID)
+	}
+	if decision.Target.X != gi.EnemyGoalCenter(info.Yellow).X {
+		t.Fatalf("chooseKickDecision target = %v, want enemy goal", decision.Target)
+	}
+}

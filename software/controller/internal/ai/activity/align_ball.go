@@ -15,6 +15,7 @@ type AlignConfig struct {
 	robotBallClearence float64
 	doneDist           float64
 	angleError         float64
+	kickAngleError     float64
 }
 
 func GetAlignConfig() AlignConfig {
@@ -22,6 +23,7 @@ func GetAlignConfig() AlignConfig {
 		robotBallClearence: 200,
 		doneDist:           50,
 		angleError:         3.0 * math.Pi / 180,
+		kickAngleError:     12.0 * math.Pi / 180,
 	}
 }
 
@@ -51,10 +53,10 @@ func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) 
 	}
 }
 func NewDirectAlign(team info.Team, id info.ID, to info.Position, from info.Position) *AlignBall {
-    align := NewAlign(team, id, to, from)
-    align.useRRT = false
-    align.avoidBall = false
-    return align
+	align := NewAlign(team, id, to, from)
+	align.useRRT = false
+	align.avoidBall = false
+	return align
 }
 func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 
@@ -73,9 +75,6 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 		}
 
 	}
-
-	
-	
 
 	goalPos := info.Vec2{X: m.to.X, Y: m.to.Y}
 
@@ -111,17 +110,17 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	moveTo.AvoidBall(m.avoidBall)
 	act := moveTo.GetMoveToAction(gi)
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-    if ok && ballVel.Norm2d() > 0.3 {
-        // Ball is moving face the ball to receive it
-        ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-        myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
-        if err == nil {
-            act.Dest.Angle = myPos.AngleToPosition(ballPos)
-        }
-    } else {
-        // Ball is slow align to kick direction
-        act.Dest.Angle = robotTargetPos.Angle
-    }
+	if ok && ballVel.Norm2d() > 0.3 {
+		// Ball is moving face the ball to receive it
+		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+		myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+		if err == nil {
+			act.Dest.Angle = myPos.AngleToPosition(ballPos)
+		}
+	} else {
+		// Ball is slow align to kick direction
+		act.Dest.Angle = robotTargetPos.Angle
+	}
 
 	// act := action.MoveTo{}
 	// act.Id = int(m.id)
@@ -147,7 +146,11 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	angle_error := info.NormalizeAngleDelta(robotTargetPos.Angle, myRobotPos.Angle)
 
 	dist := math.Sqrt(xx + yy)
-	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError
+	cfg := GetAlignConfig()
+	kickAngleError := info.NormalizeAngleDelta(robotTargetPos.Angle, myRobotPos.Angle)
+	hasBallAndFacesKickTarget := robotHasBallControl(gi, m.team, m.id) &&
+		math.Abs(kickAngleError) < cfg.kickAngleError
+	val := hasBallAndFacesKickTarget || (dist < cfg.doneDist && math.Abs(angle_error) < cfg.angleError)
 	if m.id == 3 {
 		// fmt.Println("angle error", math.Abs(angle_error), "threshold: ",GetAlignConfig().angleError, "dist:", dist, "threshold: ", GetAlignConfig().doneDist, val)
 	}
