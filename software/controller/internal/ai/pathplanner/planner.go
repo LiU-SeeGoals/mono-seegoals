@@ -317,7 +317,7 @@ func planningObstacles(
 		ballPos, _ := gi.State.Ball.GetPosition()
 		obstacles := []Obstacle{{Position: ballPos, Size: BallSafetyRadius}}
 		if avoidGoallines {
-			obstacles = append(obstacles, goalLineObstacles(gi)...)
+			obstacles = append(obstacles, goalLineObstacles(gi, myPos, true)...)
 		}
 		return obstacles
 	}
@@ -540,27 +540,71 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoalline
 		obstacles = append(obstacles, Obstacle{Position: pos, Size: RobotSafetyRadius})
 	}
 	if avoidGoallines {
-		obstacles = append(obstacles, goalLineObstacles(gi)...)
+		selfPos, ok := robotPosition(gi, team, id)
+		obstacles = append(obstacles, goalLineObstacles(gi, selfPos, ok)...)
 	}
 	return obstacles
 }
 
-func goalLineObstacles(gi *info.GameInfo) []Obstacle {
+func robotPosition(gi *info.GameInfo, team info.Team, id info.ID) (info.Position, bool) {
+	if gi == nil {
+		return info.Position{}, false
+	}
+	pos, err := gi.State.GetTeam(team)[id].GetPosition()
+	if err != nil {
+		return info.Position{}, false
+	}
+	return pos, true
+}
+
+type goalZone struct {
+	minX float64
+	maxX float64
+	minY float64
+	maxY float64
+}
+
+func (z goalZone) contains(pos info.Position) bool {
+	return pos.X >= z.minX && pos.X <= z.maxX && pos.Y >= z.minY && pos.Y <= z.maxY
+}
+
+func goalLineObstacles(gi *info.GameInfo, currentPos info.Position, allowCurrentZoneExit bool) []Obstacle {
 	if gi == nil || !gi.HasField() {
 		return nil
 	}
 
 	obstacles := make([]Obstacle, 0)
-	obstacles = append(obstacles, goalZoneObstacles(gi, "LeftPenaltyStretch", "LeftGoalLine")...)
-	obstacles = append(obstacles, goalZoneObstacles(gi, "RightPenaltyStretch", "RightGoalLine")...)
+	for _, zone := range goalZones(gi) {
+		if allowCurrentZoneExit && zone.contains(currentPos) {
+			continue
+		}
+		obstacles = append(obstacles, obstaclesInRectangle(
+			zone.minX,
+			zone.maxX,
+			zone.minY,
+			zone.maxY,
+			GoalLineSafetyRadius,
+		)...)
+	}
 	return obstacles
 }
 
-func goalZoneObstacles(gi *info.GameInfo, frontLineName, backLineName string) []Obstacle {
+func goalZones(gi *info.GameInfo) []goalZone {
+	zones := make([]goalZone, 0, 2)
+	if zone, ok := goalZoneFromLines(gi, "LeftPenaltyStretch", "LeftGoalLine"); ok {
+		zones = append(zones, zone)
+	}
+	if zone, ok := goalZoneFromLines(gi, "RightPenaltyStretch", "RightGoalLine"); ok {
+		zones = append(zones, zone)
+	}
+	return zones
+}
+
+func goalZoneFromLines(gi *info.GameInfo, frontLineName, backLineName string) (goalZone, bool) {
 	front := gi.GetFieldLine(frontLineName)
 	back := gi.GetFieldLine(backLineName)
 	if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
-		return nil
+		return goalZone{}, false
 	}
 
 	frontX := float64(front.GetP1().GetX())
@@ -568,13 +612,12 @@ func goalZoneObstacles(gi *info.GameInfo, frontLineName, backLineName string) []
 	y1 := float64(front.GetP1().GetY())
 	y2 := float64(front.GetP2().GetY())
 
-	return obstaclesInRectangle(
-		math.Min(frontX, backX),
-		math.Max(frontX, backX),
-		math.Min(y1, y2),
-		math.Max(y1, y2),
-		GoalLineSafetyRadius,
-	)
+	return goalZone{
+		minX: math.Min(frontX, backX),
+		maxX: math.Max(frontX, backX),
+		minY: math.Min(y1, y2),
+		maxY: math.Max(y1, y2),
+	}, true
 }
 
 func obstaclesInRectangle(minX, maxX, minY, maxY, size float64) []Obstacle {
