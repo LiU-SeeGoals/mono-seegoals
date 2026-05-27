@@ -3,6 +3,7 @@ package info
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
@@ -57,8 +58,8 @@ func (gi GameInfo) PrintField() {
 // field_arcs:{name:"CenterCircle" center:{x:0 y:0} radius:500 a1:0 a2:6.2831855 thickness:10}
 
 func (gi GameInfo) GetFieldLine(line string) *ssl_vision.SSL_FieldLineSegment {
-	for i := range gi.field.FieldLines{
-		if *gi.field.FieldLines[i].Name == "CenterLine"{
+	for i := range gi.field.FieldLines {
+		if strings.EqualFold(gi.field.FieldLines[i].GetName(), line) {
 			return gi.field.FieldLines[i]
 		}
 	}

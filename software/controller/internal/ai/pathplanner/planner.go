@@ -12,11 +12,14 @@ import (
 
 // Field/planning constants (mm) — same semantics as the former move_to_position locals.
 const (
-	RobotSafetyRadius = 240.0
-	BallSafetyRadius  = 150.0
-	PlanningRadius    = 400.0
-	MotionRadius      = 100.0
+	RobotSafetyRadius    = 240.0
+	BallSafetyRadius     = 150.0
+	GoalLineSafetyRadius = 100.0
+	PlanningRadius       = 400.0
+	MotionRadius         = 100.0
 )
+
+const goalLineObstacleSpacing = GoalLineSafetyRadius
 
 // Defaults for persistent path reuse (used when the corresponding RRTConfig field is zero).
 const (
@@ -145,6 +148,7 @@ func (p *Planner) PlanPath(
 	id info.ID,
 	finalDestination info.Position,
 	avoidBall bool,
+	avoidGoallines bool,
 	gi *info.GameInfo,
 	cfg RRTConfig,
 ) []info.Position {
@@ -153,7 +157,7 @@ func (p *Planner) PlanPath(
 	}
 	perm := cfg.persistence()
 	myPos, _ := gi.State.GetTeam(team)[id].GetPosition()
-	obstacles := planningObstacles(team, id, myPos, finalDestination, avoidBall, gi, perm)
+	obstacles := planningObstacles(team, id, myPos, finalDestination, avoidBall, avoidGoallines, gi, perm)
 
 	// Inflated “collision”: escape this tick only. Do not commit: overwriting the
 	// session with a 1-point path is common near the goal in traffic and made the
@@ -305,14 +309,19 @@ func planningObstacles(
 	id info.ID,
 	myPos, finalDestination info.Position,
 	avoidBall bool,
+	avoidGoallines bool,
 	gi *info.GameInfo,
 	perm resolvedPersistence,
 ) []Obstacle {
 	if ignoreRobotObstaclesForBallApproach(myPos, finalDestination, avoidBall, gi, perm) {
 		ballPos, _ := gi.State.Ball.GetPosition()
-		return []Obstacle{{Position: ballPos, Size: BallSafetyRadius}}
+		obstacles := []Obstacle{{Position: ballPos, Size: BallSafetyRadius}}
+		if avoidGoallines {
+			obstacles = append(obstacles, goalLineObstacles(gi)...)
+		}
+		return obstacles
 	}
-	return ObstaclesForRobot(team, id, avoidBall, gi)
+	return ObstaclesForRobot(team, id, avoidBall, avoidGoallines, gi)
 }
 
 func ignoreRobotObstaclesForBallApproach(
@@ -508,7 +517,7 @@ func IsPathClear(start, end info.Position, obstacles []Obstacle, extraMargin flo
 }
 
 // ObstaclesForRobot lists disc obstacles (other robots, optional ball) for path checks.
-func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, gi *info.GameInfo) []Obstacle {
+func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoallines bool, gi *info.GameInfo) []Obstacle {
 	obstacles := make([]Obstacle, 0)
 	allRobots := append(gi.State.GetTeam(info.Blue)[:], gi.State.GetTeam(info.Yellow)[:]...)
 
@@ -530,5 +539,72 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, gi *info.Game
 		}
 		obstacles = append(obstacles, Obstacle{Position: pos, Size: RobotSafetyRadius})
 	}
+	if avoidGoallines {
+		obstacles = append(obstacles, goalLineObstacles(gi)...)
+	}
+	return obstacles
+}
+
+func goalLineObstacles(gi *info.GameInfo) []Obstacle {
+	if gi == nil || !gi.HasField() {
+		return nil
+	}
+
+	obstacles := make([]Obstacle, 0)
+	obstacles = append(obstacles, goalZoneObstacles(gi, "LeftPenaltyStretch", "LeftGoalLine")...)
+	obstacles = append(obstacles, goalZoneObstacles(gi, "RightPenaltyStretch", "RightGoalLine")...)
+	return obstacles
+}
+
+func goalZoneObstacles(gi *info.GameInfo, frontLineName, backLineName string) []Obstacle {
+	front := gi.GetFieldLine(frontLineName)
+	back := gi.GetFieldLine(backLineName)
+	if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
+		return nil
+	}
+
+	frontX := float64(front.GetP1().GetX())
+	backX := float64(back.GetP1().GetX())
+	y1 := float64(front.GetP1().GetY())
+	y2 := float64(front.GetP2().GetY())
+
+	return obstaclesInRectangle(
+		math.Min(frontX, backX),
+		math.Max(frontX, backX),
+		math.Min(y1, y2),
+		math.Max(y1, y2),
+		GoalLineSafetyRadius,
+	)
+}
+
+func obstaclesInRectangle(minX, maxX, minY, maxY, size float64) []Obstacle {
+	if minX > maxX {
+		minX, maxX = maxX, minX
+	}
+	if minY > maxY {
+		minY, maxY = maxY, minY
+	}
+
+	xSegments := int(math.Ceil((maxX - minX) / goalLineObstacleSpacing))
+	ySegments := int(math.Ceil((maxY - minY) / goalLineObstacleSpacing))
+	if xSegments < 1 {
+		xSegments = 1
+	}
+	if ySegments < 1 {
+		ySegments = 1
+	}
+
+	obstacles := make([]Obstacle, 0, (xSegments+1)*(ySegments+1))
+	for ix := 0; ix <= xSegments; ix++ {
+		x := minX + float64(ix)*(maxX-minX)/float64(xSegments)
+		for iy := 0; iy <= ySegments; iy++ {
+			y := minY + float64(iy)*(maxY-minY)/float64(ySegments)
+			obstacles = append(obstacles, Obstacle{
+				Position: info.Position{X: x, Y: y},
+				Size:     size,
+			})
+		}
+	}
+
 	return obstacles
 }

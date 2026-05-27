@@ -46,6 +46,7 @@ type MoveToPosition struct {
 	rrtConfig         pathplanner.RRTConfig
 	gi                *info.GameInfo
 	avoidBall         bool
+	avoidGoallines    bool
 	dribble           bool
 	lastPosition      info.Position // Last position to detect lack of movement
 	stuckThreshold    int           // Number of cycles to consider robot as stuck
@@ -85,6 +86,9 @@ func (m *MoveToPosition) SetUseRRT(use bool) {
 func (m *MoveToPosition) AvoidBall(avoid bool) {
 	m.avoidBall = avoid
 }
+func (m *MoveToPosition) AvoidGoallines(avoid bool) {
+	m.avoidGoallines = avoid
+}
 
 func (m *MoveToPosition) SetDribble(dribble bool) {
 	m.dribble = dribble
@@ -116,6 +120,8 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 
 	if m.useRRT {
 		m.rrtConfig.StepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), m.rrtConfig.StepSize)
+		m.AvoidBall(true)
+		m.AvoidGoallines(true)
 		// fmt.Println(m.rrtConfig.StepSize)
 		// fmt.Println(m.final_destination)
 		// fmt.Println(myPos)
@@ -125,12 +131,12 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 		ps := getPathService(m.team)
 		if ps != nil {
 			cfg := m.rrtConfig
-			m.path = ps.PlanPath(m.team, m.id, m.final_destination, m.avoidBall, gi, cfg)
+			m.path = ps.PlanPath(m.team, m.id, m.final_destination, m.avoidBall, m.avoidGoallines, gi, cfg)
 		} else {
 			m.path = []info.Position{m.final_destination}
 		}
 
-		obstacles := pathplanner.ObstaclesForRobot(m.team, m.id, m.avoidBall, gi)
+		obstacles := pathplanner.ObstaclesForRobot(m.team, m.id, m.avoidBall, m.avoidGoallines, gi)
 		if len(m.path) > 0 {
 			cand := m.pickLookAheadTarget(myPos, obstacles)
 			targetPos = m.applyStickyLookAhead(myPos, cand)
