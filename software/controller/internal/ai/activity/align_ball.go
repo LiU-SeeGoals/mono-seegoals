@@ -13,6 +13,7 @@ import (
 
 type AlignConfig struct {
 	robotBallClearence float64
+	stagingClearance   float64
 	doneDist           float64
 	angleError         float64
 	turnToKickDist     float64
@@ -22,7 +23,8 @@ type AlignConfig struct {
 
 func GetAlignConfig() AlignConfig {
 	return AlignConfig{
-		robotBallClearence: 200,
+		robotBallClearence: 300,
+		stagingClearance:   700,
 		doneDist:           50,
 		angleError:         3.0 * math.Pi / 180,
 		turnToKickDist:     180,
@@ -63,29 +65,39 @@ func NewDirectAlign(team info.Team, id info.ID, to info.Position, from info.Posi
 	return align
 }
 func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
+	return m.getTargetPosWithClearance(gi, GetAlignConfig().robotBallClearence)
+}
 
+func (m *AlignBall) getStagingPos(gi *info.GameInfo) info.Position {
+	return m.getTargetPosWithClearance(gi, GetAlignConfig().stagingClearance)
+}
+
+func (m *AlignBall) getTargetPosWithClearance(gi *info.GameInfo, clearance float64) info.Position {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-	ballV2 := info.Vec2{X: m.from.X, Y: m.from.Y}
+	alignBallPos := ballPos
 	if ok && ballVel.Norm2d() > 0.3 {
 		lookahead := 0.8
-		ballPos.X += ballVel.X * 1000 * lookahead
-		ballPos.Y += ballVel.Y * 1000 * lookahead
-		ballV2 = info.Vec2{X: ballPos.X, Y: ballPos.Y}
+		alignBallPos.X += ballVel.X * 1000 * lookahead
+		alignBallPos.Y += ballVel.Y * 1000 * lookahead
 
 		// if we are in line with the ball don't lookahead, it just makes us miss the ball
 		if math.Abs(info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), ballPos.Angle)) < 10*math.Pi/180 {
-			ballV2 = info.Vec2{X: ballPos.X, Y: ballPos.Y}
+			alignBallPos = ballPos
 		}
 
 	}
 
+	ballV2 := info.Vec2{X: alignBallPos.X, Y: alignBallPos.Y}
 	goalPos := info.Vec2{X: m.to.X, Y: m.to.Y}
 
 	ballGoalTangent := info.Sub(goalPos, ballV2)
+	if ballGoalTangent.Norm() < 1 {
+		return alignBallPos
+	}
 	ballGoalTangent.DivNorm()
 
-	alignPos := ballGoalTangent.Mult(GetAlignConfig().robotBallClearence)
+	alignPos := ballGoalTangent.Mult(clearance)
 	robotXY := info.Sub(ballV2, alignPos)
 	robotTargetPos := info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: ballGoalTangent.Angle()}
 	m.AlignAngle = ballGoalTangent.Angle()
@@ -95,6 +107,7 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 
 	robotTargetPos := m.getTargetPos(gi)
+	stagingPos := m.getStagingPos(gi)
 	// myRobotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
 	// if err != nil {
 	// 	fmt.Println(err)
@@ -109,9 +122,24 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	// 	robotTargetPos = myRobotPos
 	// }
 
-	moveTo := NewMoveToPosition(m.team, m.id, robotTargetPos)
-	moveTo.SetUseRRT(m.useRRT)
-	moveTo.AvoidBall(m.avoidBall)
+	myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+	if err != nil {
+		fmt.Println(err)
+	}
+	isBehindBall, isOnPassLine := m.passLineChecks(myPos, gi)
+	moveTarget := robotTargetPos
+	useRRT := m.useRRT
+	avoidBall := m.avoidBall
+	if !isBehindBall || !isOnPassLine {
+		moveTarget = stagingPos
+	} else {
+		useRRT = false
+		avoidBall = false
+	}
+
+	moveTo := NewMoveToPosition(m.team, m.id, moveTarget)
+	moveTo.SetUseRRT(useRRT)
+	moveTo.AvoidBall(avoidBall)
 	act := moveTo.GetMoveToAction(gi)
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
 	if ok && ballVel.Norm2d() > 0.3 {
@@ -122,9 +150,8 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 			act.Dest.Angle = myPos.AngleToPosition(ballPos)
 		}
 	} else {
-		myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
-		if err == nil && !m.readyToFaceKick(myPos, robotTargetPos, gi) {
-			// Drive to the behind-ball point before rotating toward the final pass angle.
+		if !m.readyToFaceKick(myPos, robotTargetPos, gi) {
+			// Drive to the behind-ball staging/final point before rotating toward the pass angle.
 			act.Dest.Angle = myPos.AngleToPosition(act.Dest)
 		} else {
 			// Ball is slow and we are in the approach corridor, align to kick direction.
@@ -144,11 +171,8 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 
 func (m *AlignBall) readyToFaceKick(myRobotPos, robotTargetPos info.Position, gi *info.GameInfo) bool {
 	cfg := GetAlignConfig()
-	if myRobotPos.Dist2d(robotTargetPos) < cfg.turnToKickDist {
-		return true
-	}
 	isBehindBall, isOnPassLine := m.passLineChecks(myRobotPos, gi)
-	return isBehindBall && isOnPassLine
+	return isBehindBall && (isOnPassLine || myRobotPos.Dist2d(robotTargetPos) < cfg.turnToKickDist)
 }
 
 func (m *AlignBall) passLineChecks(myRobotPos info.Position, gi *info.GameInfo) (bool, bool) {
