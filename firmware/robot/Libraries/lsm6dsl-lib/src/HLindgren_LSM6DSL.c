@@ -108,7 +108,7 @@ Lsm6dsl_GyroData_t lsm6dsl_gyro_read(Lsm6dsl_Device_t *device) {
 
   uint16_t *buf16 = (uint16_t *)&inbuf;
 
-  return (Lsm6dsl_GyroData_t){.x = buf16[0], .y = buf16[1], .z = buf16[2]};
+  return (Lsm6dsl_GyroData_t){.x = 0.f, .y = 0.f, .z = 0.f};
 }
 
 Lsm6dsl_AccelData_t lsm6dsl_accel_read(Lsm6dsl_Device_t *device) {

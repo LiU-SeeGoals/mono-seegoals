@@ -281,7 +281,7 @@ static void ekfStateJacobianFunc(const arm_matrix_instance_f32* pX, const arm_ma
     // [domega/dx domega/dy domega/domenga]
     const float dt = STATE_DELTA_T;
 
-    float gyr_w = MAT_ELEMENT(*pU, 0, 0);
+    float gyr_w = 0.f;
     float vx = MAT_ELEMENT(*pU, 1, 0);
     float vy = MAT_ELEMENT(*pU, 2, 0);
     // vx = 0;
