@@ -19,6 +19,7 @@ type KickConfig struct {
 	driveThrough    float64
 	doneDist        float64
 	ballAbortRadius float64
+	kickContactDist float64
 }
 
 func GetKickConfig() KickConfig {
@@ -26,6 +27,7 @@ func GetKickConfig() KickConfig {
 		driveThrough:    30,
 		doneDist:        20,
 		ballAbortRadius: 200,
+		kickContactDist: 100,
 	}
 }
 
@@ -100,7 +102,9 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	act.Pos = robotPos
 	act.Dest = robotTargetPos
 
-	if robotPos.Dist2d(ballUntracked) > 100 {
+	dribblerPos := gi.State.GetTeam(m.team)[m.id].DribblerPos()
+	dribblerDist := dribblerPos.Dist2d(ballUntracked)
+	if dribblerDist > GetKickConfig().kickContactDist {
 		act.Dribble = true
 	} else {
 		act.KickSpeed = 2
