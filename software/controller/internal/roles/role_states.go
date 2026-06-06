@@ -146,6 +146,7 @@ type InterceptBallState struct {
 	team            info.Team
 	name            sm.StateName
 	activityHandler *ai.ActivityHandler
+	ctx             TargetContext
 }
 
 func (s *InterceptBallState) Initialize() {
@@ -156,7 +157,21 @@ func (s *InterceptBallState) GetName() sm.StateName {
 }
 
 func (s *InterceptBallState) Update() sm.EventName {
-	activity := act.NewMoveToBall(s.team, s.robotId)
+	ballVel, ok := s.gi.State.GetTrackedBall().GetTrackedVelocity()
+	if ok && ballVel.Norm2d() > 0.3 {
+		activity := act.NewMoveToBall(s.team, s.robotId)
+		s.activityHandler.AddActivity(activity)
+
+		if activity.Achieved(s.gi) {
+			return "BALL_OWNER"
+		}
+
+		return "NONE"
+	}
+
+	targetPos := s.ctx.GetTargetPosition()
+	fromPos := s.ctx.GetFromPosition()
+	activity := act.NewAlign(s.team, s.robotId, targetPos, fromPos)
 	s.activityHandler.AddActivity(activity)
 
 	if activity.Achieved(s.gi) {

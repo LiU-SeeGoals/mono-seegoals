@@ -313,6 +313,7 @@ func (kr *OffenseRole) Init() {
 		team:            kr.team,
 		name:            interceptName,
 		activityHandler: kr.activityHandler,
+		ctx:             offenseContext,
 	}
 	receivePass := &ReceivePassState{
 		gi:              kr.gi,
