@@ -24,12 +24,12 @@ type AlignConfig struct {
 func GetAlignConfig() AlignConfig {
 	return AlignConfig{
 		robotBallClearence: 300,
-		stagingClearance:   700,
+		stagingClearance:   500,
 		doneDist:           90,
-		angleError:         6.0 * math.Pi / 180,
+		angleError:         3.0 * math.Pi / 180,
 		turnToKickDist:     180,
 		minBehindBall:      120,
-		maxLineError:       120,
+		maxLineError:       40,
 	}
 }
 
