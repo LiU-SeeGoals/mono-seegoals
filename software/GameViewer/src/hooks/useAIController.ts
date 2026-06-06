@@ -1,8 +1,20 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, type Dispatch, type SetStateAction } from 'react';
 import { Action } from '../types/Action';
 
+type RobotRoleDTO = {
+  Team: number;
+  Id: number;
+  Role: string;
+};
+
+type AIControllerPacket = {
+  Actions?: Action[];
+  RobotRoles?: RobotRoleDTO[];
+};
+
 export const useAIController = (
-  setRobotActions: React.Dispatch<React.SetStateAction<Action[]>>
+  setRobotActions: Dispatch<SetStateAction<Action[]>>,
+  setRobotRoles?: Dispatch<SetStateAction<Record<string, string>>>
 ) => {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -66,10 +78,34 @@ export const useAIController = (
 
         try {
           if (!event.data) return;
-          const parsedData: Action[] = JSON.parse(event.data);
-          if (!parsedData) return;
+          const parsedData: Action[] | AIControllerPacket = JSON.parse(event.data);
+          const actions = Array.isArray(parsedData)
+            ? parsedData
+            : Array.isArray(parsedData.Actions)
+              ? parsedData.Actions
+              : [];
+          if (actions.length === 0 && Array.isArray(parsedData)) return;
+
+          const roleUpdates: Record<string, string> = {};
+          if (!Array.isArray(parsedData) && Array.isArray(parsedData.RobotRoles)) {
+            for (const role of parsedData.RobotRoles) {
+              roleUpdates[`${role.Team}:${role.Id}`] = role.Role;
+            }
+            if (setRobotRoles) {
+              setRobotRoles(roleUpdates);
+            }
+          } else {
+            for (const action of actions) {
+              if (action.Team !== undefined && action.Role) {
+                roleUpdates[`${action.Team}:${action.Id}`] = action.Role;
+              }
+            }
+            if (setRobotRoles && Object.keys(roleUpdates).length > 0) {
+              setRobotRoles((prevRoles) => ({ ...prevRoles, ...roleUpdates }));
+            }
+          }
           setRobotActions((prevActions) => {
-            const updatedActions = [...prevActions, ...parsedData];
+            const updatedActions = [...prevActions, ...actions];
             return updatedActions.slice(-10);
           });
         } catch (e) {
@@ -85,7 +121,7 @@ export const useAIController = (
       wsRef.current?.close();
       if (retryTimeout) clearTimeout(retryTimeout);
     };
-  }, [setRobotActions]);
+  }, [setRobotActions, setRobotRoles]);
 
   const controllerSend = (data: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

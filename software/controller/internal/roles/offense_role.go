@@ -18,6 +18,18 @@ type OffenseRole struct {
 	team            Team
 	intent          *AttemptGoalIntent
 	receiveTarget   info.Position
+	slot            OffenseSlot
+}
+
+type OffenseRoleKind string
+
+const (
+	OffenseRoleChaser   OffenseRoleKind = "chaser"
+	OffenseRoleReceiver OffenseRoleKind = "receiver"
+)
+
+type OffenseSlot struct {
+	Kind OffenseRoleKind
 }
 
 type PassTarget struct {
@@ -42,11 +54,12 @@ func NewOffenseRole(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo
 }
 
 type AttemptGoalIntent struct {
-	gi       *GameInfo
-	team     Team
-	id       ID
-	frozen   bool
-	decision KickDecision
+	gi          *GameInfo
+	team        Team
+	id          ID
+	frozen      bool
+	decision    KickDecision
+	receiverIDs []info.ID
 }
 
 func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool {
@@ -78,14 +91,19 @@ func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool 
 	return true
 }
 
-func (kr *AttemptGoalIntent) bestReceiverID() info.ID {
+func (kr *AttemptGoalIntent) SetReceivers(receiverIDs []info.ID) {
+	kr.receiverIDs = append(kr.receiverIDs[:0], receiverIDs...)
+}
+
+func (kr *AttemptGoalIntent) bestReceiverID() (info.ID, bool) {
 	bestID := info.ID(0)
 	bestScore := math.Inf(-1)
+	found := false
 
 	ballPos, _ := kr.gi.State.GetBall().GetEstimatedPosition()
 	goal := kr.gi.EnemyGoalCenter(kr.team)
 
-	for _, id := range []info.ID{1, 2, 3} {
+	for _, id := range kr.receiverIDs {
 		if id == kr.id {
 			continue
 		}
@@ -103,10 +121,11 @@ func (kr *AttemptGoalIntent) bestReceiverID() info.ID {
 		if score > bestScore {
 			bestScore = score
 			bestID = id
+			found = true
 		}
 	}
 
-	return bestID
+	return bestID, found
 }
 
 func (kr *AttemptGoalIntent) chooseKickDecision() KickDecision {
@@ -127,7 +146,15 @@ func (kr *AttemptGoalIntent) chooseKickDecision() KickDecision {
 		}
 	}
 
-	receiverID := kr.bestReceiverID()
+	receiverID, ok := kr.bestReceiverID()
+	if !ok {
+		return KickDecision{
+			Target: goalPosition,
+			From:   ballPos,
+			IsPass: false,
+		}
+	}
+
 	receiverPos, err := kr.gi.State.GetRobotPosition(kr.team, receiverID)
 	if err != nil {
 		return KickDecision{
@@ -314,6 +341,7 @@ func (kr *OffenseRole) Init() {
 	sm.AddTransition(receiveName, "BALL_LOST", awaitBall)
 
 	kr.sm = sm
+	kr.slot = OffenseSlot{Kind: OffenseRoleChaser}
 }
 
 func (kr *OffenseRole) Run() {
@@ -339,4 +367,15 @@ func (kr *OffenseRole) CurrentDecision() KickDecision {
 func (kr *OffenseRole) ReceivePass(target info.Position) {
 	kr.receiveTarget = target
 	kr.sm.TriggerEvent("PASS_TARGETED")
+}
+
+func (kr *OffenseRole) SetSlot(slot OffenseSlot) {
+	kr.slot = slot
+}
+
+func (kr *OffenseRole) SetPassReceivers(receiverIDs []info.ID) {
+	if kr.intent == nil {
+		return
+	}
+	kr.intent.SetReceivers(receiverIDs)
 }

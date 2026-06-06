@@ -7,6 +7,7 @@ interface gameViewerProps {
   sslFieldUpdate: SSLFieldUpdate;
   aiRobotUpdate: AIRobotUpdate;
   robotActions: Action[];
+  robotRoles: Record<string, string>;
   errorOverlay: string;
   vectorSettingBlue: boolean[];
   vectorSettingYellow: boolean[];
@@ -18,6 +19,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
   sslFieldUpdate,
   aiRobotUpdate,
   robotActions,
+  robotRoles,
   errorOverlay,
   vectorSettingBlue,
   vectorSettingYellow,
@@ -42,6 +44,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
         sslFieldUpdate={sslFieldUpdate}
         aiRobotUpdate={aiRobotUpdate}
         robotActions={robotActions}
+        robotRoles={robotRoles}
         errorOverlay={errorOverlay}
         vectorSettingBlue={vectorSettingBlue}
         vectorSettingYellow={vectorSettingYellow}

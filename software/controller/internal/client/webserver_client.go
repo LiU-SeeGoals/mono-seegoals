@@ -10,6 +10,8 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/config"
+	"github.com/LiU-SeeGoals/controller/internal/debugstate"
+	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/gorilla/websocket"
 )
@@ -170,10 +172,17 @@ func (server *WebServer) removeConnection(ws *websocket.Conn) {
 func actionsToJson(actions []action.Action) []byte {
 	actionDTOs := make([]action.ActionDTO, 0, len(actions))
 	for _, action := range actions {
-		actionDTOs = append(actionDTOs, action.ToDTO())
+		dto := action.ToDTO()
+		if dto.Team != 0 {
+			dto.Role = debugstate.GetRobotRole(info.Team(dto.Team), info.ID(dto.Id))
+		}
+		actionDTOs = append(actionDTOs, dto)
 	}
 
-	output, err := json.Marshal(actionDTOs)
+	output, err := json.Marshal(GameViewerActionPacket{
+		Actions:    actionDTOs,
+		RobotRoles: debugstate.SnapshotRobotRoles(),
+	})
 	if err != nil {
 		Logger.Error("The action packet could not be marshalled to JSON.")
 	}
@@ -230,4 +239,9 @@ type GameViewerCommand struct {
 	Y           int32  `json:"y"`
 	Id          int    `json:"Id"`
 	Type        string `json:"Type"`
+}
+
+type GameViewerActionPacket struct {
+	Actions    []action.ActionDTO        `json:"Actions"`
+	RobotRoles []debugstate.RobotRoleDTO `json:"RobotRoles"`
 }

@@ -18,7 +18,6 @@ import {
   getDefaultLog,
   getDefaultVisibleRobots,
 } from './helper/defaultValues';
-import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
 
 function fotballFieldClick(event){
 
@@ -28,6 +27,7 @@ function App() {
   const [sslFieldUpdate, setSSLFieldUpdate] = useState(getDefaultSSLFieldUpdate());
   const [aiRobotUpdate, setAIUpdate] = useState(getDefaultAIRobotUpdate());
   const [robotActions, setRobotActions] = useState(getDefaultActions());
+  const [robotRoles, setRobotRoles] = useState<Record<string, string>>({});
   const [vectorSettingBlue, setVectorSettingBlue] = useState(getDefaultVectorSetting());
   const [vectorSettingYellow, setVectorSettingYellow] = useState(getDefaultVectorSetting());
   const [traceSetting, setTraceSetting] = useState(getDefaultTraceSetting());
@@ -43,7 +43,7 @@ function App() {
     setFieldGeometry
   );
 
-  const { isConnected: isConnectedToAI, controllerSend } = useAIController(setRobotActions);
+  const { isConnected: isConnectedToAI, controllerSend } = useAIController(setRobotActions, setRobotRoles);
 
   const { isConnected: isConnectedToGameController } = useGameController();
   useEffect(() => {
@@ -73,6 +73,7 @@ function App() {
         sslFieldUpdate={sslFieldUpdate}
         aiRobotUpdate={aiRobotUpdate}
         robotActions={robotActions}
+        robotRoles={robotRoles}
         terminalLog={terminalLog}
         errorOverlay={errorOverlay}
         vectorSettingBlue={vectorSettingBlue}

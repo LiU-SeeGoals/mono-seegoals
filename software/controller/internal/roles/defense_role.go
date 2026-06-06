@@ -16,6 +16,8 @@ const (
 	forwardDefenderBallOffset = 700.0
 	middleDefenderBallOffset  = 1700.0
 	backwardDefenderDepth     = 3200.0
+	highDefenderBallOffset    = 900.0
+	lowDefenderDepth          = 3600.0
 )
 
 var neutralHoldPos = info.Position{X: 1000, Y: 0, Z: 0, Angle: 0}
@@ -27,6 +29,9 @@ const (
 	DefenseRoleForward  DefenseRoleKind = "forward"
 	DefenseRoleMiddle   DefenseRoleKind = "middle"
 	DefenseRoleBackward DefenseRoleKind = "backward"
+	DefenseRoleWall     DefenseRoleKind = "wall"
+	DefenseRoleHigh     DefenseRoleKind = "high"
+	DefenseRoleLow      DefenseRoleKind = "low"
 )
 
 type DefenseSlot struct {
@@ -64,6 +69,10 @@ func (s *DefensePressState) Update() EventName {
 	ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
 	var target info.Position
 	switch s.slot.Kind {
+	case DefenseRoleHigh:
+		target = s.ballGoalLineTarget(ballPos, highDefenderBallOffset, s.slot.LateralOffset)
+	case DefenseRoleLow:
+		target = s.lowDefenderTarget(ballPos, s.slot.LateralOffset)
 	case DefenseRoleForward:
 		target = s.ballGoalLineTarget(ballPos, forwardDefenderBallOffset, s.slot.LateralOffset)
 	case DefenseRoleMiddle:
@@ -105,6 +114,17 @@ func (s *DefensePressState) ballGoalLineTarget(ballPos info.Position, ballOffset
 func (s *DefensePressState) backwardDefenderTarget(ballPos info.Position, lateralOffset float64) info.Position {
 	target := info.Position{
 		X: defenseXSign(s.gi, s.team) * backwardDefenderDepth,
+		Y: ballPos.Y + lateralOffset,
+		Z: 0,
+	}
+	target = clampCoverTarget(target)
+	target.Angle = target.AngleToPosition(ballPos)
+	return target
+}
+
+func (s *DefensePressState) lowDefenderTarget(ballPos info.Position, lateralOffset float64) info.Position {
+	target := info.Position{
+		X: defenseXSign(s.gi, s.team) * lowDefenderDepth,
 		Y: ballPos.Y + lateralOffset,
 		Z: 0,
 	}

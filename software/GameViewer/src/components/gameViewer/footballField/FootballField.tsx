@@ -12,6 +12,7 @@ const TEAM_IDS = Object.freeze({
 const REAL_WIDTH_FIELD: number = 9600;
 const ROBOT_RADIUS: number = 90;
 const FONT_SIZE: number = 120;
+const ROLE_FONT_SIZE: number = 85;
 
 const ARROW_HEAD_LENGTH: number = 5;
 const SPEED_ARROW_COLOR: string = 'rgba(0, 0, 0, 1)';
@@ -91,6 +92,7 @@ interface FootBallFieldProps {
   sslFieldUpdate: SSLFieldUpdate;
   aiRobotUpdate: AIRobotUpdate;
   robotActions: Action[];
+  robotRoles: Record<string, string>;
   errorOverlay: string;
   vectorSettingBlue: boolean[];
   vectorSettingYellow: boolean[];
@@ -103,6 +105,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   sslFieldUpdate,
   aiRobotUpdate,
   robotActions,
+  robotRoles,
   errorOverlay,
   vectorSettingBlue,
   vectorSettingYellow,
@@ -203,11 +206,11 @@ const FootballField: React.FC<FootBallFieldProps> = ({
 
   const drawAllRobots = (context: CanvasRenderingContext2D) => {
     sslFieldUpdate.robotsBlue.map((robot) => {
-      drawRobot(context, robot, COLOR_MAP.blue, COLOR_MAP.white, 1.0);
+      drawRobot(context, robot, TEAM_IDS.BLUE, COLOR_MAP.blue, COLOR_MAP.white, 1.0);
     });
 
     sslFieldUpdate.robotsYellow.map((robot) => {
-      drawRobot(context, robot, COLOR_MAP.yellow, COLOR_MAP.black, 1.0);
+      drawRobot(context, robot, TEAM_IDS.YELLOW, COLOR_MAP.yellow, COLOR_MAP.black, 1.0);
     });
   };
 
@@ -302,6 +305,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   const drawRobot = (
     context: CanvasRenderingContext2D,
     robot: SSLRobot,
+    team: number,
     fillColor: string,
     textColor: string,
     alpha: number
@@ -347,6 +351,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     context.stroke();
 
     drawId(context, robot, withAlpha(textColor, alpha));
+    drawRoleLabel(context, robot, team);
   };
 
   const drawCircle = (
@@ -385,6 +390,35 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     context.fillText(String(robot.robotId), canvasX, canvasY);
   };
 
+  const drawRoleLabel = (
+    context: CanvasRenderingContext2D,
+    robot: SSLRobot,
+    team: number
+  ) => {
+    const role = robotRoles[`${team}:${robot.robotId}`];
+    if (!role) {
+      return;
+    }
+
+    const { canvasX, canvasY } = getCanvasCoordinates(
+      robot.x,
+      robot.y,
+      context
+    );
+    const scaler = getScaler(context.canvas.width, context.canvas.height);
+    const canvasRadius = ROBOT_RADIUS * scaler;
+    const fontSize = Math.max(9, ROLE_FONT_SIZE * scaler);
+
+    context.font = `bold ${fontSize}px Arial`;
+    context.textAlign = 'center';
+    context.textBaseline = 'bottom';
+    context.lineWidth = 3;
+    context.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    context.fillStyle = 'white';
+    context.strokeText(role, canvasX, canvasY - canvasRadius - 6);
+    context.fillText(role, canvasX, canvasY - canvasRadius - 6);
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas) {
@@ -392,7 +426,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       canvas.height = height;
       draw(canvas);
     }
-  }, [sslFieldUpdate, robotActions, width, height, zoomLevel, fieldGeometry]);
+  }, [sslFieldUpdate, robotActions, robotRoles, width, height, zoomLevel, fieldGeometry]);
 
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
