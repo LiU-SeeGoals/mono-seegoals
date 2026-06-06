@@ -51,10 +51,10 @@ func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) 
 	}
 }
 func NewDirectAlign(team info.Team, id info.ID, to info.Position, from info.Position) *AlignBall {
-    align := NewAlign(team, id, to, from)
-    align.useRRT = false
-    align.avoidBall = false
-    return align
+	align := NewAlign(team, id, to, from)
+	align.useRRT = false
+	align.avoidBall = false
+	return align
 }
 func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 
@@ -73,9 +73,6 @@ func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 		}
 
 	}
-
-	
-	
 
 	goalPos := info.Vec2{X: m.to.X, Y: m.to.Y}
 
@@ -111,17 +108,17 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	moveTo.AvoidBall(m.avoidBall)
 	act := moveTo.GetMoveToAction(gi)
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-    if ok && ballVel.Norm2d() > 0.3 {
-        // Ball is moving face the ball to receive it
-        ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-        myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
-        if err == nil {
-            act.Dest.Angle = myPos.AngleToPosition(ballPos)
-        }
-    } else {
-        // Ball is slow align to kick direction
-        act.Dest.Angle = robotTargetPos.Angle
-    }
+	if ok && ballVel.Norm2d() > 0.3 {
+		// Ball is moving face the ball to receive it
+		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+		myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+		if err == nil {
+			act.Dest.Angle = myPos.AngleToPosition(ballPos)
+		}
+	} else {
+		// Ball is slow align to kick direction
+		act.Dest.Angle = robotTargetPos.Angle
+	}
 
 	// act := action.MoveTo{}
 	// act.Id = int(m.id)
@@ -135,19 +132,35 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 
 func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
+	const minBehindball = 80.
+	const maxLineError = 80.
 	robotTargetPos := m.getTargetPos(gi)
 
 	myRobotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+
 	if err != nil {
 		fmt.Println(err)
 	}
+	myBallPos, err := gi.State.Ball.GetPosition()
+	if err != nil {
+		fmt.Println(err)
+	}
+	targetDir := m.to.Sub(&myBallPos).Normalize()
+	robotfromball := myBallPos.Sub(&myBallPos)
+
+	alongLine := robotfromball.Dot(targetDir)
+	sideError := math.Abs(robotfromball.X*targetDir.Y - robotfromball.Y*targetDir.X)
+
+	isBehindBall := alongLine < -minBehindball
+	isOnPassLine := sideError < maxLineError
 	xx := (myRobotPos.X - robotTargetPos.X) * (myRobotPos.X - robotTargetPos.X)
 	yy := (myRobotPos.Y - robotTargetPos.Y) * (myRobotPos.Y - robotTargetPos.Y)
 
 	angle_error := info.NormalizeAngleDelta(robotTargetPos.Angle, myRobotPos.Angle)
 
 	dist := math.Sqrt(xx + yy)
-	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError
+
+	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError && isBehindBall && isOnPassLine
 	if m.id == 3 {
 		// fmt.Println("angle error", math.Abs(angle_error), "threshold: ",GetAlignConfig().angleError, "dist:", dist, "threshold: ", GetAlignConfig().doneDist, val)
 	}
