@@ -25,11 +25,11 @@ func GetAlignConfig() AlignConfig {
 	return AlignConfig{
 		robotBallClearence: 300,
 		stagingClearance:   700,
-		doneDist:           50,
-		angleError:         3.0 * math.Pi / 180,
+		doneDist:           90,
+		angleError:         6.0 * math.Pi / 180,
 		turnToKickDist:     180,
-		minBehindBall:      150,
-		maxLineError:       90,
+		minBehindBall:      120,
+		maxLineError:       120,
 	}
 }
 
@@ -126,11 +126,11 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	if err != nil {
 		fmt.Println(err)
 	}
-	isBehindBall, isOnPassLine := m.passLineChecks(myPos, gi)
+	isBehindBall, _ := m.passLineChecks(myPos, gi)
 	moveTarget := robotTargetPos
 	useRRT := m.useRRT
 	avoidBall := m.avoidBall
-	if !isBehindBall || !isOnPassLine {
+	if !isBehindBall {
 		moveTarget = stagingPos
 	} else {
 		useRRT = false
