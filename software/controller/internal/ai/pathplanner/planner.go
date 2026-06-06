@@ -395,7 +395,7 @@ func runRRT(
 	finalDestination info.Position,
 	cfg RRTConfig,
 ) *RRTNode {
-	rand.Seed(time.Now().UnixNano())
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	startNode := nodes[0]
 	if isNodeValid(finalDestination, obstacles, false) &&
@@ -409,12 +409,12 @@ func runRRT(
 
 	for i := 0; i < cfg.MaxIterations; i++ {
 		var randomPoint info.Position
-		if rand.Float64() < cfg.GoalBias {
+		if rng.Float64() < cfg.GoalBias {
 			randomPoint = finalDestination
 		} else {
 			randomPoint = info.Position{
-				X:     rand.Float64()*cfg.FieldWidth - cfg.FieldWidth/2,
-				Y:     rand.Float64()*cfg.FieldHeight - cfg.FieldHeight/2,
+				X:     rng.Float64()*cfg.FieldWidth - cfg.FieldWidth/2,
+				Y:     rng.Float64()*cfg.FieldHeight - cfg.FieldHeight/2,
 				Angle: 0,
 			}
 		}
