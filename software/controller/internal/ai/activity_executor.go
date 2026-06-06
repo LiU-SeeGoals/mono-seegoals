@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -18,6 +19,11 @@ type activityExecutor struct {
 	outgoingActions  chan<- []action.Action
 	activities       *[info.TEAM_SIZE]ai.Activity // <-- pointer to a slice
 	activity_lock    *sync.Mutex                  // shared mutex for synchronization
+}
+
+type activityResult struct {
+	index  int
+	action action.Action
 }
 
 func NewActivityExecutor() *activityExecutor {
@@ -53,21 +59,47 @@ func (fb *activityExecutor) Run() {
 		copy(activitiesCopy[:], (*fb.activities)[:])
 		fb.activity_lock.Unlock()
 
-		var actions []action.Action
+		results := make([]activityResult, 0, info.TEAM_SIZE)
+		resultCh := make(chan activityResult, info.TEAM_SIZE)
+		var wg sync.WaitGroup
+
 		var i info.ID
 		for i = 0; i < info.TEAM_SIZE; i++ { // Loop through all activities
-			if activitiesCopy[i] == nil {
+			activity := activitiesCopy[i]
+			if activity == nil {
 				continue
 			} // Skip nil activities
 
-			if activitiesCopy[i].Achieved(&gameInfo) { // If achieved, log it but let planner handle lifecycle
-				Logger.Info(fmt.Sprintf("Activity achieved: %v ", activitiesCopy[i]))
-				// Don't clear the activity - let the planner detect achievement and transition states
-				actions = append(actions, activitiesCopy[i].GetAction(&gameInfo))
-			} else { // Otherwise, get an action
-				Logger.Info(fmt.Sprintf("Activity running: %v", activitiesCopy[i]))
-				actions = append(actions, activitiesCopy[i].GetAction(&gameInfo))
-			}
+			wg.Add(1)
+			go func(index int, activity ai.Activity) {
+				defer wg.Done()
+
+				if activity.Achieved(&gameInfo) { // If achieved, log it but let planner handle lifecycle
+					Logger.Info(fmt.Sprintf("Activity achieved: %v ", activity))
+					// Don't clear the activity - let the planner detect achievement and transition states
+				} else { // Otherwise, get an action
+					Logger.Info(fmt.Sprintf("Activity running: %v", activity))
+				}
+				resultCh <- activityResult{
+					index:  index,
+					action: activity.GetAction(&gameInfo),
+				}
+			}(int(i), activity)
+		}
+
+		wg.Wait()
+		close(resultCh)
+
+		for result := range resultCh {
+			results = append(results, result)
+		}
+		sort.Slice(results, func(i, j int) bool {
+			return results[i].index < results[j].index
+		})
+
+		actions := make([]action.Action, 0, len(results))
+		for _, result := range results {
+			actions = append(actions, result.action)
 		}
 
 		for _, action := range actions {
