@@ -24,9 +24,6 @@ const (
 	tacticalModeAttack tacticalMode = "attack"
 	tacticalModeDefend tacticalMode = "defend"
 
-	attackModeAttackerRatio = 0.50
-	defendModeAttackerRatio = 0.20
-
 	roleSwitchMinDuration    = 750 * time.Millisecond
 	tacticalModeSwitchDelay  = 500 * time.Millisecond
 	activeRobotTimeoutMillis = int64(1000)
@@ -40,6 +37,19 @@ const (
 	roleOffense roleKind = "offense"
 	roleDefense roleKind = "defense"
 )
+
+type defensiveShape string
+
+const (
+	defensiveShapeNone defensiveShape = ""
+	defensiveShapeFull defensiveShape = "full"
+	defensiveShapeBack defensiveShape = "back"
+)
+
+type roleAssignment struct {
+	attackerCount int
+	defenseShape  defensiveShape
+}
 
 type combinedRoleManager struct {
 	activityHandler *coreai.ActivityHandler
@@ -141,6 +151,16 @@ func (rm *combinedRoleManager) defenseIDs() []info.ID {
 		return ids[i] < ids[j]
 	})
 	return ids
+}
+
+func (rm *combinedRoleManager) setDefenseSlots(slots map[info.ID]roles.DefenseSlot) {
+	for id, defender := range rm.defenders {
+		slot, ok := slots[id]
+		if !ok {
+			slot = roles.DefenseSlot{Kind: roles.DefenseRoleCover}
+		}
+		defender.SetSlot(slot)
+	}
 }
 
 func NewCombinedPlan(team Team) *CombinedPlan {
@@ -267,21 +287,6 @@ func (m *CombinedPlan) chooseGoalie(gi *GameInfo, activeRobots []info.ID) (info.
 	return m.getRobotClosestToPosition(gi, activeRobots, m.defendedGoalCenter(gi)), true
 }
 
-func attackerCount(total int, ratio float64) int {
-	if total == 0 {
-		return 0
-	}
-
-	count := int(math.Ceil(float64(total) * ratio))
-	if count < 1 {
-		return 1
-	}
-	if count > total {
-		return total
-	}
-	return count
-}
-
 func (m *CombinedPlan) desiredMode(gi *GameInfo, fallback tacticalMode) tacticalMode {
 	possessor := gi.State.GetBall().GetPossessor()
 	if possessor == nil {
@@ -319,6 +324,40 @@ func stableMode(
 	*candidate = ""
 	*candidateSince = time.Time{}
 	return desired
+}
+
+func roleAssignmentForMode(total int, mode tacticalMode) roleAssignment {
+	if mode == tacticalModeDefend {
+		switch total {
+		case 0:
+			return roleAssignment{}
+		case 1:
+			return roleAssignment{attackerCount: 1}
+		case 2:
+			return roleAssignment{attackerCount: 1, defenseShape: defensiveShapeFull}
+		case 3:
+			return roleAssignment{attackerCount: 1, defenseShape: defensiveShapeFull}
+		case 4:
+			return roleAssignment{attackerCount: 1, defenseShape: defensiveShapeFull}
+		default:
+			return roleAssignment{attackerCount: 1, defenseShape: defensiveShapeFull}
+		}
+	}
+
+	switch total {
+	case 0:
+		return roleAssignment{}
+	case 1:
+		return roleAssignment{attackerCount: 1}
+	case 2:
+		return roleAssignment{attackerCount: 1, defenseShape: defensiveShapeBack}
+	case 3:
+		return roleAssignment{attackerCount: 2, defenseShape: defensiveShapeBack}
+	case 4:
+		return roleAssignment{attackerCount: 2, defenseShape: defensiveShapeBack}
+	default:
+		return roleAssignment{attackerCount: 3, defenseShape: defensiveShapeBack}
+	}
 }
 
 func (m *CombinedPlan) selectOffenseRobots(gi *GameInfo, candidates []info.ID, count int) []info.ID {
@@ -359,6 +398,54 @@ func splitRoles(allRobots []info.ID, offenseRobots []info.ID) []info.ID {
 		}
 	}
 	return defenseRobots
+}
+
+func (m *CombinedPlan) defenseSlots(gi *GameInfo, defenders []info.ID, shapeKind defensiveShape) map[info.ID]roles.DefenseSlot {
+	slots := make(map[info.ID]roles.DefenseSlot, len(defenders))
+	if shapeKind == defensiveShapeNone {
+		return slots
+	}
+
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	sorted := append([]info.ID{}, defenders...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		posI, errI := gi.State.GetRobotPosition(m.team, sorted[i])
+		posJ, errJ := gi.State.GetRobotPosition(m.team, sorted[j])
+		if errI != nil {
+			return false
+		}
+		if errJ != nil {
+			return true
+		}
+		return posI.Dist2d(ballPos) < posJ.Dist2d(ballPos)
+	})
+
+	shape := []roles.DefenseSlot{
+		{Kind: roles.DefenseRoleForward, LateralOffset: 0},
+		{Kind: roles.DefenseRoleMiddle, LateralOffset: 0},
+		{Kind: roles.DefenseRoleBackward, LateralOffset: -180},
+		{Kind: roles.DefenseRoleBackward, LateralOffset: 180},
+		{Kind: roles.DefenseRoleBackward, LateralOffset: 0},
+	}
+	if shapeKind == defensiveShapeBack {
+		shape = []roles.DefenseSlot{
+			{Kind: roles.DefenseRoleBackward, LateralOffset: -180},
+			{Kind: roles.DefenseRoleBackward, LateralOffset: 180},
+			{Kind: roles.DefenseRoleBackward, LateralOffset: 0},
+			{Kind: roles.DefenseRoleBackward, LateralOffset: -360},
+			{Kind: roles.DefenseRoleBackward, LateralOffset: 360},
+		}
+	}
+
+	for i, id := range sorted {
+		if i >= len(shape) {
+			slots[id] = roles.DefenseSlot{Kind: roles.DefenseRoleBackward}
+			continue
+		}
+		slots[id] = shape[i]
+	}
+
+	return slots
 }
 
 func (m *CombinedPlan) getAttackerPosition(gi *GameInfo) (Position, bool) {
@@ -493,16 +580,13 @@ func (m *CombinedPlan) run() {
 		desiredMode := m.desiredMode(&gi, mode)
 		mode = stableMode(mode, desiredMode, &candidateMode, &candidateModeSince, tickStart)
 
-		attackerRatio := attackModeAttackerRatio
-		if mode == tacticalModeDefend {
-			attackerRatio = defendModeAttackerRatio
-		}
-
-		offenseRobots := m.selectOffenseRobots(&gi, fieldRobots, attackerCount(len(fieldRobots), attackerRatio))
+		assignment := roleAssignmentForMode(len(fieldRobots), mode)
+		offenseRobots := m.selectOffenseRobots(&gi, fieldRobots, assignment.attackerCount)
 		defenseRobots := splitRoles(fieldRobots, offenseRobots)
 		roleManager.applyAssignments(offenseRobots, defenseRobots, tickStart)
 		offenseRobots = roleManager.offenseIDs()
 		defenseRobots = roleManager.defenseIDs()
+		roleManager.setDefenseSlots(m.defenseSlots(&gi, defenseRobots, assignment.defenseShape))
 
 		possessor := gi.State.GetBall().GetPossessor()
 

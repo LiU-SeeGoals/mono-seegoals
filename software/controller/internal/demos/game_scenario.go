@@ -93,7 +93,6 @@ func GameScenario() {
 		basestationClient = client.NewBaseStationClient(config.GetBasestationAddress())
 		basestationClient.Init()
 	}
-	simController.TeleportBall(0, 1000)
 	for {
 
 		playTime := time.Now().UnixMilli()
