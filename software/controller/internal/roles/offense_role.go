@@ -57,7 +57,7 @@ func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool 
 	goalPosition := gi.EnemyGoalCenter(team)
 
 	// check that the goal is in range
-	if from.Dist2d(goalPosition) > 2000 { // TODO: I have no idea what a reasonable shooting distance is
+	if from.Dist2d(goalPosition) > 200 { // TODO: I have no idea what a reasonable shooting distance is
 		return false
 	}
 

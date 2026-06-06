@@ -15,6 +15,9 @@ type AlignConfig struct {
 	robotBallClearence float64
 	doneDist           float64
 	angleError         float64
+	turnToKickDist     float64
+	minBehindBall      float64
+	maxLineError       float64
 }
 
 func GetAlignConfig() AlignConfig {
@@ -22,6 +25,9 @@ func GetAlignConfig() AlignConfig {
 		robotBallClearence: 200,
 		doneDist:           50,
 		angleError:         3.0 * math.Pi / 180,
+		turnToKickDist:     180,
+		minBehindBall:      150,
+		maxLineError:       90,
 	}
 }
 
@@ -116,8 +122,11 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 			act.Dest.Angle = myPos.AngleToPosition(ballPos)
 		}
 	} else {
-		// Ball is slow align to kick direction
-		act.Dest.Angle = robotTargetPos.Angle
+		myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+		if err == nil && !m.readyToFaceKick(myPos, robotTargetPos, gi) {
+			// Ball is slow align to kick direction
+			act.Dest.Angle = robotTargetPos.Angle
+		}
 	}
 
 	// act := action.MoveTo{}
@@ -130,10 +139,37 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	return act
 }
 
+func (m *AlignBall) readyToFaceKick(myRobotPos, robotTargetPos info.Position, gi *info.GameInfo) bool {
+	cfg := GetAlignConfig()
+	if myRobotPos.Dist2d(robotTargetPos) < cfg.turnToKickDist {
+		return true
+	}
+	isBehindBall, isOnPassLine := m.passLineChecks(myRobotPos, gi)
+	return isBehindBall && isOnPassLine
+}
+
+func (m *AlignBall) passLineChecks(myRobotPos info.Position, gi *info.GameInfo) (bool, bool) {
+	cfg := GetAlignConfig()
+	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
+	if err != nil {
+		fmt.Println(err)
+		return false, false
+	}
+	targetDir := m.to.Sub(&ballPos)
+	targetDir.Z = 0
+	targetDir.Angle = 0
+	if targetDir.Norm2d() == 0 {
+		return false, false
+	}
+	targetDir = targetDir.Normalize()
+	robotFromBall := myRobotPos.Sub(&ballPos)
+	alongLine := robotFromBall.X*targetDir.Y - robotFromBall.Y*targetDir.X
+	SideError := math.Abs(robotFromBall.X*targetDir.Y - robotFromBall.Y*targetDir.X)
+
+	return alongLine < -cfg.minBehindBall, SideError < cfg.maxLineError
+}
 func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
-	const minBehindball = 80.
-	const maxLineError = 80.
 	robotTargetPos := m.getTargetPos(gi)
 
 	myRobotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
@@ -141,18 +177,7 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	if err != nil {
 		fmt.Println(err)
 	}
-	myBallPos, err := gi.State.Ball.GetPosition()
-	if err != nil {
-		fmt.Println(err)
-	}
-	targetDir := m.to.Sub(&myBallPos).Normalize()
-	robotfromball := myBallPos.Sub(&myBallPos)
 
-	alongLine := robotfromball.Dot(targetDir)
-	sideError := math.Abs(robotfromball.X*targetDir.Y - robotfromball.Y*targetDir.X)
-
-	isBehindBall := alongLine < -minBehindball
-	isOnPassLine := sideError < maxLineError
 	xx := (myRobotPos.X - robotTargetPos.X) * (myRobotPos.X - robotTargetPos.X)
 	yy := (myRobotPos.Y - robotTargetPos.Y) * (myRobotPos.Y - robotTargetPos.Y)
 
@@ -160,7 +185,7 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
 	dist := math.Sqrt(xx + yy)
 
-	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError && isBehindBall && isOnPassLine
+	val := dist < GetAlignConfig().doneDist && math.Abs(angle_error) < GetAlignConfig().angleError
 	if m.id == 3 {
 		// fmt.Println("angle error", math.Abs(angle_error), "threshold: ",GetAlignConfig().angleError, "dist:", dist, "threshold: ", GetAlignConfig().doneDist, val)
 	}
