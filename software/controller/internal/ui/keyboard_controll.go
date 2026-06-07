@@ -9,6 +9,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/client"
+	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/eiannone/keyboard"
 )
 
@@ -64,8 +65,7 @@ func askForRobotId() int {
 }
 
 func initCommands(robotId int) {
-	// In remote control mode, we've got some additional commands and expect
-	// some special handling of other commands.
+
 	commands = map[rune]command{
 		'w': {
 			message: "Moving forward",
@@ -74,6 +74,7 @@ func initCommands(robotId int) {
 				return &action.MoveRemote{
 					Id:        robotId,
 					Direction: mat.NewVecDense(2, []float64{0.0, 1.0}),
+					Dest:      info.Position{X: 0.0, Y: 1.0, Z: 0.0},
 					Speed:     speed,
 				}
 			},
@@ -85,6 +86,7 @@ func initCommands(robotId int) {
 				return &action.MoveRemote{
 					Id:        robotId,
 					Direction: mat.NewVecDense(2, []float64{-1.0, 0.0}),
+					Dest:      info.Position{X: -1.0, Y: 0.0, Z: 0.0},
 					Speed:     speed,
 				}
 			},
@@ -96,6 +98,7 @@ func initCommands(robotId int) {
 				return &action.MoveRemote{
 					Id:        robotId,
 					Direction: mat.NewVecDense(2, []float64{0.0, -1.0}),
+					Dest:      info.Position{X: 0.0, Y: -1.0, Z: 0.0},
 					Speed:     speed,
 				}
 			},
@@ -107,6 +110,7 @@ func initCommands(robotId int) {
 				return &action.MoveRemote{
 					Id:        robotId,
 					Direction: mat.NewVecDense(2, []float64{1.0, 0.0}),
+					Dest:      info.Position{X: 1.0, Y: 0.0, Z: 0.0},
 					Speed:     speed,
 				}
 			},
@@ -133,9 +137,11 @@ func initCommands(robotId int) {
 			message: "Rotating left",
 			run: func() action.Action {
 				robotStopped = false
-				return &action.Rotate{
-					Id:         robotId,
-					AngularVel: -speed,
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{0.0, 0.0}),
+					Dest:      info.Position{X: 0.0, Y: 0.0, Z: -1.0},
+					Speed:     speed,
 				}
 			},
 		},
@@ -143,9 +149,11 @@ func initCommands(robotId int) {
 			message: "Rotating right",
 			run: func() action.Action {
 				robotStopped = false
-				return &action.Rotate{
-					Id:         robotId,
-					AngularVel: speed,
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{0.0, 0.0}),
+					Dest:      info.Position{X: 0.0, Y: 0.0, Z: 1.0},
+					Speed:     speed,
 				}
 			},
 		},
@@ -176,6 +184,18 @@ func initCommands(robotId int) {
 			run: func() action.Action {
 				return &action.Ping{
 					Id: robotId,
+				}
+			},
+		},
+		'f': {
+			message: "Sent ping",
+			run: func() action.Action {
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{0.0, 0.0}),
+					Dest:      info.Position{X: 0.0, Y: 0.0, Z: 0.0},
+					Speed:     speed,
+					Dribble:   true,
 				}
 			},
 		},

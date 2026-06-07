@@ -1,6 +1,7 @@
 package action
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
 	"github.com/LiU-SeeGoals/proto_go/simulation"
 	"gonum.org/v1/gonum/mat"
@@ -11,7 +12,9 @@ import (
 type MoveRemote struct {
 	Id        int
 	Direction *mat.VecDense // 2D vector, first value is x, second is y
+	Dest      info.Position
 	Speed     int
+	Dribble   bool
 }
 
 // Do nothing, only implemented to satisfy interface
@@ -23,6 +26,12 @@ func (i *MoveRemote) TranslateSim() *simulation.RobotCommand {
 }
 
 func (s *MoveRemote) TranslateReal() *robot_action.Command {
+
+	dribble := int32(0)
+	if s.Dribble {
+		dribble = 1
+	}
+
 	command := &robot_action.Command{
 		CommandId: robot_action.ActionType_MOVE_ACTION,
 		RobotId:   int32(s.Id),
@@ -30,7 +39,13 @@ func (s *MoveRemote) TranslateReal() *robot_action.Command {
 			X: int32(s.Direction.AtVec(1)),
 			Y: int32(s.Direction.AtVec(0)),
 		},
-		KickSpeed: int32(s.Speed),
+		Dest: &robot_action.Vector3D{
+			X: int32(s.Dest.Y),
+			Y: int32(s.Dest.X),
+			W: float32(s.Dest.Z),
+		},
+		KickSpeed:  int32(s.Speed),
+		AngularVel: dribble,
 	}
 	return command
 }
