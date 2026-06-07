@@ -27,8 +27,8 @@ func (s *MoveRemote) TranslateReal() *robot_action.Command {
 		CommandId: robot_action.ActionType_MOVE_ACTION,
 		RobotId:   int32(s.Id),
 		Direction: &robot_action.Vector2D{
-			X: int32(s.Direction.AtVec(0)),
-			Y: int32(s.Direction.AtVec(1)),
+			X: int32(s.Direction.AtVec(1)),
+			Y: int32(s.Direction.AtVec(0)),
 		},
 		KickSpeed: int32(s.Speed),
 	}
