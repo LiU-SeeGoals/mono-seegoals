@@ -283,9 +283,6 @@ void NAV_HandleCommand(Command* cmd)
         break;
     case ACTION_TYPE__MOVE_TO_ACTION: {
 
-        NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
-        // NAV_GoToAction(cmd);
-
         if(cmd->angular_vel == 1)
         {
             NAV_RunDribbler();
@@ -295,6 +292,7 @@ void NAV_HandleCommand(Command* cmd)
             NAV_StopDribbler();
         }
 
+        NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
     } break;
 
     case ACTION_TYPE__MOVE_ACTION: {
