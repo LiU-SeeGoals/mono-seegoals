@@ -3,13 +3,13 @@ package main
 import (
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"gonum.org/v1/gonum/mat"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/client"
+	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/eiannone/keyboard"
 )
 
@@ -40,31 +40,11 @@ func main() {
 }
 
 func askForClient(port string) client.Client {
-	var userChoice string
 	var clientHost string = port
 	var clientBaseStation client.Client
 
-	fmt.Println("Please enter the client type [g]sim (default), [b]ase station or [r]emote control: ")
-	fmt.Scanln(&userChoice)
-
-	if userChoice == "b" || userChoice == "r" {
-		fmt.Println("Enter <ip>:<port> for the basestation (port defaults to 6001): ")
-		fmt.Scanln(&clientHost)
-		if !strings.Contains(clientHost, ":") {
-			clientHost = clientHost + ":6001"
-		}
-
-		if userChoice == "b" {
-			clientType = basestation
-			fmt.Println("Creating base station client.")
-		} else {
-			clientType = remote_control
-			fmt.Println("Creating base station client for remote control.")
-		}
-	} else {
-		clientType = gsim
-		fmt.Println("Creating gsim client.")
-	}
+	clientType = remote_control
+	fmt.Println("Creating base station client for remote control.")
 
 	clientBaseStation = client.NewBaseStationClient(clientHost)
 	return clientBaseStation
@@ -85,178 +65,140 @@ func askForRobotId() int {
 }
 
 func initCommands(robotId int) {
-	if clientType == gsim || clientType == basestation {
-		commands = map[rune]command{
-			'w': {
-				message: "Moving forward",
-				run: func() action.Action {
-					return &action.Move{
-						Id:        robotId,
-						Direction: mat.NewVecDense(2, []float64{0.0, 1.0}),
-					}
-				},
+
+	commands = map[rune]command{
+		'w': {
+			message: "Moving forward",
+			run: func() action.Action {
+				robotStopped = false
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{0.0, 1.0}),
+					Dest:      info.Position{X: 0.0, Y: 1.0, Z: 0.0},
+					Speed:     speed,
+				}
 			},
-			'l': {
-				message: "Stopping robot",
-				run: func() action.Action {
-					return &action.Stop{
-						Id: robotId,
-					}
-				},
+		},
+		'a': {
+			message: "Moving left",
+			run: func() action.Action {
+				robotStopped = false
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{-1.0, 0.0}),
+					Dest:      info.Position{X: -1.0, Y: 0.0, Z: 0.0},
+					Speed:     speed,
+				}
 			},
-			'a': {
-				message: "Moving left",
-				run: func() action.Action {
-					return &action.Move{
-						Id:        robotId,
-						Direction: mat.NewVecDense(2, []float64{-1.0, 0.0}),
-					}
-				},
+		},
+		's': {
+			message: "Moving backward",
+			run: func() action.Action {
+				robotStopped = false
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{0.0, -1.0}),
+					Dest:      info.Position{X: 0.0, Y: -1.0, Z: 0.0},
+					Speed:     speed,
+				}
 			},
-			's': {
-				message: "Moving backward",
-				run: func() action.Action {
-					return &action.Move{
-						Id:        robotId,
-						Direction: mat.NewVecDense(2, []float64{0.0, -1.0}),
-					}
-				},
+		},
+		'd': {
+			message: "Moving right",
+			run: func() action.Action {
+				robotStopped = false
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{1.0, 0.0}),
+					Dest:      info.Position{X: 1.0, Y: 0.0, Z: 0.0},
+					Speed:     speed,
+				}
 			},
-			'd': {
-				message: "Moving right",
-				run: func() action.Action {
-					return &action.Move{
-						Id:        robotId,
-						Direction: mat.NewVecDense(2, []float64{1.0, 0.0}),
-					}
-				},
+		},
+		'l': {
+			message: "Stopping robot",
+			run: func() action.Action {
+				robotStopped = true
+				return &action.Stop{
+					Id: robotId,
+				}
 			},
-			'k': {
-				message: "Kicking",
-				run: func() action.Action {
-					return &action.Kick{
-						Id: robotId,
-					}
-				},
+		},
+		'k': {
+			message: "Kicking",
+			run: func() action.Action {
+				robotStopped = false
+				return &action.Kick{
+					Id: robotId,
+				}
 			},
-		}
-	} else { // remote control
-		// In remote control mode, we've got some additional commands and expect
-		// some special handling of other commands.
-		commands = map[rune]command{
-			'w': {
-				message: "Moving forward",
-				run: func() action.Action {
-					robotStopped = false
-					return &action.MoveRemote{
-						Id:        robotId,
-						Direction: mat.NewVecDense(2, []float64{0.0, 1.0}),
-						Speed:     speed,
-					}
-				},
+		},
+		'q': {
+			message: "Rotating left",
+			run: func() action.Action {
+				robotStopped = false
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{0.0, 0.0}),
+					Dest:      info.Position{X: 0.0, Y: 0.0, Z: -1.0},
+					Speed:     speed,
+				}
 			},
-			'a': {
-				message: "Moving left",
-				run: func() action.Action {
-					robotStopped = false
-					return &action.MoveRemote{
-						Id:        robotId,
-						Direction: mat.NewVecDense(2, []float64{-1.0, 0.0}),
-						Speed:     speed,
-					}
-				},
+		},
+		'e': {
+			message: "Rotating right",
+			run: func() action.Action {
+				robotStopped = false
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{0.0, 0.0}),
+					Dest:      info.Position{X: 0.0, Y: 0.0, Z: 1.0},
+					Speed:     speed,
+				}
 			},
-			's': {
-				message: "Moving backward",
-				run: func() action.Action {
-					robotStopped = false
-					return &action.MoveRemote{
-						Id:        robotId,
-						Direction: mat.NewVecDense(2, []float64{0.0, -1.0}),
-						Speed:     speed,
-					}
-				},
+		},
+		'r': {
+			message: "Speed decreased",
+			run: func() action.Action {
+				if speed >= 1 {
+					speed -= 1
+				}
+				fmt.Println(speed)
+				return &action.Kick{
+					Id: robotId,
+				}
 			},
-			'd': {
-				message: "Moving right",
-				run: func() action.Action {
-					robotStopped = false
-					return &action.MoveRemote{
-						Id:        robotId,
-						Direction: mat.NewVecDense(2, []float64{1.0, 0.0}),
-						Speed:     speed,
-					}
-				},
+		},
+		't': {
+			message: "Speed increased",
+			run: func() action.Action {
+				speed += 1
+				fmt.Println(speed)
+				return &action.Kick{
+					Id: robotId,
+				}
 			},
-			'l': {
-				message: "Stopping robot",
-				run: func() action.Action {
-					robotStopped = true
-					return &action.Stop{
-						Id: robotId,
-					}
-				},
+		},
+		'p': {
+			message: "Sent ping",
+			run: func() action.Action {
+				return &action.Ping{
+					Id: robotId,
+				}
 			},
-			'k': {
-				message: "Kicking",
-				run: func() action.Action {
-					robotStopped = false
-					return &action.Kick{
-						Id: robotId,
-					}
-				},
+		},
+		'f': {
+			message: "Sent ping",
+			run: func() action.Action {
+				return &action.MoveRemote{
+					Id:        robotId,
+					Direction: mat.NewVecDense(2, []float64{0.0, 0.0}),
+					Dest:      info.Position{X: 0.0, Y: 0.0, Z: 0.0},
+					Speed:     speed,
+					Dribble:   true,
+				}
 			},
-			'q': {
-				message: "Rotating left",
-				run: func() action.Action {
-					robotStopped = false
-					return &action.Rotate{
-						Id:         robotId,
-						AngularVel: -speed,
-					}
-				},
-			},
-			'e': {
-				message: "Rotating right",
-				run: func() action.Action {
-					robotStopped = false
-					return &action.Rotate{
-						Id:         robotId,
-						AngularVel: speed,
-					}
-				},
-			},
-			'r': {
-				message: "Speed decreased",
-				run: func() action.Action {
-					if speed >= 1 {
-						speed -= 1
-					}
-					fmt.Println(speed)
-					return &action.Kick{
-						Id: robotId,
-					}
-				},
-			},
-			't': {
-				message: "Speed increased",
-				run: func() action.Action {
-					speed += 1
-					fmt.Println(speed)
-					return &action.Kick{
-						Id: robotId,
-					}
-				},
-			},
-			'p': {
-				message: "Sent ping",
-				run: func() action.Action {
-					return &action.Ping{
-						Id: robotId,
-					}
-				},
-			},
-		}
+		},
 	}
 }
 
@@ -285,18 +227,14 @@ func listenKeyboard(client client.Client) {
 	}
 	defer keyboard.Close()
 
-	if clientType == gsim || clientType == basestation {
-		fmt.Println("Use WASD to control the robot, <space> to stop all movement, K to kick.")
-	} else {
-		fmt.Println("Use WASD to control the robot, <space> to stop all movement, K to kick, O/P to decrease/increase speed.")
-		fmt.Println("Pings are sent continually unless <space> is pressed.")
-	}
+	fmt.Println("Use WASD to control the robot, <space> to stop all movement, K to kick, O/P to decrease/increase speed.")
+	fmt.Println("Pings are sent continually unless <space> is pressed.")
 	fmt.Println("Press <ESC> to exit.")
 
 	// Send continous pings if we're remote controlling
-	if clientType == remote_control {
-		go sendPing(client)
-	}
+	// if clientType == remote_control {
+	// 	go sendPing(client)
+	// }
 
 	for {
 		char, key, err := keyboard.GetKey()
