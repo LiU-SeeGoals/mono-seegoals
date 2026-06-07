@@ -25,6 +25,7 @@ const float CLOCK_FREQ = 400000000;
 const float CONTROL_TIM_FREQ = 200000000;
 float CONTROL_FREQ; // set in init
 static MovementType currentMovementType = NAV_POSITION_MOVEMENT;
+static uint8_t dribblerRunning = false;
 
 /* Private functions declarations */
 void set_motors(float m1, float m2, float m3, float m4);
@@ -335,13 +336,27 @@ void NAV_SetMovement(Command* cmd, MovementType movementType)
     }
     else if (movementType == NAV_VELOCITY_MOVEMENT)
     {
-        const int32_t speed = cmd->kick_speed;
-        const int32_t x = cmd->direction->x;
-        const int32_t y = cmd->direction->y;
+        if(cmd->angular_vel == 1)
+        {
+            if (dribblerRunning)
+            {
+                NAV_StopDribbler();
+            }
+            else
+            {
+                NAV_RunDribbler();
+            }
+        }
+
+        const int32_t speed = cmd->kick_speed * 100.f;
+        const int32_t x = cmd->dest->x;
+        const int32_t y = cmd->dest->y;
+        const int32_t angle = cmd->dest->w;
 
         robot_cmd.x = x * speed;
         robot_cmd.y = y * speed;
-        robot_cmd.w = 0.f;
+        robot_cmd.w = angle * speed / 2.f;
+
     }
 }
 
@@ -438,10 +453,12 @@ void set_motors(float m1, float m2, float m3, float m4)
 
 void NAV_StopDribbler() {
     // LOG_DEBUG("stop dirbling\r\n");
+    dribblerRunning = false;
     HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_RESET); }
 
 void NAV_RunDribbler() {
     // LOG_DEBUG("dirbling\r\n");
+    dribblerRunning = true;
     HAL_GPIO_WritePin(DRIBBLER_GPIO_Port, DRIBBLER_Pin, GPIO_PIN_SET); }
 
 void NAV_TestDribbler()
