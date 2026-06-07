@@ -24,7 +24,7 @@ static float I_prevs[4]; // PI control I-parts
 const float CLOCK_FREQ = 400000000;
 const float CONTROL_TIM_FREQ = 200000000;
 float CONTROL_FREQ; // set in init
-static int queued = 0;
+static MovementType currentMovementType = NAV_POSITION_MOVEMENT;
 
 /* Private functions declarations */
 void set_motors(float m1, float m2, float m3, float m4);
@@ -283,8 +283,8 @@ void NAV_HandleCommand(Command* cmd)
         break;
     case ACTION_TYPE__MOVE_TO_ACTION: {
 
-        NAV_EnableMovement();
-        NAV_GoToAction(cmd);
+        NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
+        // NAV_GoToAction(cmd);
 
         if(cmd->angular_vel == 1)
         {
@@ -298,25 +298,16 @@ void NAV_HandleCommand(Command* cmd)
     } break;
 
     case ACTION_TYPE__MOVE_ACTION: {
-        const int32_t speed = cmd->kick_speed;
-        const int32_t x = cmd->direction->x;
-        const int32_t y = cmd->direction->y;
 
-        NAV_EnableMovement();
+        NAV_SetMovement(cmd, NAV_VELOCITY_MOVEMENT);
 
-        // TODO: Should somehow know that we're in remote control mode
-        if (0 <= speed && speed <= 10) {
-            NAV_TEST_Set_robot_cmd(x, y, speed);
-        }
     } break;
     case ACTION_TYPE__ROTATE_ACTION:
         break;
     case ACTION_TYPE__KICK_ACTION:
-        NAV_EnableMovement();
 
         KICKER_ChargeStart();
-        NAV_GoToAction(cmd);
-
+        NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
         break;
     default:
         LOG_ERROR("Not known command: %i\r\n", cmd->command_id);
@@ -335,6 +326,26 @@ void NAV_HandleCommand(Command* cmd)
 /*
  * Private function implementations
  */
+void NAV_SetMovement(Command* cmd, MovementType movementType)
+{
+    NAV_EnableMovement();
+    NAV_SetMovementType(movementType);
+
+    if (movementType == NAV_POSITION_MOVEMENT)
+    {
+        NAV_GoToAction(cmd);
+    }
+    else if (movementType == NAV_VELOCITY_MOVEMENT)
+    {
+        const int32_t speed = cmd->kick_speed;
+        const int32_t x = cmd->direction->x;
+        const int32_t y = cmd->direction->y;
+
+        robot_cmd.x = x * speed;
+        robot_cmd.y = y * speed;
+        robot_cmd.w = 0.f;
+    }
+}
 
 void NAV_GoToAction(Command* cmd)
 {
@@ -376,10 +387,6 @@ void NAV_GoToAction(Command* cmd)
         // LOG_INFO("ignoring vision %d\r\n", diff);
         return;
     }
-
-
-    // LOG_INFO("diff %d\r\n", diff);
-
 
     prev_cam_x = cam_x;
     prev_cam_y = cam_y;
@@ -460,6 +467,51 @@ void NAV_TEST_Set_robot_cmd(float x, float y, float w)
     robot_cmd.x = x;
     robot_cmd.y = y;
     robot_cmd.w = w;
+}
+
+void NAV_SetMovementType(MovementType type)
+{
+    currentMovementType = type;
+}
+
+void NAV_VelocityMovementUpdate()
+{
+    float x = NAV_GetNavX();
+    float y = NAV_GetNavY();
+    float w = NAV_GetNavW();
+
+    NAV_steer(x, y, w);
+}
+
+void NAV_PositionMovementUpdate()
+{
+    if (STATE_is_calibrated() != 1)
+    {
+        return;
+    }
+
+    IMU_AccelVec3 acc = IMU_read_accel_mps2();
+    IMU_GyroVec3 gyr = IMU_read_gyro_radps();
+
+    STATE_FusionEKFIntertialUpdate(acc, gyr);
+    float x = NAV_GetNavX();
+    float y = NAV_GetNavY();
+    float w = NAV_GetNavW();
+    DATA_log_imu_data(gyr.x,gyr.y,gyr.z);
+
+    POS_go_to_position_lqr(x,y,w);
+}
+
+void NAV_MovementUpdate()
+{
+    if (currentMovementType == NAV_POSITION_MOVEMENT)
+    {
+        NAV_PositionMovementUpdate();
+    }
+    else if (currentMovementType == NAV_VELOCITY_MOVEMENT)
+    {
+        NAV_VelocityMovementUpdate();
+    }
 }
 
 float NAV_GetNavX() { return robot_cmd.x; }
