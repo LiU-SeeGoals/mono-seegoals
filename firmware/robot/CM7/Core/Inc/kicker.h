@@ -2,6 +2,7 @@
 #define KICKER_H
 
 #include "main.h"
+#include "stm32h7xx_hal_adc.h"
 #include "stm32h7xx_hal_spi.h"
 
 typedef struct {
@@ -19,10 +20,13 @@ typedef enum {
 } KICKER_type;
 
 /**
- * Initalize the kicker subsystem.
- * Curently initializes the log module
+ * Initalize the kicker subsystem. This needs to be run before the other
+ * KICKER_* functions.
+ * @param htim_charge  timer for charging the kicker
+ * @param htim_kick    timer for the discharge
+ * @param hspi         spi handle for the kicker board voltage measurement
  */
-void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick);
+void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, SPI_HandleTypeDef* hspi, ADC_HandleTypeDef* adc);
 
 /**
  *

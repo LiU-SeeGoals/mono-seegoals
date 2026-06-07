@@ -336,7 +336,7 @@ void parse_key()
             break;
         case 'K': // Kick
             LOG_UI("Kicking\r\n");
-            KICKER_KickStart(KICKER);
+            KICKER_KickStart(CHIPPER);
             break;
         case 'L': // Chip, L because it is next to K on QWERTY
             LOG_UI("Chipping\r\n");
