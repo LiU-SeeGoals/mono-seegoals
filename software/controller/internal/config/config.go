@@ -155,13 +155,13 @@ func loadConfig() {
 
 	err := godotenv.Load(envPath)
 	if err != nil {
-		log.Fatalf("Unable to load .env file: %e", err)
+		log.Fatalf("Unable to load .env file path:%s \n %e", envPath, err)
 	}
 
 	cfg := &Config{}
 	err = env.Parse(cfg)
 	if err != nil {
-		log.Fatalf("Unable to parse config: %e", err)
+		log.Fatalf("Unable to parse config path:%s \n %e", envPath, err)
 	}
 
 	instance = cfg
