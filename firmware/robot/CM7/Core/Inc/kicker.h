@@ -11,6 +11,12 @@ typedef struct {
     int charges_since_last_kick;
 } KICKER_Settings;
 
+typedef enum
+{
+    KICKER_STRAIGHT,
+    KICKER_CHIPPER,
+} KickerMode;
+
 /**
  * Initalize the kicker subsystem.
  * Curently initializes the log module
@@ -38,6 +44,8 @@ void KICKER_KickStart();
 void KICKER_KickStop();
 
 void KICKER_KickSafe();
+
+void KICKER_SetKickerMode(KickerMode mode);
 
 /**
  * Returns a reference to the current kicker settings.

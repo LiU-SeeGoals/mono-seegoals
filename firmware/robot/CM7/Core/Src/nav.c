@@ -58,8 +58,8 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     motors[1].speed = 0.f;
     motors[1].prev_tick = 0;
     motors[1].channel = TIM_CHANNEL_2;
-    motors[2].breakPinPort = MOTOR2_BREAK_GPIO_Port;
-    motors[2].breakPin = MOTOR2_BREAK_Pin;
+    motors[1].breakPinPort = MOTOR2_BREAK_GPIO_Port;
+    motors[1].breakPin = MOTOR2_BREAK_Pin;
     motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
     motors[1].reversePin = MOTOR2_REVERSE_Pin;
     motors[1].dir = 1;
@@ -276,8 +276,6 @@ void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
 void NAV_HandleCommand(Command* cmd)
 {
-    static int kicks_since_last_kick = 0;
-
     switch (cmd->command_id) {
     case ACTION_TYPE__STOP_ACTION:
         NAV_DisableMovement();
@@ -305,20 +303,20 @@ void NAV_HandleCommand(Command* cmd)
         break;
     case ACTION_TYPE__KICK_ACTION:
 
+        if(cmd->kick_speed == 1)
+        {
+            KICKER_SetKickerMode(KICKER_CHIPPER);
+        }
+        else
+        {
+            KICKER_SetKickerMode(KICKER_STRAIGHT);
+        }
         KICKER_ChargeStart();
         NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
         break;
     default:
         LOG_ERROR("Not known command: %i\r\n", cmd->command_id);
         break;
-    }
-    if (cmd->command_id == ACTION_TYPE__KICK_ACTION)
-    {
-        kicks_since_last_kick++;
-    }
-    else
-    {
-        kicks_since_last_kick = 0;
     }
 }
 
