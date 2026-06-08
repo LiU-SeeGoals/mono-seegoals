@@ -303,7 +303,7 @@ void NAV_HandleCommand(Command* cmd)
         break;
     case ACTION_TYPE__KICK_ACTION:
 
-        if(cmd->kick_speed == 1)
+        if(cmd->kick_speed == 2)
         {
             KICKER_SetKickerMode(KICKER_CHIPPER);
         }
