@@ -1,6 +1,5 @@
 package main
 
-
 import (
 	"fmt"
 	"log"
@@ -15,15 +14,15 @@ import (
 )
 
 // Use RUN_PROFILER to trace program execution time and memory usage
-// When you run this, it will create a file called trace.out. 
+// When you run this, it will create a file called trace.out.
 // You can then analyze this file using the go tool trace command:
 // go tool trace trace.out
 // You can also watch the pprof server on localhost:6060 to see live profiling data.
-// Todo this, run the command go tool pprof -alloc_space http://localhost:6060/debug/pprof/heap 
+// Todo this, run the command go tool pprof -alloc_space http://localhost:6060/debug/pprof/heap
 // and then write top to see memory usage.
 
 const (
-	RUN_PROFILER = false
+	RUN_PROFILER = true
 )
 
 func main() {

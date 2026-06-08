@@ -103,7 +103,6 @@ func (c RRTConfig) persistence() resolvedPersistence {
 type RRTNode struct {
 	position info.Position
 	parent   *RRTNode
-	cost     float64
 }
 
 // Obstacle is a disc obstacle in the plane (e.g. another robot or the ball).
@@ -178,7 +177,7 @@ func (p *Planner) PlanPath(
 	}
 
 	// Full RRT
-	startNode := &RRTNode{position: myPos, parent: nil, cost: 0}
+	startNode := &RRTNode{position: myPos, parent: nil}
 	nodes := []*RRTNode{startNode}
 	goalNode := runRRT(nodes, obstacles, finalDestination, cfg)
 	if goalNode == nil {
@@ -258,7 +257,7 @@ func isStoredPathValid(
 	if st == nil || len(st.path) == 0 {
 		return false
 	}
-	if distanceBetween(st.goal, goal) > goalMatchEpsilon {
+	if distanceSquared(st.goal, goal) > goalMatchEpsilon*goalMatchEpsilon {
 		return false
 	}
 	if !IsPathClear(myPos, st.path[0], obstacles, PlanningRadius) {
@@ -279,7 +278,7 @@ func maxPlanAgeForContext(
 	gi *info.GameInfo,
 	perm resolvedPersistence,
 ) time.Duration {
-	if distanceBetween(myPos, goal) < perm.goalProximityDistance {
+	if distanceSquared(myPos, goal) < perm.goalProximityDistance*perm.goalProximityDistance {
 		return perm.closeRobotMaxPlanAge
 	}
 	for _, t := range []info.Team{info.Blue, info.Yellow} {
@@ -296,7 +295,7 @@ func maxPlanAgeForContext(
 			if time.Now().UnixMilli()-rototTime > 200 {
 				continue
 			}
-			if distanceBetween(myPos, pos) < perm.nearRobotDistance {
+			if distanceSquared(myPos, pos) < perm.nearRobotDistance*perm.nearRobotDistance {
 				return perm.closeRobotMaxPlanAge
 			}
 		}
@@ -333,23 +332,24 @@ func ignoreRobotObstaclesForBallApproach(
 	if !avoidBall {
 		return false
 	}
-	if distanceBetween(myPos, finalDestination) > perm.ballApproachRobotIgnoreDistance {
+	if distanceSquared(myPos, finalDestination) > perm.ballApproachRobotIgnoreDistance*perm.ballApproachRobotIgnoreDistance {
 		return false
 	}
 	ballPos, _ := gi.State.Ball.GetPosition()
-	return distanceBetween(ballPos, finalDestination) <= perm.ballGoalProximityDistance
+	return distanceSquared(ballPos, finalDestination) <= perm.ballGoalProximityDistance*perm.ballGoalProximityDistance
 }
 
 func collisionTarget(myPos info.Position, obstacles []Obstacle) (bool, Obstacle) {
 	robotsNearby := false
 	var nearestObstacle Obstacle
-	shortestDist := math.MaxFloat64
+	shortestDistSq := math.MaxFloat64
 	for _, obstacle := range obstacles {
-		dist := distanceBetween(myPos, obstacle.Position)
-		if dist <= obstacle.Size {
+		distSq := distanceSquared(myPos, obstacle.Position)
+		obstacleSizeSq := obstacle.Size * obstacle.Size
+		if distSq <= obstacleSizeSq {
 			robotsNearby = true
-			if dist < shortestDist {
-				shortestDist = dist
+			if distSq < shortestDistSq {
+				shortestDistSq = distSq
 				nearestObstacle = obstacle
 			}
 		}
@@ -360,9 +360,10 @@ func collisionTarget(myPos info.Position, obstacles []Obstacle) (bool, Obstacle)
 func makeEscapePath(myPos info.Position, nearestObstacle Obstacle) []info.Position {
 	dx := myPos.X - nearestObstacle.Position.X
 	dy := myPos.Y - nearestObstacle.Position.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
+	distSq := dx*dx + dy*dy
 	safeDistance := nearestObstacle.Size + MotionRadius
-	if dist > 0 {
+	if distSq > 0 {
+		dist := math.Sqrt(distSq)
 		dx = dx / dist * safeDistance
 		dy = dy / dist * safeDistance
 	} else {
@@ -384,9 +385,13 @@ func DistanceBetween(pos1, pos2 info.Position) float64 {
 }
 
 func distanceBetween(pos1, pos2 info.Position) float64 {
+	return math.Sqrt(distanceSquared(pos1, pos2))
+}
+
+func distanceSquared(pos1, pos2 info.Position) float64 {
 	dx := pos1.X - pos2.X
 	dy := pos1.Y - pos2.Y
-	return math.Sqrt(dx*dx + dy*dy)
+	return dx*dx + dy*dy
 }
 
 func runRRT(
@@ -403,7 +408,6 @@ func runRRT(
 		return &RRTNode{
 			position: finalDestination,
 			parent:   startNode,
-			cost:     distanceBetween(startNode.position, finalDestination),
 		}
 	}
 
@@ -430,14 +434,12 @@ func runRRT(
 		}
 
 		newNode.parent = nearestNode
-		newNode.cost = nearestNode.cost + distanceBetween(nearestNode.position, newNode.position)
 		nodes = append(nodes, newNode)
 
-		if distanceBetween(newNode.position, finalDestination) < cfg.CompletionDistance {
+		if distanceSquared(newNode.position, finalDestination) < cfg.CompletionDistance*cfg.CompletionDistance {
 			goalNode := &RRTNode{
 				position: finalDestination,
 				parent:   newNode,
-				cost:     newNode.cost + distanceBetween(newNode.position, finalDestination),
 			}
 			if IsPathClear(newNode.position, goalNode.position, obstacles, PlanningRadius) {
 				return goalNode
@@ -446,19 +448,19 @@ func runRRT(
 	}
 
 	closestNode := findNearestNode(nodes, finalDestination)
-	if distanceBetween(closestNode.position, finalDestination) > 500.0 {
+	if distanceSquared(closestNode.position, finalDestination) > 500.0*500.0 {
 		return nil
 	}
 	return closestNode
 }
 
 func findNearestNode(nodes []*RRTNode, target info.Position) *RRTNode {
-	minDist := math.MaxFloat64
+	minDistSq := math.MaxFloat64
 	var nearest *RRTNode
 	for _, node := range nodes {
-		dist := distanceBetween(node.position, target)
-		if dist < minDist {
-			minDist = dist
+		distSq := distanceSquared(node.position, target)
+		if distSq < minDistSq {
+			minDistSq = distSq
 			nearest = node
 		}
 	}
@@ -468,11 +470,12 @@ func findNearestNode(nodes []*RRTNode, target info.Position) *RRTNode {
 func extendTree(nearest *RRTNode, random info.Position, stepSize float64) *RRTNode {
 	dx := random.X - nearest.position.X
 	dy := random.Y - nearest.position.Y
-	dist := math.Sqrt(dx*dx + dy*dy)
+	distSq := dx*dx + dy*dy
 
-	if dist <= stepSize {
-		return &RRTNode{position: random, parent: nil, cost: 0}
+	if distSq <= stepSize*stepSize {
+		return &RRTNode{position: random, parent: nil}
 	}
+	dist := math.Sqrt(distSq)
 	dx = dx / dist * stepSize
 	dy = dy / dist * stepSize
 	newPos := info.Position{
@@ -480,7 +483,7 @@ func extendTree(nearest *RRTNode, random info.Position, stepSize float64) *RRTNo
 		Y:     nearest.position.Y + dy,
 		Angle: nearest.position.Angle,
 	}
-	return &RRTNode{position: newPos, parent: nil, cost: 0}
+	return &RRTNode{position: newPos, parent: nil}
 }
 
 func isNodeValid(position info.Position, obstacles []Obstacle, isStartPosition bool) bool {
@@ -488,7 +491,7 @@ func isNodeValid(position info.Position, obstacles []Obstacle, isStartPosition b
 		return true
 	}
 	for _, obstacle := range obstacles {
-		if distanceBetween(position, obstacle.Position) <= obstacle.Size {
+		if distanceSquared(position, obstacle.Position) <= obstacle.Size*obstacle.Size {
 			return false
 		}
 	}
@@ -497,23 +500,42 @@ func isNodeValid(position info.Position, obstacles []Obstacle, isStartPosition b
 
 // IsPathClear checks if the path between two positions is clear of obstacles.
 func IsPathClear(start, end info.Position, obstacles []Obstacle, extraMargin float64) bool {
-	_ = extraMargin
-	const numChecks = 10
-	for i := 0; i <= numChecks; i++ {
-		t := float64(i) / float64(numChecks)
-		checkPos := info.Position{
-			X:     start.X + t*(end.X-start.X),
-			Y:     start.Y + t*(end.Y-start.Y),
-			Angle: start.Angle,
-		}
-		if i == 0 {
-			continue
-		}
-		if !isNodeValid(checkPos, obstacles, false) {
+	for _, obstacle := range obstacles {
+		if segmentIntersectsObstacle(start, end, obstacle, extraMargin) {
 			return false
 		}
 	}
 	return true
+}
+
+func segmentIntersectsObstacle(start, end info.Position, obstacle Obstacle, extraMargin float64) bool {
+	_ = extraMargin
+	radius := obstacle.Size
+
+	abX := end.X - start.X
+	abY := end.Y - start.Y
+	acX := obstacle.Position.X - start.X
+	acY := obstacle.Position.Y - start.Y
+	abLenSq := abX*abX + abY*abY
+	radiusSq := radius * radius
+
+	if abLenSq == 0 {
+		return distanceSquared(start, obstacle.Position) <= radiusSq
+	}
+
+	t := (acX*abX + acY*abY) / abLenSq
+	if t <= 0 {
+		return false
+	}
+	if t > 1 {
+		t = 1
+	}
+
+	closestX := start.X + t*abX
+	closestY := start.Y + t*abY
+	dx := obstacle.Position.X - closestX
+	dy := obstacle.Position.Y - closestY
+	return dx*dx+dy*dy <= radiusSq
 }
 
 // ObstaclesForRobot lists disc obstacles (other robots, optional ball) for path checks.

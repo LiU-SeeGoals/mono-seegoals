@@ -178,6 +178,12 @@ func (m *MoveToPosition) Achieved(gi *info.GameInfo) bool {
 }
 
 func (m *MoveToPosition) String() string {
+	if m == nil {
+		return "MoveToPosition: <nil>"
+	}
+	if m.gi == nil {
+		return fmt.Sprintf("MoveToPosition: dest%v", m.final_destination)
+	}
 	currPos, _ := m.gi.State.GetTeam(m.team)[m.id].GetPosition()
 	return fmt.Sprintf("MoveToPosition: dist%f", pathplanner.DistanceBetween(currPos, m.final_destination))
 }

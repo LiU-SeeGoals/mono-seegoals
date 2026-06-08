@@ -1,7 +1,6 @@
 package ai
 
 import (
-	"fmt"
 	"sort"
 	"sync"
 	"time"
@@ -10,7 +9,6 @@ import (
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 type activityExecutor struct {
@@ -74,12 +72,7 @@ func (fb *activityExecutor) Run() {
 			go func(index int, activity ai.Activity) {
 				defer wg.Done()
 
-				if activity.Achieved(&gameInfo) { // If achieved, log it but let planner handle lifecycle
-					Logger.Info(fmt.Sprintf("Activity achieved: %v ", activity))
-					// Don't clear the activity - let the planner detect achievement and transition states
-				} else { // Otherwise, get an action
-					Logger.Info(fmt.Sprintf("Activity running: %v", activity))
-				}
+				_ = activity.Achieved(&gameInfo)
 				resultCh <- activityResult{
 					index:  index,
 					action: activity.GetAction(&gameInfo),
