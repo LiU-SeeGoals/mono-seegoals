@@ -404,17 +404,14 @@ func runRRT(
 	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
 
 	startNode := nodes[0]
-	if isNodeValid(finalDestination, obstacles, false) &&
-		IsPathClear(startNode.position, finalDestination, obstacles, PlanningRadius) {
-		return &RRTNode{
-			position: finalDestination,
-			parent:   startNode,
-		}
+	if goalNode := connectToGoalIfClear(startNode, finalDestination, obstacles); goalNode != nil {
+		return goalNode
 	}
 
 	for i := 0; i < cfg.MaxIterations; i++ {
 		var randomPoint info.Position
-		if rng.Float64() < cfg.GoalBias {
+		sampledGoal := rng.Float64() < cfg.GoalBias
+		if sampledGoal {
 			randomPoint = finalDestination
 		} else {
 			randomPoint = info.Position{
@@ -437,12 +434,14 @@ func runRRT(
 		newNode.parent = nearestNode
 		nodes = append(nodes, newNode)
 
-		if distanceSquared(newNode.position, finalDestination) < cfg.CompletionDistance*cfg.CompletionDistance {
-			goalNode := &RRTNode{
-				position: finalDestination,
-				parent:   newNode,
+		if sampledGoal {
+			if goalNode := connectToGoalIfClear(newNode, finalDestination, obstacles); goalNode != nil {
+				return goalNode
 			}
-			if IsPathClear(newNode.position, goalNode.position, obstacles, PlanningRadius) {
+		}
+
+		if distanceSquared(newNode.position, finalDestination) < cfg.CompletionDistance*cfg.CompletionDistance {
+			if goalNode := connectToGoalIfClear(newNode, finalDestination, obstacles); goalNode != nil {
 				return goalNode
 			}
 		}
@@ -453,6 +452,22 @@ func runRRT(
 		return nil
 	}
 	return closestNode
+}
+
+func connectToGoalIfClear(from *RRTNode, finalDestination info.Position, obstacles []Obstacle) *RRTNode {
+	if from == nil {
+		return nil
+	}
+	if !isNodeValid(finalDestination, obstacles, false) {
+		return nil
+	}
+	if !IsPathClear(from.position, finalDestination, obstacles, PlanningRadius) {
+		return nil
+	}
+	return &RRTNode{
+		position: finalDestination,
+		parent:   from,
+	}
 }
 
 func shortcutPath(path []info.Position, obstacles []Obstacle, extraMargin float64) []info.Position {

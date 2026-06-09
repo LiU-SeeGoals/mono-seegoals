@@ -22,7 +22,7 @@ import (
 // and then write top to see memory usage.
 
 const (
-	RUN_PROFILER = true
+	RUN_PROFILER = false
 )
 
 func main() {
