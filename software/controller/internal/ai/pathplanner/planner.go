@@ -190,6 +190,7 @@ func (p *Planner) PlanPath(
 	for cur := goalNode; cur != nil; cur = cur.parent {
 		path = append([]info.Position{cur.position}, path...)
 	}
+	path = shortcutPath(path, obstacles, PlanningRadius)
 	p.commit(id, path, finalDestination)
 	return p.copyPath(id)
 }
@@ -452,6 +453,29 @@ func runRRT(
 		return nil
 	}
 	return closestNode
+}
+
+func shortcutPath(path []info.Position, obstacles []Obstacle, extraMargin float64) []info.Position {
+	if len(path) <= 2 {
+		return path
+	}
+
+	out := make([]info.Position, 0, len(path))
+	out = append(out, path[0])
+
+	for i := 0; i < len(path)-1; {
+		next := i + 1
+		for j := len(path) - 1; j > i+1; j-- {
+			if IsPathClear(path[i], path[j], obstacles, extraMargin) {
+				next = j
+				break
+			}
+		}
+		out = append(out, path[next])
+		i = next
+	}
+
+	return out
 }
 
 func findNearestNode(nodes []*RRTNode, target info.Position) *RRTNode {
