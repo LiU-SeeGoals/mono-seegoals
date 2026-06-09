@@ -113,3 +113,72 @@ func TestConnectToGoalIfClearRejectsBlockedSegment(t *testing.T) {
 		t.Fatalf("expected blocked goal connection to be rejected, got %#v", got)
 	}
 }
+
+func TestIsPathClearRejectsRectObstacle(t *testing.T) {
+	obstacles := []Obstacle{
+		rectObstacle(100, 200, -50, 50, 0),
+	}
+
+	if IsPathClear(info.Position{X: 0, Y: 0}, info.Position{X: 300, Y: 0}, obstacles, 0) {
+		t.Fatal("expected segment through rectangle to be blocked")
+	}
+}
+
+func TestIsPathClearAllowsLeavingRectObstacle(t *testing.T) {
+	obstacles := []Obstacle{
+		rectObstacle(100, 200, -50, 50, 0),
+	}
+
+	if !IsPathClear(info.Position{X: 150, Y: 0}, info.Position{X: 250, Y: 0}, obstacles, 0) {
+		t.Fatal("expected segment leaving rectangle to be allowed")
+	}
+}
+
+func TestIsNodeValidRejectsRectObstacle(t *testing.T) {
+	obstacles := []Obstacle{
+		rectObstacle(100, 200, -50, 50, 10),
+	}
+
+	if isNodeValid(info.Position{X: 95, Y: 0}, obstacles, false) {
+		t.Fatal("expected node inside inflated rectangle to be invalid")
+	}
+	if !isNodeValid(info.Position{X: 80, Y: 0}, obstacles, false) {
+		t.Fatal("expected node outside inflated rectangle to be valid")
+	}
+}
+
+func TestNoGoZoneEscapePathUsesNearestSide(t *testing.T) {
+	obstacles := []Obstacle{
+		rectObstacle(100, 200, -50, 50, 10),
+	}
+	pos := info.Position{X: 205, Y: 0, Angle: 1.5}
+
+	got, ok := noGoZoneEscapePath(pos, obstacles)
+
+	if !ok {
+		t.Fatal("expected escape path for position inside no-go zone")
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected one escape waypoint, got %d", len(got))
+	}
+	wantX := 200.0 + 10.0 + noGoZoneEscapeClearance
+	if got[0].X != wantX || got[0].Y != pos.Y {
+		t.Fatalf("expected nearest right-side exit at (%v,%v), got %#v", wantX, pos.Y, got[0])
+	}
+	if got[0].Angle != pos.Angle {
+		t.Fatalf("expected escape waypoint to preserve angle, got %v want %v", got[0].Angle, pos.Angle)
+	}
+	if pointInsideObstacle(got[0], obstacles[0]) {
+		t.Fatal("expected escape waypoint outside inflated no-go zone")
+	}
+}
+
+func TestNoGoZoneEscapePathIgnoresOutsidePosition(t *testing.T) {
+	obstacles := []Obstacle{
+		rectObstacle(100, 200, -50, 50, 10),
+	}
+
+	if got, ok := noGoZoneEscapePath(info.Position{X: 50, Y: 0}, obstacles); ok {
+		t.Fatalf("expected no escape path outside no-go zone, got %#v", got)
+	}
+}

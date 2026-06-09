@@ -19,7 +19,7 @@ const (
 	MotionRadius         = 100.0
 )
 
-const goalLineObstacleSpacing = GoalLineSafetyRadius
+const noGoZoneEscapeClearance = MotionRadius
 
 // Defaults for persistent path reuse (used when the corresponding RRTConfig field is zero).
 const (
@@ -105,10 +105,15 @@ type RRTNode struct {
 	parent   *RRTNode
 }
 
-// Obstacle is a disc obstacle in the plane (e.g. another robot or the ball).
+// Obstacle is either a disc obstacle (robots/ball) or a rectangular no-go zone.
 type Obstacle struct {
 	Position info.Position
 	Size     float64
+	rect     bool
+	minX     float64
+	maxX     float64
+	minY     float64
+	maxY     float64
 }
 
 // robotPathState is per-robot cached plan + metadata for persistence.
@@ -157,6 +162,10 @@ func (p *Planner) PlanPath(
 	perm := cfg.persistence()
 	myPos, _ := gi.State.GetTeam(team)[id].GetPosition()
 	obstacles := planningObstacles(team, id, myPos, finalDestination, avoidBall, avoidGoallines, gi, perm)
+
+	if escapePath, ok := noGoZoneEscapePath(myPos, obstacles); ok {
+		return escapePath
+	}
 
 	// Inflated “collision”: escape this tick only. Do not commit: overwriting the
 	// session with a 1-point path is common near the goal in traffic and made the
@@ -345,6 +354,9 @@ func collisionTarget(myPos info.Position, obstacles []Obstacle) (bool, Obstacle)
 	var nearestObstacle Obstacle
 	shortestDistSq := math.MaxFloat64
 	for _, obstacle := range obstacles {
+		if obstacle.rect {
+			continue
+		}
 		distSq := distanceSquared(myPos, obstacle.Position)
 		obstacleSizeSq := obstacle.Size * obstacle.Size
 		if distSq <= obstacleSizeSq {
@@ -356,6 +368,61 @@ func collisionTarget(myPos info.Position, obstacles []Obstacle) (bool, Obstacle)
 		}
 	}
 	return robotsNearby, nearestObstacle
+}
+
+func noGoZoneEscapePath(myPos info.Position, obstacles []Obstacle) ([]info.Position, bool) {
+	found := false
+	bestDistSq := math.MaxFloat64
+	var best info.Position
+
+	for _, obstacle := range obstacles {
+		if !obstacle.rect {
+			continue
+		}
+		target, distSq, inside := nearestRectExit(myPos, obstacle)
+		if !inside {
+			continue
+		}
+		if distSq < bestDistSq {
+			found = true
+			bestDistSq = distSq
+			best = target
+		}
+	}
+
+	if !found {
+		return nil, false
+	}
+	return []info.Position{best}, true
+}
+
+func nearestRectExit(myPos info.Position, obstacle Obstacle) (info.Position, float64, bool) {
+	minX, maxX, minY, maxY := expandedRect(obstacle)
+	if !pointInRect(myPos, minX, maxX, minY, maxY) {
+		return info.Position{}, 0, false
+	}
+
+	target := myPos
+	bestDist := myPos.X - minX
+	target.X = minX - noGoZoneEscapeClearance
+
+	if dist := maxX - myPos.X; dist < bestDist {
+		bestDist = dist
+		target = myPos
+		target.X = maxX + noGoZoneEscapeClearance
+	}
+	if dist := myPos.Y - minY; dist < bestDist {
+		bestDist = dist
+		target = myPos
+		target.Y = minY - noGoZoneEscapeClearance
+	}
+	if dist := maxY - myPos.Y; dist < bestDist {
+		bestDist = dist
+		target = myPos
+		target.Y = maxY + noGoZoneEscapeClearance
+	}
+
+	return target, bestDist * bestDist, true
 }
 
 func makeEscapePath(myPos info.Position, nearestObstacle Obstacle) []info.Position {
@@ -530,7 +597,7 @@ func isNodeValid(position info.Position, obstacles []Obstacle, isStartPosition b
 		return true
 	}
 	for _, obstacle := range obstacles {
-		if distanceSquared(position, obstacle.Position) <= obstacle.Size*obstacle.Size {
+		if pointInsideObstacle(position, obstacle) {
 			return false
 		}
 	}
@@ -548,6 +615,13 @@ func IsPathClear(start, end info.Position, obstacles []Obstacle, extraMargin flo
 }
 
 func segmentIntersectsObstacle(start, end info.Position, obstacle Obstacle, extraMargin float64) bool {
+	if obstacle.rect {
+		return segmentIntersectsRectObstacle(start, end, obstacle, extraMargin)
+	}
+	return segmentIntersectsCircleObstacle(start, end, obstacle, extraMargin)
+}
+
+func segmentIntersectsCircleObstacle(start, end info.Position, obstacle Obstacle, extraMargin float64) bool {
 	_ = extraMargin
 	radius := obstacle.Size
 
@@ -577,18 +651,109 @@ func segmentIntersectsObstacle(start, end info.Position, obstacle Obstacle, extr
 	return dx*dx+dy*dy <= radiusSq
 }
 
+func segmentIntersectsRectObstacle(start, end info.Position, obstacle Obstacle, extraMargin float64) bool {
+	_ = extraMargin
+	minX, maxX, minY, maxY := expandedRect(obstacle)
+	startInside := pointInRect(start, minX, maxX, minY, maxY)
+	endInside := pointInRect(end, minX, maxX, minY, maxY)
+	if startInside {
+		return endInside
+	}
+	if endInside {
+		return true
+	}
+	return segmentIntersectsRect(start, end, minX, maxX, minY, maxY)
+}
+
+func pointInsideObstacle(position info.Position, obstacle Obstacle) bool {
+	if obstacle.rect {
+		minX, maxX, minY, maxY := expandedRect(obstacle)
+		return pointInRect(position, minX, maxX, minY, maxY)
+	}
+	return distanceSquared(position, obstacle.Position) <= obstacle.Size*obstacle.Size
+}
+
+func expandedRect(obstacle Obstacle) (float64, float64, float64, float64) {
+	return obstacle.minX - obstacle.Size,
+		obstacle.maxX + obstacle.Size,
+		obstacle.minY - obstacle.Size,
+		obstacle.maxY + obstacle.Size
+}
+
+func pointInRect(position info.Position, minX, maxX, minY, maxY float64) bool {
+	return position.X >= minX && position.X <= maxX &&
+		position.Y >= minY && position.Y <= maxY
+}
+
+func segmentIntersectsRect(start, end info.Position, minX, maxX, minY, maxY float64) bool {
+	dx := end.X - start.X
+	dy := end.Y - start.Y
+	t0 := 0.0
+	t1 := 1.0
+
+	if !clipSegment(-dx, start.X-minX, &t0, &t1) {
+		return false
+	}
+	if !clipSegment(dx, maxX-start.X, &t0, &t1) {
+		return false
+	}
+	if !clipSegment(-dy, start.Y-minY, &t0, &t1) {
+		return false
+	}
+	if !clipSegment(dy, maxY-start.Y, &t0, &t1) {
+		return false
+	}
+	return t1 >= 0 && t0 <= 1
+}
+
+func clipSegment(p, q float64, t0, t1 *float64) bool {
+	if p == 0 {
+		return q >= 0
+	}
+
+	r := q / p
+	if p < 0 {
+		if r > *t1 {
+			return false
+		}
+		if r > *t0 {
+			*t0 = r
+		}
+		return true
+	}
+
+	if r < *t0 {
+		return false
+	}
+	if r < *t1 {
+		*t1 = r
+	}
+	return true
+}
+
 // ObstaclesForRobot lists disc obstacles (other robots, optional ball) for path checks.
 func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoallines bool, gi *info.GameInfo) []Obstacle {
-	obstacles := make([]Obstacle, 0)
-	allRobots := append(gi.State.GetTeam(info.Blue)[:], gi.State.GetTeam(info.Yellow)[:]...)
+	obstacles := make([]Obstacle, 0, 1+int(info.TEAM_SIZE)*2+2)
 
 	if avoidBall {
 		ballPos, _ := gi.State.Ball.GetPosition()
 		obstacles = append(obstacles, Obstacle{Position: ballPos, Size: BallSafetyRadius})
 	}
 
-	for _, robot := range allRobots {
-		if robot.GetTeam() == team && robot.GetID() == id {
+	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Blue), team, id)
+	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Yellow), team, id)
+	if avoidGoallines {
+		obstacles = append(obstacles, goalLineObstacles(gi)...)
+	}
+	return obstacles
+}
+
+func appendRobotObstacles(obstacles []Obstacle, robots *info.RobotTeam, ownTeam info.Team, ownID info.ID) []Obstacle {
+	for _, robot := range robots {
+		if robot == nil {
+			continue
+		}
+		if robot.GetTeam() == ownTeam && robot.GetID() == ownID {
 			continue
 		}
 		pos, rototTime, err := robot.GetPositionTime()
@@ -600,9 +765,6 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoalline
 		}
 		obstacles = append(obstacles, Obstacle{Position: pos, Size: RobotSafetyRadius})
 	}
-	if avoidGoallines {
-		obstacles = append(obstacles, goalLineObstacles(gi)...)
-	}
 	return obstacles
 }
 
@@ -611,17 +773,21 @@ func goalLineObstacles(gi *info.GameInfo) []Obstacle {
 		return nil
 	}
 
-	obstacles := make([]Obstacle, 0)
-	obstacles = append(obstacles, goalZoneObstacles(gi, "LeftPenaltyStretch", "LeftGoalLine")...)
-	obstacles = append(obstacles, goalZoneObstacles(gi, "RightPenaltyStretch", "RightGoalLine")...)
-	return obstacles
+	zones := make([]Obstacle, 0, 2)
+	if zone, ok := goalZoneObstacle(gi, "LeftPenaltyStretch", "LeftGoalLine"); ok {
+		zones = append(zones, zone)
+	}
+	if zone, ok := goalZoneObstacle(gi, "RightPenaltyStretch", "RightGoalLine"); ok {
+		zones = append(zones, zone)
+	}
+	return zones
 }
 
-func goalZoneObstacles(gi *info.GameInfo, frontLineName, backLineName string) []Obstacle {
+func goalZoneObstacle(gi *info.GameInfo, frontLineName, backLineName string) (Obstacle, bool) {
 	front := gi.GetFieldLine(frontLineName)
 	back := gi.GetFieldLine(backLineName)
 	if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
-		return nil
+		return Obstacle{}, false
 	}
 
 	frontX := float64(front.GetP1().GetX())
@@ -629,16 +795,16 @@ func goalZoneObstacles(gi *info.GameInfo, frontLineName, backLineName string) []
 	y1 := float64(front.GetP1().GetY())
 	y2 := float64(front.GetP2().GetY())
 
-	return obstaclesInRectangle(
+	return rectObstacle(
 		math.Min(frontX, backX),
 		math.Max(frontX, backX),
 		math.Min(y1, y2),
 		math.Max(y1, y2),
 		GoalLineSafetyRadius,
-	)
+	), true
 }
 
-func obstaclesInRectangle(minX, maxX, minY, maxY, size float64) []Obstacle {
+func rectObstacle(minX, maxX, minY, maxY, size float64) Obstacle {
 	if minX > maxX {
 		minX, maxX = maxX, minX
 	}
@@ -646,26 +812,12 @@ func obstaclesInRectangle(minX, maxX, minY, maxY, size float64) []Obstacle {
 		minY, maxY = maxY, minY
 	}
 
-	xSegments := int(math.Ceil((maxX - minX) / goalLineObstacleSpacing))
-	ySegments := int(math.Ceil((maxY - minY) / goalLineObstacleSpacing))
-	if xSegments < 1 {
-		xSegments = 1
+	return Obstacle{
+		Size: size,
+		rect: true,
+		minX: minX,
+		maxX: maxX,
+		minY: minY,
+		maxY: maxY,
 	}
-	if ySegments < 1 {
-		ySegments = 1
-	}
-
-	obstacles := make([]Obstacle, 0, (xSegments+1)*(ySegments+1))
-	for ix := 0; ix <= xSegments; ix++ {
-		x := minX + float64(ix)*(maxX-minX)/float64(xSegments)
-		for iy := 0; iy <= ySegments; iy++ {
-			y := minY + float64(iy)*(maxY-minY)/float64(ySegments)
-			obstacles = append(obstacles, Obstacle{
-				Position: info.Position{X: x, Y: y},
-				Size:     size,
-			})
-		}
-	}
-
-	return obstacles
 }
