@@ -58,6 +58,9 @@ func (b *rawBall) GetVelocity() (Vec2, error){
 	ball2 := element2.Value.(*rawBallPos)
 
 	dt := float64(ball.time) - float64(ball2.time)
+	if dt == 0 {
+		return Vec2{0, 0}, fmt.Errorf("Zero time delta between ball positions")
+	}
 	dPos := ball.pos.Sub(&ball2.pos)
 
 	return Vec2{dPos.X/dt, dPos.Y/dt}, nil

@@ -7,6 +7,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/vision"
 	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
 	"google.golang.org/protobuf/proto"
 )
@@ -79,9 +80,10 @@ func (r *SSLConnection) Receive(packetChan chan *ssl_vision.SSL_WrapperPacket) {
 type SSLVisionClient struct {
 	ssl         *SSLConnection
 	ssl_channel chan *ssl_vision.SSL_WrapperPacket
+	ballFilter  vision.BallFilter
 }
 
-func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time int64) {
+func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time int64, bf *vision.BallFilter) {
 	detect := packet.GetDetection()
 	gi.State.SetMessageReceivedTime(play_time)
 
@@ -103,17 +105,12 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 
 	}
 
-	// TOOD: Here we loop over all balls, setting the one last in the list
-	// meaning error balls have 100% chance of fing it up!
-	if detect.GetBalls() != nil {
-		for _, ball := range detect.GetBalls() {
-			//fmt.Println("Ball", ball.GetX(), ball.GetY(), ball.GetZ())
-			x := float64(ball.GetX())
-			y := float64(ball.GetY())
-			z := float64(ball.GetZ())
+	if ball := bf.Filter(detect.GetBalls(), play_time); ball != nil {
+		x := float64(ball.GetX())
+		y := float64(ball.GetY())
+		z := float64(ball.GetZ())
 
-			gi.State.SetBall(x, y, z, play_time)
-		}
+		gi.State.SetBall(x, y, z, play_time)
 	}
 
 	gi.State.SetValid(true)
@@ -132,7 +129,7 @@ func (receiver *SSLVisionClient) handlePacket(packet *ssl_vision.SSL_WrapperPack
 		return
 	}
 
-	unpack(packet, gi, play_time)
+	unpack(packet, gi, play_time, &receiver.ballFilter)
 }
 
 func (receiver *SSLVisionClient) UpdateGameInfo(gi *info.GameInfo, play_time int64) {

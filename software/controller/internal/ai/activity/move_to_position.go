@@ -76,6 +76,7 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 		rrtConfig:         rrtConfig,
 		useRRT:            true, // Enable RRT by default
 		avoidBall:         true, // Enable ball avoidance by default
+		avoidGoallines:    true, // Enable goal-line avoidance by default
 	}
 }
 
@@ -119,18 +120,14 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	var targetPos info.Position
 
 	if m.useRRT {
-		m.rrtConfig.StepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), m.rrtConfig.StepSize)
-		m.AvoidBall(true)
-		m.AvoidGoallines(true)
-		// fmt.Println(m.rrtConfig.StepSize)
-		// fmt.Println(m.final_destination)
-		// fmt.Println(myPos)
-
 		targetPos = myPos
 
 		ps := getPathService(m.team)
 		if ps != nil {
+			// Scale the step with the remaining distance on a local copy; mutating
+			// m.rrtConfig would ratchet StepSize down for the activity's lifetime.
 			cfg := m.rrtConfig
+			cfg.StepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), cfg.StepSize)
 			m.path = ps.PlanPath(m.team, m.id, m.final_destination, m.avoidBall, m.avoidGoallines, gi, cfg)
 		} else {
 			m.path = []info.Position{m.final_destination}

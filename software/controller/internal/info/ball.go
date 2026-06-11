@@ -50,15 +50,23 @@ func (b *Ball) GetVelocity() Position {
 	ball := element.Value.(*rawBallPos)
 
 	sum_deltas := Position{}
+	count := 0
 
 	for e := b.history.Front().Next(); e != nil; e = e.Next() {
 		ball2 := e.Value.(*rawBallPos)
-		dPos := ball2.pos.Sub(&ball.pos)
 		dt := float64(ball2.time - ball.time)
+		if dt == 0 {
+			continue
+		}
+		dPos := ball2.pos.Sub(&ball.pos)
 		scaled := dPos.Scale(1 / dt)
 		sum_deltas = sum_deltas.Add(&scaled)
+		count++
 	}
-	return sum_deltas.Scale(1 / float64(b.history.Len()-1))
+	if count == 0 {
+		return Position{0, 0, 0, 0}
+	}
+	return sum_deltas.Scale(1 / float64(count))
 }
 
 func (b *Ball) GetVelocity2() (Vec2, error){
