@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -27,26 +28,32 @@ func NewMoveToBall(team info.Team, id info.ID) *MoveToBall {
 }
 
 func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
-	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
-	if err != nil {
-		Logger.Errorf("Position retrieval failed - Ball: %v\n", err)
-		return NewStop(m.id).GetAction(gi)
-	}
-
-	robotPos, err := gi.State.GetRobot(m.id, m.team).GetPosition()
+	robot := gi.State.GetRobot(m.id, m.team)
+	robotPos, err := robot.GetPosition()
 	if err != nil {
 		Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
 		return NewStop(m.id).GetAction(gi)
 	}
 
+	ballPos := predictedBallPos(gi, ballLookaheadSec)
 	angleToBall := robotPos.AngleToPosition(ballPos)
+	headingErr := math.Abs(info.NormalizeAngleDelta(angleToBall, robotPos.Angle))
+
+	// Target the standoff point in front of the ball on our side, never the
+	// ball itself; the margin only closes once the kicker points at the ball.
+	dist := kickerStandoffDist(alignmentMargin(headingErr))
+	target := info.Position{
+		X:     ballPos.X - dist*math.Cos(angleToBall),
+		Y:     ballPos.Y - dist*math.Sin(angleToBall),
+		Angle: angleToBall,
+	}
 
 	dribble := false
-	if ballPos.Distance(robotPos) < 120 {
+	dribblerPos := robot.DribblerPos()
+	if dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance {
 		dribble = true
 	}
 
-	target := info.Position{X: ballPos.X, Y: ballPos.Y, Z: 0, Angle: angleToBall}
 	move := NewMoveToPosition(m.team, m.id, target)
 	move.AvoidBall(false)
 	moveAction := move.GetMoveToAction(gi)
