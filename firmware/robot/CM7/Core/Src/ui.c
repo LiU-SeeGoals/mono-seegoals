@@ -60,11 +60,11 @@ typedef enum
 CommandInfo default_commands[4] = {{'R', "F"}, {'K', "icker"}, {'L', "ogs"}, {'M', "otors"}};
 
 CommandInfo kicker_commands[5] = {
-    {'C', "harge"},
-    {'K', "ick"},
+    {'S', "traigt kick"},
+    {'C', "hipper kick"},
+    {'D', "ischarge"},
     {'P', "rint vars"},
     {'E', "dit vars"},
-    {'T', "est while driving"}
 };
 
 CommandInfo kicker_edit_commands[3] = {
@@ -330,13 +330,19 @@ void parse_key()
         }
     } else if (current_state == state_kicker) {
         switch (key) {
-        case 'C': // Charge
-            LOG_UI("Charging\r\n");
+        case 'D':
+            LOG_UI("Discharging\r\n");
+            KICKER_KickStart();
+            break;
+        case 'S':
+            LOG_UI("Straight kicking\r\n");
+            KICKER_SetKickerMode(KICKER_STRAIGHT);
             KICKER_ChargeStart();
             break;
-        case 'K': // Kick
-            LOG_UI("Kicking\r\n");
-            KICKER_KickStart();
+        case 'C':
+            LOG_UI("Chipper kicking\r\n");
+            KICKER_SetKickerMode(KICKER_CHIPPER);
+            KICKER_ChargeStart();
             break;
         case 'P': // Print vars
         {
@@ -345,10 +351,6 @@ void parse_key()
         } break;
         case 'E': // Edit vars
             current_state = state_kicker_edit;
-            print_help();
-            break;
-        case 'T': // Test while driving
-            NAV_SetCommandPosition(0.5, 0, 0);
             print_help();
             break;
         }
