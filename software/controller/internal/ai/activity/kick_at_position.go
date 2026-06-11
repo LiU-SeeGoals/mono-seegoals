@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
+	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -17,6 +18,9 @@ const (
 	// Drive-through distance past the ball when kicking [mm].
 	kickRunUpDist = 100.0
 	kickSpeed     = 5
+	// Far-approach goal must sit outside the planner's no-go band around the
+	// ball, otherwise RRT can never reach it and orbits the ball instead.
+	kickStagingClearance = pathplanner.BallSafetyRadius + pathplanner.MotionRadius + 50.0
 )
 
 type KickAtPosition struct {
@@ -54,12 +58,15 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 
 	finalOrientation := ballPred.AngleToPosition(kp.targetPosition)
 	headingErr := math.Abs(info.NormalizeAngleDelta(finalOrientation, robotPos.Angle))
-	behindBall := kp.isBehindBall(robotPos, ballPred)
+	// Bearing error around the ball: 0 when the robot sits on the kick line
+	// behind the ball.
+	lineErr := math.Abs(info.NormalizeAngleDelta(ballPred.AngleToPosition(robotPos), finalOrientation+math.Pi))
 
-	// Far away: path-plan to the lineup point behind the ball at full standoff.
+	// Far away: path-plan to a staging point behind the ball, outside the
+	// planner's ball no-go zone.
 	if robotPos.Dist2d(ballNow) > kickFarApproachDist {
 		kp.alignedSince = time.Time{}
-		lineup := behindBallDest(ballPred, kp.targetPosition, maxMarginToBall)
+		lineup := behindBallDest(ballPred, kp.targetPosition, kickStagingClearance-kickerStandoffDist(0))
 		move := NewMoveToPosition(kp.team, kp.id, lineup)
 		move.AvoidBall(true)
 		moveAction := move.GetMoveToAction(gi)
@@ -67,7 +74,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		return moveAction
 	}
 
-	if kp.armed(robotPos, ballNow, headingErr, behindBall) {
+	if kp.armed(robotPos, ballNow, headingErr, lineErr) {
 		// Aim held: drive through the ball toward the target and kick.
 		dest := info.Position{
 			X:     ballPred.X + kickRunUpDist*math.Cos(finalOrientation),
@@ -87,7 +94,9 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	// only closes once heading and position are lined up, so we cannot bump
 	// the ball away while still rotating around it.
 	minMargin := alignmentMargin(headingErr)
-	if !behindBall {
+	if lineErr > 0.3 {
+		// Never push toward the ball while still off the kick line, even if
+		// the heading happens to point at the target.
 		minMargin = math.Max(minMargin, 0)
 	}
 	lineup := behindBallDest(ballPred, kp.targetPosition, minMargin)
@@ -106,21 +115,11 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	}
 }
 
-// isBehindBall reports whether the robot is on the far side of the ball seen
-// from the kick target, i.e. kicking would send the ball toward the target.
-func (kp *KickAtPosition) isBehindBall(robotPos, ballPos info.Position) bool {
-	toTargetX := kp.targetPosition.X - ballPos.X
-	toTargetY := kp.targetPosition.Y - ballPos.Y
-	toRobotX := robotPos.X - ballPos.X
-	toRobotY := robotPos.Y - ballPos.Y
-	return toTargetX*toRobotX+toTargetY*toRobotY < 0
-}
-
 // armed gates the kick: heading and position on the kick line must be held
 // for kickAlignConfirmTime with the kicker close to the ball.
-func (kp *KickAtPosition) armed(robotPos, ballPos info.Position, headingErr float64, behindBall bool) bool {
+func (kp *KickAtPosition) armed(robotPos, ballPos info.Position, headingErr, lineErr float64) bool {
 	nearBall := robotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall)
-	aligned := headingErr < roughAngleTolerance && behindBall && nearBall
+	aligned := headingErr < roughAngleTolerance && lineErr < 2*roughAngleTolerance && nearBall
 	if !aligned {
 		kp.alignedSince = time.Time{}
 		return false

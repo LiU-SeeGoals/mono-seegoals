@@ -339,6 +339,7 @@ func (kr *OffenseRole) Init() {
 	sm.AddTransition(kickName, "BALL_LOST", awaitBall)
 	sm.AddTransition(receiveName, "BALL_OWNER", prepareKick)
 	sm.AddTransition(receiveName, "BALL_RECEIVED", prepareKick)
+	sm.AddTransition(receiveName, "BALL_APPROACHING", intercept)
 	sm.AddTransition(receiveName, "BALL_LOST", awaitBall)
 
 	kr.sm = sm

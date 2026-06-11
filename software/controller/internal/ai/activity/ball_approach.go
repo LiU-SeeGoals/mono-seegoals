@@ -42,6 +42,14 @@ func alignmentMargin(headingErr float64) float64 {
 	return ballPushMargin + (maxMarginToBall-ballPushMargin)*frac
 }
 
+func behindBallHalfPlane(ballPos, robotPos, target info.Position) bool {
+	toTargetX := target.X - ballPos.X
+	toTargetY := target.Y - ballPos.Y
+	toRobotX := robotPos.X - ballPos.X
+	toRobotY := robotPos.Y - ballPos.Y
+	return toTargetX*toRobotX+toTargetY*toRobotY < 0
+}
+
 func behindBallDest(ballPos, target info.Position, margin float64) info.Position {
 	dx := target.X - ballPos.X
 	dy := target.Y - ballPos.Y

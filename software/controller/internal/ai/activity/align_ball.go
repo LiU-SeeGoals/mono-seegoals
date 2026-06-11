@@ -126,6 +126,14 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	if err != nil {
 		fmt.Println(err)
 	}
+
+	// A robot already close to a lying ball (it just took a pass, or a failed
+	// pass stopped at its feet) must not retreat to the clearance points;
+	// orbit the ball onto the kick line instead.
+	if m.nearLyingBall(myPos, gi) {
+		return m.aroundBallAction(myPos, gi)
+	}
+
 	isBehindBall, _ := m.passLineChecks(myPos, gi)
 	moveTarget := robotTargetPos
 	useRRT := m.useRRT
@@ -169,6 +177,50 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	return act
 }
 
+// nearLyingBall reports whether the ball is lying still with the robot close
+// enough that the clearance/staging targets would point away from the ball.
+func (m *AlignBall) nearLyingBall(myPos info.Position, gi *info.GameInfo) bool {
+	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
+	if ok && ballVel.Norm2d() > minRollingBallSpeed {
+		return false
+	}
+	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
+	if err != nil {
+		return false
+	}
+	return myPos.Dist2d(ballPos) <= kickFarApproachDist
+}
+
+// aroundBallAction walks around the ball onto the kick line, the standoff
+// margin closing as the heading aligns, so the robot keeps the ball at its
+// kicker instead of backing off to the clearance points.
+func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) action.Action {
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+
+	finalOrientation := ballPos.AngleToPosition(m.to)
+	m.AlignAngle = finalOrientation
+	headingErr := math.Abs(info.NormalizeAngleDelta(finalOrientation, myPos.Angle))
+
+	minMargin := alignmentMargin(headingErr)
+	if !behindBallHalfPlane(ballPos, myPos, m.to) {
+		minMargin = math.Max(minMargin, 0)
+	}
+	lineup := behindBallDest(ballPos, m.to, minMargin)
+	carrot := aroundBallDest(ballPos, myPos, lineup, minMargin)
+	carrot.Angle = steppedOrientation(myPos, ballPos, finalOrientation)
+
+	dribblerPos := gi.State.GetTeam(m.team)[m.id].DribblerPos()
+	dribble := dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance
+
+	return &action.MoveTo{
+		Id:      int(m.id),
+		Team:    m.team,
+		Pos:     myPos,
+		Dest:    carrot,
+		Dribble: dribble,
+	}
+}
+
 func (m *AlignBall) readyToFaceKick(myRobotPos, robotTargetPos info.Position, gi *info.GameInfo) bool {
 	cfg := GetAlignConfig()
 	isBehindBall, isOnPassLine := m.passLineChecks(myRobotPos, gi)
@@ -203,6 +255,20 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
 	if err != nil {
 		fmt.Println(err)
+	}
+
+	// At a lying ball the clearance-point check below would force a robot
+	// already in possession to back off before ALIGNED could fire; count it
+	// aligned once it is behind the ball on the pass line, close in and
+	// facing the kick direction.
+	if m.nearLyingBall(myRobotPos, gi) {
+		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+		_, isOnPassLine := m.passLineChecks(myRobotPos, gi)
+		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
+		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
+			behindBallHalfPlane(ballPos, myRobotPos, m.to) &&
+			isOnPassLine &&
+			math.Abs(headingErr) < GetAlignConfig().angleError
 	}
 
 	xx := (myRobotPos.X - robotTargetPos.X) * (myRobotPos.X - robotTargetPos.X)
