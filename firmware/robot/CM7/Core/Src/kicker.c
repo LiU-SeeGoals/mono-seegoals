@@ -15,6 +15,7 @@ static volatile bool charging = false;
 static volatile bool kicking = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
 static TIM_HandleTypeDef* htim_kicker_kick;
+static volatile KickerMode kickerMode;
 
 /*
  * Public functions implementations
@@ -75,12 +76,19 @@ void KICKER_KickStart()
         LOG_DEBUG("Already kicking\r\n");
         return;
     }
+    kicking = true;
 
     LOG_DEBUG("Kicking start\r\n");
 
     // Kicks on low
-    HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
-    kicking = true;
+    if (kickerMode == KICKER_STRAIGHT)
+    {
+        HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
+    }
+    else if (kickerMode == KICKER_CHIPPER)
+    {
+        HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_RESET);
+    }
 
     __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us);
     __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
@@ -92,12 +100,18 @@ void KICKER_KickStart()
 
 void KICKER_KickStop()
 {
-    // Stop kick on high
+    // Stop kick on high, both chipper and straight
     HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_SET);
     settings.charges_since_last_kick = 0;
     LOG_DEBUG("Kicking stop\r\n");
     HAL_TIM_Base_Stop_IT(htim_kicker_kick);
     kicking = false;
+}
+
+void KICKER_SetKickerMode(KickerMode mode)
+{
+    kickerMode = mode;
 }
 
 void KICKER_KickSafe()
