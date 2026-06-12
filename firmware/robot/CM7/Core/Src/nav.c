@@ -346,7 +346,7 @@ void NAV_SetMovement(Command* cmd, MovementType movementType)
             }
         }
 
-        const int32_t speed = cmd->kick_speed * 100.f;
+        const int32_t speed = cmd->kick_speed;
         const int32_t x = cmd->dest->x;
         const int32_t y = cmd->dest->y;
         const int32_t angle = cmd->dest->w;

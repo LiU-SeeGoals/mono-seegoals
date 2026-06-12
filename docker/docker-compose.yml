@@ -16,6 +16,8 @@ services:
       - DISPLAY=${DISPLAY}
     command: tail -f /dev/null
     network_mode: host
+    devices:
+      - /dev/input:/dev/input
 
   game-viewer:
     platform: linux/amd64
