@@ -1,11 +1,16 @@
 package roles
 
 import (
+	"math"
+
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
 	sm "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
+
+const chaserNoGoWaitClearance = pathplanner.MotionRadius
 
 type TargetContext interface {
 	GetTargetPosition() info.Position
@@ -157,6 +162,15 @@ func (s *InterceptBallState) GetName() sm.StateName {
 }
 
 func (s *InterceptBallState) Update() sm.EventName {
+	if ballPos, err := s.gi.State.GetBall().GetEstimatedPosition(); err == nil {
+		if waitPos, ok := chaserWaitPositionOutsideGoalNoGo(s.gi, ballPos); ok {
+			waitPos.Angle = waitPos.AngleToPosition(ballPos)
+			activity := act.NewMoveToPosition(s.team, s.robotId, waitPos)
+			s.activityHandler.AddActivity(activity)
+			return "NONE"
+		}
+	}
+
 	ballVel, ok := s.gi.State.GetTrackedBall().GetTrackedVelocity()
 	if ok && ballVel.Norm2d() > 0.3 {
 		activity := act.NewMoveToBall(s.team, s.robotId)
@@ -179,6 +193,76 @@ func (s *InterceptBallState) Update() sm.EventName {
 	}
 
 	return "NONE"
+}
+
+type chaserGoalNoGoZone struct {
+	minX float64
+	maxX float64
+	minY float64
+	maxY float64
+}
+
+func chaserWaitPositionOutsideGoalNoGo(gi *info.GameInfo, ballPos info.Position) (info.Position, bool) {
+	for _, zone := range chaserGoalNoGoZones(gi) {
+		if !zone.contains(ballPos) {
+			continue
+		}
+		return zone.waitPosition(ballPos), true
+	}
+
+	return info.Position{}, false
+}
+
+func chaserGoalNoGoZones(gi *info.GameInfo) []chaserGoalNoGoZone {
+	if gi == nil || !gi.HasField() {
+		return nil
+	}
+
+	zones := make([]chaserGoalNoGoZone, 0, 2)
+	if zone, ok := chaserGoalNoGoZoneFromLines(gi, "LeftPenaltyStretch", "LeftGoalLine"); ok {
+		zones = append(zones, zone)
+	}
+	if zone, ok := chaserGoalNoGoZoneFromLines(gi, "RightPenaltyStretch", "RightGoalLine"); ok {
+		zones = append(zones, zone)
+	}
+	return zones
+}
+
+func chaserGoalNoGoZoneFromLines(gi *info.GameInfo, frontLineName, backLineName string) (chaserGoalNoGoZone, bool) {
+	front := gi.GetFieldLine(frontLineName)
+	back := gi.GetFieldLine(backLineName)
+	if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
+		return chaserGoalNoGoZone{}, false
+	}
+
+	frontX := float64(front.GetP1().GetX())
+	backX := float64(back.GetP1().GetX())
+	y1 := float64(front.GetP1().GetY())
+	y2 := float64(front.GetP2().GetY())
+	margin := pathplanner.GoalLineSafetyRadius
+
+	return chaserGoalNoGoZone{
+		minX: math.Min(frontX, backX) - margin,
+		maxX: math.Max(frontX, backX) + margin,
+		minY: math.Min(y1, y2) - margin,
+		maxY: math.Max(y1, y2) + margin,
+	}, true
+}
+
+func (z chaserGoalNoGoZone) contains(pos info.Position) bool {
+	return pos.X >= z.minX && pos.X <= z.maxX &&
+		pos.Y >= z.minY && pos.Y <= z.maxY
+}
+
+func (z chaserGoalNoGoZone) waitPosition(ballPos info.Position) info.Position {
+	waitPos := ballPos
+	if z.maxX <= 0 {
+		waitPos.X = z.maxX + chaserNoGoWaitClearance
+	} else {
+		waitPos.X = z.minX - chaserNoGoWaitClearance
+	}
+	waitPos.Y = math.Max(z.minY, math.Min(z.maxY, waitPos.Y))
+	return waitPos
 }
 
 type KickState struct {
