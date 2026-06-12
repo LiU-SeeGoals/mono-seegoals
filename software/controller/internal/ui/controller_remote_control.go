@@ -79,7 +79,7 @@ func askForRobotId() int {
 func openController() *sdl.GameController {
 
 	if err := sdl.Init(
-			sdl.INIT_GAMECONTROLLER,
+		sdl.INIT_GAMECONTROLLER,
 	); err != nil {
 		panic(err)
 	}
@@ -124,6 +124,7 @@ func runControllerLoop(
 		lastA bool
 		lastB bool
 		lastX bool
+		lastY bool
 
 		lastLT bool
 		lastRT bool
@@ -172,9 +173,9 @@ func runControllerLoop(
 			),
 
 			Dest: info.Position{
-				X: lx,
-				Y: ly,
-				Z: rx,
+				X: lx * 10,
+				Y: ly * 10,
+				Z: rx * 20,
 			},
 
 			Speed:   speed,
@@ -201,8 +202,26 @@ func runControllerLoop(
 				},
 			)
 		}
+		yPressed := controller.Button(
+			sdl.CONTROLLER_BUTTON_Y,
+		) != 0
+
+		if yPressed && !lastY {
+
+			fmt.Println("Kick")
+
+			c.SendActions(
+				[]action.Action{
+					&action.Kick{
+						Id:        robotID,
+						KickSpeed: 2,
+					},
+				},
+			)
+		}
 
 		lastA = aPressed
+		lastY = yPressed
 
 		bPressed := controller.Button(
 			sdl.CONTROLLER_BUTTON_B,
