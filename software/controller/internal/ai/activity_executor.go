@@ -92,7 +92,7 @@ func (fb *activityExecutor) Run() {
 
 		actions := make([]action.Action, 0, len(results))
 		for _, result := range results {
-			actions = append(actions, result.action)
+			actions = append(actions, clampMoveActionToField(result.action, &gameInfo))
 		}
 
 		for _, action := range actions {
@@ -106,4 +106,26 @@ func (fb *activityExecutor) Run() {
 
 		helper.PaceLoop(tickStart, helper.ExecutorLoopPeriod, "activity_executor")
 	}
+}
+
+func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action {
+	move, ok := act.(*action.MoveTo)
+	if !ok || gi == nil || !gi.HasField() {
+		return act
+	}
+
+	margin := 0.0
+	if move.AllowOutsideField {
+		margin = -gi.FieldBoundaryWidth()
+	}
+
+	move.Dest = gi.ClampToField(move.Dest, margin)
+	if len(move.Path) > 0 {
+		clamped := make([]info.Position, len(move.Path))
+		for i, waypoint := range move.Path {
+			clamped[i] = gi.ClampToField(waypoint, margin)
+		}
+		move.Path = clamped
+	}
+	return move
 }

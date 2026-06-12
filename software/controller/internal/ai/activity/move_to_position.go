@@ -48,6 +48,7 @@ type MoveToPosition struct {
 	avoidBall         bool
 	avoidGoallines    bool
 	dribble           bool
+	allowOutsideField bool
 	lastPosition      info.Position // Last position to detect lack of movement
 	stuckThreshold    int           // Number of cycles to consider robot as stuck
 	useRRT            bool          // Flag to enable/disable RRT-based collision avoidance
@@ -95,6 +96,10 @@ func (m *MoveToPosition) SetDribble(dribble bool) {
 	m.dribble = dribble
 }
 
+func (m *MoveToPosition) AllowOutsideField(allow bool) {
+	m.allowOutsideField = allow
+}
+
 // GetAction returns an action for the robot with RRT-based collision avoidance
 func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
 	moveToAction := m.GetMoveToAction(gi)
@@ -105,14 +110,15 @@ func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
 func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	myRobot := gi.State.GetTeam(m.team)[m.id]
 	myPos, _ := myRobot.GetPosition()
+	finalDestination := m.clampedFinalDestination(gi)
 
 	if m.closeEnoughToGoal(gi) {
 		act := &action.MoveTo{}
 		act.Id = int(m.id)
 		act.Team = m.team
 		act.Pos = myPos
-		act.Dest = m.final_destination
-		act.Dest.Angle = m.final_destination.Angle
+		act.Dest = finalDestination
+		act.AllowOutsideField = m.allowOutsideField
 		act.Dribble = false
 		return act
 	}
@@ -126,12 +132,13 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 		if ps != nil {
 			// Scale the step with the remaining distance on a local copy; mutating
 			// m.rrtConfig would ratchet StepSize down for the activity's lifetime.
-			cfg := m.rrtConfig
-			cfg.StepSize = min(max(myPos.Dist2d(m.final_destination)/100, 1), cfg.StepSize)
-			m.path = ps.PlanPath(m.team, m.id, m.final_destination, m.avoidBall, m.avoidGoallines, gi, cfg)
+			cfg := m.fieldAwareRRTConfig(gi)
+			cfg.StepSize = min(max(myPos.Dist2d(finalDestination)/100, 1), cfg.StepSize)
+			m.path = ps.PlanPath(m.team, m.id, finalDestination, m.avoidBall, m.avoidGoallines, gi, cfg)
 		} else {
-			m.path = []info.Position{m.final_destination}
+			m.path = []info.Position{finalDestination}
 		}
+		m.path = clampPathToField(m.path, gi, m.fieldClampMargin(gi))
 
 		obstacles := pathplanner.ObstaclesForRobot(m.team, m.id, m.avoidBall, m.avoidGoallines, gi)
 		if len(m.path) > 0 {
@@ -139,15 +146,17 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 			targetPos = m.applyStickyLookAhead(myPos, cand)
 		}
 	} else {
-		targetPos = m.final_destination
+		targetPos = finalDestination
 	}
+	targetPos = clampToField(targetPos, gi, m.fieldClampMargin(gi))
 
 	act := &action.MoveTo{}
 	act.Id = int(m.id)
 	act.Team = m.team
 	act.Pos = myPos
 	act.Dest = targetPos
-	act.Dest.Angle = m.final_destination.Angle
+	act.Dest.Angle = finalDestination.Angle
+	act.AllowOutsideField = m.allowOutsideField
 	act.Dribble = m.dribble
 	// Include the full planned path for visualization in the GameViewer.
 	// Note: this is a copy so UI serialization can't race on m.path.
@@ -159,7 +168,57 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 
 func (m *MoveToPosition) closeEnoughToGoal(gi *info.GameInfo) bool {
 	currPos, _ := gi.State.GetTeam(m.team)[m.id].GetPosition()
-	return pathplanner.DistanceBetween(currPos, m.final_destination) <= m.rrtConfig.CompletionDistance
+	return pathplanner.DistanceBetween(currPos, m.clampedFinalDestination(gi)) <= m.rrtConfig.CompletionDistance
+}
+
+func (m *MoveToPosition) fieldAwareRRTConfig(gi *info.GameInfo) pathplanner.RRTConfig {
+	cfg := m.rrtConfig
+	if gi == nil || !gi.HasField() {
+		return cfg
+	}
+
+	field := gi.FieldSize()
+	if field.X > 0 {
+		cfg.FieldWidth = field.X + 2*m.fieldExpansion(gi)
+	}
+	if field.Y > 0 {
+		cfg.FieldHeight = field.Y + 2*m.fieldExpansion(gi)
+	}
+	return cfg
+}
+
+func (m *MoveToPosition) clampedFinalDestination(gi *info.GameInfo) info.Position {
+	return clampToField(m.final_destination, gi, m.fieldClampMargin(gi))
+}
+
+func (m *MoveToPosition) fieldExpansion(gi *info.GameInfo) float64 {
+	if !m.allowOutsideField || gi == nil {
+		return 0
+	}
+	return gi.FieldBoundaryWidth()
+}
+
+func (m *MoveToPosition) fieldClampMargin(gi *info.GameInfo) float64 {
+	return -m.fieldExpansion(gi)
+}
+
+func clampToField(pos info.Position, gi *info.GameInfo, margin float64) info.Position {
+	if gi == nil {
+		return pos
+	}
+	return gi.ClampToField(pos, margin)
+}
+
+func clampPathToField(path []info.Position, gi *info.GameInfo, margin float64) []info.Position {
+	if len(path) == 0 || gi == nil || !gi.HasField() {
+		return path
+	}
+
+	clamped := make([]info.Position, len(path))
+	for i, pos := range path {
+		clamped[i] = gi.ClampToField(pos, margin)
+	}
+	return clamped
 }
 
 // Achieved returns true if the robot is sufficiently close to the final destination.

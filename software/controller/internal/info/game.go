@@ -104,6 +104,34 @@ func (gi GameInfo) FieldSize() Position {
 	return Position{X: x, Y: y, Z: 0, Angle: 0}
 }
 
+func (gi GameInfo) FieldBoundaryWidth() float64 {
+	if !gi.HasField() {
+		return 0
+	}
+	return float64(gi.field.GetBoundaryWidth())
+}
+
+func (gi GameInfo) FieldBounds(margin float64) (minX, maxX, minY, maxY float64, ok bool) {
+	if !gi.HasField() {
+		return 0, 0, 0, 0, false
+	}
+
+	halfX := math.Max(0, float64(gi.field.GetFieldLength())/2-margin)
+	halfY := math.Max(0, float64(gi.field.GetFieldWidth())/2-margin)
+	return -halfX, halfX, -halfY, halfY, true
+}
+
+func (gi GameInfo) ClampToField(pos Position, margin float64) Position {
+	minX, maxX, minY, maxY, ok := gi.FieldBounds(margin)
+	if !ok {
+		return pos
+	}
+
+	pos.X = math.Max(minX, math.Min(maxX, pos.X))
+	pos.Y = math.Max(minY, math.Min(maxY, pos.Y))
+	return pos
+}
+
 func (gi GameInfo) HomeGoalDefPos(team Team) Position {
 
 	x := float64(gi.field.GetFieldLength()/2 - gi.field.GetGoalWidth())

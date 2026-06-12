@@ -159,12 +159,13 @@ func (p *Planner) PlanPath(
 	if p == nil {
 		return nil
 	}
+	finalDestination = clampToPlanningBounds(finalDestination, cfg)
 	perm := cfg.persistence()
 	myPos, _ := gi.State.GetTeam(team)[id].GetPosition()
 	obstacles := planningObstacles(team, id, myPos, finalDestination, avoidBall, avoidGoallines, gi, perm)
 
 	if escapePath, ok := noGoZoneEscapePath(myPos, obstacles); ok {
-		return escapePath
+		return clampPathToPlanningBounds(escapePath, cfg)
 	}
 
 	// Inflated “collision”: escape this tick only. Do not commit: overwriting the
@@ -172,7 +173,7 @@ func (p *Planner) PlanPath(
 	// full plan appear to “vanish” until age-based replanning created a new path.
 	robotsNearby, nearest := collisionTarget(myPos, obstacles)
 	if robotsNearby {
-		return makeEscapePath(myPos, nearest)
+		return clampPathToPlanningBounds(makeEscapePath(myPos, nearest), cfg)
 	}
 
 	p.mu.Lock()
@@ -180,7 +181,7 @@ func (p *Planner) PlanPath(
 	p.mu.Unlock()
 
 	if st != nil && len(st.path) > 0 {
-		if !shouldCreateNewPath(st, myPos, finalDestination, obstacles, gi, team, id, perm) {
+		if !shouldCreateNewPath(st, myPos, finalDestination, obstacles, gi, team, id, cfg, perm) {
 			return p.copyPath(id)
 		}
 	}
@@ -200,6 +201,7 @@ func (p *Planner) PlanPath(
 		path = append([]info.Position{cur.position}, path...)
 	}
 	path = shortcutPath(path, obstacles, PlanningRadius)
+	path = clampPathToPlanningBounds(path, cfg)
 	p.commit(id, path, finalDestination)
 	return p.copyPath(id)
 }
@@ -243,12 +245,13 @@ func shouldCreateNewPath(
 	gi *info.GameInfo,
 	team info.Team,
 	selfID info.ID,
+	cfg RRTConfig,
 	perm resolvedPersistence,
 ) bool {
 	if st == nil || len(st.path) == 0 {
 		return true
 	}
-	if !isStoredPathValid(st, myPos, goal, obstacles, perm.goalMatchEpsilon) {
+	if !isStoredPathValid(st, myPos, goal, obstacles, cfg, perm.goalMatchEpsilon) {
 		return true
 	}
 	if time.Since(st.plannedAt) > maxPlanAgeForContext(myPos, goal, team, selfID, gi, perm) {
@@ -262,9 +265,13 @@ func isStoredPathValid(
 	st *robotPathState,
 	myPos, goal info.Position,
 	obstacles []Obstacle,
+	cfg RRTConfig,
 	goalMatchEpsilon float64,
 ) bool {
 	if st == nil || len(st.path) == 0 {
+		return false
+	}
+	if !pathWithinPlanningBounds(st.path, cfg) {
 		return false
 	}
 	if distanceSquared(st.goal, goal) > goalMatchEpsilon*goalMatchEpsilon {
@@ -279,6 +286,49 @@ func isStoredPathValid(
 		}
 	}
 	return true
+}
+
+func hasPlanningBounds(cfg RRTConfig) bool {
+	return cfg.FieldWidth > 0 && cfg.FieldHeight > 0
+}
+
+func clampToPlanningBounds(pos info.Position, cfg RRTConfig) info.Position {
+	if !hasPlanningBounds(cfg) {
+		return pos
+	}
+
+	halfX := cfg.FieldWidth / 2
+	halfY := cfg.FieldHeight / 2
+	pos.X = math.Max(-halfX, math.Min(halfX, pos.X))
+	pos.Y = math.Max(-halfY, math.Min(halfY, pos.Y))
+	return pos
+}
+
+func pathWithinPlanningBounds(path []info.Position, cfg RRTConfig) bool {
+	if !hasPlanningBounds(cfg) {
+		return true
+	}
+
+	halfX := cfg.FieldWidth / 2
+	halfY := cfg.FieldHeight / 2
+	for _, pos := range path {
+		if pos.X < -halfX || pos.X > halfX || pos.Y < -halfY || pos.Y > halfY {
+			return false
+		}
+	}
+	return true
+}
+
+func clampPathToPlanningBounds(path []info.Position, cfg RRTConfig) []info.Position {
+	if len(path) == 0 || !hasPlanningBounds(cfg) {
+		return path
+	}
+
+	clamped := make([]info.Position, len(path))
+	for i, pos := range path {
+		clamped[i] = clampToPlanningBounds(pos, cfg)
+	}
+	return clamped
 }
 
 func maxPlanAgeForContext(

@@ -182,3 +182,35 @@ func TestNoGoZoneEscapePathIgnoresOutsidePosition(t *testing.T) {
 		t.Fatalf("expected no escape path outside no-go zone, got %#v", got)
 	}
 }
+
+func TestStoredPathInvalidWhenOutsidePlanningBounds(t *testing.T) {
+	goal := info.Position{X: 3900, Y: 0}
+	st := &robotPathState{
+		path: []info.Position{
+			{X: 0, Y: 0},
+			{X: 4500, Y: 0},
+			goal,
+		},
+		goal: goal,
+	}
+	cfg := RRTConfig{FieldWidth: 8000, FieldHeight: 6000}
+
+	if isStoredPathValid(st, info.Position{X: 0, Y: 0}, goal, nil, cfg, 10) {
+		t.Fatal("expected cached path outside current field bounds to be invalid")
+	}
+}
+
+func TestClampToPlanningBoundsPreservesAngle(t *testing.T) {
+	cfg := RRTConfig{FieldWidth: 8000, FieldHeight: 6000}
+	got := clampToPlanningBounds(info.Position{X: 4500, Y: -3500, Angle: 1.5}, cfg)
+
+	if got.X != 4000 {
+		t.Fatalf("expected X clamped to 4000, got %v", got.X)
+	}
+	if got.Y != -3000 {
+		t.Fatalf("expected Y clamped to -3000, got %v", got.Y)
+	}
+	if got.Angle != 1.5 {
+		t.Fatalf("expected angle to be preserved, got %v", got.Angle)
+	}
+}
