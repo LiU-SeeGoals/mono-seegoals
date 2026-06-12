@@ -188,7 +188,7 @@ func initCommands(robotId int) {
 			},
 		},
 		'f': {
-			message: "Sent ping",
+			message: "Dribble",
 			run: func() action.Action {
 				return &action.MoveRemote{
 					Id:        robotId,
