@@ -315,7 +315,6 @@ void NAV_HandleCommand(Command* cmd)
         else
         {
             kickerSpeed = KICKER_SPEED_STRAIGHT_GOAL;
-            KICKER_SetKickerMode(KICKER_STRAIGHT);
         }
 
         if(check_bit(cmd->kick_speed, 1u))
