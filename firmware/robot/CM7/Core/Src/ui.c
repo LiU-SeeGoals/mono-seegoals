@@ -337,12 +337,12 @@ void parse_key()
         case 'S':
             LOG_UI("Straight kicking\r\n");
             KICKER_SetKickerMode(KICKER_STRAIGHT);
-            KICKER_ChargeStart();
+            KICKER_ChargeStart(KICKER_SPEED_DEFAULT);
             break;
         case 'C':
             LOG_UI("Chipper kicking\r\n");
             KICKER_SetKickerMode(KICKER_CHIPPER);
-            KICKER_ChargeStart();
+            KICKER_ChargeStart(KICKER_SPEED_DEFAULT);
             break;
         case 'P': // Print vars
         {

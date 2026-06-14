@@ -17,6 +17,14 @@ typedef enum
     KICKER_CHIPPER,
 } KickerMode;
 
+typedef enum
+{
+    KICKER_SPEED_DEFAULT = 0,
+    KICKER_SPEED_STRAIGHT_PASS = 1,
+    KICKER_SPEED_STRAIGHT_GOAL = 2,
+    KICKER_SPEED_CHIP_PASS = 3,
+} KickerSpeed;
+
 /**
  * Initalize the kicker subsystem.
  * Curently initializes the log module
@@ -26,7 +34,7 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick);
 /**
  *
  */
-void KICKER_ChargeStart();
+void KICKER_ChargeStart(KickerSpeed kickSpeed);
 
 /**
  *
