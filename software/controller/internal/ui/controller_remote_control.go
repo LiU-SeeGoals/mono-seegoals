@@ -119,15 +119,17 @@ func runControllerLoop(
 ) {
 
 	var (
-		dribble bool
+		 dribble bool
 
-		lastA bool
-		lastB bool
-		lastX bool
-		lastY bool
+		 lastB bool
+		 lastX bool
+		 lastY bool
 
-		lastLT bool
-		lastRT bool
+		 lastLB bool
+		 lastRB bool
+
+		 lastLT bool
+		 lastRT bool
 	)
 
 	ticker := time.NewTicker(
@@ -186,29 +188,53 @@ func runControllerLoop(
 			[]action.Action{move},
 		)
 
-		aPressed := controller.Button(
-			sdl.CONTROLLER_BUTTON_A,
+		lbPressed := controller.Button(
+			 sdl.CONTROLLER_BUTTON_LEFTSHOULDER,
 		) != 0
 
-		if aPressed && !lastA {
+		if lbPressed && !lastLB {
 
-			fmt.Println("Kick")
+			 fmt.Println("Kick (speed 0)")
 
-			c.SendActions(
-				[]action.Action{
-					&action.Kick{
-						Id: robotID,
-					},
-				},
-			)
+			 c.SendActions(
+				  []action.Action{
+						&action.Kick{
+							 Id:        robotID,
+							 KickSpeed: 0,
+						},
+				  },
+			 )
 		}
+
+		lastLB = lbPressed
+
+		rbPressed := controller.Button(
+			 sdl.CONTROLLER_BUTTON_RIGHTSHOULDER,
+		) != 0
+
+		if rbPressed && !lastRB {
+
+			 fmt.Println("Kick (speed 1)")
+
+			 c.SendActions(
+				  []action.Action{
+						&action.Kick{
+							 Id:        robotID,
+							 KickSpeed: 1,
+						},
+				  },
+			 )
+		}
+
+		lastRB = rbPressed
+
 		yPressed := controller.Button(
 			sdl.CONTROLLER_BUTTON_Y,
 		) != 0
 
 		if yPressed && !lastY {
 
-			fmt.Println("Kick")
+			fmt.Println("Kick chip")
 
 			c.SendActions(
 				[]action.Action{
@@ -220,7 +246,6 @@ func runControllerLoop(
 			)
 		}
 
-		lastA = aPressed
 		lastY = yPressed
 
 		bPressed := controller.Button(
