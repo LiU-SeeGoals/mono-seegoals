@@ -29,6 +29,7 @@ static uint8_t dribblerRunning = false;
 
 /* Private functions declarations */
 void set_motors(float m1, float m2, float m3, float m4);
+uint8_t check_bit(int32_t val, uint8_t n);
 
 /*
  * Public function implementations
@@ -276,6 +277,8 @@ void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
 void NAV_HandleCommand(Command* cmd)
 {
+    KickerSpeed kickerSpeed = KICKER_SPEED_DEFAULT;
+
     switch (cmd->command_id) {
     case ACTION_TYPE__STOP_ACTION:
         NAV_DisableMovement();
@@ -303,15 +306,28 @@ void NAV_HandleCommand(Command* cmd)
         break;
     case ACTION_TYPE__KICK_ACTION:
 
-        if(cmd->kick_speed == 2)
+        // First bit is set -> hard/soft kick
+        // if second bit -> chip/straight kick mode
+        if(check_bit(cmd->kick_speed, 0u))
+        {
+            kickerSpeed = KICKER_SPEED_STRAIGHT_PASS;
+        }
+        else
+        {
+            kickerSpeed = KICKER_SPEED_STRAIGHT_GOAL;
+        }
+
+        if(check_bit(cmd->kick_speed, 1u))
         {
             KICKER_SetKickerMode(KICKER_CHIPPER);
+            kickerSpeed = KICKER_SPEED_CHIP_PASS;
         }
         else
         {
             KICKER_SetKickerMode(KICKER_STRAIGHT);
         }
-        KICKER_ChargeStart();
+
+        KICKER_ChargeStart(kickerSpeed);
         NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
         break;
     default:
@@ -323,6 +339,14 @@ void NAV_HandleCommand(Command* cmd)
 /*
  * Private function implementations
  */
+
+uint8_t check_bit(int32_t val, uint8_t n)
+{
+    uint8_t bit = (val & (1u << n)) != 0;
+
+    return bit;
+}
+
 void NAV_SetMovement(Command* cmd, MovementType movementType)
 {
     NAV_EnableMovement();
@@ -532,4 +556,3 @@ float NAV_GetNavX() { return robot_cmd.x; }
 float NAV_GetNavY() { return robot_cmd.y; }
 
 float NAV_GetNavW() { return robot_cmd.w; }
-

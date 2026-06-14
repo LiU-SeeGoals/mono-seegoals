@@ -241,7 +241,7 @@ int main(void)
     UI_Init(&huart3);
     ITR_Init();
     LOG_INFO("Discharging kicker\r\n");
-    const int DISCHARGE_AMNT = 50;
+    const int DISCHARGE_AMNT = 10;
     COMMON_buzzer_warning_with_delay();
 
     for (int i = 0; i < DISCHARGE_AMNT; i++)
@@ -252,7 +252,7 @@ int main(void)
         }
 
         KICKER_KickSafe();
-        HAL_Delay(60);
+        HAL_Delay(40);
     }
 
     STATE_calibrate_imu_gyr();
