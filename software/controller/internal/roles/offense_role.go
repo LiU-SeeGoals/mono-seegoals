@@ -351,10 +351,20 @@ func (kr *OffenseRole) Run() {
 }
 
 func (kr *OffenseRole) TriggerEvent(event EventName) {
-	transitions := kr.sm.StateTransitions[kr.sm.CurrentStateName()]
-	_, canTransition := transitions[event]
-	if event == "BALL_LOST" && canTransition && kr.intent != nil {
-		kr.intent.ResetTarget()
+	stateName := kr.sm.CurrentStateName()
+	transitions := kr.sm.StateTransitions[stateName]
+	nextState, canTransition := transitions[event]
+	if event == "BALL_LOST" && canTransition {
+		fmt.Printf(
+			"OffenseRole %d BALL_LOST: slot=%s state=%s -> %s\n",
+			kr.id,
+			kr.slot.Kind,
+			stateName,
+			nextState.GetName(),
+		)
+		if kr.intent != nil {
+			kr.intent.ResetTarget()
+		}
 	}
 
 	kr.sm.TriggerEvent(event)
