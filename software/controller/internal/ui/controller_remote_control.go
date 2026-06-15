@@ -19,6 +19,7 @@ const (
 	remote_control = iota
 	deadzone       = 8000
 	updateRateHz   = 50
+	rotationRate   = 5.0 // rad/s at full stick deflection
 )
 
 var (
@@ -43,8 +44,10 @@ func main() {
 	fmt.Println("Xbox Controller Connected")
 	fmt.Println("-------------------------")
 	fmt.Println("Left Stick  : Translation")
-	fmt.Println("Right Stick : Rotation")
-	fmt.Println("A           : Kick")
+	fmt.Println("Right Stick : Heading")
+	fmt.Println("LB          : Kick Speed 0")
+	fmt.Println("RB          : Kick Speed 1")
+	fmt.Println("Y           : Kick Speed 2")
 	fmt.Println("B           : Stop")
 	fmt.Println("X           : Toggle Dribbler")
 	fmt.Println("LT          : Decrease Speed")
@@ -119,17 +122,19 @@ func runControllerLoop(
 ) {
 
 	var (
-		 dribble bool
+		dribble bool
 
-		 lastB bool
-		 lastX bool
-		 lastY bool
+		targetHeading float64
 
-		 lastLB bool
-		 lastRB bool
+		lastB bool
+		lastX bool
+		lastY bool
 
-		 lastLT bool
-		 lastRT bool
+		lastLB bool
+		lastRB bool
+
+		lastLT bool
+		lastRT bool
 	)
 
 	ticker := time.NewTicker(
@@ -138,6 +143,7 @@ func runControllerLoop(
 	defer ticker.Stop()
 
 	for {
+		actionSent := false
 
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 
@@ -166,6 +172,9 @@ func runControllerLoop(
 			),
 		)
 
+		// Left = clockwise, Right = counter-clockwise
+		targetHeading -= rx * rotationRate / updateRateHz
+
 		move := &action.MoveRemote{
 			Id: robotID,
 
@@ -175,55 +184,53 @@ func runControllerLoop(
 			),
 
 			Dest: info.Position{
-				X: lx * 10,
-				Y: ly * 10,
-				Z: rx * 20,
+				X: lx * 30 + 1000,
+				Y: ly * 30 + 1000,
+				Z: targetHeading * 1000 + 1000,
 			},
 
 			Speed:   speed,
 			Dribble: dribble,
 		}
 
-		c.SendActions(
-			[]action.Action{move},
-		)
-
 		lbPressed := controller.Button(
-			 sdl.CONTROLLER_BUTTON_LEFTSHOULDER,
+			sdl.CONTROLLER_BUTTON_LEFTSHOULDER,
 		) != 0
 
 		if lbPressed && !lastLB {
 
-			 fmt.Println("Kick (speed 0)")
+			fmt.Println("Kick (speed 0)")
 
-			 c.SendActions(
-				  []action.Action{
-						&action.Kick{
-							 Id:        robotID,
-							 KickSpeed: 0,
-						},
-				  },
-			 )
+			c.SendActions(
+				[]action.Action{
+					&action.Kick{
+						Id:        robotID,
+						KickSpeed: 0,
+					},
+				},
+			)
+			actionSent = true
 		}
 
 		lastLB = lbPressed
 
 		rbPressed := controller.Button(
-			 sdl.CONTROLLER_BUTTON_RIGHTSHOULDER,
+			sdl.CONTROLLER_BUTTON_RIGHTSHOULDER,
 		) != 0
 
 		if rbPressed && !lastRB {
 
-			 fmt.Println("Kick (speed 1)")
+			fmt.Println("Kick (speed 1)")
 
-			 c.SendActions(
-				  []action.Action{
-						&action.Kick{
-							 Id:        robotID,
-							 KickSpeed: 1,
-						},
-				  },
-			 )
+			c.SendActions(
+				[]action.Action{
+					&action.Kick{
+						Id:        robotID,
+						KickSpeed: 1,
+					},
+				},
+			)
+			actionSent = true
 		}
 
 		lastRB = rbPressed
@@ -244,6 +251,7 @@ func runControllerLoop(
 					},
 				},
 			)
+			actionSent = true
 		}
 
 		lastY = yPressed
@@ -263,6 +271,7 @@ func runControllerLoop(
 					},
 				},
 			)
+			actionSent = true
 		}
 
 		lastB = bPressed
@@ -317,6 +326,14 @@ func runControllerLoop(
 
 		lastRT = rtPressed
 
+
+		if (!actionSent){
+			c.SendActions(
+				[]action.Action{move},
+			)
+		}
+
 		<-ticker.C
+
 	}
 }
