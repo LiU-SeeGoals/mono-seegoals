@@ -394,6 +394,16 @@ func (m *CombinedPlan) desiredMode(gi *GameInfo, fallback tacticalMode) tactical
 	return tacticalModeDefend
 }
 
+func desiredModeForTrackedOwner(owner trackedBallOwner, ourTeam Team, fallback tacticalMode) tacticalMode {
+	if !owner.valid {
+		return fallback
+	}
+	if owner.team == ourTeam {
+		return tacticalModeAttack
+	}
+	return tacticalModeDefend
+}
+
 func stableMode(
 	current tacticalMode,
 	desired tacticalMode,
@@ -460,7 +470,11 @@ func clampFloat(value float64, minValue float64, maxValue float64) float64 {
 	return math.Max(minValue, math.Min(maxValue, value))
 }
 
-func (m *CombinedPlan) chooseBallChaser(gi *GameInfo, candidates []info.ID) info.ID {
+func (m *CombinedPlan) chooseBallChaser(gi *GameInfo, candidates []info.ID, owner trackedBallOwner) info.ID {
+	if owner.valid && owner.team == m.team && containsRobot(candidates, owner.id) {
+		return owner.id
+	}
+
 	possessor := gi.State.GetBall().GetPossessor()
 	if possessor != nil && possessor.GetTeam() == m.team && containsRobot(candidates, possessor.GetID()) {
 		return possessor.GetID()
@@ -545,6 +559,7 @@ func (m *CombinedPlan) assignTacticalSlots(
 	gi *GameInfo,
 	robots []info.ID,
 	assignment roleAssignment,
+	owner trackedBallOwner,
 ) map[info.ID]tacticalSlotKind {
 	assignments := make(map[info.ID]tacticalSlotKind)
 	available := append([]info.ID{}, robots...)
@@ -557,7 +572,7 @@ func (m *CombinedPlan) assignTacticalSlots(
 		var id info.ID
 		switch slot {
 		case tacticalSlotBallChaser:
-			id = m.chooseBallChaser(gi, available)
+			id = m.chooseBallChaser(gi, available, owner)
 		case tacticalSlotBallReceiver:
 			id = m.chooseReceiver(gi, available)
 		default:
@@ -654,6 +669,8 @@ func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Po
 func (m *CombinedPlan) run() {
 	gi := <-m.incomingGameInfo
 	roleManager := newCombinedRoleManager(&m.ActivityHandler, &gi, m.team)
+	possessionTracker := &ballPossessionTracker{}
+	actorTracker := &offenseBallActorTracker{}
 	mode := tacticalModeAttack
 	candidateMode := tacticalMode("")
 	candidateModeSince := time.Time{}
@@ -668,6 +685,8 @@ func (m *CombinedPlan) run() {
 	for m.Active {
 		tickStart := time.Now()
 		gi = <-m.incomingGameInfo
+		possession := possessionTracker.update(&gi, tickStart)
+		rawOwner := observedBallOwner(&gi)
 
 		activeRobots := m.activeRobots(&gi)
 		//nextGoalieID, hasGoalie := m.chooseGoalie(&gi, activeRobots)
@@ -687,34 +706,35 @@ func (m *CombinedPlan) run() {
 		//	goalieRole = nil
 		//}
 
-		desiredMode := m.desiredMode(&gi, mode)
+		desiredMode := desiredModeForTrackedOwner(possession.owner, m.team, mode)
 		mode = stableMode(mode, desiredMode, &candidateMode, &candidateModeSince, tickStart)
 
 		assignment := roleAssignmentForMode(len(fieldRobots), mode)
-		slotAssignments := m.assignTacticalSlots(&gi, fieldRobots, assignment)
+		slotAssignments := m.assignTacticalSlots(&gi, fieldRobots, assignment, possession.owner)
 		roleManager.applySlotAssignments(slotAssignments, tickStart)
 		offenseRobots := roleManager.offenseIDs()
 		receiverIDs := roleManager.idsForSlot(tacticalSlotBallReceiver)
 		chaserID, hasChaser := roleManager.idForSlot(tacticalSlotBallChaser)
 		roleManager.configureOffenseReceivers(receiverIDs)
 
-		possessor := gi.State.GetBall().GetPossessor()
+		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
+		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
+		ownerRetained := possession.owner.valid && ownerStillRetained(&gi, possession.owner)
 
 		handledByOffense := false
-		if possessor != nil && possessor.GetTeam() == m.team {
-			ownerID := possessor.GetID()
+		passInFlight := hasActiveReceiver &&
+			containsRobot(offenseRobots, activeReceiver) &&
+			time.Since(activeReceiverStart) < 2*time.Second &&
+			(!rawOwner.valid || rawOwner.team != m.team) &&
+			(ballMoving || !ownerRetained)
+		if !passInFlight && possession.owner.valid && possession.owner.team == m.team {
+			ownerID := possession.owner.id
 			owner, ok := roleManager.kickers[ownerID]
 			if ok {
 				handledByOffense = true
 				hasActiveReceiver = false
-				for _, id := range offenseRobots {
-					if id != ownerID {
-						if kicker, ok := roleManager.kickers[id]; ok {
-							kicker.TriggerEvent("BALL_LOST")
-						}
-					}
-				}
 
+				actorTracker.switchTo(roleManager.kickers, newOffenseBallActor(ownerID, offenseBallActorOwner))
 				owner.TriggerEvent("BALL_OWNER")
 				decision := owner.CurrentDecision()
 				if decision.IsPass && decision.ReceiverID != ownerID {
@@ -730,29 +750,19 @@ func (m *CombinedPlan) run() {
 		}
 
 		if !handledByOffense {
-			if hasActiveReceiver && containsRobot(offenseRobots, activeReceiver) && time.Since(activeReceiverStart) < 2*time.Second {
-				for _, id := range offenseRobots {
-					if id != activeReceiver {
-						if kicker, ok := roleManager.kickers[id]; ok {
-							kicker.TriggerEvent("BALL_LOST")
-						}
-					}
-				}
+			if passInFlight {
+				actorTracker.switchTo(roleManager.kickers, newOffenseBallActor(activeReceiver, offenseBallActorReceiver))
 			} else {
 				hasActiveReceiver = false
 				interceptorID := chaserID
 				if !hasChaser {
 					interceptorID = m.getRobotForBall(&gi, offenseRobots)
 				}
-				for _, id := range offenseRobots {
-					if id != interceptorID {
-						if kicker, ok := roleManager.kickers[id]; ok {
-							kicker.TriggerEvent("BALL_LOST")
-						}
-					}
-				}
 				if interceptor, ok := roleManager.kickers[interceptorID]; ok {
+					actorTracker.switchTo(roleManager.kickers, newOffenseBallActor(interceptorID, offenseBallActorChaser))
 					interceptor.TriggerEvent("BALL_APPROACHING")
+				} else {
+					actorTracker.switchTo(roleManager.kickers, noOffenseBallActor())
 				}
 			}
 		}

@@ -106,11 +106,15 @@ func (g *GameScenario) run() {
 	var activeReceiver info.ID
 	var activeReceiverStart time.Time
 	hasActiveReceiver := false
+	possessionTracker := &ballPossessionTracker{}
+	actorTracker := &offenseBallActorTracker{}
 
 	for {
 		tickStart := time.Now()
 
 		gi = <-g.incomingGameInfo
+		possession := possessionTracker.update(&gi, tickStart)
+		rawOwner := observedBallOwner(&gi)
 		// handleRef := refereeHandler.HandleReferee()
 		// if handleRef {
 		// 	helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
@@ -118,19 +122,23 @@ func (g *GameScenario) run() {
 		// }
 		// Only coordinate robot roles, trigger ball events
 
-		possessor := gi.State.GetBall().GetPossessor()
+		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
+		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
+		ownerRetained := possession.owner.valid && ownerStillRetained(&gi, possession.owner)
 
-		if possessor != nil && possessor.GetTeam() == g.team {
-			ownerID := possessor.GetID()
+		passInFlight := hasActiveReceiver &&
+			containsRobot(activeRobots, activeReceiver) &&
+			time.Since(activeReceiverStart) < 2*time.Second &&
+			(!rawOwner.valid || rawOwner.team != g.team) &&
+			(ballMoving || !ownerRetained)
+
+		if !passInFlight && possession.owner.valid && possession.owner.team == g.team {
+			ownerID := possession.owner.id
 			owner, ok := kickers[ownerID]
 			if ok {
 				hasActiveReceiver = false
-				for _, id := range activeRobots {
-					if id != ownerID {
-						kickers[id].TriggerEvent("BALL_LOST")
-					}
-				}
 
+				actorTracker.switchTo(kickers, newOffenseBallActor(ownerID, offenseBallActorOwner))
 				owner.TriggerEvent("BALL_OWNER")
 				decision := owner.CurrentDecision()
 				if decision.IsPass && decision.ReceiverID != ownerID {
@@ -144,21 +152,13 @@ func (g *GameScenario) run() {
 				}
 			}
 		} else {
-			if hasActiveReceiver && time.Since(activeReceiverStart) < 2*time.Second {
-				for _, id := range activeRobots {
-					if id != activeReceiver {
-						kickers[id].TriggerEvent("BALL_LOST")
-					}
-				}
+			if passInFlight {
+				actorTracker.switchTo(kickers, newOffenseBallActor(activeReceiver, offenseBallActorReceiver))
 			} else {
 				hasActiveReceiver = false
 				interceptorID := g.getRobotForBall(&gi, activeRobots)
 
-				for _, id := range activeRobots {
-					if id != interceptorID {
-						kickers[id].TriggerEvent("BALL_LOST")
-					}
-				}
+				actorTracker.switchTo(kickers, newOffenseBallActor(interceptorID, offenseBallActorChaser))
 				kickers[interceptorID].TriggerEvent("BALL_APPROACHING")
 			}
 		}

@@ -214,12 +214,12 @@ type supportOffset struct {
 }
 
 var supportOffsets = []supportOffset{
-	{forward: 900, lateral: -900},
-	{forward: 900, lateral: 900},
-	{forward: 1500, lateral: -1400},
-	{forward: 1500, lateral: 1400},
-	{forward: 2200, lateral: -500},
-	{forward: 2200, lateral: 500},
+	{forward: 9990, lateral: 0},
+	{forward: 9990, lateral: 0},
+	{forward: 9990, lateral: 0},
+	{forward: 9990, lateral: 0},
+	{forward: 9990, lateral: 0},
+	{forward: 9990, lateral: 0},
 }
 
 func clamp(value, minValue, maxValue float64) float64 {
@@ -351,7 +351,9 @@ func (kr *OffenseRole) Run() {
 }
 
 func (kr *OffenseRole) TriggerEvent(event EventName) {
-	if event == "BALL_LOST" && kr.intent != nil {
+	transitions := kr.sm.StateTransitions[kr.sm.CurrentStateName()]
+	_, canTransition := transitions[event]
+	if event == "BALL_LOST" && canTransition && kr.intent != nil {
 		kr.intent.ResetTarget()
 	}
 
