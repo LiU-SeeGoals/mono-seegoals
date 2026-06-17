@@ -6,20 +6,15 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
-
 const (
-
-	center2DribblerDist = 90.0
-	ballRadius          = 21.5
-	maxMarginToBall = 70.0
-	ballPushMargin = -20.0
-	aroundBallShiftAngle = 0.7
+	maxMarginToBall          = 70.0
+	ballPushMargin           = -20.0
+	aroundBallShiftAngle     = 0.7
 	maxTargetOrientationStep = 0.4
-	roughAngleTolerance = 0.1
-	ballLookaheadSec = 0.3
-	minRollingBallSpeed = 0.3
+	roughAngleTolerance      = 0.1
+	ballLookaheadSec         = 0.3
+	minRollingBallSpeed      = 0.3
 )
-
 
 func predictedBallPos(gi *info.GameInfo, lookaheadSec float64) info.Position {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
@@ -32,9 +27,8 @@ func predictedBallPos(gi *info.GameInfo, lookaheadSec float64) info.Position {
 	return ballPos
 }
 
-
 func kickerStandoffDist(margin float64) float64 {
-	return center2DribblerDist + ballRadius + margin
+	return info.Center2DribblerDist + info.BallRadius + margin
 }
 
 func alignmentMargin(headingErr float64) float64 {
@@ -65,7 +59,6 @@ func behindBallDest(ballPos, target info.Position, margin float64) info.Position
 	}
 }
 
-
 func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info.Position {
 	ball2BotAngle := ballPos.AngleToPosition(botPos)
 	ball2DestAngle := ballPos.AngleToPosition(dest)
@@ -76,7 +69,6 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 		relMargin = 0
 	}
 	distance := kickerStandoffDist(minMargin + relMargin)
-
 
 	if ballPos.Dist2d(botPos) > 300 {
 		abX := dest.X - botPos.X
@@ -99,7 +91,6 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 		}
 	}
 
-	
 	shift := -math.Copysign(math.Min(math.Abs(remaining), aroundBallShiftAngle), remaining)
 	bearing := ball2BotAngle + shift
 	return info.Position{
@@ -108,7 +99,6 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 		Angle: dest.Angle,
 	}
 }
-
 
 func steppedOrientation(botPos, ballPos info.Position, finalOrientation float64) float64 {
 	currentDirection := botPos.AngleToPosition(ballPos)
