@@ -9,6 +9,9 @@ import (
 const (
 	maxMarginToBall          = 70.0
 	ballPushMargin           = -20.0
+	captureMarginToBall      = 25.0
+	captureLineTolerance     = info.KickCenterTolerance
+	capturePoseTolerance     = 45.0
 	aroundBallShiftAngle     = 0.7
 	maxTargetOrientationStep = 0.4
 	roughAngleTolerance      = 0.1
@@ -42,6 +45,36 @@ func behindBallHalfPlane(ballPos, robotPos, target info.Position) bool {
 	toRobotX := robotPos.X - ballPos.X
 	toRobotY := robotPos.Y - ballPos.Y
 	return toTargetX*toRobotX+toTargetY*toRobotY < 0
+}
+
+func lineErrorToTarget(pos, ballPos, target info.Position) (float64, float64, bool) {
+	targetDir := target.Sub(&ballPos)
+	targetDir.Z = 0
+	targetDir.Angle = 0
+	if targetDir.Norm2d() < 1 {
+		return 0, 0, false
+	}
+	targetDir = targetDir.Normalize2d()
+	posFromBall := pos.Sub(&ballPos)
+	alongLine := posFromBall.X*targetDir.X + posFromBall.Y*targetDir.Y
+	sideError := math.Abs(posFromBall.X*targetDir.Y - posFromBall.Y*targetDir.X)
+	return alongLine, sideError, true
+}
+
+func captureApproachReady(robotPos, ballPos, target info.Position, headingErr float64) bool {
+	alongLine, sideError, ok := lineErrorToTarget(robotPos, ballPos, target)
+	if !ok {
+		return false
+	}
+	return sideError < captureLineTolerance &&
+		alongLine < -info.Center2DribblerDist &&
+		headingErr < 2*roughAngleTolerance
+}
+
+func capturePoseReady(robotPos, ballPos, target info.Position, headingErr float64) bool {
+	capturePos := behindBallDest(ballPos, target, captureMarginToBall)
+	return captureApproachReady(robotPos, ballPos, target, headingErr) &&
+		robotPos.Dist2d(capturePos) < capturePoseTolerance
 }
 
 func behindBallDest(ballPos, target info.Position, margin float64) info.Position {
