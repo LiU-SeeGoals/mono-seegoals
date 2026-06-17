@@ -31,7 +31,7 @@ func GetAlignConfig() AlignConfig {
 		maxContactLineError: info.KickCenterTolerance,
 		turnToKickDist:      180,
 		minBehindBall:       120,
-		maxLineError:        40,
+		maxLineError:        captureLineTolerance,
 	}
 }
 
@@ -205,16 +205,22 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	headingErr := math.Abs(info.NormalizeAngleDelta(finalOrientation, myPos.Angle))
 	dribblerPos := robot.DribblerPos()
 	ballCentered := m.contactPointCentered(robot, ballPos)
+	captureReady := capturePoseReady(myPos, ballPos, m.to, headingErr)
 
 	minMargin := alignmentMargin(headingErr)
-	if !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered {
+	if !captureReady {
+		minMargin = math.Max(minMargin, captureMarginToBall)
+	} else if !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered {
 		minMargin = math.Max(minMargin, 0)
 	}
 	lineup := behindBallDest(ballPos, m.to, minMargin)
 	carrot := aroundBallDest(ballPos, myPos, lineup, minMargin)
 	carrot.Angle = steppedOrientation(myPos, ballPos, finalOrientation)
 
-	dribble := dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && ballCentered
+	dribble := dribblerPos.Dist2d(ballPos) < 120 &&
+		headingErr < 2*roughAngleTolerance &&
+		captureReady &&
+		ballCentered
 
 	return &action.MoveTo{
 		Id:      int(m.id),
@@ -252,18 +258,7 @@ func (m *AlignBall) passLineError(pos info.Position, gi *info.GameInfo) (float64
 		fmt.Println(err)
 		return 0, 0, false
 	}
-	targetDir := m.to.Sub(&ballPos)
-	targetDir.Z = 0
-	targetDir.Angle = 0
-	if targetDir.Norm2d() < 1 {
-		return 0, 0, false
-	}
-	targetDir = targetDir.Normalize2d()
-	robotFromBall := pos.Sub(&ballPos)
-	alongLine := robotFromBall.X*targetDir.X + robotFromBall.Y*targetDir.Y
-	sideError := math.Abs(robotFromBall.X*targetDir.Y - robotFromBall.Y*targetDir.X)
-
-	return alongLine, sideError, true
+	return lineErrorToTarget(pos, ballPos, m.to)
 }
 func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
@@ -284,7 +279,7 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 		robot := gi.State.GetTeam(m.team)[m.id]
 		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
-			behindBallHalfPlane(ballPos, myRobotPos, m.to) &&
+			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr)) &&
 			m.contactPointCentered(robot, ballPos) &&
 			math.Abs(headingErr) < GetAlignConfig().angleError
 	}

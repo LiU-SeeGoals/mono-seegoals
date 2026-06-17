@@ -69,6 +69,11 @@ func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 	kickAngle := ballToTarget.Angle()
 	ballToTarget.DivNorm()
 
+	headingErr := math.Abs(info.NormalizeAngleDelta(kickAngle, robotPos.Angle))
+	if !captureApproachReady(robotPos, ballPos, m.to, headingErr) {
+		return behindBallDest(ballPos, m.to, captureMarginToBall)
+	}
+
 	robotXY := info.Add(ballV2, ballToTarget.Mult(GetKickConfig().driveThrough))
 	robotTargetPos := info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: kickAngle}
 	return robotTargetPos
