@@ -70,7 +70,7 @@ func isGoalShotAvailable(team info.Team, from info.Position, gi *GameInfo) bool 
 	goalPosition := gi.EnemyGoalCenter(team)
 
 	// check that the goal is in range
-	if from.Dist2d(goalPosition) > 200 { // TODO: I have no idea what a reasonable shooting distance is
+	if from.Dist2d(goalPosition) > 2000 { // TODO: I have no idea what a reasonable shooting distance is
 		return false
 	}
 
@@ -214,12 +214,12 @@ type supportOffset struct {
 }
 
 var supportOffsets = []supportOffset{
-	{forward: 9990, lateral: 0},
-	{forward: 9990, lateral: 0},
-	{forward: 9990, lateral: 0},
-	{forward: 9990, lateral: 0},
-	{forward: 9990, lateral: 0},
-	{forward: 9990, lateral: 0},
+	{forward: 1800, lateral: -1400},
+	{forward: 1800, lateral: 1400},
+	{forward: 3000, lateral: 0},
+	{forward: 900, lateral: -2300},
+	{forward: 900, lateral: 2300},
+	{forward: -1200, lateral: 0},
 }
 
 func clamp(value, minValue, maxValue float64) float64 {
@@ -356,8 +356,9 @@ func (kr *OffenseRole) TriggerEvent(event EventName) {
 	nextState, canTransition := transitions[event]
 	if event == "BALL_LOST" && canTransition {
 		fmt.Printf(
-			"OffenseRole %d BALL_LOST: slot=%s state=%s -> %s\n",
+			"OffenseRole %d %s BALL_LOST: slot=%s state=%s -> %s\n",
 			kr.id,
+			kr.team,
 			kr.slot.Kind,
 			stateName,
 			nextState.GetName(),

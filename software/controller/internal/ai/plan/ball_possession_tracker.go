@@ -8,12 +8,10 @@ import (
 )
 
 const (
-	// Sumatra-style possession filtering: acquire quickly when a bot is near,
-	// retain more generously so one noisy vision frame does not drop ownership.
-	ballPossessionAcquireDelay    = 100 * time.Millisecond
+	ballPossessionAcquireDelay    = 150 * time.Millisecond
 	ballPossessionLossDelay       = 1500 * time.Millisecond
-	ballPossessionRetainDistance  = 160.0
-	ballPossessionFacingTolerance = 0.7
+	ballPossessionRetainDistance  = 200.0
+	ballPossessionFacingTolerance = 0.9
 )
 
 type trackedBallOwner struct {

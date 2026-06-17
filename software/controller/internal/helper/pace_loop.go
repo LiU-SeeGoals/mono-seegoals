@@ -1,7 +1,7 @@
 package helper
 
 import (
-	"fmt"
+	// "fmt"
 	"time"
 )
 
@@ -18,8 +18,8 @@ func PaceLoop(start time.Time, period time.Duration, name string) {
 	elapsed := time.Since(start)
 	if elapsed >= period {
 		if name != "" {
-			fmt.Printf("%s: control loop ran too long (took %v, budget %v); use a faster computer or speed up this code path\n",
-				name, elapsed, period)
+			// fmt.Printf("%s: control loop ran too long (took %v, budget %v); use a faster computer or speed up this code path\n",
+			// 	name, elapsed, period)
 		}
 		return
 	}
