@@ -85,6 +85,22 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			Y:     ballPred.Y + kickRunUpDist*math.Sin(finalOrientation),
 			Angle: finalOrientation,
 		}
+		printCaptureDebug(
+			"kick-at-position-fire",
+			kp.team,
+			kp.id,
+			robot,
+			robotPos,
+			ballNow,
+			kp.targetPosition,
+			dest,
+			headingErr,
+			captureReady,
+			ballCentered,
+			false,
+			kickSpeed,
+			math.NaN(),
+		)
 		return &action.MoveTo{
 			Id:        int(kp.id),
 			Team:      kp.team,
@@ -115,6 +131,22 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		lineErr < roughAngleTolerance &&
 		captureReady &&
 		ballCentered
+	printCaptureDebug(
+		"kick-at-position",
+		kp.team,
+		kp.id,
+		robot,
+		robotPos,
+		ballNow,
+		kp.targetPosition,
+		carrot,
+		headingErr,
+		captureReady,
+		ballCentered,
+		dribble,
+		0,
+		minMargin,
+	)
 
 	return &action.MoveTo{
 		Id:      int(kp.id),
