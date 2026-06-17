@@ -78,7 +78,13 @@ func (m *AlignBall) getTargetPosWithClearance(gi *info.GameInfo, clearance float
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
 	alignBallPos := ballPos
-	if ok && ballVel.Norm2d() > 0.3 {
+	useLookahead := ok && ballVel.Norm2d() > minRollingBallSpeed
+	if useLookahead {
+		if myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition(); err == nil && myPos.Dist2d(ballPos) <= kickFarApproachDist {
+			useLookahead = false
+		}
+	}
+	if useLookahead {
 		lookahead := 0.8
 		alignBallPos.X += ballVel.X * 1000 * lookahead
 		alignBallPos.Y += ballVel.Y * 1000 * lookahead
@@ -204,15 +210,19 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 // nearLyingBall reports whether the ball is lying still with the robot close
 // enough that the clearance/staging targets would point away from the ball.
 func (m *AlignBall) nearLyingBall(myPos info.Position, gi *info.GameInfo) bool {
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-	if ok && ballVel.Norm2d() > minRollingBallSpeed {
-		return false
-	}
 	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
 	if err != nil {
 		return false
 	}
-	return myPos.Dist2d(ballPos) <= kickFarApproachDist
+	dist := myPos.Dist2d(ballPos)
+	if dist <= nearBallOrbitRetainDist {
+		return true
+	}
+	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
+	if ok && ballVel.Norm2d() > minRollingBallSpeed {
+		return false
+	}
+	return dist <= kickFarApproachDist
 }
 
 // aroundBallAction walks around the ball onto the kick line, the standoff
@@ -228,6 +238,7 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	dribblerPos := robot.DribblerPos()
 	ballCentered := m.contactPointCentered(robot, ballPos)
 	captureReady := capturePoseReady(myPos, ballPos, m.to, headingErr)
+	forward, lateral, localOK := robot.BallLocalOffset(ballPos)
 
 	minMargin := alignmentMargin(headingErr)
 	if !captureReady {
@@ -235,6 +246,38 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	} else if !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered {
 		minMargin = math.Max(minMargin, 0)
 	}
+
+	if localOK &&
+		!ballCentered &&
+		forward > info.Center2DribblerDist*0.5 &&
+		myPos.Dist2d(ballPos) < recenterBallTriggerDist {
+		carrot := recenterBallDest(ballPos, myPos, finalOrientation, forward, lateral, minMargin)
+		printCaptureDebug(
+			"align-recenter",
+			m.team,
+			m.id,
+			robot,
+			myPos,
+			ballPos,
+			m.to,
+			carrot,
+			headingErr,
+			captureReady,
+			ballCentered,
+			false,
+			0,
+			minMargin,
+		)
+
+		return &action.MoveTo{
+			Id:      int(m.id),
+			Team:    m.team,
+			Pos:     myPos,
+			Dest:    carrot,
+			Dribble: false,
+		}
+	}
+
 	lineup := behindBallDest(ballPos, m.to, minMargin)
 	carrot := aroundBallDest(ballPos, myPos, lineup, minMargin)
 	carrot.Angle = steppedOrientation(myPos, ballPos, finalOrientation)
