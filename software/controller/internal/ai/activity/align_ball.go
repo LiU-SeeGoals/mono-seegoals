@@ -12,24 +12,26 @@ import (
 )
 
 type AlignConfig struct {
-	robotBallClearence float64
-	stagingClearance   float64
-	doneDist           float64
-	angleError         float64
-	turnToKickDist     float64
-	minBehindBall      float64
-	maxLineError       float64
+	robotBallClearence  float64
+	stagingClearance    float64
+	doneDist            float64
+	angleError          float64
+	maxContactLineError float64
+	turnToKickDist      float64
+	minBehindBall       float64
+	maxLineError        float64
 }
 
 func GetAlignConfig() AlignConfig {
 	return AlignConfig{
-		robotBallClearence: 300,
-		stagingClearance:   500,
-		doneDist:           90,
-		angleError:         3.0 * math.Pi / 180,
-		turnToKickDist:     180,
-		minBehindBall:      120,
-		maxLineError:       40,
+		robotBallClearence:  300,
+		stagingClearance:    500,
+		doneDist:            90,
+		angleError:          3.0 * math.Pi / 180,
+		maxContactLineError: 15,
+		turnToKickDist:      180,
+		minBehindBall:       120,
+		maxLineError:        40,
 	}
 }
 
@@ -200,17 +202,18 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	finalOrientation := ballPos.AngleToPosition(m.to)
 	m.AlignAngle = finalOrientation
 	headingErr := math.Abs(info.NormalizeAngleDelta(finalOrientation, myPos.Angle))
+	dribblerPos := gi.State.GetTeam(m.team)[m.id].DribblerPos()
+	dribblerCentered := m.contactPointCentered(dribblerPos, gi)
 
 	minMargin := alignmentMargin(headingErr)
-	if !behindBallHalfPlane(ballPos, myPos, m.to) {
+	if !behindBallHalfPlane(ballPos, myPos, m.to) || !dribblerCentered {
 		minMargin = math.Max(minMargin, 0)
 	}
 	lineup := behindBallDest(ballPos, m.to, minMargin)
 	carrot := aroundBallDest(ballPos, myPos, lineup, minMargin)
 	carrot.Angle = steppedOrientation(myPos, ballPos, finalOrientation)
 
-	dribblerPos := gi.State.GetTeam(m.team)[m.id].DribblerPos()
-	dribble := dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance
+	dribble := dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && dribblerCentered
 
 	return &action.MoveTo{
 		Id:      int(m.id),
@@ -229,23 +232,37 @@ func (m *AlignBall) readyToFaceKick(myRobotPos, robotTargetPos info.Position, gi
 
 func (m *AlignBall) passLineChecks(myRobotPos info.Position, gi *info.GameInfo) (bool, bool) {
 	cfg := GetAlignConfig()
+	alongLine, sideError, ok := m.passLineError(myRobotPos, gi)
+	if !ok {
+		return false, false
+	}
+
+	return alongLine < -cfg.minBehindBall, sideError < cfg.maxLineError
+}
+
+func (m *AlignBall) contactPointCentered(pos info.Position, gi *info.GameInfo) bool {
+	_, sideError, ok := m.passLineError(pos, gi)
+	return ok && sideError < GetAlignConfig().maxContactLineError
+}
+
+func (m *AlignBall) passLineError(pos info.Position, gi *info.GameInfo) (float64, float64, bool) {
 	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
 	if err != nil {
 		fmt.Println(err)
-		return false, false
+		return 0, 0, false
 	}
 	targetDir := m.to.Sub(&ballPos)
 	targetDir.Z = 0
 	targetDir.Angle = 0
 	if targetDir.Norm2d() < 1 {
-		return false, false
+		return 0, 0, false
 	}
 	targetDir = targetDir.Normalize2d()
-	robotFromBall := myRobotPos.Sub(&ballPos)
+	robotFromBall := pos.Sub(&ballPos)
 	alongLine := robotFromBall.X*targetDir.X + robotFromBall.Y*targetDir.Y
 	sideError := math.Abs(robotFromBall.X*targetDir.Y - robotFromBall.Y*targetDir.X)
 
-	return alongLine < -cfg.minBehindBall, sideError < cfg.maxLineError
+	return alongLine, sideError, true
 }
 func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
@@ -263,11 +280,11 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	// facing the kick direction.
 	if m.nearLyingBall(myRobotPos, gi) {
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-		_, isOnPassLine := m.passLineChecks(myRobotPos, gi)
+		dribblerPos := gi.State.GetTeam(m.team)[m.id].DribblerPos()
 		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
 			behindBallHalfPlane(ballPos, myRobotPos, m.to) &&
-			isOnPassLine &&
+			m.contactPointCentered(dribblerPos, gi) &&
 			math.Abs(headingErr) < GetAlignConfig().angleError
 	}
 

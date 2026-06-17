@@ -78,7 +78,7 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
 
 	const maxLinearSpeed = 0.65
 	const slowdownDistance = 1000.0
-	const minLinearSpeed = 0.02
+	const minLinearSpeed = 0.1
 	const angleKp = 1.0
 	mv.Dest.Angle = convAngle(mv.Dest.Angle)
 	mv.Pos.Angle = convAngle(mv.Pos.Angle)

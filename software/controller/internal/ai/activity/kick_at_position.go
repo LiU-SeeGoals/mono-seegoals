@@ -104,7 +104,9 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	carrot.Angle = steppedOrientation(robotPos, ballPred, finalOrientation)
 
 	dribblerPos := robot.DribblerPos()
-	dribble := dribblerPos.Dist2d(ballNow) < 120 && headingErr < 2*roughAngleTolerance
+	dribble := dribblerPos.Dist2d(ballNow) < 120 &&
+		headingErr < 2*roughAngleTolerance &&
+		lineErr < roughAngleTolerance
 
 	return &action.MoveTo{
 		Id:      int(kp.id),
