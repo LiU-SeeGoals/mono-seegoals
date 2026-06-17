@@ -60,7 +60,8 @@ func printCaptureDebug(
 	}
 	dribblerDist := math.NaN()
 	if robot != nil {
-		dribblerDist = robot.DribblerPos().Dist2d(ballPos)
+		driblerpos := robot.DribblerPos()
+		dribblerDist = driblerpos.Dist2d(ballPos)
 	}
 
 	fmt.Printf(
