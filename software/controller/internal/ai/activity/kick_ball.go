@@ -112,12 +112,30 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	dribblerDist := dribblerPos.Dist2d(ballUntracked)
 	_, lateral, ok := robot.BallLocalOffset(ballUntracked)
 	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
+	headingErr := math.Abs(info.NormalizeAngleDelta(robotTargetPos.Angle, robotPos.Angle))
+	captureReady := captureApproachReady(robotPos, ballUntracked, m.to, headingErr)
 
 	if dribblerDist > GetKickConfig().kickContactDist || !ballCentered {
 		act.Dribble = true
 	} else {
 		act.KickSpeed = 2
 	}
+	printCaptureDebug(
+		"kick-ball",
+		m.team,
+		m.id,
+		robot,
+		robotPos,
+		ballUntracked,
+		m.to,
+		robotTargetPos,
+		headingErr,
+		captureReady,
+		ballCentered,
+		act.Dribble,
+		act.KickSpeed,
+		math.NaN(),
+	)
 
 	return &act
 }

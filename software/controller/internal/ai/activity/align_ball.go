@@ -169,6 +169,28 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 		}
 	}
 
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	robot := gi.State.GetTeam(m.team)[m.id]
+	finalHeadingErr := math.Abs(info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myPos.Angle))
+	captureReady := capturePoseReady(myPos, ballPos, m.to, finalHeadingErr)
+	ballCentered := m.contactPointCentered(robot, ballPos)
+	printCaptureDebug(
+		"align",
+		m.team,
+		m.id,
+		robot,
+		myPos,
+		ballPos,
+		m.to,
+		act.Dest,
+		finalHeadingErr,
+		captureReady,
+		ballCentered,
+		act.Dribble,
+		act.KickSpeed,
+		math.NaN(),
+	)
+
 	// act := action.MoveTo{}
 	// act.Id = int(m.id)
 	// act.Team = m.team
@@ -221,6 +243,23 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 		headingErr < 2*roughAngleTolerance &&
 		captureReady &&
 		ballCentered
+
+	printCaptureDebug(
+		"align-around",
+		m.team,
+		m.id,
+		robot,
+		myPos,
+		ballPos,
+		m.to,
+		carrot,
+		headingErr,
+		captureReady,
+		ballCentered,
+		dribble,
+		0,
+		minMargin,
+	)
 
 	return &action.MoveTo{
 		Id:      int(m.id),

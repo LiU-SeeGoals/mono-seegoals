@@ -59,6 +59,8 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 
 	dribble := false
 	dribblerPos := robot.DribblerPos()
+	_, lateral, ok := robot.BallLocalOffset(ballPos)
+	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
 	if dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && captureReady {
 		dribble = true
 	}
@@ -67,6 +69,22 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 	move.AvoidBall(false)
 	moveAction := move.GetMoveToAction(gi)
 	moveAction.Dest.Angle = angleToBall
+	printCaptureDebug(
+		"move-to-ball",
+		m.team,
+		m.id,
+		robot,
+		robotPos,
+		ballPos,
+		captureTarget,
+		moveAction.Dest,
+		headingErr,
+		captureReady,
+		ballCentered,
+		dribble,
+		0,
+		margin,
+	)
 	act := action.MoveTo{
 		Id:   int(m.id),
 		Team: m.team,
