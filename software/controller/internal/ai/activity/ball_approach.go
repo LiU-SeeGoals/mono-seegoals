@@ -12,6 +12,8 @@ const (
 	captureMarginToBall      = 25.0
 	captureLineTolerance     = info.KickCenterTolerance
 	capturePoseTolerance     = 45.0
+	minAroundBallStep        = 35.0
+	minAroundBallStepTrigger = 8.0
 	aroundBallShiftAngle     = 0.7
 	maxTargetOrientationStep = 0.4
 	roughAngleTolerance      = 0.1
@@ -124,7 +126,14 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 		}
 	}
 
-	shift := -math.Copysign(math.Min(math.Abs(remaining), aroundBallShiftAngle), remaining)
+	shiftMag := math.Min(math.Abs(remaining), aroundBallShiftAngle)
+	if distance > 1 {
+		arcStep := shiftMag * distance
+		if arcStep > minAroundBallStepTrigger && arcStep < minAroundBallStep {
+			shiftMag = math.Min(aroundBallShiftAngle, minAroundBallStep/distance)
+		}
+	}
+	shift := -math.Copysign(shiftMag, remaining)
 	bearing := ball2BotAngle + shift
 	return info.Position{
 		X:     ballPos.X + distance*math.Cos(bearing),
