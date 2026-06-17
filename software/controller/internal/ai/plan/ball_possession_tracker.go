@@ -143,13 +143,13 @@ type offenseBallActorTracker struct {
 	current offenseBallActor
 }
 
-func (t *offenseBallActorTracker) switchTo(kickers map[info.ID]*roles.OffenseRole, next offenseBallActor) {
+func (t *offenseBallActorTracker) switchTo(attackers map[info.ID]*roles.OffenseRole, next offenseBallActor) {
 	if t.current.same(next) {
 		return
 	}
 	if t.current.valid {
-		if kicker, ok := kickers[t.current.id]; ok {
-			kicker.TriggerEvent("BALL_LOST")
+		if attacker, ok := attackers[t.current.id]; ok {
+			attacker.TriggerEvent("BALL_LOST")
 		}
 	}
 	t.current = next

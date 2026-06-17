@@ -10,7 +10,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
-const chaserNoGoWaitClearance = pathplanner.MotionRadius
+const interceptNoGoWaitClearance = pathplanner.MotionRadius
 
 type TargetContext interface {
 	GetTargetPosition() info.Position
@@ -163,7 +163,7 @@ func (s *InterceptBallState) GetName() sm.StateName {
 
 func (s *InterceptBallState) Update() sm.EventName {
 	if ballPos, err := s.gi.State.GetBall().GetEstimatedPosition(); err == nil {
-		if waitPos, ok := chaserWaitPositionOutsideGoalNoGo(s.gi, ballPos); ok {
+		if waitPos, ok := interceptWaitPositionOutsideGoalNoGo(s.gi, ballPos); ok {
 			waitPos.Angle = waitPos.AngleToPosition(ballPos)
 			activity := act.NewMoveToPosition(s.team, s.robotId, waitPos)
 			s.activityHandler.AddActivity(activity)
@@ -195,15 +195,15 @@ func (s *InterceptBallState) Update() sm.EventName {
 	return "NONE"
 }
 
-type chaserGoalNoGoZone struct {
+type interceptGoalNoGoZone struct {
 	minX float64
 	maxX float64
 	minY float64
 	maxY float64
 }
 
-func chaserWaitPositionOutsideGoalNoGo(gi *info.GameInfo, ballPos info.Position) (info.Position, bool) {
-	for _, zone := range chaserGoalNoGoZones(gi) {
+func interceptWaitPositionOutsideGoalNoGo(gi *info.GameInfo, ballPos info.Position) (info.Position, bool) {
+	for _, zone := range interceptGoalNoGoZones(gi) {
 		if !zone.contains(ballPos) {
 			continue
 		}
@@ -213,26 +213,26 @@ func chaserWaitPositionOutsideGoalNoGo(gi *info.GameInfo, ballPos info.Position)
 	return info.Position{}, false
 }
 
-func chaserGoalNoGoZones(gi *info.GameInfo) []chaserGoalNoGoZone {
+func interceptGoalNoGoZones(gi *info.GameInfo) []interceptGoalNoGoZone {
 	if gi == nil || !gi.HasField() {
 		return nil
 	}
 
-	zones := make([]chaserGoalNoGoZone, 0, 2)
-	if zone, ok := chaserGoalNoGoZoneFromLines(gi, "LeftPenaltyStretch", "LeftGoalLine"); ok {
+	zones := make([]interceptGoalNoGoZone, 0, 2)
+	if zone, ok := interceptGoalNoGoZoneFromLines(gi, "LeftPenaltyStretch", "LeftGoalLine"); ok {
 		zones = append(zones, zone)
 	}
-	if zone, ok := chaserGoalNoGoZoneFromLines(gi, "RightPenaltyStretch", "RightGoalLine"); ok {
+	if zone, ok := interceptGoalNoGoZoneFromLines(gi, "RightPenaltyStretch", "RightGoalLine"); ok {
 		zones = append(zones, zone)
 	}
 	return zones
 }
 
-func chaserGoalNoGoZoneFromLines(gi *info.GameInfo, frontLineName, backLineName string) (chaserGoalNoGoZone, bool) {
+func interceptGoalNoGoZoneFromLines(gi *info.GameInfo, frontLineName, backLineName string) (interceptGoalNoGoZone, bool) {
 	front := gi.GetFieldLine(frontLineName)
 	back := gi.GetFieldLine(backLineName)
 	if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
-		return chaserGoalNoGoZone{}, false
+		return interceptGoalNoGoZone{}, false
 	}
 
 	frontX := float64(front.GetP1().GetX())
@@ -241,7 +241,7 @@ func chaserGoalNoGoZoneFromLines(gi *info.GameInfo, frontLineName, backLineName 
 	y2 := float64(front.GetP2().GetY())
 	margin := pathplanner.GoalLineSafetyRadius
 
-	return chaserGoalNoGoZone{
+	return interceptGoalNoGoZone{
 		minX: math.Min(frontX, backX) - margin,
 		maxX: math.Max(frontX, backX) + margin,
 		minY: math.Min(y1, y2) - margin,
@@ -249,17 +249,17 @@ func chaserGoalNoGoZoneFromLines(gi *info.GameInfo, frontLineName, backLineName 
 	}, true
 }
 
-func (z chaserGoalNoGoZone) contains(pos info.Position) bool {
+func (z interceptGoalNoGoZone) contains(pos info.Position) bool {
 	return pos.X >= z.minX && pos.X <= z.maxX &&
 		pos.Y >= z.minY && pos.Y <= z.maxY
 }
 
-func (z chaserGoalNoGoZone) waitPosition(ballPos info.Position) info.Position {
+func (z interceptGoalNoGoZone) waitPosition(ballPos info.Position) info.Position {
 	waitPos := ballPos
 	if z.maxX <= 0 {
-		waitPos.X = z.maxX + chaserNoGoWaitClearance
+		waitPos.X = z.maxX + interceptNoGoWaitClearance
 	} else {
-		waitPos.X = z.minX - chaserNoGoWaitClearance
+		waitPos.X = z.minX - interceptNoGoWaitClearance
 	}
 	waitPos.Y = math.Max(z.minY, math.Min(z.maxY, waitPos.Y))
 	return waitPos
