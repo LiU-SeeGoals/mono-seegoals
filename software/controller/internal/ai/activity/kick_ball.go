@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"math"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -75,8 +76,9 @@ func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 
 func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	robotTargetPos := m.GetTargetPos(gi)
+	robot := gi.State.GetTeam(m.team)[m.id]
 
-	robotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+	robotPos, err := robot.GetPosition()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -101,9 +103,12 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	act.Pos = robotPos
 	act.Dest = robotTargetPos
 
-	dribblerPos := gi.State.GetTeam(m.team)[m.id].DribblerPos()
+	dribblerPos := robot.DribblerPos()
 	dribblerDist := dribblerPos.Dist2d(ballUntracked)
-	if dribblerDist > GetKickConfig().kickContactDist {
+	_, lateral, ok := robot.BallLocalOffset(ballUntracked)
+	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
+
+	if dribblerDist > GetKickConfig().kickContactDist || !ballCentered {
 		act.Dribble = true
 	} else {
 		act.KickSpeed = 2

@@ -74,7 +74,10 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		return moveAction
 	}
 
-	if kp.armed(robotPos, ballNow, headingErr, lineErr) {
+	_, lateral, ok := robot.BallLocalOffset(ballNow)
+	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
+
+	if kp.armed(robotPos, ballNow, headingErr, lineErr, ballCentered) {
 		// Aim held: drive through the ball toward the target and kick.
 		dest := info.Position{
 			X:     ballPred.X + kickRunUpDist*math.Cos(finalOrientation),
@@ -94,9 +97,9 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	// only closes once heading and position are lined up, so we cannot bump
 	// the ball away while still rotating around it.
 	minMargin := alignmentMargin(headingErr)
-	if lineErr > 0.3 {
-		// Never push toward the ball while still off the kick line, even if
-		// the heading happens to point at the target.
+	if lineErr > 0.3 || !ballCentered {
+		// Never push toward the ball while still off the kick line or while
+		// the ball is visibly offset in the dribbler mouth.
 		minMargin = math.Max(minMargin, 0)
 	}
 	lineup := behindBallDest(ballPred, kp.targetPosition, minMargin)
@@ -106,7 +109,8 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	dribblerPos := robot.DribblerPos()
 	dribble := dribblerPos.Dist2d(ballNow) < 120 &&
 		headingErr < 2*roughAngleTolerance &&
-		lineErr < roughAngleTolerance
+		lineErr < roughAngleTolerance &&
+		ballCentered
 
 	return &action.MoveTo{
 		Id:      int(kp.id),
@@ -119,9 +123,12 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 
 // armed gates the kick: heading and position on the kick line must be held
 // for kickAlignConfirmTime with the kicker close to the ball.
-func (kp *KickAtPosition) armed(robotPos, ballPos info.Position, headingErr, lineErr float64) bool {
+func (kp *KickAtPosition) armed(robotPos, ballPos info.Position, headingErr, lineErr float64, ballCentered bool) bool {
 	nearBall := robotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall)
-	aligned := headingErr < roughAngleTolerance && lineErr < 2*roughAngleTolerance && nearBall
+	aligned := headingErr < roughAngleTolerance &&
+		lineErr < 2*roughAngleTolerance &&
+		nearBall &&
+		ballCentered
 	if !aligned {
 		kp.alignedSince = time.Time{}
 		return false

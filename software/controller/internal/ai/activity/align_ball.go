@@ -28,7 +28,7 @@ func GetAlignConfig() AlignConfig {
 		stagingClearance:    500,
 		doneDist:            90,
 		angleError:          3.0 * math.Pi / 180,
-		maxContactLineError: 15,
+		maxContactLineError: info.KickCenterTolerance,
 		turnToKickDist:      180,
 		minBehindBall:       120,
 		maxLineError:        40,
@@ -198,22 +198,23 @@ func (m *AlignBall) nearLyingBall(myPos info.Position, gi *info.GameInfo) bool {
 // kicker instead of backing off to the clearance points.
 func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) action.Action {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	robot := gi.State.GetTeam(m.team)[m.id]
 
 	finalOrientation := ballPos.AngleToPosition(m.to)
 	m.AlignAngle = finalOrientation
 	headingErr := math.Abs(info.NormalizeAngleDelta(finalOrientation, myPos.Angle))
-	dribblerPos := gi.State.GetTeam(m.team)[m.id].DribblerPos()
-	dribblerCentered := m.contactPointCentered(dribblerPos, gi)
+	dribblerPos := robot.DribblerPos()
+	ballCentered := m.contactPointCentered(robot, ballPos)
 
 	minMargin := alignmentMargin(headingErr)
-	if !behindBallHalfPlane(ballPos, myPos, m.to) || !dribblerCentered {
+	if !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered {
 		minMargin = math.Max(minMargin, 0)
 	}
 	lineup := behindBallDest(ballPos, m.to, minMargin)
 	carrot := aroundBallDest(ballPos, myPos, lineup, minMargin)
 	carrot.Angle = steppedOrientation(myPos, ballPos, finalOrientation)
 
-	dribble := dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && dribblerCentered
+	dribble := dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && ballCentered
 
 	return &action.MoveTo{
 		Id:      int(m.id),
@@ -240,9 +241,9 @@ func (m *AlignBall) passLineChecks(myRobotPos info.Position, gi *info.GameInfo) 
 	return alongLine < -cfg.minBehindBall, sideError < cfg.maxLineError
 }
 
-func (m *AlignBall) contactPointCentered(pos info.Position, gi *info.GameInfo) bool {
-	_, sideError, ok := m.passLineError(pos, gi)
-	return ok && sideError < GetAlignConfig().maxContactLineError
+func (m *AlignBall) contactPointCentered(robot *info.Robot, ballPos info.Position) bool {
+	_, lateral, ok := robot.BallLocalOffset(ballPos)
+	return ok && math.Abs(lateral) < GetAlignConfig().maxContactLineError
 }
 
 func (m *AlignBall) passLineError(pos info.Position, gi *info.GameInfo) (float64, float64, bool) {
@@ -280,11 +281,11 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	// facing the kick direction.
 	if m.nearLyingBall(myRobotPos, gi) {
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-		dribblerPos := gi.State.GetTeam(m.team)[m.id].DribblerPos()
+		robot := gi.State.GetTeam(m.team)[m.id]
 		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
 			behindBallHalfPlane(ballPos, myRobotPos, m.to) &&
-			m.contactPointCentered(dribblerPos, gi) &&
+			m.contactPointCentered(robot, ballPos) &&
 			math.Abs(headingErr) < GetAlignConfig().angleError
 	}
 

@@ -18,6 +18,15 @@ const (
 	Blue    Team = 2
 )
 
+const (
+	// Center2DribblerDist is the distance from robot center to the center of the
+	// dribbler/front contact line [mm]. Tune this from real/sim measurements.
+	Center2DribblerDist = 75.0
+	BallRadius          = 21.5
+	DribblerHalfWidth   = 35.0
+	KickCenterTolerance = 15.0
+)
+
 func (t Team) String() string {
 	switch t {
 	case Yellow:
@@ -55,22 +64,37 @@ func (r *Robot) At(pos Position, threshold float64) bool {
 	return robotPos.Distance(pos) < threshold
 }
 
-
 func (r *Robot) DribblerPos() Position {
-
 	robotPos, _ := r.GetPosition()
-	robotPos.X += 90 * math.Cos(robotPos.Angle) // WARN: Magic number
-	robotPos.Y += 90 * math.Sin(robotPos.Angle) // WARN: Magic number
+	robotPos.X += Center2DribblerDist * math.Cos(robotPos.Angle)
+	robotPos.Y += Center2DribblerDist * math.Sin(robotPos.Angle)
 	return robotPos
 }
 
+func BallLocalOffset(robotPos Position, ballPos Position) (forward float64, lateral float64) {
+	dx := ballPos.X - robotPos.X
+	dy := ballPos.Y - robotPos.Y
+
+	forward = dx*math.Cos(robotPos.Angle) + dy*math.Sin(robotPos.Angle)
+	lateral = -dx*math.Sin(robotPos.Angle) + dy*math.Cos(robotPos.Angle)
+	return forward, lateral
+}
+
+func (r *Robot) BallLocalOffset(ballPos Position) (forward float64, lateral float64, ok bool) {
+	robotPos, err := r.GetPosition()
+	if err != nil {
+		return 0, 0, false
+	}
+	forward, lateral = BallLocalOffset(robotPos, ballPos)
+	return forward, lateral, true
+}
 
 func (r *Robot) Facing(target Position, threshold float64) bool {
 	pos, err := r.GetPosition()
 	if err != nil {
 		return false
 	}
-	return pos.FacingPosition(target, threshold) 
+	return pos.FacingPosition(target, threshold)
 }
 
 func (r *Robot) GetVelocity() Position {
