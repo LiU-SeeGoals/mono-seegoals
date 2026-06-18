@@ -21,9 +21,9 @@ const (
 const (
 	// Center2DribblerDist is the distance from robot center to the center of the
 	// dribbler/front contact line [mm]. Tune this from real/sim measurements.
-	Center2DribblerDist = 75.0
-	BallRadius          = 21.5
-	DribblerHalfWidth   = 35.0
+	Center2DribblerDist = 90.0
+	BallRadius          = 18.5
+	DribblerHalfWidth   = 45.0
 	KickCenterTolerance = DribblerHalfWidth
 )
 
