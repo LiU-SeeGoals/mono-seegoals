@@ -3,6 +3,7 @@ package ai
 import (
 	"fmt"
 	"math"
+	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -14,6 +15,7 @@ type KickBall struct {
 	orignalBallPos info.Position
 	inited         bool
 	to             info.Position
+	dribbleSince   time.Time
 }
 
 type KickConfig struct {
@@ -22,6 +24,12 @@ type KickConfig struct {
 	ballAbortRadius float64
 	kickContactDist float64
 }
+
+const (
+	kickMouthLateralTolerance = info.DribblerHalfWidth + 1.5*info.BallRadius
+	kickDribbleSettleTime     = 250 * time.Millisecond
+	kickHeldHeadingTolerance  = 0.4
+)
 
 func GetKickConfig() KickConfig {
 	return KickConfig{
@@ -44,6 +52,7 @@ func NewKickBall(team info.Team, id info.ID, to, ballPos info.Position) *KickBal
 		ballPos,
 		false,
 		to,
+		time.Time{},
 	}
 }
 
@@ -118,12 +127,23 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 
 	dribblerPos := robot.DribblerPos()
 	dribblerDist := dribblerPos.Dist2d(ballUntracked)
-	_, lateral, ok := robot.BallLocalOffset(ballUntracked)
+	forward, lateral, ok := robot.BallLocalOffset(ballUntracked)
 	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
 	headingErr := math.Abs(info.NormalizeAngleDelta(robotTargetPos.Angle, robotPos.Angle))
 	captureReady := captureApproachReady(robotPos, ballUntracked, m.to, headingErr)
 
-	if dribblerDist > GetKickConfig().kickContactDist || !ballCentered {
+	ballHeldInMouth := ok &&
+		kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
+	if ballHeldInMouth && !ballCentered {
+		if m.dribbleSince.IsZero() {
+			m.dribbleSince = time.Now()
+		}
+	} else {
+		m.dribbleSince = time.Time{}
+	}
+
+	kickAfterSettle := !m.dribbleSince.IsZero() && time.Since(m.dribbleSince) >= kickDribbleSettleTime
+	if !kickBallShouldFire(dribblerDist, ballCentered, kickAfterSettle) {
 		act.Dribble = true
 	} else {
 		act.KickSpeed = 2
@@ -146,6 +166,18 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	)
 
 	return &act
+}
+
+func kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr float64) bool {
+	return forward > info.Center2DribblerDist &&
+		dribblerDist <= GetKickConfig().kickContactDist &&
+		math.Abs(lateral) < kickMouthLateralTolerance &&
+		headingErr < kickHeldHeadingTolerance
+}
+
+func kickBallShouldFire(dribblerDist float64, ballCentered bool, kickAfterSettle bool) bool {
+	return dribblerDist <= GetKickConfig().kickContactDist &&
+		(ballCentered || kickAfterSettle)
 }
 
 func (m *KickBall) Achieved(gi *info.GameInfo) bool {

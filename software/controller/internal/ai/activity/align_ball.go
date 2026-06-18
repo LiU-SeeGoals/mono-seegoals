@@ -240,21 +240,19 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	approachReady := captureApproachReady(myPos, ballPos, m.to, headingErr)
 	captureReady := capturePoseReady(myPos, ballPos, m.to, headingErr)
 
-	minMargin := alignmentMargin(headingErr)
-	if !approachReady {
-		minMargin = math.Max(minMargin, captureMarginToBall)
-	} else if !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered {
-		minMargin = math.Max(minMargin, 0)
-	}
+	keepWide := !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered
+	minMargin := captureOrbitMargin(headingErr, approachReady, keepWide)
 
 	lineup := behindBallDest(ballPos, m.to, minMargin)
 	carrot := aroundBallDest(ballPos, myPos, lineup, minMargin)
 	carrot.Angle = steppedOrientation(myPos, ballPos, finalOrientation)
 
-	dribble := dribblerPos.Dist2d(ballPos) < GetKickConfig().kickContactDist &&
+	forward, lateral, ok := robot.BallLocalOffset(ballPos)
+	ballHeldInMouth := ok && kickBallHeldInMouth(dribblerPos.Dist2d(ballPos), forward, lateral, headingErr)
+	dribble := ballHeldInMouth || (dribblerPos.Dist2d(ballPos) < GetKickConfig().kickContactDist &&
 		headingErr < 2*roughAngleTolerance &&
 		approachReady &&
-		ballCentered
+		ballCentered)
 
 	printCaptureDebug(
 		"align-around",
