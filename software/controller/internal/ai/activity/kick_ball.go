@@ -25,10 +25,10 @@ type KickConfig struct {
 
 func GetKickConfig() KickConfig {
 	return KickConfig{
-		driveThrough:    30,
+		driveThrough:    100,
 		doneDist:        20,
 		ballAbortRadius: 200,
-		kickContactDist: 100,
+		kickContactDist: 130,
 	}
 }
 
