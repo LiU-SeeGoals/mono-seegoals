@@ -114,24 +114,21 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	// Near the ball: orbit around it onto the kick line. The standoff margin
 	// only closes once heading and position are lined up, so we cannot bump
 	// the ball away while still rotating around it.
-	minMargin := alignmentMargin(headingErr)
-	if !approachReady {
-		minMargin = math.Max(minMargin, captureMarginToBall)
-	} else if lineErr > 0.3 || !ballCentered {
-		// Never push toward the ball while still off the kick line or while
-		// the ball is visibly offset in the dribbler mouth.
-		minMargin = math.Max(minMargin, 0)
-	}
+	// Never push toward the ball while still off the kick line or while the
+	// ball is visibly offset in the dribbler mouth.
+	minMargin := captureOrbitMargin(headingErr, approachReady, lineErr > 0.3 || !ballCentered)
 	lineup := behindBallDest(ballPred, kp.targetPosition, minMargin)
 	carrot := aroundBallDest(ballPred, robotPos, lineup, minMargin)
 	carrot.Angle = steppedOrientation(robotPos, ballPred, finalOrientation)
 
 	dribblerPos := robot.DribblerPos()
-	dribble := dribblerPos.Dist2d(ballNow) < 120 &&
+	forward, lateral, ok := robot.BallLocalOffset(ballNow)
+	ballHeldInMouth := ok && kickBallHeldInMouth(dribblerPos.Dist2d(ballNow), forward, lateral, headingErr)
+	dribble := ballHeldInMouth || (dribblerPos.Dist2d(ballNow) < 120 &&
 		headingErr < 2*roughAngleTolerance &&
 		lineErr < roughAngleTolerance &&
 		approachReady &&
-		ballCentered
+		ballCentered)
 	printCaptureDebug(
 		"kick-at-position",
 		kp.team,

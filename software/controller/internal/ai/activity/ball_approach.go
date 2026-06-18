@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	maxMarginToBall          = 70.0
-	ballPushMargin           = -20.0
-	captureMarginToBall      = 25.0
+	maxMarginToBall          = 90.0
+	ballPushMargin           = -10.0
+	captureMarginToBall      = 40.0
+	offCenterOrbitMargin     = 30.0
 	captureLineTolerance     = info.DribblerHalfWidth + info.BallRadius
 	capturePoseTolerance     = 65.0
 	nearBallOrbitRetainDist  = 300.0
@@ -40,6 +41,17 @@ func kickerStandoffDist(margin float64) float64 {
 func alignmentMargin(headingErr float64) float64 {
 	frac := math.Min(1, math.Abs(headingErr)/(math.Pi/4))
 	return ballPushMargin + (maxMarginToBall-ballPushMargin)*frac
+}
+
+func captureOrbitMargin(headingErr float64, approachReady bool, keepWide bool) float64 {
+	margin := alignmentMargin(headingErr)
+	if !approachReady {
+		return math.Max(margin, captureMarginToBall)
+	}
+	if keepWide {
+		return math.Max(margin, offCenterOrbitMargin)
+	}
+	return margin
 }
 
 func behindBallHalfPlane(ballPos, robotPos, target info.Position) bool {

@@ -45,12 +45,14 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 	approachReady := captureApproachReady(robotPos, ballPos, captureTarget, headingErr)
 	captureReady := capturePoseReady(robotPos, ballPos, captureTarget, headingErr)
 
+	dribblerPos := robot.DribblerPos()
+	forward, lateral, ok := robot.BallLocalOffset(ballPos)
+	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
+	ballHeldInMouth := ok && kickBallHeldInMouth(dribblerPos.Dist2d(ballPos), forward, lateral, headingErr)
+
 	// Target the standoff point in front of the ball on our side, never the
 	// ball itself; the margin only closes once the kicker points at the ball.
-	margin := alignmentMargin(headingErr)
-	if !approachReady {
-		margin = math.Max(margin, captureMarginToBall)
-	}
+	margin := captureOrbitMargin(headingErr, approachReady, !ballCentered)
 	dist := kickerStandoffDist(margin)
 	target := info.Position{
 		X:     ballPos.X - dist*math.Cos(angleToBall),
@@ -59,10 +61,7 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 	}
 
 	dribble := false
-	dribblerPos := robot.DribblerPos()
-	_, lateral, ok := robot.BallLocalOffset(ballPos)
-	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
-	if dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && approachReady {
+	if ballHeldInMouth || (dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && approachReady) {
 		dribble = true
 	}
 
