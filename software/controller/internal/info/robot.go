@@ -21,17 +21,10 @@ const (
 const (
 	// Center2DribblerDist is the distance from robot center to the center of the
 	// dribbler/front contact line [mm]. Tune this from real/sim measurements.
-<<<<<<< HEAD
-	Center2DribblerDist = 90.0
-	BallRadius          = 18.5
-	DribblerHalfWidth   = 45.0
-	KickCenterTolerance = DribblerHalfWidth
-=======
 	Center2DribblerDist = 75.0
 	BallRadius          = 21.5
 	DribblerHalfWidth   = 35.0
 	KickCenterTolerance = DribblerHalfWidth + BallRadius/2
->>>>>>> a9702dd6e873e12baf7736e91749aef17506cc62
 )
 
 func (t Team) String() string {
