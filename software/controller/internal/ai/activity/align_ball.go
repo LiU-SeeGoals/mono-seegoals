@@ -27,7 +27,7 @@ func GetAlignConfig() AlignConfig {
 		robotBallClearence:  300,
 		stagingClearance:    500,
 		doneDist:            90,
-		angleError:          3.0 * math.Pi / 180,
+		angleError:          roughAngleTolerance,
 		maxContactLineError: info.KickCenterTolerance,
 		turnToKickDist:      180,
 		minBehindBall:       120,
@@ -237,10 +237,11 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	headingErr := math.Abs(info.NormalizeAngleDelta(finalOrientation, myPos.Angle))
 	dribblerPos := robot.DribblerPos()
 	ballCentered := m.contactPointCentered(robot, ballPos)
+	approachReady := captureApproachReady(myPos, ballPos, m.to, headingErr)
 	captureReady := capturePoseReady(myPos, ballPos, m.to, headingErr)
 
 	minMargin := alignmentMargin(headingErr)
-	if !captureReady {
+	if !approachReady {
 		minMargin = math.Max(minMargin, captureMarginToBall)
 	} else if !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered {
 		minMargin = math.Max(minMargin, 0)
@@ -250,9 +251,9 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	carrot := aroundBallDest(ballPos, myPos, lineup, minMargin)
 	carrot.Angle = steppedOrientation(myPos, ballPos, finalOrientation)
 
-	dribble := dribblerPos.Dist2d(ballPos) < 120 &&
+	dribble := dribblerPos.Dist2d(ballPos) < GetKickConfig().kickContactDist &&
 		headingErr < 2*roughAngleTolerance &&
-		captureReady &&
+		approachReady &&
 		ballCentered
 
 	printCaptureDebug(
@@ -322,16 +323,17 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
 	// At a lying ball the clearance-point check below would force a robot
 	// already in possession to back off before ALIGNED could fire; count it
-	// aligned once it is behind the ball on the pass line, close in and
-	// facing the kick direction.
+	// aligned once it is behind the ball on the pass line and close in.
+	// captureApproachReady already allows only a rough heading error; the
+	// Kick state should drive through immediately instead of waiting here for
+	// a perfect final angle.
 	if m.nearLyingBall(myRobotPos, gi) {
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 		robot := gi.State.GetTeam(m.team)[m.id]
 		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
 			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr)) &&
-			m.contactPointCentered(robot, ballPos) &&
-			math.Abs(headingErr) < GetAlignConfig().angleError
+			m.contactPointCentered(robot, ballPos)
 	}
 
 	xx := (myRobotPos.X - robotTargetPos.X) * (myRobotPos.X - robotTargetPos.X)

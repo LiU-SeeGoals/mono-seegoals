@@ -14,7 +14,7 @@ const (
 	// Beyond this distance to the ball [mm] we path-plan to the lineup point.
 	kickFarApproachDist = 600.0
 	// Time the aim must be held before the kick is armed.
-	kickAlignConfirmTime = 300 * time.Millisecond
+	kickAlignConfirmTime = 80 * time.Millisecond
 	// Drive-through distance past the ball when kicking [mm].
 	kickRunUpDist = 100.0
 	kickSpeed     = 5
@@ -76,6 +76,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 
 	_, lateral, ok := robot.BallLocalOffset(ballNow)
 	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
+	approachReady := captureApproachReady(robotPos, ballPred, kp.targetPosition, headingErr)
 	captureReady := capturePoseReady(robotPos, ballPred, kp.targetPosition, headingErr)
 
 	if kp.armed(robotPos, ballNow, headingErr, lineErr, ballCentered) {
@@ -114,7 +115,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	// only closes once heading and position are lined up, so we cannot bump
 	// the ball away while still rotating around it.
 	minMargin := alignmentMargin(headingErr)
-	if !captureReady {
+	if !approachReady {
 		minMargin = math.Max(minMargin, captureMarginToBall)
 	} else if lineErr > 0.3 || !ballCentered {
 		// Never push toward the ball while still off the kick line or while
@@ -129,7 +130,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	dribble := dribblerPos.Dist2d(ballNow) < 120 &&
 		headingErr < 2*roughAngleTolerance &&
 		lineErr < roughAngleTolerance &&
-		captureReady &&
+		approachReady &&
 		ballCentered
 	printCaptureDebug(
 		"kick-at-position",
