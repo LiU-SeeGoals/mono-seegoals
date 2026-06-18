@@ -61,7 +61,7 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 	}
 
 	dribble := false
-	if ballHeldInMouth || (dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && approachReady) {
+	if ballCentered && (ballHeldInMouth || (dribblerPos.Dist2d(ballPos) < 120 && headingErr < 2*roughAngleTolerance && approachReady)) {
 		dribble = true
 	}
 
