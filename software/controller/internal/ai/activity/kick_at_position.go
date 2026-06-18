@@ -124,11 +124,10 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	dribblerPos := robot.DribblerPos()
 	forward, lateral, ok := robot.BallLocalOffset(ballNow)
 	ballHeldInMouth := ok && kickBallHeldInMouth(dribblerPos.Dist2d(ballNow), forward, lateral, headingErr)
-	dribble := ballHeldInMouth || (dribblerPos.Dist2d(ballNow) < 120 &&
+	dribble := ballCentered && (ballHeldInMouth || (dribblerPos.Dist2d(ballNow) < 120 &&
 		headingErr < 2*roughAngleTolerance &&
 		lineErr < roughAngleTolerance &&
-		approachReady &&
-		ballCentered)
+		approachReady))
 	printCaptureDebug(
 		"kick-at-position",
 		kp.team,

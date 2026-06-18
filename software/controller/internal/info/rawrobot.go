@@ -61,7 +61,5 @@ func (r *rawRobot) SetActive(active bool) {
 }
 
 func (r *rawRobot) IsActive() bool {
-	// Require at least 3 historical position samples to filter out transient/ghost vision detections
-	return r.active && r.history.Len() >= 3
+	return r.active
 }
-

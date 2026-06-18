@@ -249,10 +249,9 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 
 	forward, lateral, ok := robot.BallLocalOffset(ballPos)
 	ballHeldInMouth := ok && kickBallHeldInMouth(dribblerPos.Dist2d(ballPos), forward, lateral, headingErr)
-	dribble := ballHeldInMouth || (dribblerPos.Dist2d(ballPos) < GetKickConfig().kickContactDist &&
+	dribble := ballCentered && (ballHeldInMouth || (dribblerPos.Dist2d(ballPos) < GetKickConfig().kickContactDist &&
 		headingErr < 2*roughAngleTolerance &&
-		approachReady &&
-		ballCentered)
+		approachReady))
 
 	printCaptureDebug(
 		"align-around",
