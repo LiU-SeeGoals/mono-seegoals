@@ -13,8 +13,6 @@ const (
 	captureLineTolerance     = info.KickCenterTolerance
 	capturePoseTolerance     = 45.0
 	nearBallOrbitRetainDist  = 300.0
-	recenterBallTriggerDist  = 240.0
-	maxRecenterStep          = 70.0
 	minAroundBallStep        = 35.0
 	minAroundBallStepTrigger = 8.0
 	aroundBallShiftAngle     = 0.7
@@ -142,24 +140,6 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 		X:     ballPos.X + distance*math.Cos(bearing),
 		Y:     ballPos.Y + distance*math.Sin(bearing),
 		Angle: dest.Angle,
-	}
-}
-
-func recenterBallDest(ballPos, botPos info.Position, finalOrientation, forward, lateral, minMargin float64) info.Position {
-	lateralStep := math.Max(-maxRecenterStep, math.Min(maxRecenterStep, lateral))
-	desiredForward := kickerStandoffDist(math.Max(minMargin, 0))
-	backoffStep := math.Max(0, desiredForward-forward)
-	backoffStep = math.Min(maxRecenterStep, backoffStep)
-
-	forwardX := math.Cos(botPos.Angle)
-	forwardY := math.Sin(botPos.Angle)
-	leftX := -math.Sin(botPos.Angle)
-	leftY := math.Cos(botPos.Angle)
-
-	return info.Position{
-		X:     botPos.X + lateralStep*leftX - backoffStep*forwardX,
-		Y:     botPos.Y + lateralStep*leftY - backoffStep*forwardY,
-		Angle: steppedOrientation(botPos, ballPos, finalOrientation),
 	}
 }
 

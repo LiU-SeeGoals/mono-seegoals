@@ -238,44 +238,12 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	dribblerPos := robot.DribblerPos()
 	ballCentered := m.contactPointCentered(robot, ballPos)
 	captureReady := capturePoseReady(myPos, ballPos, m.to, headingErr)
-	forward, lateral, localOK := robot.BallLocalOffset(ballPos)
 
 	minMargin := alignmentMargin(headingErr)
 	if !captureReady {
 		minMargin = math.Max(minMargin, captureMarginToBall)
 	} else if !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered {
 		minMargin = math.Max(minMargin, 0)
-	}
-
-	if localOK &&
-		!ballCentered &&
-		forward > info.Center2DribblerDist*0.5 &&
-		myPos.Dist2d(ballPos) < recenterBallTriggerDist {
-		carrot := recenterBallDest(ballPos, myPos, finalOrientation, forward, lateral, minMargin)
-		printCaptureDebug(
-			"align-recenter",
-			m.team,
-			m.id,
-			robot,
-			myPos,
-			ballPos,
-			m.to,
-			carrot,
-			headingErr,
-			captureReady,
-			ballCentered,
-			false,
-			0,
-			minMargin,
-		)
-
-		return &action.MoveTo{
-			Id:      int(m.id),
-			Team:    m.team,
-			Pos:     myPos,
-			Dest:    carrot,
-			Dribble: false,
-		}
 	}
 
 	lineup := behindBallDest(ballPos, m.to, minMargin)
