@@ -54,3 +54,65 @@ func TestCaptureOrbitMarginAllowsPushOnlyWhenCentered(t *testing.T) {
 		t.Fatalf("expected push margin once approach is ready and centered, got %.1f", got)
 	}
 }
+
+func TestAroundBallDestEnforcesMinimumMoveDistance(t *testing.T) {
+	ball := info.Position{X: 0, Y: 0}
+	bot := info.Position{X: -137, Y: 0}
+	lineup := info.Position{X: -126.5, Y: 35}
+
+	dest := aroundBallDest(ball, bot, lineup, offCenterOrbitMargin)
+	moveDist := bot.Dist2d(dest)
+
+	if math.Abs(moveDist-minAroundBallMoveDist) > 1e-6 {
+		t.Fatalf("expected %.1f mm minimum move, got %.3f mm", minAroundBallMoveDist, moveDist)
+	}
+	wantRadius := kickerStandoffDist(offCenterOrbitMargin)
+	if got := ball.Dist2d(dest); math.Abs(got-wantRadius) > 1e-6 {
+		t.Fatalf("expected destination to remain on %.1f mm orbit, got %.3f mm", wantRadius, got)
+	}
+}
+
+func TestAroundBallDestDoesNotExtendTinyCorrection(t *testing.T) {
+	ball := info.Position{X: 0, Y: 0}
+	radius := kickerStandoffDist(offCenterOrbitMargin)
+	bot := info.Position{X: -radius, Y: 0}
+	lineup := info.Position{X: -radius, Y: 1}
+
+	dest := aroundBallDest(ball, bot, lineup, offCenterOrbitMargin)
+
+	if got := bot.Dist2d(dest); got >= minAroundBallMoveTrigger {
+		t.Fatalf("expected tiny correction to remain below trigger, got %.3f mm", got)
+	}
+}
+
+func TestAroundBallDestDoesNotTurnRadialCorrectionIntoOrbit(t *testing.T) {
+	ball := info.Position{X: 0, Y: 0}
+	bot := info.Position{X: -137, Y: 0}
+	radius := kickerStandoffDist(offCenterOrbitMargin)
+	lineup := info.Position{X: -radius, Y: 0}
+
+	dest := aroundBallDest(ball, bot, lineup, offCenterOrbitMargin)
+
+	if got := dest.Dist2d(lineup); got > 1e-6 {
+		t.Fatalf("expected radial correction to target lineup, offset %.6f mm", got)
+	}
+}
+
+func TestAroundBallDestLeavesLargeMoveUnchanged(t *testing.T) {
+	ball := info.Position{X: 0, Y: 0}
+	botRadius := kickerStandoffDist(offCenterOrbitMargin)
+	bot := info.Position{X: -botRadius, Y: 0}
+	lineup := info.Position{X: 0, Y: botRadius}
+
+	dest := aroundBallDest(ball, bot, lineup, offCenterOrbitMargin)
+	wantBearing := math.Pi - aroundBallShiftAngle
+	wantRadius := kickerStandoffDist(offCenterOrbitMargin + maxMarginToBall/2)
+	want := info.Position{
+		X: wantRadius * math.Cos(wantBearing),
+		Y: wantRadius * math.Sin(wantBearing),
+	}
+
+	if got := dest.Dist2d(want); got > 1e-6 {
+		t.Fatalf("expected large move destination to remain unchanged, offset %.6f mm", got)
+	}
+}

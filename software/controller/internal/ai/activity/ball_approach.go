@@ -14,8 +14,8 @@ const (
 	captureLineTolerance     = info.DribblerHalfWidth + info.BallRadius
 	capturePoseTolerance     = 65.0
 	nearBallOrbitRetainDist  = 300.0
-	minAroundBallStep        = 35.0
-	minAroundBallStepTrigger = 8.0
+	minAroundBallMoveDist    = 60.0
+	minAroundBallMoveTrigger = 8.0
 	aroundBallShiftAngle     = 0.7
 	maxTargetOrientationStep = 0.4
 	roughAngleTolerance      = 0.1
@@ -140,10 +140,19 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 	}
 
 	shiftMag := math.Min(math.Abs(remaining), aroundBallShiftAngle)
-	if distance > 1 {
-		arcStep := shiftMag * distance
-		if arcStep > minAroundBallStepTrigger && arcStep < minAroundBallStep {
-			shiftMag = math.Min(aroundBallShiftAngle, minAroundBallStep/distance)
+	botRadius := ballPos.Dist2d(botPos)
+	if distance > 1 && botRadius > 1 {
+		orbitArc := shiftMag * distance
+		moveDist := math.Sqrt(botRadius*botRadius + distance*distance -
+			2*botRadius*distance*math.Cos(shiftMag))
+		if orbitArc > minAroundBallMoveTrigger && moveDist < minAroundBallMoveDist {
+			// Solve the chord equation for the angular shift that places the
+			// carrot far enough away while keeping it on the intended orbit.
+			cosShift := (botRadius*botRadius + distance*distance -
+				minAroundBallMoveDist*minAroundBallMoveDist) / (2 * botRadius * distance)
+			cosShift = math.Max(-1, math.Min(1, cosShift))
+			minShift := math.Acos(cosShift)
+			shiftMag = math.Min(aroundBallShiftAngle, math.Max(shiftMag, minShift))
 		}
 	}
 	shift := -math.Copysign(shiftMag, remaining)
