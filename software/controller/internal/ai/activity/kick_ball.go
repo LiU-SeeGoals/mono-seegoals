@@ -54,7 +54,8 @@ func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 	// fmt.Println("new pos", ballPos, m.orignalBallPos, ballPos.Norm2d(m.orignalBallPos))
 	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
 
-	robotPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
+	robot := gi.State.GetTeam(m.team)[m.id]
+	robotPos, err := robot.GetPosition()
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -70,7 +71,14 @@ func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 	ballToTarget.DivNorm()
 
 	headingErr := math.Abs(info.NormalizeAngleDelta(kickAngle, robotPos.Angle))
-	if !captureApproachReady(robotPos, ballPos, m.to, headingErr) {
+	dribblerPos := robot.DribblerPos()
+	forward, lateral, ok := robot.BallLocalOffset(ballPos)
+	closeEnoughToFinish := ok &&
+		forward > info.Center2DribblerDist &&
+		math.Abs(lateral) < captureLineTolerance &&
+		dribblerPos.Dist2d(ballPos) < GetKickConfig().kickContactDist &&
+		headingErr < 2*roughAngleTolerance
+	if !captureApproachReady(robotPos, ballPos, m.to, headingErr) && !closeEnoughToFinish {
 		return behindBallDest(ballPos, m.to, captureMarginToBall)
 	}
 

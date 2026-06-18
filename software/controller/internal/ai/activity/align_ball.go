@@ -237,10 +237,11 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	headingErr := math.Abs(info.NormalizeAngleDelta(finalOrientation, myPos.Angle))
 	dribblerPos := robot.DribblerPos()
 	ballCentered := m.contactPointCentered(robot, ballPos)
+	approachReady := captureApproachReady(myPos, ballPos, m.to, headingErr)
 	captureReady := capturePoseReady(myPos, ballPos, m.to, headingErr)
 
 	minMargin := alignmentMargin(headingErr)
-	if !captureReady {
+	if !approachReady {
 		minMargin = math.Max(minMargin, captureMarginToBall)
 	} else if !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered {
 		minMargin = math.Max(minMargin, 0)
@@ -252,7 +253,7 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 
 	dribble := dribblerPos.Dist2d(ballPos) < GetKickConfig().kickContactDist &&
 		headingErr < 2*roughAngleTolerance &&
-		captureReady &&
+		approachReady &&
 		ballCentered
 
 	printCaptureDebug(
