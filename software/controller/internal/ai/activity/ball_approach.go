@@ -10,8 +10,8 @@ const (
 	maxMarginToBall          = 70.0
 	ballPushMargin           = -20.0
 	captureMarginToBall      = 25.0
-	captureLineTolerance     = info.KickCenterTolerance
-	capturePoseTolerance     = 45.0
+	captureLineTolerance     = info.DribblerHalfWidth + info.BallRadius
+	capturePoseTolerance     = 65.0
 	nearBallOrbitRetainDist  = 300.0
 	minAroundBallStep        = 35.0
 	minAroundBallStepTrigger = 8.0
