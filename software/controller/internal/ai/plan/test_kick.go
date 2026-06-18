@@ -5,11 +5,8 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
-	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
-
-const testKickPlannerLoopPeriod = 100 * time.Millisecond
 
 type TestKick struct {
 	plannerCore
@@ -43,7 +40,7 @@ func (m *TestKick) Init(
 
 func (g *TestKick) run() {
 	for {
-		tickStart := time.Now()
+		<-g.incomingGameInfo
 		if g.ActivityHandler.Activities[3] == nil {
 			queue := ai.NewActivityQueue(3, []ai.Activity{
 				ai.NewMoveToBall(g.team, 3),
@@ -51,7 +48,6 @@ func (g *TestKick) run() {
 			})
 			g.ActivityHandler.AddActivity(queue)
 		}
-		helper.PaceLoop(tickStart, testKickPlannerLoopPeriod, "test_kick")
 	}
 
 }

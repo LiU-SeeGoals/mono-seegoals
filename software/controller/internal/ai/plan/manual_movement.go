@@ -7,11 +7,8 @@ import (
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/client"
-	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
-
-const plannerManualMovementLoopPeriod = 100 * time.Millisecond
 
 type plannerManualMovement struct {
 	plannerCore
@@ -49,9 +46,9 @@ func (m *plannerManualMovement) run() {
 	fmt.Println(gameInfo.Status)
 
 	for m.Active {
+		<-m.incomingGameInfo // Only used for pacing
 		command := client.GetCommand(client.MOVE_ROBOT)
 		// fmt.Println(len(commands))
-		tickStart := time.Now()
 
 		if command != nil {
 			fmt.Println("changing command")
@@ -59,8 +56,6 @@ func (m *plannerManualMovement) run() {
 
 			m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(command.Id), pos))
 		}
-
-		helper.PaceLoop(tickStart, plannerManualMovementLoopPeriod, "planner_rw")
 	}
 }
 

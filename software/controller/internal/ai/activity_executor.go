@@ -1,9 +1,9 @@
 package ai
 
 import (
+	"fmt"
 	"sort"
 	"sync"
-	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
@@ -47,9 +47,10 @@ func (fb *activityExecutor) Init(
 }
 
 func (fb *activityExecutor) Run() {
+	frameMonitor := helper.NewFrameSkipMonitor(fmt.Sprintf("%s activity_executor", fb.team))
 	for {
 		gameInfo := <-fb.incomingGameInfo
-		tickStart := time.Now()
+		frameMonitor.Observe(gameInfo.VisionFrame())
 
 		// Make a snapshot of current activities under lock
 		fb.activity_lock.Lock()
@@ -103,8 +104,6 @@ func (fb *activityExecutor) Run() {
 
 		// Send actions
 		fb.outgoingActions <- actions
-
-		helper.PaceLoop(tickStart, helper.ExecutorLoopPeriod, "activity_executor")
 	}
 }
 

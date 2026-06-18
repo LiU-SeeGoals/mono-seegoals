@@ -671,6 +671,7 @@ func (m *CombinedPlan) run() {
 	roleManager := newCombinedRoleManager(&m.ActivityHandler, &gi, m.team)
 	possessionTracker := &ballPossessionTracker{}
 	actorTracker := &offenseBallActorTracker{}
+	frameMonitor := helper.NewFrameSkipMonitor(m.team.String() + " combined_plan")
 	mode := tacticalModeAttack
 	candidateMode := tacticalMode("")
 	candidateModeSince := time.Time{}
@@ -685,6 +686,7 @@ func (m *CombinedPlan) run() {
 	for m.Active {
 		tickStart := time.Now()
 		gi = <-m.incomingGameInfo
+		frameMonitor.Observe(gi.VisionFrame())
 		possession := possessionTracker.update(&gi, tickStart)
 		rawOwner := observedBallOwner(&gi)
 
@@ -804,8 +806,6 @@ func (m *CombinedPlan) run() {
 			}
 			goalieRole.Run()
 		}
-
-		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "combined_plan")
 	}
 }
 
