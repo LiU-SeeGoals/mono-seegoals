@@ -24,7 +24,7 @@ const (
 	Center2DribblerDist = 75.0
 	BallRadius          = 21.5
 	DribblerHalfWidth   = 35.0
-	KickCenterTolerance = DribblerHalfWidth
+	KickCenterTolerance = DribblerHalfWidth + BallRadius/2
 )
 
 func (t Team) String() string {
