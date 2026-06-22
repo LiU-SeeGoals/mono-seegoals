@@ -13,6 +13,8 @@ const (
 	ballRadius          = 21.5
 	maxMarginToBall = 70.0
 	ballPushMargin = -20.0
+	minAroundBallMoveDist = 10.0
+	minAroundBallMoveTrigger = 8.0
 	aroundBallShiftAngle = 0.7
 	maxTargetOrientationStep = 0.4
 	roughAngleTolerance = 0.1
@@ -100,7 +102,21 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 	}
 
 	
-	shift := -math.Copysign(math.Min(math.Abs(remaining), aroundBallShiftAngle), remaining)
+	shiftMag := math.Min(math.Abs(remaining), aroundBallShiftAngle)
+	botRadius := ballPos.Dist2d(botPos)
+	if distance > 1 && botRadius > 1 {
+		orbitArc := shiftMag * distance
+		moveDist := math.Sqrt(botRadius*botRadius + distance*distance -
+			2*botRadius*distance*math.Cos(shiftMag))
+		if orbitArc > minAroundBallMoveTrigger && moveDist < minAroundBallMoveDist {
+			cosShift := (botRadius*botRadius + distance*distance -
+				minAroundBallMoveDist*minAroundBallMoveDist) / (2 * botRadius * distance)
+			cosShift = math.Max(-1, math.Min(1, cosShift))
+			minShift := math.Acos(cosShift)
+			shiftMag = math.Min(aroundBallShiftAngle, math.Max(shiftMag, minShift))
+		}
+	}
+	shift := -math.Copysign(shiftMag, remaining)
 	bearing := ball2BotAngle + shift
 	return info.Position{
 		X:     ballPos.X + distance*math.Cos(bearing),
