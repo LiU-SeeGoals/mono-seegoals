@@ -24,6 +24,12 @@ type MoveTo struct {
 	// area instead of clamping them to the playable touchlines. The goal-line
 	// safety guard remains active.
 	AllowOutsideField bool
+	// AllowGoalArea permits the robot to enter either goal/penalty area between
+	// the penalty stretch and goal line. This is intended for the goalie only.
+	AllowGoalArea bool
+	// MinLinearSpeed optionally raises the simulator's linear speed floor for
+	// motions such as close ball orbits. Zero keeps the default floor.
+	MinLinearSpeed float64
 	// Decides if the robot should dribble while moving
 	Dribble bool
 	// We need to know ID AND team to know how to update the pos
@@ -79,8 +85,12 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
 
 	const maxLinearSpeed = 0.65
 	const slowdownDistance = 1000.0
-	const minLinearSpeed = 0.1
+	const defaultMinLinearSpeed = 0.1
 	const angleKp = 1.0
+	minLinearSpeed := defaultMinLinearSpeed
+	if mv.MinLinearSpeed > 0 {
+		minLinearSpeed = math.Min(maxLinearSpeed, mv.MinLinearSpeed)
+	}
 	mv.Dest.Angle = convAngle(mv.Dest.Angle)
 	mv.Pos.Angle = convAngle(mv.Pos.Angle)
 
