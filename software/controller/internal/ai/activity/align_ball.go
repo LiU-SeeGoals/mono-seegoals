@@ -271,11 +271,12 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	)
 
 	return &action.MoveTo{
-		Id:      int(m.id),
-		Team:    m.team,
-		Pos:     myPos,
-		Dest:    carrot,
-		Dribble: dribble,
+		Id:             int(m.id),
+		Team:           m.team,
+		Pos:            myPos,
+		Dest:           carrot,
+		MinLinearSpeed: aroundBallLinearSpeed(myPos, carrot),
+		Dribble:        dribble,
 	}
 }
 

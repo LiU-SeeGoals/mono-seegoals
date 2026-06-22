@@ -119,6 +119,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 		act.Pos = myPos
 		act.Dest = finalDestination
 		act.AllowOutsideField = m.allowOutsideField
+		act.AllowGoalArea = !m.avoidGoallines
 		act.Dribble = false
 		return act
 	}
@@ -157,6 +158,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	act.Dest = targetPos
 	act.Dest.Angle = finalDestination.Angle
 	act.AllowOutsideField = m.allowOutsideField
+	act.AllowGoalArea = !m.avoidGoallines
 	act.Dribble = m.dribble
 	// Include the full planned path for visualization in the GameViewer.
 	// Note: this is a copy so UI serialization can't race on m.path.

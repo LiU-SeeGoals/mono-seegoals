@@ -107,6 +107,7 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	act.Pos = myRobotPos
 	act.Dest = goaliePos
 	act.Dest.Angle = lookAtBall
+	act.AllowGoalArea = true
 	act.Dribble = false
 
 	return &act

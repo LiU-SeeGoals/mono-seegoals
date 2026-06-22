@@ -7,16 +7,23 @@ import (
 )
 
 const (
-	maxMarginToBall          = 90.0
-	ballPushMargin           = -10.0
-	captureMarginToBall      = 40.0
-	offCenterOrbitMargin     = 30.0
-	captureLineTolerance     = info.DribblerHalfWidth + info.BallRadius
-	capturePoseTolerance     = 65.0
-	nearBallOrbitRetainDist  = 300.0
-	minAroundBallMoveDist    = 60.0
+	maxMarginToBall         = 90.0
+	ballPushMargin          = -10.0
+	captureMarginToBall     = 40.0
+	offCenterOrbitMargin    = 30.0
+	captureLineTolerance    = info.DribblerHalfWidth + info.BallRadius
+	capturePoseTolerance    = 65.0
+	nearBallOrbitRetainDist = 300.0
+	// The real robot's position follower scales velocity with destination
+	// distance. Keep close orbit corrections large enough to avoid crawling.
+	minAroundBallMoveDist    = 100.0
 	minAroundBallMoveTrigger = 8.0
-	aroundBallShiftAngle     = 0.7
+	aroundBallMinLinearSpeed = 0.2
+	// Keep the orbit carrot far enough ahead that the position controller
+	// commands useful tangential speed while the robot has substantial
+	// rotation remaining. Small final corrections are still limited by the
+	// remaining angle below.
+	aroundBallShiftAngle     = 1.0
 	maxTargetOrientationStep = 0.4
 	roughAngleTolerance      = 0.1
 	ballLookaheadSec         = 0.3
@@ -162,6 +169,13 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 		Y:     ballPos.Y + distance*math.Sin(bearing),
 		Angle: dest.Angle,
 	}
+}
+
+func aroundBallLinearSpeed(botPos, dest info.Position) float64 {
+	if botPos.Dist2d(dest) < minAroundBallMoveTrigger {
+		return 0
+	}
+	return aroundBallMinLinearSpeed
 }
 
 func steppedOrientation(botPos, ballPos info.Position, finalOrientation float64) float64 {

@@ -147,11 +147,12 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	)
 
 	return &action.MoveTo{
-		Id:      int(kp.id),
-		Team:    kp.team,
-		Pos:     robotPos,
-		Dest:    carrot,
-		Dribble: dribble,
+		Id:             int(kp.id),
+		Team:           kp.team,
+		Pos:            robotPos,
+		Dest:           carrot,
+		MinLinearSpeed: aroundBallLinearSpeed(robotPos, carrot),
+		Dribble:        dribble,
 	}
 }
 

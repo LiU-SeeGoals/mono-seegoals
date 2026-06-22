@@ -26,6 +26,13 @@ const (
 	goalLineMaxClearanceMM        = 1200.0
 )
 
+type goalAreaBounds struct {
+	frontX float64
+	backX  float64
+	minY   float64
+	maxY   float64
+}
+
 type activityExecutor struct {
 	team             info.Team
 	incomingGameInfo <-chan info.GameInfo
@@ -134,13 +141,33 @@ func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action 
 	}
 	goalClearance := goalLineClearance(move, gi)
 
+	originalDestX := move.Dest.X
 	move.Dest = gi.ClampToField(move.Dest, margin)
 	move.Dest = clampToGoalLines(move.Dest, gi, goalClearance)
+	goalAreaAdjusted := false
+	var goalAreas []goalAreaBounds
+	if !move.AllowGoalArea {
+		goalAreas = getGoalAreaBounds(gi)
+		move.Dest, goalAreaAdjusted = clampGoalAreaMotion(move.Pos, move.Dest, goalAreas, goalClearance)
+	}
+
+	// Kicks are a distinct firmware action which continues position control
+	// while charging. If safety changed its drive-through destination, or the
+	// robot is already inside a forbidden goal area, use a normal MoveTo command
+	// so it brakes/retreats without arming the kicker.
+	if move.KickSpeed != 0 && (move.Dest.X != originalDestX || goalAreaAdjusted ||
+		(!move.AllowGoalArea && positionInGoalArea(move.Pos, goalAreas, goalLineBaseClearanceMM))) {
+		move.KickSpeed = 0
+	}
+
 	if len(move.Path) > 0 {
 		clamped := make([]info.Position, len(move.Path))
 		for i, waypoint := range move.Path {
 			clamped[i] = gi.ClampToField(waypoint, margin)
 			clamped[i] = clampToGoalLines(clamped[i], gi, goalClearance)
+			if !move.AllowGoalArea {
+				clamped[i], _ = clampOutsideGoalAreas(clamped[i], goalAreas, goalClearance)
+			}
 		}
 		move.Path = clamped
 	}
@@ -190,4 +217,118 @@ func clampToGoalLines(pos info.Position, gi *info.GameInfo, clearance float64) i
 
 	pos.X = math.Max(minX, math.Min(maxX, pos.X))
 	return pos
+}
+
+func clampOutsideGoalAreas(pos info.Position, areas []goalAreaBounds, clearance float64) (info.Position, bool) {
+	for _, area := range areas {
+		minX := math.Min(area.frontX, area.backX) - clearance
+		maxX := math.Max(area.frontX, area.backX) + clearance
+		minY := area.minY - clearance
+		maxY := area.maxY + clearance
+		if pos.X < minX || pos.X > maxX || pos.Y < minY || pos.Y > maxY {
+			continue
+		}
+
+		if area.backX < area.frontX {
+			pos.X = area.frontX + clearance
+		} else {
+			pos.X = area.frontX - clearance
+		}
+		return pos, true
+	}
+	return pos, false
+}
+
+// clampGoalAreaMotion also catches a direct kick approach whose destination is
+// outside a goal area but whose straight drive-through segment cuts a corner.
+func clampGoalAreaMotion(from, dest info.Position, areas []goalAreaBounds, clearance float64) (info.Position, bool) {
+	if clamped, adjusted := clampOutsideGoalAreas(dest, areas, clearance); adjusted {
+		return clamped, true
+	}
+	if positionInGoalArea(from, areas, clearance) {
+		// Do not block a robot which is already inside from retreating.
+		return dest, false
+	}
+
+	for _, area := range areas {
+		minX := math.Min(area.frontX, area.backX) - clearance
+		maxX := math.Max(area.frontX, area.backX) + clearance
+		minY := area.minY - clearance
+		maxY := area.maxY + clearance
+		if t, ok := segmentRectangleEntry(from, dest, minX, maxX, minY, maxY); ok {
+			dx := dest.X - from.X
+			dy := dest.Y - from.Y
+			length := math.Hypot(dx, dy)
+			if length > 0 {
+				t = math.Max(0, t-1.0/length) // remain 1 mm outside the inflated area
+			}
+			dest.X = from.X + t*dx
+			dest.Y = from.Y + t*dy
+			return dest, true
+		}
+	}
+	return dest, false
+}
+
+func segmentRectangleEntry(from, to info.Position, minX, maxX, minY, maxY float64) (float64, bool) {
+	tEnter, tExit := 0.0, 1.0
+	dx := to.X - from.X
+	dy := to.Y - from.Y
+	for _, edge := range [][2]float64{
+		{-dx, from.X - minX},
+		{dx, maxX - from.X},
+		{-dy, from.Y - minY},
+		{dy, maxY - from.Y},
+	} {
+		p, q := edge[0], edge[1]
+		if p == 0 {
+			if q < 0 {
+				return 0, false
+			}
+			continue
+		}
+		r := q / p
+		if p < 0 {
+			if r > tExit {
+				return 0, false
+			}
+			tEnter = math.Max(tEnter, r)
+		} else {
+			if r < tEnter {
+				return 0, false
+			}
+			tExit = math.Min(tExit, r)
+		}
+	}
+	return tEnter, tEnter <= tExit
+}
+
+func positionInGoalArea(pos info.Position, areas []goalAreaBounds, clearance float64) bool {
+	_, adjusted := clampOutsideGoalAreas(pos, areas, clearance)
+	return adjusted
+}
+
+func getGoalAreaBounds(gi *info.GameInfo) []goalAreaBounds {
+	if gi == nil || !gi.HasField() {
+		return nil
+	}
+
+	areas := make([]goalAreaBounds, 0, 2)
+	for _, names := range [][2]string{
+		{"LeftPenaltyStretch", "LeftGoalLine"},
+		{"RightPenaltyStretch", "RightGoalLine"},
+	} {
+		front := gi.GetFieldLine(names[0])
+		back := gi.GetFieldLine(names[1])
+		if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
+			continue
+		}
+		areas = append(areas, goalAreaBounds{
+			frontX: float64(front.GetP1().GetX()),
+			backX:  float64(back.GetP1().GetX()),
+			minY:   math.Min(float64(front.GetP1().GetY()), float64(front.GetP2().GetY())),
+			maxY:   math.Max(float64(front.GetP1().GetY()), float64(front.GetP2().GetY())),
+		})
+	}
+	return areas
 }
