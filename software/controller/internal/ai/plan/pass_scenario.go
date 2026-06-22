@@ -108,18 +108,16 @@ func (g *GameScenario) run() {
 	hasActiveReceiver := false
 	possessionTracker := &ballPossessionTracker{}
 	actorTracker := &offenseBallActorTracker{}
+	frameMonitor := helper.NewFrameSkipMonitor(g.team.String() + " pass_scenario")
 
 	for {
 		tickStart := time.Now()
 
 		gi = <-g.incomingGameInfo
+		frameMonitor.Observe(gi.VisionFrame())
 		possession := possessionTracker.update(&gi, tickStart)
 		rawOwner := observedBallOwner(&gi)
 		// handleRef := refereeHandler.HandleReferee()
-		// if handleRef {
-		// 	helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
-		// 	continue
-		// }
 		// Only coordinate robot roles, trigger ball events
 
 		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
@@ -170,7 +168,6 @@ func (g *GameScenario) run() {
 		// Defense strategy
 
 		// Etc...
-		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "pass_scenario")
 	}
 }
 

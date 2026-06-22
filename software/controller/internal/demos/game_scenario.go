@@ -94,10 +94,11 @@ func GameScenario() {
 		basestationClient.Init()
 	}
 	for {
+		// Pace the control loop from raw vision frames.
+		sslClientRaw.WaitForVision(gameInfo)
 
 		playTime := time.Now().UnixMilli()
 
-		sslClientRaw.UpdateState(gameInfo, playTime)
 		sslClientTracked.UpdateState(gameInfo, playTime)
 
 		command := client.GetCommand(client.CHANGE_SCENARIO)

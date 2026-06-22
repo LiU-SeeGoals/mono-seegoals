@@ -6,11 +6,8 @@ import (
 	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
-	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
-
-const plannerRwLoopPeriod = 100 * time.Millisecond
 
 type plannerRw struct {
 	plannerCore
@@ -64,7 +61,7 @@ func (m *plannerRw) run() {
 	fmt.Println(gameInfo.Status)
 
 	for {
-		tickStart := time.Now()
+		<-m.incomingGameInfo
 
 		robot := robots[0]
 		if m.ActivityHandler.Activities[robot] == nil {
@@ -73,7 +70,5 @@ func (m *plannerRw) run() {
 			m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(robot), way_points[index]))
 			index = (index + 1) % len(way_points)
 		}
-
-		helper.PaceLoop(tickStart, plannerRwLoopPeriod, "planner_rw")
 	}
 }

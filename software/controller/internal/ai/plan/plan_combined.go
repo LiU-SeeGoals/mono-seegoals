@@ -94,7 +94,7 @@ type combinedRoleManager struct {
 	activityHandler *coreai.ActivityHandler
 	gi              *GameInfo
 	team            Team
-	kickers         map[info.ID]*roles.OffenseRole
+	attackers       map[info.ID]*roles.OffenseRole
 	defenders       map[info.ID]*roles.DefenseRole
 	roleByRobot     map[info.ID]roleKind
 	slotByRobot     map[info.ID]tacticalSlotKind
@@ -106,7 +106,7 @@ func newCombinedRoleManager(activityHandler *coreai.ActivityHandler, gi *GameInf
 		activityHandler: activityHandler,
 		gi:              gi,
 		team:            team,
-		kickers:         make(map[info.ID]*roles.OffenseRole),
+		attackers:       make(map[info.ID]*roles.OffenseRole),
 		defenders:       make(map[info.ID]*roles.DefenseRole),
 		roleByRobot:     make(map[info.ID]roleKind),
 		slotByRobot:     make(map[info.ID]tacticalSlotKind),
@@ -156,9 +156,9 @@ func (rm *combinedRoleManager) applySlotAssignments(assignments map[info.ID]tact
 
 func (rm *combinedRoleManager) assignOffense(id info.ID, now time.Time) {
 	rm.remove(id)
-	kicker := roles.NewOffenseRole(id, *rm.activityHandler, rm.gi, rm.team)
-	kicker.Init()
-	rm.kickers[id] = kicker
+	attacker := roles.NewOffenseRole(id, *rm.activityHandler, rm.gi, rm.team)
+	attacker.Init()
+	rm.attackers[id] = attacker
 	rm.roleByRobot[id] = roleOffense
 	rm.lastChanged[id] = now
 }
@@ -173,7 +173,7 @@ func (rm *combinedRoleManager) assignDefense(id info.ID, now time.Time) {
 }
 
 func (rm *combinedRoleManager) remove(id info.ID) {
-	delete(rm.kickers, id)
+	delete(rm.attackers, id)
 	delete(rm.defenders, id)
 	delete(rm.roleByRobot, id)
 	delete(rm.slotByRobot, id)
@@ -188,12 +188,12 @@ func (rm *combinedRoleManager) setSlot(id info.ID, slot tacticalSlotKind, now ti
 
 	switch slot {
 	case tacticalSlotBallChaser:
-		if kicker, ok := rm.kickers[id]; ok {
-			kicker.SetSlot(roles.OffenseSlot{Kind: roles.OffenseRoleChaser})
+		if attacker, ok := rm.attackers[id]; ok {
+			attacker.SetSlot(roles.OffenseSlot{Kind: roles.OffenseRoleChaser})
 		}
 	case tacticalSlotBallReceiver:
-		if kicker, ok := rm.kickers[id]; ok {
-			kicker.SetSlot(roles.OffenseSlot{Kind: roles.OffenseRoleReceiver})
+		if attacker, ok := rm.attackers[id]; ok {
+			attacker.SetSlot(roles.OffenseSlot{Kind: roles.OffenseRoleReceiver})
 		}
 	case tacticalSlotDefenderWall:
 		if defender, ok := rm.defenders[id]; ok {
@@ -211,8 +211,8 @@ func (rm *combinedRoleManager) setSlot(id info.ID, slot tacticalSlotKind, now ti
 }
 
 func (rm *combinedRoleManager) offenseIDs() []info.ID {
-	ids := make([]info.ID, 0, len(rm.kickers))
-	for id := range rm.kickers {
+	ids := make([]info.ID, 0, len(rm.attackers))
+	for id := range rm.attackers {
 		ids = append(ids, id)
 	}
 	sort.Slice(ids, func(i, j int) bool {
@@ -254,8 +254,8 @@ func (rm *combinedRoleManager) idForSlot(slot tacticalSlotKind) (info.ID, bool) 
 }
 
 func (rm *combinedRoleManager) configureOffenseReceivers(receiverIDs []info.ID) {
-	for _, kicker := range rm.kickers {
-		kicker.SetPassReceivers(receiverIDs)
+	for _, attacker := range rm.attackers {
+		attacker.SetPassReceivers(receiverIDs)
 	}
 }
 
@@ -671,6 +671,7 @@ func (m *CombinedPlan) run() {
 	roleManager := newCombinedRoleManager(&m.ActivityHandler, &gi, m.team)
 	possessionTracker := &ballPossessionTracker{}
 	actorTracker := &offenseBallActorTracker{}
+	frameMonitor := helper.NewFrameSkipMonitor(m.team.String() + " combined_plan")
 	mode := tacticalModeAttack
 	candidateMode := tacticalMode("")
 	candidateModeSince := time.Time{}
@@ -685,6 +686,7 @@ func (m *CombinedPlan) run() {
 	for m.Active {
 		tickStart := time.Now()
 		gi = <-m.incomingGameInfo
+		frameMonitor.Observe(gi.VisionFrame())
 		possession := possessionTracker.update(&gi, tickStart)
 		rawOwner := observedBallOwner(&gi)
 
@@ -729,16 +731,16 @@ func (m *CombinedPlan) run() {
 			(ballMoving || !ownerRetained)
 		if !passInFlight && possession.owner.valid && possession.owner.team == m.team {
 			ownerID := possession.owner.id
-			owner, ok := roleManager.kickers[ownerID]
+			owner, ok := roleManager.attackers[ownerID]
 			if ok {
 				handledByOffense = true
 				hasActiveReceiver = false
 
-				actorTracker.switchTo(roleManager.kickers, newOffenseBallActor(ownerID, offenseBallActorOwner))
+				actorTracker.switchTo(roleManager.attackers, newOffenseBallActor(ownerID, offenseBallActorOwner))
 				owner.TriggerEvent("BALL_OWNER")
 				decision := owner.CurrentDecision()
 				if decision.IsPass && decision.ReceiverID != ownerID {
-					receiver, ok := roleManager.kickers[decision.ReceiverID]
+					receiver, ok := roleManager.attackers[decision.ReceiverID]
 					if ok {
 						activeReceiver = decision.ReceiverID
 						activeReceiverStart = time.Now()
@@ -751,24 +753,24 @@ func (m *CombinedPlan) run() {
 
 		if !handledByOffense {
 			if passInFlight {
-				actorTracker.switchTo(roleManager.kickers, newOffenseBallActor(activeReceiver, offenseBallActorReceiver))
+				actorTracker.switchTo(roleManager.attackers, newOffenseBallActor(activeReceiver, offenseBallActorReceiver))
 			} else {
 				hasActiveReceiver = false
 				interceptorID := chaserID
 				if !hasChaser {
 					interceptorID = m.getRobotForBall(&gi, offenseRobots)
 				}
-				if interceptor, ok := roleManager.kickers[interceptorID]; ok {
-					actorTracker.switchTo(roleManager.kickers, newOffenseBallActor(interceptorID, offenseBallActorChaser))
+				if interceptor, ok := roleManager.attackers[interceptorID]; ok {
+					actorTracker.switchTo(roleManager.attackers, newOffenseBallActor(interceptorID, offenseBallActorChaser))
 					interceptor.TriggerEvent("BALL_APPROACHING")
 				} else {
-					actorTracker.switchTo(roleManager.kickers, noOffenseBallActor())
+					actorTracker.switchTo(roleManager.attackers, noOffenseBallActor())
 				}
 			}
 		}
 
-		for _, kicker := range roleManager.kickers {
-			kicker.Run()
+		for _, attacker := range roleManager.attackers {
+			attacker.Run()
 		}
 
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
@@ -804,8 +806,6 @@ func (m *CombinedPlan) run() {
 			}
 			goalieRole.Run()
 		}
-
-		helper.PaceLoop(tickStart, helper.PlannerLoopPeriod, "combined_plan")
 	}
 }
 

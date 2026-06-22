@@ -11,9 +11,10 @@ import (
 
 // Maybe State should also be private, so we can keep track of coordinate system here?
 type GameInfo struct {
-	State  *GameState
-	Status *GameStatus
-	field  *ssl_vision.SSL_GeometryFieldSize
+	State       *GameState
+	Status      *GameStatus
+	field       *ssl_vision.SSL_GeometryFieldSize
+	visionFrame uint64
 }
 
 func NewGameInfo(capacity int) *GameInfo {
@@ -39,6 +40,14 @@ func correctedPosition(team Team, pos Position) Position {
 
 func (gi GameInfo) PrintField() {
 	fmt.Println(gi.field)
+}
+
+func (gi *GameInfo) AdvanceVisionFrame() {
+	gi.visionFrame++
+}
+
+func (gi GameInfo) VisionFrame() uint64 {
+	return gi.visionFrame
 }
 
 // Existing lines:

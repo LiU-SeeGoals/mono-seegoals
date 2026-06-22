@@ -33,6 +33,11 @@ func (client *SSLClient) UpdateState(gi *info.GameInfo, play_time int64) {
 	client.referee.UpdateGameInfo(gi)
 }
 
+func (client *SSLClient) WaitForVision(gi *info.GameInfo) {
+	client.vision.WaitForVision(gi)
+	client.referee.UpdateGameInfo(gi)
+}
+
 func (client *SSLTrackedClient) UpdateState(gi *info.GameInfo, play_time int64) {
 	client.vision.UpdateGameInfoTracked(gi, play_time)
 }
