@@ -21,7 +21,8 @@ type MoveTo struct {
 	// Used for visualization in the GameViewer.
 	Path []info.Position
 	// AllowOutsideField lets the executor keep destinations in the SSL boundary
-	// area instead of clamping them to the playable field lines.
+	// area instead of clamping them to the playable touchlines. The goal-line
+	// safety guard remains active.
 	AllowOutsideField bool
 	// Decides if the robot should dribble while moving
 	Dribble bool
