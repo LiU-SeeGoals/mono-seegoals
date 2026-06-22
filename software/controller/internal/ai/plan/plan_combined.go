@@ -440,7 +440,7 @@ func roleAssignmentForMode(total int, mode tacticalMode) roleAssignment {
 		case 1:
 			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser}}
 		case 2:
-			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotDefenderWall}}
+			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver}}
 		case 3:
 			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotDefenderWall, tacticalSlotDefenderLow}}
 		case 4:
@@ -456,7 +456,7 @@ func roleAssignmentForMode(total int, mode tacticalMode) roleAssignment {
 	case 1:
 		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser}}
 	case 2:
-		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotDefenderLow}}
+		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver}}
 	case 3:
 		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver, tacticalSlotDefenderLow}}
 	case 4:
