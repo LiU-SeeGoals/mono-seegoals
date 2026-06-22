@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"sync"
 
@@ -9,6 +10,20 @@ import (
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+)
+
+const (
+	// Keep the robot center this far inside either goal line even when it is
+	// stationary. This covers the approximately 90 mm robot radius and leaves
+	// additional room for vision and controller error on the real robots.
+	goalLineBaseClearanceMM = 250.0
+
+	// The real robot cannot react to a new destination instantaneously. Reserve
+	// the distance travelled during that delay and the estimated braking
+	// distance when it is moving towards a goal line.
+	goalLineReactionTimeS         = 0.10
+	goalLineBrakeDecelerationMPS2 = 1.50
+	goalLineMaxClearanceMM        = 1200.0
 )
 
 type activityExecutor struct {
@@ -117,14 +132,62 @@ func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action 
 	if move.AllowOutsideField {
 		margin = -gi.FieldBoundaryWidth()
 	}
+	goalClearance := goalLineClearance(move, gi)
 
 	move.Dest = gi.ClampToField(move.Dest, margin)
+	move.Dest = clampToGoalLines(move.Dest, gi, goalClearance)
 	if len(move.Path) > 0 {
 		clamped := make([]info.Position, len(move.Path))
 		for i, waypoint := range move.Path {
 			clamped[i] = gi.ClampToField(waypoint, margin)
+			clamped[i] = clampToGoalLines(clamped[i], gi, goalClearance)
 		}
 		move.Path = clamped
 	}
 	return move
+}
+
+func goalLineClearance(move *action.MoveTo, gi *info.GameInfo) float64 {
+	if move == nil || gi == nil || gi.State == nil || move.Id < 0 || move.Id >= int(info.TEAM_SIZE) {
+		return goalLineBaseClearanceMM
+	}
+
+	robot := gi.State.GetTeam(move.Team)[info.ID(move.Id)]
+	if robot == nil {
+		return goalLineBaseClearanceMM
+	}
+
+	velocity := robot.GetVelocity()
+	outwardSpeed := 0.0
+	if move.Pos.X > 0 {
+		outwardSpeed = math.Max(0, velocity.X)
+	} else if move.Pos.X < 0 {
+		outwardSpeed = math.Max(0, -velocity.X)
+	} else {
+		outwardSpeed = math.Abs(velocity.X)
+	}
+
+	return goalLineClearanceForSpeed(outwardSpeed)
+}
+
+// goalLineClearanceForSpeed expects m/s. Robot.GetVelocity uses mm/ms, which
+// has the same numeric value. The result is in millimetres.
+func goalLineClearanceForSpeed(outwardSpeed float64) float64 {
+	if outwardSpeed <= 0 {
+		return goalLineBaseClearanceMM
+	}
+
+	reactionDistance := outwardSpeed * goalLineReactionTimeS * 1000
+	brakingDistance := outwardSpeed * outwardSpeed / (2 * goalLineBrakeDecelerationMPS2) * 1000
+	return math.Min(goalLineMaxClearanceMM, goalLineBaseClearanceMM+reactionDistance+brakingDistance)
+}
+
+func clampToGoalLines(pos info.Position, gi *info.GameInfo, clearance float64) info.Position {
+	minX, maxX, _, _, ok := gi.FieldBounds(clearance)
+	if !ok {
+		return pos
+	}
+
+	pos.X = math.Max(minX, math.Min(maxX, pos.X))
+	return pos
 }
