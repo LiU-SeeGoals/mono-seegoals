@@ -134,7 +134,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 
 	ballHeldInMouth := ok &&
 		kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
-	if ballHeldInMouth && !ballCentered {
+	if ballHeldInMouth {
 		if m.dribbleSince.IsZero() {
 			m.dribbleSince = time.Now()
 		}
@@ -143,9 +143,12 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	}
 
 	kickAfterSettle := !m.dribbleSince.IsZero() && time.Since(m.dribbleSince) >= kickDribbleSettleTime
-	if !kickBallShouldFire(dribblerDist, ballCentered, kickAfterSettle) {
-		act.Dribble = true
-	} else {
+	// Keep control of the ball while the kick is armed. In particular, the
+	// dribbler must already be running before the real robot receives its kick
+	// command because that command preserves, rather than changes, dribbler
+	// state.
+	act.Dribble = true
+	if kickBallShouldFire(dribblerDist, kickAfterSettle) {
 		act.KickSpeed = 2
 	}
 	printCaptureDebug(
@@ -175,9 +178,9 @@ func kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr float64) boo
 		headingErr < kickHeldHeadingTolerance
 }
 
-func kickBallShouldFire(dribblerDist float64, ballCentered bool, kickAfterSettle bool) bool {
+func kickBallShouldFire(dribblerDist float64, kickAfterSettle bool) bool {
 	return dribblerDist <= GetKickConfig().kickContactDist &&
-		(ballCentered || kickAfterSettle)
+		kickAfterSettle
 }
 
 func (m *KickBall) Achieved(gi *info.GameInfo) bool {

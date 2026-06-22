@@ -98,7 +98,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			headingErr,
 			captureReady,
 			ballCentered,
-			false,
+			true,
 			kickSpeed,
 			math.NaN(),
 		)
@@ -107,6 +107,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			Team:      kp.team,
 			Pos:       robotPos,
 			Dest:      dest,
+			Dribble:   true,
 			KickSpeed: kickSpeed,
 		}
 	}
