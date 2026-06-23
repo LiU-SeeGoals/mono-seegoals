@@ -52,17 +52,17 @@ type roleAssignment struct {
 type tacticalSlotKind string
 
 const (
-	tacticalSlotBallChaser   tacticalSlotKind = "ball_chaser"
-	tacticalSlotBallReceiver tacticalSlotKind = "ball_receiver"
-	tacticalSlotDefenderWall tacticalSlotKind = "defender_wall"
-	tacticalSlotDefenderHigh tacticalSlotKind = "defender_high"
-	tacticalSlotDefenderLow  tacticalSlotKind = "defender_low"
-	tacticalSlotGoalie       tacticalSlotKind = "goalie"
+	tacticalSlotBallChaser     tacticalSlotKind = "ball_chaser"
+	tacticalSlotSupportShooter tacticalSlotKind = "support_shooter"
+	tacticalSlotDefenderWall   tacticalSlotKind = "defender_wall"
+	tacticalSlotDefenderHigh   tacticalSlotKind = "defender_high"
+	tacticalSlotDefenderLow    tacticalSlotKind = "defender_low"
+	tacticalSlotGoalie         tacticalSlotKind = "goalie"
 )
 
 func (slot tacticalSlotKind) roleKind() roleKind {
 	switch slot {
-	case tacticalSlotBallChaser, tacticalSlotBallReceiver:
+	case tacticalSlotBallChaser, tacticalSlotSupportShooter:
 		return roleOffense
 	case tacticalSlotDefenderWall, tacticalSlotDefenderHigh, tacticalSlotDefenderLow:
 		return roleDefense
@@ -75,8 +75,8 @@ func (slot tacticalSlotKind) label() string {
 	switch slot {
 	case tacticalSlotBallChaser:
 		return "Chaser"
-	case tacticalSlotBallReceiver:
-		return "Receiver"
+	case tacticalSlotSupportShooter:
+		return "Shooter"
 	case tacticalSlotDefenderWall:
 		return "Wall"
 	case tacticalSlotDefenderHigh:
@@ -191,9 +191,9 @@ func (rm *combinedRoleManager) setSlot(id info.ID, slot tacticalSlotKind, now ti
 		if attacker, ok := rm.attackers[id]; ok {
 			attacker.SetSlot(roles.OffenseSlot{Kind: roles.OffenseRoleChaser})
 		}
-	case tacticalSlotBallReceiver:
+	case tacticalSlotSupportShooter:
 		if attacker, ok := rm.attackers[id]; ok {
-			attacker.SetSlot(roles.OffenseSlot{Kind: roles.OffenseRoleReceiver})
+			attacker.SetSlot(roles.OffenseSlot{Kind: roles.OffenseRoleShooter})
 		}
 	case tacticalSlotDefenderWall:
 		if defender, ok := rm.defenders[id]; ok {
@@ -383,6 +383,18 @@ func (m *CombinedPlan) chooseGoalie(gi *GameInfo, activeRobots []info.ID) (info.
 	return m.getRobotClosestToPosition(gi, activeRobots, m.defendedGoalCenter(gi)), true
 }
 
+func (m *CombinedPlan) splitGoalieFromFieldRobots(
+	gi *GameInfo,
+	activeRobots []info.ID,
+) (info.ID, bool, []info.ID) {
+	goalieID, hasGoalie := m.chooseGoalie(gi, activeRobots)
+	if !hasGoalie {
+		return 0, false, activeRobots
+	}
+
+	return goalieID, true, withoutRobot(activeRobots, goalieID)
+}
+
 func (m *CombinedPlan) desiredMode(gi *GameInfo, fallback tacticalMode) tacticalMode {
 	possessor := gi.State.GetBall().GetPossessor()
 	if possessor == nil {
@@ -440,13 +452,13 @@ func roleAssignmentForMode(total int, mode tacticalMode) roleAssignment {
 		case 1:
 			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser}}
 		case 2:
-			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver}}
+			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter}}
 		case 3:
 			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotDefenderWall, tacticalSlotDefenderLow}}
 		case 4:
 			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotDefenderWall, tacticalSlotDefenderLow, tacticalSlotDefenderHigh}}
 		default:
-			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver, tacticalSlotDefenderWall, tacticalSlotDefenderLow, tacticalSlotDefenderHigh}}
+			return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotDefenderWall, tacticalSlotDefenderLow, tacticalSlotDefenderHigh}}
 		}
 	}
 
@@ -456,13 +468,13 @@ func roleAssignmentForMode(total int, mode tacticalMode) roleAssignment {
 	case 1:
 		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser}}
 	case 2:
-		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver}}
+		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter}}
 	case 3:
-		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver, tacticalSlotDefenderLow}}
+		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotDefenderLow}}
 	case 4:
-		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver, tacticalSlotDefenderLow, tacticalSlotDefenderHigh}}
+		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotDefenderLow, tacticalSlotDefenderHigh}}
 	default:
-		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotBallReceiver, tacticalSlotDefenderLow, tacticalSlotDefenderHigh, tacticalSlotDefenderWall}}
+		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotDefenderLow, tacticalSlotDefenderHigh, tacticalSlotDefenderWall}}
 	}
 }
 
@@ -482,7 +494,7 @@ func (m *CombinedPlan) chooseBallChaser(gi *GameInfo, candidates []info.ID, owne
 	return m.getRobotForBall(gi, candidates)
 }
 
-func (m *CombinedPlan) chooseReceiver(gi *GameInfo, candidates []info.ID) info.ID {
+func (m *CombinedPlan) chooseSupportShooter(gi *GameInfo, candidates []info.ID) info.ID {
 	if len(candidates) == 0 {
 		return 0
 	}
@@ -573,8 +585,8 @@ func (m *CombinedPlan) assignTacticalSlots(
 		switch slot {
 		case tacticalSlotBallChaser:
 			id = m.chooseBallChaser(gi, available, owner)
-		case tacticalSlotBallReceiver:
-			id = m.chooseReceiver(gi, available)
+		case tacticalSlotSupportShooter:
+			id = m.chooseSupportShooter(gi, available)
 		default:
 			id = m.getRobotClosestToPosition(gi, available, m.targetForTacticalSlot(gi, slot))
 		}
@@ -675,9 +687,9 @@ func (m *CombinedPlan) run() {
 	mode := tacticalModeAttack
 	candidateMode := tacticalMode("")
 	candidateModeSince := time.Time{}
-	//clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
+	clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
 
-	//var goalieID info.ID
+	var goalieID info.ID
 	var goalieRole *roles.GoalieRole
 	var activeReceiver info.ID
 	var activeReceiverStart time.Time
@@ -691,22 +703,22 @@ func (m *CombinedPlan) run() {
 		rawOwner := observedBallOwner(&gi)
 
 		activeRobots := m.activeRobots(&gi)
-		//nextGoalieID, hasGoalie := m.chooseGoalie(&gi, activeRobots)
-		fieldRobots := activeRobots
-		//if hasGoalie {
-		//	fieldRobots = withoutRobot(activeRobots, nextGoalieID)
-		//	if goalieRole == nil || goalieID != nextGoalieID {
-		//		if goalieRole != nil {
-		//			m.ActivityHandler.ClearActivity(goalieID)
-		//		}
-		//		goalieID = nextGoalieID
-		//		goalieRole = roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
-		//		goalieRole.Init()
-		//	}
-		//} else if goalieRole != nil {
-		//	m.ActivityHandler.ClearActivity(goalieID)
-		//	goalieRole = nil
-		//}
+		nextGoalieID, hasGoalie, fieldRobots := m.splitGoalieFromFieldRobots(&gi, activeRobots)
+		if hasGoalie {
+			if goalieRole == nil || goalieID != nextGoalieID {
+				if goalieRole != nil {
+					m.ActivityHandler.ClearActivity(goalieID)
+					debugstate.ClearRobotRole(m.team, goalieID)
+				}
+				goalieID = nextGoalieID
+				goalieRole = roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
+				goalieRole.Init()
+			}
+		} else if goalieRole != nil {
+			m.ActivityHandler.ClearActivity(goalieID)
+			debugstate.ClearRobotRole(m.team, goalieID)
+			goalieRole = nil
+		}
 
 		desiredMode := desiredModeForTrackedOwner(possession.owner, m.team, mode)
 		mode = stableMode(mode, desiredMode, &candidateMode, &candidateModeSince, tickStart)
@@ -715,9 +727,8 @@ func (m *CombinedPlan) run() {
 		slotAssignments := m.assignTacticalSlots(&gi, fieldRobots, assignment, possession.owner)
 		roleManager.applySlotAssignments(slotAssignments, tickStart)
 		offenseRobots := roleManager.offenseIDs()
-		receiverIDs := roleManager.idsForSlot(tacticalSlotBallReceiver)
 		chaserID, hasChaser := roleManager.idForSlot(tacticalSlotBallChaser)
-		roleManager.configureOffenseReceivers(receiverIDs)
+		roleManager.configureOffenseReceivers(nil)
 
 		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
 		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
@@ -799,6 +810,7 @@ func (m *CombinedPlan) run() {
 
 		if goalieRole != nil {
 			goalieRole.SetGameInfo(gi)
+			debugstate.SetRobotRole(m.team, goalieID, tacticalSlotGoalie.label())
 			if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
 				goalieRole.TriggerEvent("BALL_OWNER")
 			} else {
