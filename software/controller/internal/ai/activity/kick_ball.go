@@ -29,9 +29,10 @@ const (
 	kickMouthLateralTolerance = info.DribblerHalfWidth + 1.5*info.BallRadius
 	kickDribbleSettleTime     = 250 * time.Millisecond
 	kickHeldHeadingTolerance  = 0.4
-	kickFirmwareDelay         = 70 * time.Millisecond
-	kickMinFirmwareLeadDist   = 20.0
-	kickMaxFirmwareLeadDist   = 80.0
+	kickFirmwareDelay         = 150 * time.Millisecond
+	kickAssumedFinalSpeed     = 0.65
+	kickMinFirmwareLeadDist   = 50.0
+	kickMaxFirmwareLeadDist   = 220.0
 )
 
 func GetKickConfig() KickConfig {
@@ -138,7 +139,8 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	ballHeldInMouth := ok &&
 		kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
 	kickAfterSettle := updateKickDribbleSettle(&m.dribbleSince, ballHeldInMouth)
-	impactReady := captureReady && ok && kickBallImpactReady(forward, lateral, headingErr, kickFirmwareLeadDist(robot))
+	firmwareLeadDist := kickFirmwareLeadDist(robot)
+	impactReady := captureReady && ok && kickBallImpactReady(forward, lateral, headingErr, firmwareLeadDist)
 	// Keep control of the ball while the kick is armed. In particular, the
 	// dribbler must already be running before the real robot receives its kick
 	// command because that command preserves, rather than changes, dribbler
@@ -161,7 +163,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 		ballCentered,
 		act.Dribble,
 		act.KickSpeed,
-		math.NaN(),
+		firmwareLeadDist,
 	)
 
 	return &act
@@ -187,16 +189,24 @@ func kickBallImpactReady(forward, lateral, headingErr, leadDist float64) bool {
 
 func kickFirmwareLeadDist(robot *info.Robot) float64 {
 	if robot == nil {
-		return kickMinFirmwareLeadDist
+		return kickFirmwareLeadDistForSpeed(kickAssumedFinalSpeed)
 	}
 	robotPos, err := robot.GetPosition()
 	if err != nil {
-		return kickMinFirmwareLeadDist
+		return kickFirmwareLeadDistForSpeed(kickAssumedFinalSpeed)
 	}
 	velocity := robot.GetVelocity()
 	forwardSpeed := velocity.X*math.Cos(robotPos.Angle) + velocity.Y*math.Sin(robotPos.Angle)
+	return kickFirmwareLeadDistForSpeed(math.Max(kickAssumedFinalSpeed, forwardSpeed))
+}
+
+func kickFirmwareLeadDistForSpeed(forwardSpeed float64) float64 {
 	leadDist := math.Max(0, forwardSpeed) * kickFirmwareDelay.Seconds() * 1000
 	return math.Max(kickMinFirmwareLeadDist, math.Min(kickMaxFirmwareLeadDist, leadDist))
+}
+
+func kickFirmwareArmingDist(leadDist float64) float64 {
+	return math.Max(kickerStandoffDist(maxMarginToBall), info.Center2DribblerDist+info.BallRadius+leadDist)
 }
 
 func updateKickDribbleSettle(dribbleSince *time.Time, ballHeldInMouth bool) bool {
