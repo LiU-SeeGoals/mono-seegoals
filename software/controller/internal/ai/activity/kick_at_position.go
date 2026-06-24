@@ -30,6 +30,7 @@ type KickAtPosition struct {
 	// Wall-clock confirmation that the aim has been held (Sumatra's
 	// TargetAngleReachedChecker); zero while unaligned.
 	alignedSince time.Time
+	dribbleSince time.Time
 }
 
 func (k *KickAtPosition) String() string {
@@ -66,6 +67,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	// planner's ball no-go zone.
 	if robotPos.Dist2d(ballNow) > kickFarApproachDist {
 		kp.alignedSince = time.Time{}
+		kp.dribbleSince = time.Time{}
 		lineup := behindBallDest(ballPred, kp.targetPosition, kickStagingClearance-kickerStandoffDist(0))
 		move := NewMoveToPosition(kp.team, kp.id, lineup)
 		move.AvoidBall(true)
@@ -74,20 +76,35 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		return moveAction
 	}
 
-	_, lateral, ok := robot.BallLocalOffset(ballNow)
+	dribblerPos := robot.DribblerPos()
+	dribblerDist := dribblerPos.Dist2d(ballNow)
+	forward, lateral, ok := robot.BallLocalOffset(ballNow)
 	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
+	ballReachable := ok && kickBallReachableByMouth(forward, lateral, headingErr)
+	ballHeldInMouth := ok && kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
 	approachReady := captureApproachReady(robotPos, ballPred, kp.targetPosition, headingErr)
 	captureReady := capturePoseReady(robotPos, ballPred, kp.targetPosition, headingErr)
 
-	if kp.armed(robotPos, ballNow, headingErr, lineErr, ballCentered) {
-		// Aim held: drive through the ball toward the target and kick.
+	if kp.armed(robotPos, ballNow, headingErr, lineErr, ballReachable) {
+		// Aim held: drive through the ball toward the target, but only kick
+		// once the ball is at the front of the robot or has settled in the mouth.
 		dest := info.Position{
 			X:     ballPred.X + kickRunUpDist*math.Cos(finalOrientation),
 			Y:     ballPred.Y + kickRunUpDist*math.Sin(finalOrientation),
 			Angle: finalOrientation,
 		}
+		kickAfterSettle := updateKickDribbleSettle(&kp.dribbleSince, ballHeldInMouth)
+		impactReady := approachReady && ok && kickBallImpactReady(forward, lateral, headingErr)
+		kickSpeedCmd := 0
+		if kickBallShouldFire(dribblerDist, kickAfterSettle, impactReady) {
+			kickSpeedCmd = kickSpeed
+		}
+		label := "kick-at-position-drive"
+		if kickSpeedCmd != 0 {
+			label = "kick-at-position-fire"
+		}
 		printCaptureDebug(
-			"kick-at-position-fire",
+			label,
 			kp.team,
 			kp.id,
 			robot,
@@ -99,7 +116,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			captureReady,
 			ballCentered,
 			true,
-			kickSpeed,
+			kickSpeedCmd,
 			math.NaN(),
 		)
 		return &action.MoveTo{
@@ -108,9 +125,10 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			Pos:       robotPos,
 			Dest:      dest,
 			Dribble:   true,
-			KickSpeed: kickSpeed,
+			KickSpeed: kickSpeedCmd,
 		}
 	}
+	kp.dribbleSince = time.Time{}
 
 	// Near the ball: orbit around it onto the kick line. The standoff margin
 	// only closes once heading and position are lined up, so we cannot bump
@@ -122,10 +140,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	carrot := aroundBallDest(ballPred, robotPos, lineup, minMargin)
 	carrot.Angle = steppedOrientation(robotPos, ballPred, finalOrientation)
 
-	dribblerPos := robot.DribblerPos()
-	forward, lateral, ok := robot.BallLocalOffset(ballNow)
-	ballHeldInMouth := ok && kickBallHeldInMouth(dribblerPos.Dist2d(ballNow), forward, lateral, headingErr)
-	dribble := ballCentered && (ballHeldInMouth || (dribblerPos.Dist2d(ballNow) < 120 &&
+	dribble := ballReachable && (ballHeldInMouth || (dribblerDist < 120 &&
 		headingErr < 2*roughAngleTolerance &&
 		lineErr < roughAngleTolerance &&
 		approachReady))
@@ -156,14 +171,14 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	}
 }
 
-// armed gates the kick: heading and position on the kick line must be held
-// for kickAlignConfirmTime with the kicker close to the ball.
-func (kp *KickAtPosition) armed(robotPos, ballPos info.Position, headingErr, lineErr float64, ballCentered bool) bool {
+// armed gates the drive-through: heading and position on the kick line must be
+// held for kickAlignConfirmTime with the ball reachable by the dribbler mouth.
+func (kp *KickAtPosition) armed(robotPos, ballPos info.Position, headingErr, lineErr float64, ballReachable bool) bool {
 	nearBall := robotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall)
 	aligned := headingErr < roughAngleTolerance &&
 		lineErr < 2*roughAngleTolerance &&
 		nearBall &&
-		ballCentered
+		ballReachable
 	if !aligned {
 		kp.alignedSince = time.Time{}
 		return false

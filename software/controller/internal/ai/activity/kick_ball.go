@@ -29,6 +29,7 @@ const (
 	kickMouthLateralTolerance = info.DribblerHalfWidth + 1.5*info.BallRadius
 	kickDribbleSettleTime     = 250 * time.Millisecond
 	kickHeldHeadingTolerance  = 0.4
+	kickImpactPreContactDist  = 35.0
 )
 
 func GetKickConfig() KickConfig {
@@ -134,21 +135,14 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 
 	ballHeldInMouth := ok &&
 		kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
-	if ballHeldInMouth {
-		if m.dribbleSince.IsZero() {
-			m.dribbleSince = time.Now()
-		}
-	} else {
-		m.dribbleSince = time.Time{}
-	}
-
-	kickAfterSettle := !m.dribbleSince.IsZero() && time.Since(m.dribbleSince) >= kickDribbleSettleTime
+	kickAfterSettle := updateKickDribbleSettle(&m.dribbleSince, ballHeldInMouth)
+	impactReady := captureReady && ok && kickBallImpactReady(forward, lateral, headingErr)
 	// Keep control of the ball while the kick is armed. In particular, the
 	// dribbler must already be running before the real robot receives its kick
 	// command because that command preserves, rather than changes, dribbler
 	// state.
 	act.Dribble = true
-	if kickBallShouldFire(dribblerDist, kickAfterSettle) {
+	if kickBallShouldFire(dribblerDist, kickAfterSettle, impactReady) {
 		act.KickSpeed = 2
 	}
 	printCaptureDebug(
@@ -178,9 +172,30 @@ func kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr float64) boo
 		headingErr < kickHeldHeadingTolerance
 }
 
-func kickBallShouldFire(dribblerDist float64, kickAfterSettle bool) bool {
-	return dribblerDist <= GetKickConfig().kickContactDist &&
-		kickAfterSettle
+func kickBallReachableByMouth(forward, lateral, headingErr float64) bool {
+	return forward >= info.Center2DribblerDist-info.BallRadius &&
+		math.Abs(lateral) < captureLineTolerance &&
+		headingErr < kickHeldHeadingTolerance
+}
+
+func kickBallImpactReady(forward, lateral, headingErr float64) bool {
+	return kickBallReachableByMouth(forward, lateral, headingErr) &&
+		forward <= info.Center2DribblerDist+info.BallRadius+kickImpactPreContactDist
+}
+
+func updateKickDribbleSettle(dribbleSince *time.Time, ballHeldInMouth bool) bool {
+	if !ballHeldInMouth {
+		*dribbleSince = time.Time{}
+		return false
+	}
+	if dribbleSince.IsZero() {
+		*dribbleSince = time.Now()
+	}
+	return time.Since(*dribbleSince) >= kickDribbleSettleTime
+}
+
+func kickBallShouldFire(dribblerDist float64, kickAfterSettle bool, impactReady bool) bool {
+	return impactReady || (dribblerDist <= GetKickConfig().kickContactDist && kickAfterSettle)
 }
 
 func (m *KickBall) Achieved(gi *info.GameInfo) bool {
