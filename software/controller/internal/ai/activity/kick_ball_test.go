@@ -62,14 +62,25 @@ func TestKickBallShouldFireInImpactWindowWithoutSettle(t *testing.T) {
 }
 
 func TestKickBallImpactReadyRequiresFrontContactWindow(t *testing.T) {
-	forwardBeforeContact := info.Center2DribblerDist + info.BallRadius + kickImpactPreContactDist + 1
-	if kickBallImpactReady(forwardBeforeContact, 0, 0) {
+	forwardBeforeContact := info.Center2DribblerDist + info.BallRadius + kickMinFirmwareLeadDist + 1
+	if kickBallImpactReady(forwardBeforeContact, 0, 0, kickMinFirmwareLeadDist) {
 		t.Fatal("expected ball before the impact window to stay unready")
 	}
 
 	forwardInWindow := info.Center2DribblerDist + info.BallRadius
-	if !kickBallImpactReady(forwardInWindow, captureLineTolerance-1, 0) {
+	if !kickBallImpactReady(forwardInWindow, captureLineTolerance-1, 0, kickMinFirmwareLeadDist) {
 		t.Fatal("expected reachable ball at the dribbler front to be impact-ready")
+	}
+}
+
+func TestKickFirmwareLeadDistUsesForwardVelocity(t *testing.T) {
+	gi, _ := newKickTestGameInfo()
+	gi.State.SetBlueRobot(3, 35, 0, 0, 71)
+
+	leadDist := kickFirmwareLeadDist(gi.State.GetRobot(3, info.Blue))
+	wantLeadDist := 35.0
+	if math.Abs(leadDist-wantLeadDist) > 1e-6 {
+		t.Fatalf("expected %.1f mm lead from forward velocity and firmware delay, got %.3f", wantLeadDist, leadDist)
 	}
 }
 
@@ -81,7 +92,7 @@ func TestKickBallCenterToleranceIsStricterThanMouthTolerance(t *testing.T) {
 
 func TestKickBallDribblesBeforeAndDuringKick(t *testing.T) {
 	gi, ballPos := newKickTestGameInfo()
-	ballPos = info.Position{X: info.Center2DribblerDist + info.BallRadius + kickImpactPreContactDist + 10}
+	ballPos = info.Position{X: info.Center2DribblerDist + info.BallRadius + kickMinFirmwareLeadDist + 10}
 	gi.State.SetBall(ballPos.X, ballPos.Y, 0, 1)
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
 	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)
@@ -121,7 +132,7 @@ func TestKickAtPositionDribblesWhileFiring(t *testing.T) {
 
 func TestKickAtPositionDrivesBeforeImpactWindow(t *testing.T) {
 	gi, _ := newKickTestGameInfo()
-	ballPos := info.Position{X: info.Center2DribblerDist + info.BallRadius + kickImpactPreContactDist + 10}
+	ballPos := info.Position{X: info.Center2DribblerDist + info.BallRadius + kickMinFirmwareLeadDist + 10}
 	gi.State.SetBall(ballPos.X, ballPos.Y, 0, 1)
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
 	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)

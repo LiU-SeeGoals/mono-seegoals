@@ -29,7 +29,9 @@ const (
 	kickMouthLateralTolerance = info.DribblerHalfWidth + 1.5*info.BallRadius
 	kickDribbleSettleTime     = 250 * time.Millisecond
 	kickHeldHeadingTolerance  = 0.4
-	kickImpactPreContactDist  = 35.0
+	kickFirmwareDelay         = 70 * time.Millisecond
+	kickMinFirmwareLeadDist   = 20.0
+	kickMaxFirmwareLeadDist   = 80.0
 )
 
 func GetKickConfig() KickConfig {
@@ -136,7 +138,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	ballHeldInMouth := ok &&
 		kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
 	kickAfterSettle := updateKickDribbleSettle(&m.dribbleSince, ballHeldInMouth)
-	impactReady := captureReady && ok && kickBallImpactReady(forward, lateral, headingErr)
+	impactReady := captureReady && ok && kickBallImpactReady(forward, lateral, headingErr, kickFirmwareLeadDist(robot))
 	// Keep control of the ball while the kick is armed. In particular, the
 	// dribbler must already be running before the real robot receives its kick
 	// command because that command preserves, rather than changes, dribbler
@@ -178,9 +180,23 @@ func kickBallReachableByMouth(forward, lateral, headingErr float64) bool {
 		headingErr < kickHeldHeadingTolerance
 }
 
-func kickBallImpactReady(forward, lateral, headingErr float64) bool {
+func kickBallImpactReady(forward, lateral, headingErr, leadDist float64) bool {
 	return kickBallReachableByMouth(forward, lateral, headingErr) &&
-		forward <= info.Center2DribblerDist+info.BallRadius+kickImpactPreContactDist
+		forward <= info.Center2DribblerDist+info.BallRadius+leadDist
+}
+
+func kickFirmwareLeadDist(robot *info.Robot) float64 {
+	if robot == nil {
+		return kickMinFirmwareLeadDist
+	}
+	robotPos, err := robot.GetPosition()
+	if err != nil {
+		return kickMinFirmwareLeadDist
+	}
+	velocity := robot.GetVelocity()
+	forwardSpeed := velocity.X*math.Cos(robotPos.Angle) + velocity.Y*math.Sin(robotPos.Angle)
+	leadDist := math.Max(0, forwardSpeed) * kickFirmwareDelay.Seconds() * 1000
+	return math.Max(kickMinFirmwareLeadDist, math.Min(kickMaxFirmwareLeadDist, leadDist))
 }
 
 func updateKickDribbleSettle(dribbleSince *time.Time, ballHeldInMouth bool) bool {

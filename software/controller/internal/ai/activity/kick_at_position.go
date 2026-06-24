@@ -94,7 +94,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			Angle: finalOrientation,
 		}
 		kickAfterSettle := updateKickDribbleSettle(&kp.dribbleSince, ballHeldInMouth)
-		impactReady := approachReady && ok && kickBallImpactReady(forward, lateral, headingErr)
+		impactReady := approachReady && ok && kickBallImpactReady(forward, lateral, headingErr, kickFirmwareLeadDist(robot))
 		kickSpeedCmd := 0
 		if kickBallShouldFire(dribblerDist, kickAfterSettle, impactReady) {
 			kickSpeedCmd = kickSpeed
