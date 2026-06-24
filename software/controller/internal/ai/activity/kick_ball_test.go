@@ -73,14 +73,24 @@ func TestKickBallImpactReadyRequiresFrontContactWindow(t *testing.T) {
 	}
 }
 
-func TestKickFirmwareLeadDistUsesForwardVelocity(t *testing.T) {
+func TestKickFirmwareLeadDistUsesAssumedFinalSpeedWhenMeasuredSpeedIsLow(t *testing.T) {
 	gi, _ := newKickTestGameInfo()
 	gi.State.SetBlueRobot(3, 35, 0, 0, 71)
 
 	leadDist := kickFirmwareLeadDist(gi.State.GetRobot(3, info.Blue))
-	wantLeadDist := 35.0
+	wantLeadDist := kickAssumedFinalSpeed * kickFirmwareDelay.Seconds() * 1000
 	if math.Abs(leadDist-wantLeadDist) > 1e-6 {
 		t.Fatalf("expected %.1f mm lead from forward velocity and firmware delay, got %.3f", wantLeadDist, leadDist)
+	}
+}
+
+func TestKickFirmwareLeadDistCapsHighMeasuredSpeed(t *testing.T) {
+	gi, _ := newKickTestGameInfo()
+	gi.State.SetBlueRobot(3, 200, 0, 0, 101)
+
+	leadDist := kickFirmwareLeadDist(gi.State.GetRobot(3, info.Blue))
+	if leadDist != kickMaxFirmwareLeadDist {
+		t.Fatalf("expected lead to be capped at %.1f mm, got %.3f", kickMaxFirmwareLeadDist, leadDist)
 	}
 }
 
@@ -92,7 +102,8 @@ func TestKickBallCenterToleranceIsStricterThanMouthTolerance(t *testing.T) {
 
 func TestKickBallDribblesBeforeAndDuringKick(t *testing.T) {
 	gi, ballPos := newKickTestGameInfo()
-	ballPos = info.Position{X: info.Center2DribblerDist + info.BallRadius + kickMinFirmwareLeadDist + 10}
+	leadDist := kickFirmwareLeadDist(gi.State.GetRobot(3, info.Blue))
+	ballPos = info.Position{X: info.Center2DribblerDist + info.BallRadius + leadDist + 10}
 	gi.State.SetBall(ballPos.X, ballPos.Y, 0, 1)
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
 	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)
@@ -130,9 +141,10 @@ func TestKickAtPositionDribblesWhileFiring(t *testing.T) {
 	}
 }
 
-func TestKickAtPositionDrivesBeforeImpactWindow(t *testing.T) {
+func TestKickAtPositionWaitsBeforeFirmwareLeadWindow(t *testing.T) {
 	gi, _ := newKickTestGameInfo()
-	ballPos := info.Position{X: info.Center2DribblerDist + info.BallRadius + kickMinFirmwareLeadDist + 10}
+	leadDist := kickFirmwareLeadDist(gi.State.GetRobot(3, info.Blue))
+	ballPos := info.Position{X: info.Center2DribblerDist + info.BallRadius + leadDist + 10}
 	gi.State.SetBall(ballPos.X, ballPos.Y, 0, 1)
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
 	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)
@@ -140,12 +152,32 @@ func TestKickAtPositionDrivesBeforeImpactWindow(t *testing.T) {
 	kick := NewKickAtPosition(info.Blue, 3, info.Position{X: 1000})
 	kick.alignedSince = time.Now().Add(-kickAlignConfirmTime)
 
-	driving, ok := kick.GetAction(gi).(*action.MoveTo)
+	waiting, ok := kick.GetAction(gi).(*action.MoveTo)
 	if !ok {
-		t.Fatal("expected move-to action while driving through")
+		t.Fatal("expected move-to action before firmware lead window")
 	}
-	if !driving.Dribble || driving.KickSpeed != 0 {
-		t.Fatalf("expected dribbler-only drive before impact, got dribble=%t kick=%d", driving.Dribble, driving.KickSpeed)
+	if waiting.KickSpeed != 0 {
+		t.Fatalf("expected no kick before firmware lead window, got kick=%d", waiting.KickSpeed)
+	}
+}
+
+func TestKickAtPositionFiresInsideFirmwareLeadBeforeContact(t *testing.T) {
+	gi, _ := newKickTestGameInfo()
+	leadDist := kickFirmwareLeadDist(gi.State.GetRobot(3, info.Blue))
+	ballPos := info.Position{X: info.Center2DribblerDist + info.BallRadius + leadDist - 1}
+	gi.State.SetBall(ballPos.X, ballPos.Y, 0, 1)
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)
+
+	kick := NewKickAtPosition(info.Blue, 3, info.Position{X: 1000})
+	kick.alignedSince = time.Now().Add(-kickAlignConfirmTime)
+
+	firing, ok := kick.GetAction(gi).(*action.MoveTo)
+	if !ok {
+		t.Fatal("expected move-to action inside firmware lead window")
+	}
+	if !firing.Dribble || firing.KickSpeed == 0 {
+		t.Fatalf("expected kick inside firmware lead window, got dribble=%t kick=%d", firing.Dribble, firing.KickSpeed)
 	}
 }
 

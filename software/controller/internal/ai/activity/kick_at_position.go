@@ -84,8 +84,9 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	ballHeldInMouth := ok && kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
 	approachReady := captureApproachReady(robotPos, ballPred, kp.targetPosition, headingErr)
 	captureReady := capturePoseReady(robotPos, ballPred, kp.targetPosition, headingErr)
+	firmwareLeadDist := kickFirmwareLeadDist(robot)
 
-	if kp.armed(robotPos, ballNow, headingErr, lineErr, ballReachable) {
+	if kp.armed(robotPos, ballNow, headingErr, lineErr, ballReachable, firmwareLeadDist) {
 		// Aim held: drive through the ball toward the target, but only kick
 		// once the ball is at the front of the robot or has settled in the mouth.
 		dest := info.Position{
@@ -94,7 +95,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			Angle: finalOrientation,
 		}
 		kickAfterSettle := updateKickDribbleSettle(&kp.dribbleSince, ballHeldInMouth)
-		impactReady := approachReady && ok && kickBallImpactReady(forward, lateral, headingErr, kickFirmwareLeadDist(robot))
+		impactReady := approachReady && ok && kickBallImpactReady(forward, lateral, headingErr, firmwareLeadDist)
 		kickSpeedCmd := 0
 		if kickBallShouldFire(dribblerDist, kickAfterSettle, impactReady) {
 			kickSpeedCmd = kickSpeed
@@ -117,7 +118,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			ballCentered,
 			true,
 			kickSpeedCmd,
-			math.NaN(),
+			firmwareLeadDist,
 		)
 		return &action.MoveTo{
 			Id:        int(kp.id),
@@ -173,8 +174,13 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 
 // armed gates the drive-through: heading and position on the kick line must be
 // held for kickAlignConfirmTime with the ball reachable by the dribbler mouth.
-func (kp *KickAtPosition) armed(robotPos, ballPos info.Position, headingErr, lineErr float64, ballReachable bool) bool {
-	nearBall := robotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall)
+func (kp *KickAtPosition) armed(
+	robotPos, ballPos info.Position,
+	headingErr, lineErr float64,
+	ballReachable bool,
+	firmwareLeadDist float64,
+) bool {
+	nearBall := robotPos.Dist2d(ballPos) < kickFirmwareArmingDist(firmwareLeadDist)
 	aligned := headingErr < roughAngleTolerance &&
 		lineErr < 2*roughAngleTolerance &&
 		nearBall &&
