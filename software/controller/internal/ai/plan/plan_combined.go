@@ -210,6 +210,18 @@ func (rm *combinedRoleManager) setSlot(id info.ID, slot tacticalSlotKind, now ti
 	}
 }
 
+func (rm *combinedRoleManager) configureSupportShooters(supportIDs []info.ID) {
+	for index, id := range supportIDs {
+		if attacker, ok := rm.attackers[id]; ok {
+			attacker.SetSlot(roles.OffenseSlot{
+				Kind:  roles.OffenseRoleShooter,
+				Index: index,
+				Count: len(supportIDs),
+			})
+		}
+	}
+}
+
 func (rm *combinedRoleManager) offenseIDs() []info.ID {
 	ids := make([]info.ID, 0, len(rm.attackers))
 	for id := range rm.attackers {
@@ -470,11 +482,11 @@ func roleAssignmentForMode(total int, mode tacticalMode) roleAssignment {
 	case 2:
 		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter}}
 	case 3:
-		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotDefenderLow}}
+		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotSupportShooter}}
 	case 4:
-		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotDefenderLow, tacticalSlotDefenderHigh}}
+		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotSupportShooter, tacticalSlotDefenderLow}}
 	default:
-		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotDefenderLow, tacticalSlotDefenderHigh, tacticalSlotDefenderWall}}
+		return roleAssignment{slots: []tacticalSlotKind{tacticalSlotBallChaser, tacticalSlotSupportShooter, tacticalSlotSupportShooter, tacticalSlotDefenderLow, tacticalSlotDefenderHigh}}
 	}
 }
 
@@ -728,7 +740,9 @@ func (m *CombinedPlan) run() {
 		roleManager.applySlotAssignments(slotAssignments, tickStart)
 		offenseRobots := roleManager.offenseIDs()
 		chaserID, hasChaser := roleManager.idForSlot(tacticalSlotBallChaser)
-		roleManager.configureOffenseReceivers(nil)
+		supportIDs := roleManager.idsForSlot(tacticalSlotSupportShooter)
+		roleManager.configureSupportShooters(supportIDs)
+		roleManager.configureOffenseReceivers(supportIDs)
 
 		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
 		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
