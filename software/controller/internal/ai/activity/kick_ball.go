@@ -37,7 +37,7 @@ const (
 
 func GetKickConfig() KickConfig {
 	return KickConfig{
-		driveThrough:    100,
+		driveThrough:    0,
 		doneDist:        20,
 		ballAbortRadius: 200,
 		kickContactDist: 130,

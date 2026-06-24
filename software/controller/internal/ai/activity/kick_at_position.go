@@ -14,9 +14,9 @@ const (
 	// Beyond this distance to the ball [mm] we path-plan to the lineup point.
 	kickFarApproachDist = 600.0
 	// Time the aim must be held before the kick is armed.
-	kickAlignConfirmTime = 80 * time.Millisecond
+	kickAlignConfirmTime = 30 * time.Millisecond
 	// Drive-through distance past the ball when kicking [mm].
-	kickRunUpDist = 100.0
+	kickRunUpDist = 0.0
 	kickSpeed     = 5
 	// Far-approach goal must sit outside the planner's no-go band around the
 	// ball, otherwise RRT can never reach it and orbits the ball instead.
