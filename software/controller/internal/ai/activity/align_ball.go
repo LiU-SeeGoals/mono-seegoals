@@ -85,7 +85,7 @@ func (m *AlignBall) getTargetPosWithClearance(gi *info.GameInfo, clearance float
 		}
 	}
 	if useLookahead {
-		lookahead := 0.8
+		lookahead := 0.0
 		alignBallPos.X += ballVel.X * 1000 * lookahead
 		alignBallPos.Y += ballVel.Y * 1000 * lookahead
 

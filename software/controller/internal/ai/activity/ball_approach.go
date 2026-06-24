@@ -26,7 +26,7 @@ const (
 	aroundBallShiftAngle     = 1.0
 	maxTargetOrientationStep = 0.4
 	roughAngleTolerance      = 0.1
-	ballLookaheadSec         = 0.3
+	ballLookaheadSec         = 0.0
 	minRollingBallSpeed      = 0.3
 )
 
