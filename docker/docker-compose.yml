@@ -14,8 +14,10 @@ services:
     tty: true
     environment:
       - DISPLAY=${DISPLAY}
+      - SIM_ADDR=${DOCKER_NAME_SIM}
+    ports:
+      - "${VITE_AI_GAME_VIEWER_SOCKET_PORT}:${VITE_AI_GAME_VIEWER_SOCKET_PORT}"
     command: tail -f /dev/null
-    network_mode: host
 
   game-viewer:
     platform: linux/amd64
@@ -31,9 +33,12 @@ services:
       - SSL_GAME_CONTROLLER_PUBLISH_ADDR=${SSL_GAME_CONTROLLER_PUBLISH_ADDR}
       - SSL_GAME_CONTROLLER_PUBLISH_PORT=${SSL_GAME_CONTROLLER_PUBLISH_PORT}
     env_file: ../environment.ini
+    ports:
+      - "${GAME_VIEWER_PORT}:${GAME_VIEWER_PORT}"
+      - "${VITE_SSL_VISION_WS_PORT}:${VITE_SSL_VISION_WS_PORT}"
+      - "${VITE_SSL_GAME_CONTROLLER_WS_PORT}:${VITE_SSL_GAME_CONTROLLER_WS_PORT}"
     tty: true
     command: tail -f /dev/null
-    network_mode: host
 
   ssl-vision-client:
     platform: linux/amd64
@@ -45,7 +50,8 @@ services:
       - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"
       - "-address"
       - ":${SSL_VISION_CLIENT_PORT}"
-    network_mode: host
+    ports:
+      - "${SSL_VISION_CLIENT_PORT}:${SSL_VISION_CLIENT_PORT}"
 
   ssl-game-controller:
     platform: linux/amd64
@@ -64,7 +70,8 @@ services:
       - "${SSL_GAME_CONTROLLER_PUBLISH_ADDR}:${SSL_GAME_CONTROLLER_PUBLISH_PORT}"
       - "-address"
       - ":${SSL_GAME_CONTROLLER_UI_PORT}"
-    network_mode: host
+    ports:
+      - "${SSL_GAME_CONTROLLER_UI_PORT}:${SSL_GAME_CONTROLLER_UI_PORT}"
 
   er-sim:
     platform: linux/amd64
@@ -74,7 +81,6 @@ services:
     environment:
       GEOMETRY: ${SIM_GEOMETRY}
       REALISM: ${SIM_REALISM}
-    network_mode: host
 
   tiger-auto-referee:
     image: tigersmannheim/auto-referee
@@ -84,4 +90,7 @@ services:
       - "-hl"
       - "-va"
       - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"
-    network_mode: host
+
+networks:
+  default:
+    driver: bridge
