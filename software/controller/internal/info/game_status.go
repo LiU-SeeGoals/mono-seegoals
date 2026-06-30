@@ -10,6 +10,10 @@ type GameStatus struct {
 	gameStage GameStage
 	// The match type is a meta information about the current match that helps to process the logs after a competition
 	matchType MatchType
+	// The division influences some rule timings. Defaulting to Division B keeps
+	// fallback local timers conservative when the multicast Referee packet does
+	// not expose division.
+	division Division
 	// The UNIX timestamp when the packet was sent, in microseconds.
 	// Divide by 1,000,000 to get a time_t.
 	packet_timestamp uint64
@@ -45,6 +49,7 @@ type GameStatus struct {
 func NewGameStatus() *GameStatus {
 	gStatus := &GameStatus{
 		gameEvent: NewGameEvent(),
+		division:  DivisionB,
 		// gameStage:                  0,
 		// matchType:                  0,
 		// packet_timestamp:           0,
@@ -64,6 +69,7 @@ func (gs *GameStatus) String() string {
 		"Game Status:\n"+
 			"  Packet Timestamp: %d\n"+
 			"  Match Type: %s\n"+
+			"  Division: %s\n"+
 			"  Game Stage: %s\n"+
 			"  Stage Time Left: %d microseconds\n"+
 			"  Command Counter: %d\n"+
@@ -71,6 +77,7 @@ func (gs *GameStatus) String() string {
 			"  Status Message: %s\n",
 		gs.packet_timestamp,
 		gs.matchType.String(),
+		gs.division.String(),
 		gs.gameStage.String(),
 		gs.stage_time_left,
 		gs.command_counter,
@@ -133,13 +140,32 @@ func (gs *GameStatus) SetGameEvent(refCommand RefCommand,
 	nextCommand RefCommand,
 	currentActionTimeRemaining int64) {
 
+	gs.SetGameEventWithActionTime(
+		refCommand,
+		commandTimestamp,
+		desPosX,
+		desPosY,
+		nextCommand,
+		currentActionTimeRemaining,
+		true)
+}
+
+func (gs *GameStatus) SetGameEventWithActionTime(refCommand RefCommand,
+	commandTimestamp uint64,
+	desPosX float64,
+	desPosY float64,
+	nextCommand RefCommand,
+	currentActionTimeRemaining int64,
+	currentActionTimeRemainingValid bool) {
+
 	gs.gameEvent.UpdateFromRefCommand(
 		refCommand,
 		commandTimestamp,
 		desPosX,
 		desPosY,
 		nextCommand,
-		currentActionTimeRemaining)
+		currentActionTimeRemaining,
+		currentActionTimeRemainingValid)
 }
 
 func (gs *GameStatus) SetGameStatus(
@@ -166,6 +192,14 @@ func (gs *GameStatus) GetGameStage() GameStage {
 
 func (gs *GameStatus) GetMatchType() MatchType {
 	return gs.matchType
+}
+
+func (gs *GameStatus) SetDivision(division Division) {
+	gs.division = division
+}
+
+func (gs *GameStatus) GetDivision() Division {
+	return gs.division
 }
 
 func (gs *GameStatus) GetPacketTimestamp() uint64 {
