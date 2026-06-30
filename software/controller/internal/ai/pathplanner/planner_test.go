@@ -1,6 +1,7 @@
 package pathplanner
 
 import (
+	"math"
 	"testing"
 
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -213,4 +214,73 @@ func TestClampToPlanningBoundsPreservesAngle(t *testing.T) {
 	if got.Angle != 1.5 {
 		t.Fatalf("expected angle to be preserved, got %v", got.Angle)
 	}
+}
+
+func TestClampBallKeepoutDestinationProjectsOpponentFreeKickDestination(t *testing.T) {
+	gi := newRestartKeepoutTestGameInfo(info.DIRECT_FREE_YELLOW)
+	destination := info.Position{X: 100, Y: 0, Angle: 1.2}
+
+	got := ClampBallKeepoutDestination(info.Blue, info.Position{X: -1000}, destination, gi)
+
+	wantX := RestartBallKeepoutRadius + ballKeepoutDestinationEpsilon
+	if math.Abs(got.X-wantX) > 1e-9 || math.Abs(got.Y) > 1e-9 {
+		t.Fatalf("expected destination projected to (%.1f, 0), got %#v", wantX, got)
+	}
+	if got.Angle != destination.Angle {
+		t.Fatalf("expected angle preserved, got %v want %v", got.Angle, destination.Angle)
+	}
+}
+
+func TestClampBallKeepoutDestinationUsesRobotSideWhenDestinationIsBall(t *testing.T) {
+	gi := newRestartKeepoutTestGameInfo(info.DIRECT_FREE_YELLOW)
+
+	got := ClampBallKeepoutDestination(info.Blue, info.Position{X: -1000}, info.Position{}, gi)
+
+	wantX := -(RestartBallKeepoutRadius + ballKeepoutDestinationEpsilon)
+	if math.Abs(got.X-wantX) > 1e-9 || math.Abs(got.Y) > 1e-9 {
+		t.Fatalf("expected destination projected away on robot side to (%.1f, 0), got %#v", wantX, got)
+	}
+}
+
+func TestClampBallKeepoutDestinationLeavesOwningFreeKickTeamAlone(t *testing.T) {
+	gi := newRestartKeepoutTestGameInfo(info.DIRECT_FREE_YELLOW)
+	destination := info.Position{X: 100, Y: 0, Angle: 1.2}
+
+	got := ClampBallKeepoutDestination(info.Yellow, info.Position{X: -1000}, destination, gi)
+
+	if got != destination {
+		t.Fatalf("expected restart-owning team destination unchanged, got %#v want %#v", got, destination)
+	}
+}
+
+func TestRestartBallKeepoutActiveForOpponentKickoffOnly(t *testing.T) {
+	gi := newRestartKeepoutTestGameInfo(info.PREPARE_KICKOFF_YELLOW)
+
+	if !RestartBallKeepoutActive(info.Blue, gi) {
+		t.Fatal("expected non-possessing team to keep restart distance during opponent kickoff")
+	}
+	if RestartBallKeepoutActive(info.Yellow, gi) {
+		t.Fatal("expected restart-owning team to be allowed to approach kickoff")
+	}
+}
+
+func TestObstaclesForRobotUsesRestartKeepoutEvenWhenAvoidBallIsFalse(t *testing.T) {
+	gi := newRestartKeepoutTestGameInfo(info.DIRECT_FREE_YELLOW)
+
+	obstacles := ObstaclesForRobot(info.Blue, 0, false, false, gi)
+
+	if len(obstacles) != 1 {
+		t.Fatalf("expected only the restart ball obstacle, got %d obstacles: %#v", len(obstacles), obstacles)
+	}
+	if obstacles[0].Size != RestartBallKeepoutRadius {
+		t.Fatalf("expected restart ball obstacle radius %.1f, got %.1f", RestartBallKeepoutRadius, obstacles[0].Size)
+	}
+}
+
+func newRestartKeepoutTestGameInfo(refCommand info.RefCommand) *info.GameInfo {
+	gi := info.NewGameInfo(2)
+	gi.State.SetBall(0, 0, 0, 1)
+	gi.State.GetBall().SetEstimatedPosition(info.Position{})
+	gi.Status.SetGameEvent(refCommand, 0, 0, 0, info.UNINITIALIZED, 10_000_000)
+	return gi
 }

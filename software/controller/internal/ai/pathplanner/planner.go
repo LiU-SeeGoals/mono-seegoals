@@ -12,14 +12,16 @@ import (
 
 // Field/planning constants (mm) — same semantics as the former move_to_position locals.
 const (
-	RobotSafetyRadius    = 240.0
-	BallSafetyRadius     = 150.0
-	GoalLineSafetyRadius = 100.0
-	PlanningRadius       = 400.0
-	MotionRadius         = 100.0
+	RobotSafetyRadius        = 240.0
+	BallSafetyRadius         = 150.0
+	RestartBallKeepoutRadius = 500.0
+	GoalLineSafetyRadius     = 100.0
+	PlanningRadius           = 400.0
+	MotionRadius             = 100.0
 )
 
 const noGoZoneEscapeClearance = MotionRadius
+const ballKeepoutDestinationEpsilon = 1.0
 
 // Defaults for persistent path reuse (used when the corresponding RRTConfig field is zero).
 const (
@@ -159,9 +161,11 @@ func (p *Planner) PlanPath(
 	if p == nil {
 		return nil
 	}
-	finalDestination = clampToPlanningBounds(finalDestination, cfg)
 	perm := cfg.persistence()
 	myPos, _ := gi.State.GetTeam(team)[id].GetPosition()
+	finalDestination = clampToPlanningBounds(finalDestination, cfg)
+	finalDestination = ClampBallKeepoutDestination(team, myPos, finalDestination, gi)
+	finalDestination = clampToPlanningBounds(finalDestination, cfg)
 	obstacles := planningObstacles(team, id, myPos, finalDestination, avoidBall, avoidGoallines, gi, perm)
 
 	if escapePath, ok := noGoZoneEscapePath(myPos, obstacles); ok {
@@ -372,7 +376,8 @@ func planningObstacles(
 	gi *info.GameInfo,
 	perm resolvedPersistence,
 ) []Obstacle {
-	if ignoreRobotObstaclesForBallApproach(myPos, finalDestination, avoidBall, gi, perm) {
+	if !RestartBallKeepoutActive(team, gi) &&
+		ignoreRobotObstaclesForBallApproach(myPos, finalDestination, avoidBall, gi, perm) {
 		ballPos, _ := gi.State.Ball.GetPosition()
 		obstacles := []Obstacle{{Position: ballPos, Size: BallSafetyRadius}}
 		if avoidGoallines {
@@ -397,6 +402,70 @@ func ignoreRobotObstaclesForBallApproach(
 	}
 	ballPos, _ := gi.State.Ball.GetPosition()
 	return distanceSquared(ballPos, finalDestination) <= perm.ballGoalProximityDistance*perm.ballGoalProximityDistance
+}
+
+// RestartBallKeepoutActive reports whether this team must keep the restart
+// distance from the ball. This is intentionally narrower than
+// GameEvent.ShouldKeepDistanceFromBall, because the team taking a restart still
+// needs to approach and kick the ball.
+func RestartBallKeepoutActive(team info.Team, gi *info.GameInfo) bool {
+	if gi == nil || gi.Status == nil {
+		return false
+	}
+	gameEvent := gi.Status.GetGameEvent()
+	if gameEvent == nil || gameEvent.BallInPlay {
+		return false
+	}
+
+	switch gameEvent.CurrentState {
+	case info.STATE_FREE_KICK, info.STATE_KICKOFF_PREPARATION:
+		return gameEvent.TeamWithPossession != team
+	default:
+		return false
+	}
+}
+
+// ClampBallKeepoutDestination projects illegal restart destinations to the
+// nearest point just outside the required ball keep-out circle.
+func ClampBallKeepoutDestination(
+	team info.Team,
+	myPos info.Position,
+	destination info.Position,
+	gi *info.GameInfo,
+) info.Position {
+	if !RestartBallKeepoutActive(team, gi) || gi == nil || gi.State == nil || gi.State.Ball == nil {
+		return destination
+	}
+	ballPos, err := gi.State.Ball.GetPosition()
+	if err != nil {
+		return destination
+	}
+	return projectOutsideBallKeepout(destination, ballPos, myPos, RestartBallKeepoutRadius+ballKeepoutDestinationEpsilon)
+}
+
+func projectOutsideBallKeepout(destination, ballPos, fallback info.Position, radius float64) info.Position {
+	dx := destination.X - ballPos.X
+	dy := destination.Y - ballPos.Y
+	distSq := dx*dx + dy*dy
+	if distSq > radius*radius {
+		return destination
+	}
+
+	if distSq == 0 {
+		dx = fallback.X - ballPos.X
+		dy = fallback.Y - ballPos.Y
+		distSq = dx*dx + dy*dy
+	}
+	if distSq == 0 {
+		dx = 1
+		dy = 0
+		distSq = 1
+	}
+
+	scale := radius / math.Sqrt(distSq)
+	destination.X = ballPos.X + dx*scale
+	destination.Y = ballPos.Y + dy*scale
+	return destination
 }
 
 func collisionTarget(myPos info.Position, obstacles []Obstacle) (bool, Obstacle) {
@@ -785,9 +854,9 @@ func clipSegment(p, q float64, t0, t1 *float64) bool {
 func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoallines bool, gi *info.GameInfo) []Obstacle {
 	obstacles := make([]Obstacle, 0, 1+int(info.TEAM_SIZE)*2+2)
 
-	if avoidBall {
+	if ballRadius, ok := ballObstacleRadius(team, avoidBall, gi); ok {
 		ballPos, _ := gi.State.Ball.GetPosition()
-		obstacles = append(obstacles, Obstacle{Position: ballPos, Size: BallSafetyRadius})
+		obstacles = append(obstacles, Obstacle{Position: ballPos, Size: ballRadius})
 	}
 
 	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Blue), team, id)
@@ -796,6 +865,16 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoalline
 		obstacles = append(obstacles, goalLineObstacles(gi)...)
 	}
 	return obstacles
+}
+
+func ballObstacleRadius(team info.Team, avoidBall bool, gi *info.GameInfo) (float64, bool) {
+	if RestartBallKeepoutActive(team, gi) {
+		return RestartBallKeepoutRadius, true
+	}
+	if avoidBall {
+		return BallSafetyRadius, true
+	}
+	return 0, false
 }
 
 func appendRobotObstacles(obstacles []Obstacle, robots *info.RobotTeam, ownTeam info.Team, ownID info.ID) []Obstacle {

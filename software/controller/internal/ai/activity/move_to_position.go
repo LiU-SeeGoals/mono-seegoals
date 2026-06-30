@@ -115,7 +115,7 @@ func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
 func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	myRobot := gi.State.GetTeam(m.team)[m.id]
 	myPos, _ := myRobot.GetPosition()
-	finalDestination := m.clampedFinalDestination(gi)
+	finalDestination := m.clampedFinalDestination(gi, myPos)
 
 	if m.closeEnoughToGoal(gi) {
 		act := &action.MoveTo{}
@@ -177,7 +177,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 
 func (m *MoveToPosition) closeEnoughToGoal(gi *info.GameInfo) bool {
 	currPos, _ := gi.State.GetTeam(m.team)[m.id].GetPosition()
-	return pathplanner.DistanceBetween(currPos, m.clampedFinalDestination(gi)) <= m.rrtConfig.CompletionDistance
+	return pathplanner.DistanceBetween(currPos, m.clampedFinalDestination(gi, currPos)) <= m.rrtConfig.CompletionDistance
 }
 
 func (m *MoveToPosition) fieldAwareRRTConfig(gi *info.GameInfo) pathplanner.RRTConfig {
@@ -196,8 +196,10 @@ func (m *MoveToPosition) fieldAwareRRTConfig(gi *info.GameInfo) pathplanner.RRTC
 	return cfg
 }
 
-func (m *MoveToPosition) clampedFinalDestination(gi *info.GameInfo) info.Position {
-	return clampToField(m.final_destination, gi, m.fieldClampMargin(gi))
+func (m *MoveToPosition) clampedFinalDestination(gi *info.GameInfo, myPos info.Position) info.Position {
+	destination := clampToField(m.final_destination, gi, m.fieldClampMargin(gi))
+	destination = pathplanner.ClampBallKeepoutDestination(m.team, myPos, destination, gi)
+	return clampToField(destination, gi, m.fieldClampMargin(gi))
 }
 
 func (m *MoveToPosition) fieldExpansion(gi *info.GameInfo) float64 {
