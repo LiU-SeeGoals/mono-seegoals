@@ -16,7 +16,7 @@ import (
 const (
 	ballPlacementTouchlineMarginMM = 200.0
 	ballPlacementCornerMarginMM    = 200.0
-	ballPlacementGoalKickDepthMM   = 1000.0
+	ballPlacementGoalKickDepthMM   = 0.0
 	mmToM                          = 1.0 / 1000.0
 )
 
@@ -27,7 +27,7 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	if placement, ok := outsideFieldPlacement(gameInfo, ballPos); ok {
 		teleportBallMillimeters(simController, placement)
 	} else if time.Now().UnixMilli()-ballTime > 5000 {
-		teleportBallMillimeters(simController, info.Position{Y: 1000})
+		teleportBallMillimeters(simController, info.Position{Y: 0})
 	}
 
 	ge := gameInfo.Status.GetGameEvent()
@@ -37,7 +37,7 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	case info.STATE_KICKOFF_PREPARATION:
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
 			// fmt.Println("teleported ball (new kickoff)")
-			teleportBallMillimeters(simController, info.Position{Y: 1000})
+			teleportBallMillimeters(simController, info.Position{Y: 0})
 		}
 	case info.STATE_FREE_KICK:
 	case info.STATE_HALTED, info.STATE_STOPPED:
@@ -169,7 +169,7 @@ func GameScenario() {
 		simClientBlue = client.NewSimClient(config.GetSimBlueTeamAddress(), gameInfo)
 
 		simController = simulator.NewSimControl()
-		teleportBallMillimeters(simController, info.Position{Y: 1000})
+		teleportBallMillimeters(simController, info.Position{Y: 0})
 		simController.SetPresentRobots(teamYellow, teamBlue)
 
 	} else {

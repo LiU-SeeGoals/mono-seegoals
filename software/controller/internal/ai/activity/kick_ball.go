@@ -33,7 +33,7 @@ type KickConfig struct {
 
 const (
 	defaultKickBallSpeed      = 1
-	defaultKickBallSimSpeed   = 8.0
+	defaultKickBallSimSpeed   = 3.0
 	kickMouthLateralTolerance = info.DribblerHalfWidth + 1.5*info.BallRadius
 	kickDribbleSettleTime     = 250 * time.Millisecond
 	kickHeldHeadingTolerance  = 0.4
