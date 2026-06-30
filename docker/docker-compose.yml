@@ -88,8 +88,11 @@ services:
     restart: "no"
     command:
       - "-hl"
+      - "-a"
       - "-va"
       - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}"
+      - "-ra"
+      - "${SSL_GAME_CONTROLLER_PUBLISH_ADDR}:${SSL_GAME_CONTROLLER_PUBLISH_PORT}"
 
 networks:
   default:
