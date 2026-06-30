@@ -10,12 +10,18 @@ import (
 )
 
 type KickBall struct {
-	team           info.Team
-	id             info.ID
-	orignalBallPos info.Position
-	inited         bool
-	to             info.Position
-	dribbleSince   time.Time
+	team              info.Team
+	id                info.ID
+	orignalBallPos    info.Position
+	inited            bool
+	to                info.Position
+	dribbleSince      time.Time
+	allowGoalArea     bool
+	allowOutsideField bool
+	allowBehindGoal   bool
+	kickSpeed         int
+	simKickSpeed      float32
+	kickAngle         float32
 }
 
 type KickConfig struct {
@@ -26,6 +32,8 @@ type KickConfig struct {
 }
 
 const (
+	defaultKickBallSpeed      = 1
+	defaultKickBallSimSpeed   = 3.0
 	kickMouthLateralTolerance = info.DribblerHalfWidth + 1.5*info.BallRadius
 	kickDribbleSettleTime     = 250 * time.Millisecond
 	kickHeldHeadingTolerance  = 0.4
@@ -51,13 +59,39 @@ func (m *KickBall) String() string {
 func NewKickBall(team info.Team, id info.ID, to, ballPos info.Position) *KickBall {
 	// fmt.Println("New kick ball")
 	return &KickBall{
-		team,
-		id,
-		ballPos,
-		false,
-		to,
-		time.Time{},
+		team:           team,
+		id:             id,
+		orignalBallPos: ballPos,
+		inited:         false,
+		to:             to,
+		dribbleSince:   time.Time{},
+		kickSpeed:      defaultKickBallSpeed,
+		simKickSpeed:   defaultKickBallSimSpeed,
 	}
+}
+
+func (m *KickBall) AllowGoalArea(allow bool) {
+	m.allowGoalArea = allow
+}
+
+func (m *KickBall) AllowOutsideField(allow bool) {
+	m.allowOutsideField = allow
+}
+
+func (m *KickBall) AllowBehindGoalLine(allow bool) {
+	m.allowBehindGoal = allow
+}
+
+func (m *KickBall) SetKickSpeed(speed int) {
+	m.kickSpeed = speed
+}
+
+func (m *KickBall) SetSimKickSpeed(speed float32) {
+	m.simKickSpeed = speed
+}
+
+func (m *KickBall) SetKickAngle(angle float32) {
+	m.kickAngle = angle
 }
 
 func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
@@ -128,6 +162,11 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	act.Team = m.team
 	act.Pos = robotPos
 	act.Dest = robotTargetPos
+	act.AllowGoalArea = m.allowGoalArea
+	act.AllowOutsideField = m.allowOutsideField
+	act.AllowBehindGoalLine = m.allowBehindGoal
+	act.SimKickSpeed = m.simKickSpeed
+	act.KickAngle = m.kickAngle
 
 	dribblerPos := robot.DribblerPos()
 	dribblerDist := dribblerPos.Dist2d(ballUntracked)
@@ -147,7 +186,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	// state.
 	act.Dribble = true
 	if kickBallShouldFire(dribblerDist, kickAfterSettle, impactReady) {
-		act.KickSpeed = 2
+		act.KickSpeed = m.kickSpeed
 	}
 	printCaptureDebug(
 		"kick-ball",

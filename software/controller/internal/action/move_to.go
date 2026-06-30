@@ -24,6 +24,9 @@ type MoveTo struct {
 	// area instead of clamping them to the playable touchlines. The goal-line
 	// safety guard remains active.
 	AllowOutsideField bool
+	// AllowBehindGoalLine lets the executor keep destinations behind either goal
+	// line. This is intended for keeper-only goal-mouth positioning.
+	AllowBehindGoalLine bool
 	// AllowGoalArea permits the robot to enter either goal/penalty area between
 	// the penalty stretch and goal line. This is intended for the goalie only.
 	AllowGoalArea bool
@@ -36,6 +39,11 @@ type MoveTo struct {
 	Team info.Team
 
 	KickSpeed int
+	// SimKickSpeed is the physical simulator kick speed in m/s. If unset, the
+	// simulator falls back to KickSpeed for older call sites that use it as m/s.
+	SimKickSpeed float32
+	// KickAngle is used by the simulator in degrees. Zero is a flat kick.
+	KickAngle float32
 	// Pre-allocated protobuf objects to avoid repeated heap allocations
 	simCmd       simulation.RobotCommand
 	simMoveCmd   simulation.RobotMoveCommand
@@ -48,6 +56,7 @@ type MoveTo struct {
 	simAngular       float32
 	simDribblerSpeed float32
 	simKickSpeed     float32
+	simKickAngle     float32
 }
 
 func convAngle(angle float64) float64 {
@@ -129,10 +138,20 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
 	}
 
 	if mv.KickSpeed != 0 {
-		mv.simKickSpeed = float32(mv.KickSpeed)
+		mv.simKickSpeed = mv.SimKickSpeed
+		if mv.simKickSpeed == 0 {
+			mv.simKickSpeed = float32(mv.KickSpeed)
+		}
 		mv.simCmd.KickSpeed = &mv.simKickSpeed
+		if mv.KickAngle != 0 {
+			mv.simKickAngle = mv.KickAngle
+			mv.simCmd.KickAngle = &mv.simKickAngle
+		} else {
+			mv.simCmd.KickAngle = nil
+		}
 	} else {
 		mv.simCmd.KickSpeed = nil
+		mv.simCmd.KickAngle = nil
 	}
 
 	return &mv.simCmd
@@ -143,24 +162,17 @@ func (mv *MoveTo) TranslateSim() *simulation.RobotCommand {
 }
 
 func (mt *MoveTo) TranslateReal() *robot_action.Command {
-	// Robots only take binary commands for kick and dribblespeed.
-	// Either 0 or 1.
-	kickSpeedReal := 0
-
-	if mt.KickSpeed != 0 {
-		kickSpeedReal = 1
-
-	}
+	kickSpeedReal := mt.KickSpeed
 	dribbleSpeedReal := 0
 
 	if mt.Dribble {
 		dribbleSpeedReal = 1
 	}
-	if kickSpeedReal == 1 && dribbleSpeedReal == 1 {
+	if kickSpeedReal != 0 && dribbleSpeedReal == 1 {
 		fmt.Println("Cannot send dribble and kick at same time, sending only kick")
 	}
 
-	if kickSpeedReal == 1 {
+	if kickSpeedReal != 0 {
 		// fmt.Println("Kicking")
 		dribbleSpeedReal = 1
 		command_kick := &robot_action.Command{

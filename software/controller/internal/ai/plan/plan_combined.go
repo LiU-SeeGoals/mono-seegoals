@@ -823,11 +823,13 @@ func (m *CombinedPlan) run() {
 		}
 
 		if goalieRole != nil {
-			goalieRole.SetGameInfo(gi)
 			debugstate.SetRobotRole(m.team, goalieID, tacticalSlotGoalie.label())
+			goalieRole.SetGameInfo(gi)
 			if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
 				goalieRole.TriggerEvent("BALL_OWNER")
-			} else {
+			} else if goalieRole.ShouldCollectDeadBall() {
+				goalieRole.TriggerEvent("DEAD_BALL_TRAPPED")
+			} else if !goalieRole.IsDeadBallRescueActive() {
 				goalieRole.TriggerEvent("BALL_LOST")
 			}
 			goalieRole.Run()

@@ -143,7 +143,9 @@ func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action 
 
 	originalDestX := move.Dest.X
 	move.Dest = gi.ClampToField(move.Dest, margin)
-	move.Dest = clampToGoalLines(move.Dest, gi, goalClearance)
+	if !move.AllowBehindGoalLine {
+		move.Dest = clampToGoalLines(move.Dest, gi, goalClearance)
+	}
 	goalAreaAdjusted := false
 	var goalAreas []goalAreaBounds
 	if !move.AllowGoalArea {
@@ -164,7 +166,9 @@ func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action 
 		clamped := make([]info.Position, len(move.Path))
 		for i, waypoint := range move.Path {
 			clamped[i] = gi.ClampToField(waypoint, margin)
-			clamped[i] = clampToGoalLines(clamped[i], gi, goalClearance)
+			if !move.AllowBehindGoalLine {
+				clamped[i] = clampToGoalLines(clamped[i], gi, goalClearance)
+			}
 			if !move.AllowGoalArea {
 				clamped[i], _ = clampOutsideGoalAreas(clamped[i], goalAreas, goalClearance)
 			}

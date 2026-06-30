@@ -49,6 +49,7 @@ type MoveToPosition struct {
 	avoidGoallines    bool
 	dribble           bool
 	allowOutsideField bool
+	allowBehindGoal   bool
 	lastPosition      info.Position // Last position to detect lack of movement
 	stuckThreshold    int           // Number of cycles to consider robot as stuck
 	useRRT            bool          // Flag to enable/disable RRT-based collision avoidance
@@ -100,6 +101,10 @@ func (m *MoveToPosition) AllowOutsideField(allow bool) {
 	m.allowOutsideField = allow
 }
 
+func (m *MoveToPosition) AllowBehindGoalLine(allow bool) {
+	m.allowBehindGoal = allow
+}
+
 // GetAction returns an action for the robot with RRT-based collision avoidance
 func (m *MoveToPosition) GetAction(gi *info.GameInfo) action.Action {
 	moveToAction := m.GetMoveToAction(gi)
@@ -119,6 +124,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 		act.Pos = myPos
 		act.Dest = finalDestination
 		act.AllowOutsideField = m.allowOutsideField
+		act.AllowBehindGoalLine = m.allowBehindGoal
 		act.AllowGoalArea = !m.avoidGoallines
 		act.Dribble = false
 		return act
@@ -158,6 +164,7 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	act.Dest = targetPos
 	act.Dest.Angle = finalDestination.Angle
 	act.AllowOutsideField = m.allowOutsideField
+	act.AllowBehindGoalLine = m.allowBehindGoal
 	act.AllowGoalArea = !m.avoidGoallines
 	act.Dribble = m.dribble
 	// Include the full planned path for visualization in the GameViewer.

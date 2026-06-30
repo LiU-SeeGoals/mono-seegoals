@@ -36,13 +36,16 @@ func GetAlignConfig() AlignConfig {
 }
 
 type AlignBall struct {
-	team       info.Team
-	id         info.ID
-	to         info.Position
-	from       info.Position
-	AlignAngle float64
-	useRRT     bool
-	avoidBall  bool
+	team              info.Team
+	id                info.ID
+	to                info.Position
+	from              info.Position
+	AlignAngle        float64
+	useRRT            bool
+	avoidBall         bool
+	allowGoalArea     bool
+	allowOutsideField bool
+	allowBehindGoal   bool
 }
 
 func (m *AlignBall) String() string {
@@ -51,21 +54,35 @@ func (m *AlignBall) String() string {
 
 func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) *AlignBall {
 	return &AlignBall{
-		team,
-		id,
-		to,
-		from,
-		0,
-		true,
-		true,
+		team:       team,
+		id:         id,
+		to:         to,
+		from:       from,
+		AlignAngle: 0,
+		useRRT:     true,
+		avoidBall:  true,
 	}
 }
+
 func NewDirectAlign(team info.Team, id info.ID, to info.Position, from info.Position) *AlignBall {
 	align := NewAlign(team, id, to, from)
 	align.useRRT = false
 	align.avoidBall = false
 	return align
 }
+
+func (m *AlignBall) AllowGoalArea(allow bool) {
+	m.allowGoalArea = allow
+}
+
+func (m *AlignBall) AllowOutsideField(allow bool) {
+	m.allowOutsideField = allow
+}
+
+func (m *AlignBall) AllowBehindGoalLine(allow bool) {
+	m.allowBehindGoal = allow
+}
+
 func (m *AlignBall) getTargetPos(gi *info.GameInfo) info.Position {
 	return m.getTargetPosWithClearance(gi, GetAlignConfig().robotBallClearence)
 }
@@ -156,6 +173,9 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	moveTo := NewMoveToPosition(m.team, m.id, moveTarget)
 	moveTo.SetUseRRT(useRRT)
 	moveTo.AvoidBall(avoidBall)
+	moveTo.AvoidGoallines(!m.allowGoalArea)
+	moveTo.AllowOutsideField(m.allowOutsideField)
+	moveTo.AllowBehindGoalLine(m.allowBehindGoal)
 	act := moveTo.GetMoveToAction(gi)
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
 	if ok && ballVel.Norm2d() > 0.3 {
@@ -271,12 +291,15 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	)
 
 	return &action.MoveTo{
-		Id:             int(m.id),
-		Team:           m.team,
-		Pos:            myPos,
-		Dest:           carrot,
-		MinLinearSpeed: aroundBallLinearSpeed(myPos, carrot),
-		Dribble:        dribble,
+		Id:                  int(m.id),
+		Team:                m.team,
+		Pos:                 myPos,
+		Dest:                carrot,
+		AllowOutsideField:   m.allowOutsideField,
+		AllowBehindGoalLine: m.allowBehindGoal,
+		AllowGoalArea:       m.allowGoalArea,
+		MinLinearSpeed:      aroundBallLinearSpeed(myPos, carrot),
+		Dribble:             dribble,
 	}
 }
 

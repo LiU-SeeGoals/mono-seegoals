@@ -17,13 +17,11 @@ type GoalieRole struct {
 	gi              *info.GameInfo
 	team            info.Team
 	clearFallback   info.Position
-}
-
-type GoalieClearIntent struct {
-	gi       *info.GameInfo
-	team     info.Team
-	selfID   info.ID
-	fallback info.Position
+	deadBall        deadBallTracker
+	safeClear       *GoalieSafeClearIntent
+	collectName     StateName
+	alignName       StateName
+	kickName        StateName
 }
 
 func NewGoalieRole(robotID info.ID, activityHandler ai.ActivityHandler, team info.Team, clearTarget info.Position) *GoalieRole {
@@ -39,6 +37,7 @@ func NewGoalieRole(robotID info.ID, activityHandler ai.ActivityHandler, team inf
 
 func (gr *GoalieRole) SetGameInfo(gi info.GameInfo) {
 	*gr.gi = gi
+	gr.deadBall.Observe(gr.gi, gr.team)
 }
 
 func (gr *GoalieRole) HasBallControl(radius float64) bool {
@@ -68,58 +67,22 @@ func (gr *GoalieRole) ShouldClearBall(radius float64, minDefendedX float64) bool
 	return defenseXSign(gr.gi, gr.team)*ballPos.X > minDefendedX
 }
 
-func (gc *GoalieClearIntent) GetTargetPosition() info.Position {
-	ballPos, err := gc.gi.State.GetBall().GetEstimatedPosition()
-	if err != nil {
-		return gc.fallback
-	}
-
-	teamRobots := gc.gi.State.GetTeam(gc.team)
-	bestDist := 0.0
-	var bestPos info.Position
-	found := false
-
-	for id, robot := range teamRobots {
-		if info.ID(id) == gc.selfID || robot == nil {
-			continue
-		}
-
-		pos, err := robot.GetPosition()
-		if err != nil {
-			continue
-		}
-
-		dist := pos.Dist2d(ballPos)
-		if !found || dist < bestDist {
-			bestDist = dist
-			bestPos = pos
-			found = true
-		}
-	}
-
-	if found {
-		return bestPos
-	}
-
-	return gc.fallback
-}
-
-func (gc *GoalieClearIntent) GetFromPosition() info.Position {
-	pos, _ := gc.gi.State.GetBall().GetEstimatedPosition()
-	return pos
-}
-
 func (gr *GoalieRole) Init() {
 	defendName := StateName(fmt.Sprintf("GoalieDefend ID %d", gr.id))
+	collectName := StateName(fmt.Sprintf("GoalieCollectDeadBall ID %d", gr.id))
 	alignName := StateName(fmt.Sprintf("GoalieAlignClear ID %d", gr.id))
 	kickName := StateName(fmt.Sprintf("GoalieKickClear ID %d", gr.id))
+	gr.collectName = collectName
+	gr.alignName = alignName
+	gr.kickName = kickName
 
-	clearContext := GoalieClearIntent{
+	clearContext := &GoalieSafeClearIntent{
 		gi:       gr.gi,
 		team:     gr.team,
 		selfID:   gr.id,
 		fallback: gr.clearFallback,
 	}
+	gr.safeClear = clearContext
 
 	defend := &GoalieDefendState{
 		gi:              gr.gi,
@@ -128,16 +91,23 @@ func (gr *GoalieRole) Init() {
 		name:            defendName,
 		activityHandler: gr.activityHandler,
 	}
-	align := &AlignState{
-		Ctx:             &clearContext,
+	collect := &GoalieCollectDeadBallState{
+		gi:              gr.gi,
+		team:            gr.team,
+		robotId:         gr.id,
+		name:            collectName,
+		activityHandler: gr.activityHandler,
+	}
+	align := &GoalieSafeAlignState{
+		Ctx:             clearContext,
 		Gi:              gr.gi,
 		Team:            gr.team,
 		RobotId:         gr.id,
 		Name:            alignName,
 		ActivityHandler: gr.activityHandler,
 	}
-	kick := &KickState{
-		Ctx:             &clearContext,
+	kick := &GoalieSafeKickState{
+		Ctx:             clearContext,
 		Name:            kickName,
 		Gi:              gr.gi,
 		Team:            gr.team,
@@ -146,7 +116,10 @@ func (gr *GoalieRole) Init() {
 	}
 
 	sm := NewStateMachine(defend)
+	sm.AddTransition(defendName, "DEAD_BALL_TRAPPED", collect)
 	sm.AddTransition(defendName, "BALL_OWNER", align)
+	sm.AddTransition(collectName, "BALL_OWNER", align)
+	sm.AddTransition(collectName, "BALL_LOST", defend)
 	sm.AddTransition(alignName, "ALIGNED", kick)
 	sm.AddTransition(alignName, "BALL_LOST", defend)
 	sm.AddTransition(kickName, "KICKED", defend)
@@ -159,6 +132,17 @@ func (gr *GoalieRole) Run() {
 	gr.sm.Update()
 }
 
+func (gr *GoalieRole) IsDeadBallRescueActive() bool {
+	if gr == nil || gr.sm == nil {
+		return false
+	}
+	stateName := gr.sm.CurrentStateName()
+	return stateName == gr.collectName || stateName == gr.alignName || stateName == gr.kickName
+}
+
 func (gr *GoalieRole) TriggerEvent(event EventName) {
+	if event == "BALL_LOST" && gr.safeClear != nil {
+		gr.safeClear.ResetTarget()
+	}
 	gr.sm.TriggerEvent(event)
 }

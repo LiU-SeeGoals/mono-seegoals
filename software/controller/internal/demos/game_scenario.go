@@ -2,6 +2,8 @@ package demos
 
 import (
 	"fmt"
+	"math"
+	"math/rand"
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/ai"
@@ -12,7 +14,78 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
 
-func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
+const simulatedGoalAreaTeleportInterval = 15 * time.Second
+
+type goalAreaTeleporter struct {
+	nextTeleport time.Time
+	rng          *rand.Rand
+}
+
+func newGoalAreaTeleporter() *goalAreaTeleporter {
+	return &goalAreaTeleporter{
+		nextTeleport: time.Now().Add(simulatedGoalAreaTeleportInterval),
+		rng:          rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+func (t *goalAreaTeleporter) MaybeTeleport(gameInfo *info.GameInfo, simController *simulator.SimControl) {
+	if t == nil || simController == nil || time.Now().Before(t.nextTeleport) {
+		return
+	}
+
+	x, y := randomGoalAreaPosition(gameInfo, t.rng)
+	fmt.Printf("teleported ball (%f, %f) (periodic goal-area test)\n", x, y)
+	simController.TeleportBall(float32(x/1000), float32(y/1000))
+	t.nextTeleport = time.Now().Add(simulatedGoalAreaTeleportInterval)
+}
+
+func randomGoalAreaPosition(gameInfo *info.GameInfo, rng *rand.Rand) (float64, float64) {
+	if rng == nil {
+		rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+
+	if gameInfo != nil && gameInfo.HasField() {
+		if rng.Intn(2) == 0 {
+			if x, y, ok := randomGoalAreaPositionFromLines(gameInfo, "LeftPenaltyStretch", "LeftGoalLine", rng); ok {
+				return x, y
+			}
+		}
+		if x, y, ok := randomGoalAreaPositionFromLines(gameInfo, "RightPenaltyStretch", "RightGoalLine", rng); ok {
+			return x, y
+		}
+	}
+
+	xSign := 1.0
+	if rng.Intn(2) == 0 {
+		xSign = -1.0
+	}
+	return randomBetween(3500, 4500, rng) * xSign, randomBetween(-1000, 1000, rng)
+}
+
+func randomGoalAreaPositionFromLines(gameInfo *info.GameInfo, frontLineName, backLineName string, rng *rand.Rand) (float64, float64, bool) {
+	front := gameInfo.GetFieldLine(frontLineName)
+	back := gameInfo.GetFieldLine(backLineName)
+	if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
+		return 0, 0, false
+	}
+
+	const margin = 150.0
+	minX := math.Min(float64(front.GetP1().GetX()), float64(back.GetP1().GetX())) + margin
+	maxX := math.Max(float64(front.GetP1().GetX()), float64(back.GetP1().GetX())) - margin
+	minY := math.Min(float64(front.GetP1().GetY()), float64(front.GetP2().GetY())) + margin
+	maxY := math.Max(float64(front.GetP1().GetY()), float64(front.GetP2().GetY())) - margin
+	if minX >= maxX || minY >= maxY {
+		return 0, 0, false
+	}
+
+	return randomBetween(minX, maxX, rng), randomBetween(minY, maxY, rng), true
+}
+
+func randomBetween(minValue, maxValue float64, rng *rand.Rand) float64 {
+	return minValue + rng.Float64()*(maxValue-minValue)
+}
+
+func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl, goalAreaTeleporter *goalAreaTeleporter) {
 
 	ball := gameInfo.State.GetBall()
 	ballPos, ballTime, _ := ball.GetPositionTime()
@@ -45,6 +118,8 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 		}
 	default:
 	}
+
+	goalAreaTeleporter.MaybeTeleport(gameInfo, simController)
 }
 
 func GameScenario() {
@@ -57,6 +132,7 @@ func GameScenario() {
 	var aiBlue *ai.Ai
 	var basestationClient *client.BaseStationClient
 	var simController *simulator.SimControl
+	var goalAreaTeleporter *goalAreaTeleporter
 	var simClientYellow *client.SimClient
 	var simClientBlue *client.SimClient
 
@@ -85,6 +161,7 @@ func GameScenario() {
 		simController = simulator.NewSimControl()
 		simController.TeleportBall(0, 1000)
 		simController.SetPresentRobots(teamYellow, teamBlue)
+		goalAreaTeleporter = newGoalAreaTeleporter()
 
 	} else {
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
@@ -127,7 +204,7 @@ func GameScenario() {
 			simClientYellow.SendActions(actionsYellow)
 			simClientBlue.SendActions(actionsBlue)
 
-			handleSimulatedBall(gameInfo, simController)
+			handleSimulatedBall(gameInfo, simController, goalAreaTeleporter)
 		} else {
 			basestationClient.SendActions(actionsYellow)
 			basestationClient.SendActions(actionsBlue)

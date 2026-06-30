@@ -89,11 +89,15 @@ func (m *plannerGoalie) run() {
 		if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
 			m.changeBallOwner(goalieID, "goalie has ball control")
 			goalieRole.TriggerEvent("BALL_OWNER")
+		} else if goalieRole.ShouldCollectDeadBall() {
+			goalieRole.TriggerEvent("DEAD_BALL_TRAPPED")
 		} else {
-			if m.ballOwner == goalieID {
+			if !goalieRole.IsDeadBallRescueActive() && m.ballOwner == goalieID {
 				m.changeBallOwner(0, "goalie lost ball control")
 			}
-			goalieRole.TriggerEvent("BALL_LOST")
+			if !goalieRole.IsDeadBallRescueActive() {
+				goalieRole.TriggerEvent("BALL_LOST")
+			}
 		}
 
 		goalieRole.Run()
