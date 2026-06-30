@@ -16,8 +16,9 @@ import (
 const (
 	ballPlacementTouchlineMarginMM = 200.0
 	ballPlacementCornerMarginMM    = 200.0
-	ballPlacementGoalKickDepthMM   = 0.0
-	mmToM                          = 1.0 / 1000.0
+	// Goal kicks are free kicks placed 1 m from the goal line.
+	ballPlacementGoalKickDepthMM = 1000.0
+	mmToM                        = 1.0 / 1000.0
 )
 
 func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
