@@ -68,24 +68,25 @@ const (
 
 // GameEvent contains information about the current game state and referee commands
 type GameEvent struct {
-	RefCommand RefCommand
-	CurrentState RefState
-	PreviousState RefState
-	TeamWithPossession Team
-	CommandTimestamp uint64
+	RefCommand                 RefCommand
+	CurrentState               RefState
+	PreviousState              RefState
+	TeamWithPossession         Team
+	CommandTimestamp           uint64
 	LastUniqueCommandTimestamp uint64
-	LastUniqueCommand RefCommand
+	LastUniqueCommand          RefCommand
 	// The coordinates of the Designated Position for ball placement
-	DesignatedPosition *mat.VecDense
-	NextCommand RefCommand
-	CurrentActionTimeRemaining int64
-	BallInPlay bool
+	DesignatedPosition              *mat.VecDense
+	NextCommand                     RefCommand
+	CurrentActionTimeRemaining      int64
+	CurrentActionTimeRemainingValid bool
+	BallInPlay                      bool
 }
 
 func NewGameEvent() *GameEvent {
 	return &GameEvent{
-		RefCommand:   UNINITIALIZED,
-		CurrentState: STATE_HALTED,
+		RefCommand:    UNINITIALIZED,
+		CurrentState:  STATE_HALTED,
 		PreviousState: STATE_HALTED,
 		// TeamWithPossession will have its zero value
 		DesignatedPosition: mat.NewVecDense(2, nil),
@@ -182,7 +183,7 @@ func (ge *GameEvent) String() string {
 			"  Designated Position: %s\n"+
 			"  Next Command: %s\n"+
 			"  Ball In Play: %v\n"+
-			"  Current Action Time Remaining: %d microseconds",
+			"  Current Action Time Remaining: %s",
 		ge.RefCommand.String(),
 		ge.CurrentState.String(),
 		teamPossession,
@@ -192,7 +193,7 @@ func (ge *GameEvent) String() string {
 		position,
 		ge.NextCommand.String(),
 		ge.BallInPlay,
-		ge.CurrentActionTimeRemaining,
+		ge.currentActionTimeRemainingString(),
 	)
 }
 
@@ -202,12 +203,14 @@ func (ge *GameEvent) UpdateFromRefCommand(
 	desPosX float64,
 	desPosY float64,
 	nextCommand RefCommand,
-	currentActionTimeRemaining int64) {
+	currentActionTimeRemaining int64,
+	currentActionTimeRemainingValid bool) {
 
 	ge.RefCommand = refCommand
 	ge.CommandTimestamp = commandTimestamp
 	ge.NextCommand = nextCommand
 	ge.CurrentActionTimeRemaining = currentActionTimeRemaining
+	ge.CurrentActionTimeRemainingValid = currentActionTimeRemainingValid
 
 	if refCommand != ge.LastUniqueCommand {
 		ge.LastUniqueCommand = refCommand
@@ -234,10 +237,8 @@ func (ge *GameEvent) UpdateFromRefCommand(
 		ge.BallInPlay = false
 
 	case NORMAL_START:
-		if ge.CurrentState == STATE_KICKOFF_PREPARATION || ge.CurrentState == STATE_PENALTY_PREPARATION {
-			// Keep the current state but mark the ball as in play
-			ge.BallInPlay = true
-		}
+		// Keep the prepared restart state. The ball only enters play after it
+		// moved 50mm or the action timer expires.
 
 	case FORCE_START:
 		ge.CurrentState = STATE_PLAYING
@@ -294,8 +295,8 @@ func (ge *GameEvent) UpdateFromRefCommand(
 		ge.BallInPlay = false
 	}
 
-	if ge.CurrentActionTimeRemaining < 0 {
-		ge.CurrentState = STATE_PLAYING
+	if ge.CurrentActionTimedOut() {
+		ge.SetBallMoved()
 	}
 
 	// Check for timeouts and automatically update state if needed
@@ -317,6 +318,21 @@ func (ge *GameEvent) GetTeamWithPossession() Team {
 
 func (ge *GameEvent) GetDesignatedPosition() *mat.VecDense {
 	return ge.DesignatedPosition
+}
+
+func (ge *GameEvent) HasCurrentActionTimeRemaining() bool {
+	return ge.CurrentActionTimeRemainingValid
+}
+
+func (ge *GameEvent) CurrentActionTimedOut() bool {
+	return ge.CurrentActionTimeRemainingValid && ge.CurrentActionTimeRemaining <= 0
+}
+
+func (ge *GameEvent) currentActionTimeRemainingString() string {
+	if !ge.CurrentActionTimeRemainingValid {
+		return "N/A"
+	}
+	return fmt.Sprintf("%d microseconds", ge.CurrentActionTimeRemaining)
 }
 
 // If we should keep distance from ball it is 500 mm

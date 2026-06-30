@@ -60,8 +60,8 @@ func GameScenario() {
 	var simClientYellow *client.SimClient
 	var simClientBlue *client.SimClient
 
-	slowBrainYellow := plan.NewCombinedPlan(info.Yellow)
-	slowBrainBlue := plan.NewCombinedPlan(info.Blue)
+	slowBrainYellow := plan.NewCombinedPlanWithRef(info.Yellow)
+	slowBrainBlue := plan.NewCombinedPlanWithRef(info.Blue)
 
 	manualMovementYellow := plan.NewPlannerManualMovement(info.Yellow)
 	// manualMovementBlue := plan.NewPlannerManualMovement(info.Blue)
