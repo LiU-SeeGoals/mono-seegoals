@@ -400,7 +400,7 @@ func (m *CombinedPlan) splitGoalieFromFieldRobots(
 	activeRobots []info.ID,
 ) (info.ID, bool, []info.ID) {
 	goalieID, hasGoalie := m.chooseGoalie(gi, activeRobots)
-	if hasGoalie {
+	if !hasGoalie {
 		return 0, false, activeRobots
 	}
 
