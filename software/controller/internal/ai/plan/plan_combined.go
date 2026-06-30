@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
@@ -17,6 +18,7 @@ import (
 
 type CombinedPlan struct {
 	plannerCore
+	ballTouchRestrictedRobot atomic.Uint32
 }
 
 type tacticalMode string
@@ -257,12 +259,17 @@ func (rm *combinedRoleManager) idsForSlot(slot tacticalSlotKind) []info.ID {
 	return ids
 }
 
-func (rm *combinedRoleManager) idForSlot(slot tacticalSlotKind) (info.ID, bool) {
-	ids := rm.idsForSlot(slot)
-	if len(ids) == 0 {
-		return 0, false
+func (rm *combinedRoleManager) idForSlotExcluding(
+	slot tacticalSlotKind,
+	excludedID info.ID,
+	hasExcludedID bool,
+) (info.ID, bool) {
+	for _, id := range rm.idsForSlot(slot) {
+		if !hasExcludedID || id != excludedID {
+			return id, true
+		}
 	}
-	return ids[0], true
+	return 0, false
 }
 
 func (rm *combinedRoleManager) configureOffenseReceivers(receiverIDs []info.ID) {
@@ -334,6 +341,23 @@ func (m *CombinedPlan) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID
 	}
 
 	return m.getRobotClosestToPosition(gi, activeRobots, targetPos)
+}
+
+func (m *CombinedPlan) setBallTouchRestriction(id info.ID) {
+	// Zero represents no restriction, so robot IDs are stored with an offset.
+	m.ballTouchRestrictedRobot.Store(uint32(id) + 1)
+}
+
+func (m *CombinedPlan) clearBallTouchRestriction() {
+	m.ballTouchRestrictedRobot.Store(0)
+}
+
+func (m *CombinedPlan) ballTouchRestriction() (info.ID, bool) {
+	encoded := m.ballTouchRestrictedRobot.Load()
+	if encoded == 0 {
+		return 0, false
+	}
+	return info.ID(encoded - 1), true
 }
 
 func (m *CombinedPlan) activeRobots(gi *GameInfo) []info.ID {
@@ -584,6 +608,8 @@ func (m *CombinedPlan) assignTacticalSlots(
 	robots []info.ID,
 	assignment roleAssignment,
 	owner trackedBallOwner,
+	restrictedRobot info.ID,
+	hasRestrictedRobot bool,
 ) map[info.ID]tacticalSlotKind {
 	assignments := make(map[info.ID]tacticalSlotKind)
 	available := append([]info.ID{}, robots...)
@@ -596,7 +622,14 @@ func (m *CombinedPlan) assignTacticalSlots(
 		var id info.ID
 		switch slot {
 		case tacticalSlotBallChaser:
-			id = m.chooseBallChaser(gi, available, owner)
+			ballChaserCandidates := available
+			if hasRestrictedRobot {
+				ballChaserCandidates = withoutRobot(ballChaserCandidates, restrictedRobot)
+			}
+			if len(ballChaserCandidates) == 0 {
+				continue
+			}
+			id = m.chooseBallChaser(gi, ballChaserCandidates, owner)
 		case tacticalSlotSupportShooter:
 			id = m.chooseSupportShooter(gi, available)
 		default:
@@ -713,6 +746,7 @@ func (m *CombinedPlan) run() {
 		frameMonitor.Observe(gi.VisionFrame())
 		possession := possessionTracker.update(&gi, tickStart)
 		rawOwner := observedBallOwner(&gi)
+		restrictedRobot, hasRestrictedRobot := m.ballTouchRestriction()
 
 		activeRobots := m.activeRobots(&gi)
 		nextGoalieID, hasGoalie, fieldRobots := m.splitGoalieFromFieldRobots(&gi, activeRobots)
@@ -736,13 +770,36 @@ func (m *CombinedPlan) run() {
 		mode = stableMode(mode, desiredMode, &candidateMode, &candidateModeSince, tickStart)
 
 		assignment := roleAssignmentForMode(len(fieldRobots), mode)
-		slotAssignments := m.assignTacticalSlots(&gi, fieldRobots, assignment, possession.owner)
+		slotAssignments := m.assignTacticalSlots(
+			&gi,
+			fieldRobots,
+			assignment,
+			possession.owner,
+			restrictedRobot,
+			hasRestrictedRobot,
+		)
 		roleManager.applySlotAssignments(slotAssignments, tickStart)
+		if hasRestrictedRobot {
+			if restrictedAttacker, ok := roleManager.attackers[restrictedRobot]; ok {
+				restrictedAttacker.TriggerEvent("BALL_LOST")
+			}
+		}
 		offenseRobots := roleManager.offenseIDs()
-		chaserID, hasChaser := roleManager.idForSlot(tacticalSlotBallChaser)
+		chaserID, hasChaser := roleManager.idForSlotExcluding(
+			tacticalSlotBallChaser,
+			restrictedRobot,
+			hasRestrictedRobot,
+		)
 		supportIDs := roleManager.idsForSlot(tacticalSlotSupportShooter)
 		roleManager.configureSupportShooters(supportIDs)
-		roleManager.configureOffenseReceivers(supportIDs)
+		receiverIDs := supportIDs
+		if hasRestrictedRobot {
+			receiverIDs = withoutRobot(receiverIDs, restrictedRobot)
+			if hasActiveReceiver && activeReceiver == restrictedRobot {
+				hasActiveReceiver = false
+			}
+		}
+		roleManager.configureOffenseReceivers(receiverIDs)
 
 		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
 		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
@@ -754,7 +811,8 @@ func (m *CombinedPlan) run() {
 			time.Since(activeReceiverStart) < 2*time.Second &&
 			(!rawOwner.valid || rawOwner.team != m.team) &&
 			(ballMoving || !ownerRetained)
-		if !passInFlight && possession.owner.valid && possession.owner.team == m.team {
+		ownerMayPlayBall := !hasRestrictedRobot || possession.owner.id != restrictedRobot
+		if !passInFlight && possession.owner.valid && possession.owner.team == m.team && ownerMayPlayBall {
 			ownerID := possession.owner.id
 			owner, ok := roleManager.attackers[ownerID]
 			if ok {
@@ -782,10 +840,18 @@ func (m *CombinedPlan) run() {
 			} else {
 				hasActiveReceiver = false
 				interceptorID := chaserID
+				hasInterceptor := hasChaser
 				if !hasChaser {
-					interceptorID = m.getRobotForBall(&gi, offenseRobots)
+					interceptorCandidates := offenseRobots
+					if hasRestrictedRobot {
+						interceptorCandidates = withoutRobot(interceptorCandidates, restrictedRobot)
+					}
+					if len(interceptorCandidates) > 0 {
+						interceptorID = m.getRobotForBall(&gi, interceptorCandidates)
+						hasInterceptor = true
+					}
 				}
-				if interceptor, ok := roleManager.attackers[interceptorID]; ok {
+				if interceptor, ok := roleManager.attackers[interceptorID]; hasInterceptor && ok {
 					actorTracker.switchTo(roleManager.attackers, newOffenseBallActor(interceptorID, offenseBallActorChaser))
 					interceptor.TriggerEvent("BALL_APPROACHING")
 				} else {

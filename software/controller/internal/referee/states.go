@@ -93,6 +93,7 @@ type Kickoff struct {
 	receiverID      info.ID
 	originalBallPos info.Position
 	kickStart       time.Time
+	kickTaken       bool
 }
 
 type Running struct {
@@ -221,6 +222,7 @@ func (s *PrepareKickoff) Update() EventName {
 }
 
 func (s *Kickoff) Initialize() {
+	s.kickTaken = false
 
 	goalieID, hasGoalie := selectGoalieID(s.gi, s.team, s.activeRobots)
 	kickOffID, receiverID := selectKickoffRobots(fieldRobots(s.activeRobots, goalieID, hasGoalie))
@@ -253,9 +255,11 @@ func (s *Kickoff) Update() EventName {
 
 	trackedBall := s.gi.State.GetTrackedBall()
 	pos, ok := trackedBall.GetTrackedPosition()
+	ballMoved := ok && restartBallMovedIntoPlay(s.originalBallPos, pos)
 
-	if (ok && restartBallMovedIntoPlay(s.originalBallPos, pos)) ||
+	if ballMoved ||
 		restartActionTimedOut(s.gi.Status.GetGameEvent(), s.kickStart, KickoffMaxTime(s.gi.Status.GetDivision())) {
+		s.kickTaken = ballMoved
 		s.gi.Status.GetGameEvent().SetBallMoved()
 		return GAME_RUNNING_DETECTED
 	}
@@ -317,6 +321,8 @@ type RefereeHandler struct {
 	refereeSM                     *StateMachine
 	activeRobots                  []info.ID
 	nextCommandAfterBallPlacement info.RefCommand
+	kickOff                       *Kickoff
+	kickoffTouchRestriction       kickoffTouchRestriction
 }
 
 func KickoffMaxTime(division info.Division) time.Duration {
@@ -866,7 +872,12 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	refereeSM.AddTransition(uninitialized.GetName(), FREE_KICK, freeKick)
 	refereeSM.AddTransition(uninitialized.GetName(), BALL_PLACEMENT, ballPlacement)
 
-	return &RefereeHandler{gi: gi, refereeSM: refereeSM, activeRobots: activeRobots}
+	return &RefereeHandler{
+		gi:           gi,
+		refereeSM:    refereeSM,
+		activeRobots: activeRobots,
+		kickOff:      kickOff,
+	}
 }
 
 /*
@@ -882,12 +893,29 @@ func (s *RefereeHandler) HandleReferee() bool {
 	refEvent := s.refEventForGameEvent(gameEvent)
 	s.refereeSM.TriggerEvent(EventName(refEvent))
 
+	stateBeforeUpdate := s.refereeSM.CurrentStateName()
+	if stateBeforeUpdate != "RUNNING" && stateBeforeUpdate != "KICKOFF" {
+		s.kickoffTouchRestriction.clear()
+	}
+
 	s.refereeSM.Update()
-	if s.refereeSM.CurrentStateName() == "RUNNING" {
+	stateAfterUpdate := s.refereeSM.CurrentStateName()
+	if stateBeforeUpdate == "KICKOFF" && stateAfterUpdate == "RUNNING" &&
+		s.kickOff != nil && s.kickOff.kickTaken && gameEvent.TeamWithPossession == s.kickOff.team {
+		s.kickoffTouchRestriction.arm(s.kickOff.team, s.kickOff.kickOffID)
+	}
+	if stateAfterUpdate == "RUNNING" {
+		s.kickoffTouchRestriction.update(s.gi)
 		return false
 	}
 
 	return true
+}
+
+// KickoffRestrictedRobot returns the robot that may not touch the ball again
+// until another robot has touched it.
+func (s *RefereeHandler) KickoffRestrictedRobot() (info.ID, bool) {
+	return s.kickoffTouchRestriction.robot()
 }
 
 func (s *RefereeHandler) refEventForGameEvent(gameEvent *info.GameEvent) string {

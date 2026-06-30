@@ -78,7 +78,13 @@ func (m *CombinedPlanWithRef) refereeHandlesFrame() bool {
 		)
 	}
 
-	return m.refereeHandler.HandleReferee()
+	handled := m.refereeHandler.HandleReferee()
+	if restrictedID, restricted := m.refereeHandler.KickoffRestrictedRobot(); restricted {
+		m.normalPlan.setBallTouchRestriction(restrictedID)
+	} else {
+		m.normalPlan.clearBallTouchRestriction()
+	}
+	return handled
 }
 
 func (m *CombinedPlanWithRef) Kill() {
