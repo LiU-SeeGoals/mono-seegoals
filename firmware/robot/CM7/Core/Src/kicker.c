@@ -1,12 +1,15 @@
 #include "kicker.h"
 
 /* Private includes */
+#include "arm_math.h"
 #include "common.h"
 #include "log.h"
 #include "main.h"
 #include "stm32h755xx.h"
+#include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_adc.h"
 #include "stm32h7xx_hal_adc_ex.h"
+#include "stm32h7xx_hal_def.h"
 #include "stm32h7xx_hal_gpio.h"
 #include "stm32h7xx_hal_spi.h"
 #include <stdbool.h>
@@ -18,7 +21,7 @@
 /* Private variables */
 static LOG_Module internal_log_mod;
 static KICKER_Settings settings = {
-    .max_charges_per_kick = 6, .safe_discharge_wait_us = 15, .charge_wait_us = 1500000, .discharge_wait_us_kicker = 300, .discharge_wait_us_chipper = 300, .charges_since_last_kick = 0};
+    .max_charges_per_kick = 6, .safe_discharge_wait_us = 15, .charge_wait_us = 100000, .discharge_wait_us_kicker = 300, .discharge_wait_us_chipper = 10, .charges_since_last_kick = 0};
 static volatile bool charging = false;
 static volatile bool kicking = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
@@ -57,15 +60,16 @@ void spi_enable(bool enabled)
 
 int16_t readADC()
 {
-    uint8_t buffer[2] = {0x00, 0x00};
+    uint8_t buffer[2] = {0x08, // Control register, read from ch. 2
+                         0x00};
 
     spi_enable(true);
     HAL_SPI_Receive(kicker_hspi, &buffer[0], 2, 1000);
     spi_enable(false);
 
-    uint16_t voltage = (uint16_t)buffer[0] | ((uint16_t)buffer[1] << 8);
+    uint16_t measurement = (uint16_t)buffer[0] | ((uint16_t)buffer[1] << 8);
 
-    return voltage;
+    return measurement;
 }
 
 bool ir_sensor_ocluded()
@@ -73,13 +77,13 @@ bool ir_sensor_ocluded()
     /*
      * false => adc reading above threshold, the light is reaching the sensor
      * true  => adc reading bellow threshold, less light is reaching the sensor
-     *          so it is probablly ocluded possibly by ball
+     *          so it is probablly ocluded, possibly by ball
      */
-     if (ir_adc_value > ir_threshold) {
-         return false;
-     } else {
-         return true;
-     }
+    if (ir_adc_value > ir_threshold) {
+        return false;
+    } else {
+        return true;
+    }
 }
 
 /*
@@ -94,12 +98,6 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
     kicker_hspi = hspi;
     ir_adc = adc;
 
-    HAL_ADCEx_Calibration_Start(ir_adc, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
-    HAL_ADC_Start_DMA(ir_adc, (uint32_t*)&ir_adc_value, 1);
-
-    // Disable the spi connection as default
-    spi_enable(false);
-
     htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
     htim_kicker_charge->Instance->EGR = TIM_EGR_UG;
 
@@ -107,6 +105,41 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
     __HAL_TIM_SET_COUNTER(htim_kicker_charge, 0);
     __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us_kicker);
     __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
+
+    HAL_StatusTypeDef status = HAL_ERROR;
+    // status = HAL_ADCEx_Calibration_Start(ir_adc, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
+    // if (status != HAL_OK) {
+        // LOG_ERROR("IR sensor ADC failed calibration.\r\n");
+    // }
+
+    // Disable the spi connection as default
+    spi_enable(false);
+
+    // Testing, reading from the ADC
+    while (true) {
+        // uint16_t meas = readADC();
+        status = HAL_ADC_Start(ir_adc);
+        if (status != HAL_OK) {
+            LOG_ERROR("IR sensor ADC failed start.\r\n");
+        }
+
+        // Wait for conversion to complete, timeout 20ms
+        status = HAL_ADC_PollForConversion(ir_adc, 20);
+        if (status != HAL_OK) {
+            LOG_ERROR("ADC poll wait failed.\r\n");
+        }
+
+        uint32_t raw = HAL_ADC_GetValue(ir_adc);
+
+        status = HAL_ADC_Stop(ir_adc);
+        if (status != HAL_OK) {
+            LOG_ERROR("ADC stop failed.\r\n");
+        }
+
+        LOG_INFO("IR measurement: %u\r\n", raw);
+
+        HAL_Delay(500);
+    }
 }
 
 void KICKER_ChargeStart()
