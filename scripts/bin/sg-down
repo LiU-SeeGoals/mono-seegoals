@@ -1,0 +1,11 @@
+#!/bin/bash
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+REPO_ROOT=$( realpath "$SCRIPT_DIR/../.." )
+
+echo "Stopping and removing SeeGoals containers..."
+docker compose \
+    --env-file "$REPO_ROOT/environment.ini" \
+    -f "$REPO_ROOT/docker/docker-compose.yml" \
+    -p seegoals \
+    down

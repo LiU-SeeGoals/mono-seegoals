@@ -2,6 +2,7 @@ package demos
 
 import (
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/ai"
@@ -12,12 +13,21 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
 
+const (
+	ballPlacementTouchlineMarginMM = 200.0
+	ballPlacementCornerMarginMM    = 200.0
+	ballPlacementGoalKickDepthMM   = 1000.0
+	mmToM                          = 1.0 / 1000.0
+)
+
 func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
 
 	ball := gameInfo.State.GetBall()
 	ballPos, ballTime, _ := ball.GetPositionTime()
-	if ballPos.Y > 3000 || ballPos.Y < -3000 || ballPos.X > 4500 || ballPos.X < -4500 || time.Now().UnixMilli()-ballTime > 5000 {
-		simController.TeleportBall(0, 1)
+	if placement, ok := outsideFieldPlacement(gameInfo, ballPos); ok {
+		teleportBallMillimeters(simController, placement)
+	} else if time.Now().UnixMilli()-ballTime > 5000 {
+		teleportBallMillimeters(simController, info.Position{Y: 1000})
 	}
 
 	ge := gameInfo.Status.GetGameEvent()
@@ -27,24 +37,100 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	case info.STATE_KICKOFF_PREPARATION:
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
 			// fmt.Println("teleported ball (new kickoff)")
-			simController.TeleportBall(0, 1000)
+			teleportBallMillimeters(simController, info.Position{Y: 1000})
 		}
 	case info.STATE_FREE_KICK:
 	case info.STATE_HALTED, info.STATE_STOPPED:
 	case info.STATE_PENALTY_PREPARATION, info.STATE_TIMEOUT:
 	case info.STATE_PLAYING:
 	case info.STATE_BALL_PLACEMENT:
-		ball, _ := gameInfo.State.GetBall().GetPosition()
 		if previousState != info.STATE_BALL_PLACEMENT {
 			toX := ge.GetDesignatedPosition().At(0, 0)
 			toY := ge.GetDesignatedPosition().At(1, 0)
-			finalX := ball.X - toX
-			finalY := ball.Y - toY
 			fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", toX, toY, ge.GetTeamWithPossession())
-			simController.TeleportBall(float32(finalX), float32(finalY))
+			teleportBallMillimeters(simController, info.Position{X: toX, Y: toY})
 		}
 	default:
 	}
+}
+
+func teleportBallMillimeters(simController *simulator.SimControl, pos info.Position) {
+	simController.TeleportBall(float32(pos.X*mmToM), float32(pos.Y*mmToM))
+}
+
+func outsideFieldPlacement(gameInfo *info.GameInfo, ballPos info.Position) (info.Position, bool) {
+	if gameInfo == nil || !gameInfo.HasField() {
+		return info.Position{}, false
+	}
+
+	field := gameInfo.FieldSize()
+	halfLength := field.X / 2
+	halfWidth := field.Y / 2
+	if halfLength <= 0 || halfWidth <= 0 {
+		return info.Position{}, false
+	}
+
+	overX := math.Abs(ballPos.X) - halfLength
+	overY := math.Abs(ballPos.Y) - halfWidth
+	if overX <= 0 && overY <= 0 {
+		return info.Position{}, false
+	}
+
+	xSign := signOrOne(ballPos.X)
+	ySign := signOrOne(ballPos.Y)
+	if overY >= overX {
+		return info.Position{
+			X: clampFloat(ballPos.X, -halfLength+ballPlacementTouchlineMarginMM, halfLength-ballPlacementTouchlineMarginMM),
+			Y: ySign * (halfWidth - ballPlacementTouchlineMarginMM),
+		}, true
+	}
+
+	xDepth := ballPlacementGoalKickDepthMM
+	if ballLeftNearCorner(ballPos, halfWidth) || goalLineExitWasCornerKick(gameInfo, xSign) {
+		xDepth = ballPlacementCornerMarginMM
+	}
+
+	return info.Position{
+		X: xSign * (halfLength - xDepth),
+		Y: ySign * (halfWidth - ballPlacementCornerMarginMM),
+	}, true
+}
+
+func goalLineExitWasCornerKick(gameInfo *info.GameInfo, goalLineSign float64) bool {
+	if gameInfo == nil || gameInfo.State == nil || !gameInfo.State.KickedBall.Valid {
+		return false
+	}
+
+	return gameInfo.State.KickedBall.RobotTeam == defendingTeamAtGoalLine(gameInfo, goalLineSign)
+}
+
+func defendingTeamAtGoalLine(gameInfo *info.GameInfo, goalLineSign float64) info.Team {
+	blueDefendsPositiveX := gameInfo.Status.GetBlueTeamOnPositiveHalf()
+	if goalLineSign > 0 {
+		if blueDefendsPositiveX {
+			return info.Blue
+		}
+		return info.Yellow
+	}
+	if blueDefendsPositiveX {
+		return info.Yellow
+	}
+	return info.Blue
+}
+
+func ballLeftNearCorner(ballPos info.Position, halfWidth float64) bool {
+	return math.Abs(ballPos.Y) >= halfWidth
+}
+
+func signOrOne(value float64) float64 {
+	if value < 0 {
+		return -1
+	}
+	return 1
+}
+
+func clampFloat(value, minValue, maxValue float64) float64 {
+	return math.Max(minValue, math.Min(maxValue, value))
 }
 
 func GameScenario() {
@@ -83,7 +169,7 @@ func GameScenario() {
 		simClientBlue = client.NewSimClient(config.GetSimBlueTeamAddress(), gameInfo)
 
 		simController = simulator.NewSimControl()
-		simController.TeleportBall(0, 1000)
+		teleportBallMillimeters(simController, info.Position{Y: 1000})
 		simController.SetPresentRobots(teamYellow, teamBlue)
 
 	} else {
