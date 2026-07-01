@@ -98,21 +98,22 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	goaliePos := info.Position{X: goalieX, Y: goalieY, Z: 0.0, Angle: 0.0}
 
 	myRobotPos, _ := gi.State.GetTeam(g.team)[g.id].GetPosition()
-	lookAtBall := myRobotPos.AngleToPosition(ballPos)
+	goaliePos.Angle = myRobotPos.AngleToPosition(ballPos)
 
-	//move := NewMoveToPosition(g.team, g.id, goaliePos)
-	act := action.MoveTo{}
-	act.Id = int(g.id)
-	act.Team = g.team
-	act.Pos = myRobotPos
-	act.Dest = goaliePos
-	act.Dest.Angle = lookAtBall
-	act.AllowGoalArea = true
-	act.Dribble = false
+	move := NewMoveToPosition(g.team, g.id, goaliePos)
+	// The keeper must be able to enter its defense area. Disabling goal-line
+	// obstacles still leaves robot and restart-ball obstacles enabled in RRT.
+	move.AvoidGoallines(false)
+	move.SetUseRRT(goalieShouldUseRRT(gi))
+	return move.GetAction(gi)
+}
 
-	return &act
-
-	//return move.GetAction(gi)
+func goalieShouldUseRRT(gi *info.GameInfo) bool {
+	if gi == nil || gi.Status == nil {
+		return false
+	}
+	gameEvent := gi.Status.GetGameEvent()
+	return gameEvent != nil && !gameEvent.BallInPlay
 }
 
 // Achieved returns whether this action is "complete".

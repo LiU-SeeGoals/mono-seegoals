@@ -33,6 +33,7 @@ const (
 	kickoffFieldMarginMM           = 300.0
 	kickoffKickTargetDistanceMM    = 1000.0
 	kickoffPrepareDistanceMM       = 500.0
+	freeKickPrepareDistanceMM      = 550.0
 )
 
 const (
@@ -72,6 +73,7 @@ type Halt struct {
 type FreeKick struct {
 	RefereeInfo
 	freeKick        *StateMachine
+	kickerID        info.ID
 	freeKickStart   time.Time
 	originalBallPos info.Position
 }
@@ -116,8 +118,17 @@ func (s *Stop) Initialize() {
 }
 
 func (s *Stop) Update() EventName {
+	preparedKickerID, preparingFreeKick := prepareKickerForUpcomingFreeKick(
+		s.gi,
+		s.team,
+		s.activeRobots,
+		s.activityHandler,
+	)
 
 	for _, id := range s.activeRobots {
+		if preparingFreeKick && id == preparedKickerID {
+			continue
+		}
 		activity := act.NewRefStop(s.team, id)
 		s.activityHandler.AddActivity(activity)
 	}
@@ -144,23 +155,28 @@ func (s *KickOffIntent) GetFromPosition() info.Position {
 }
 
 func (s *FreeKick) Initialize() {
-
-	kickOffID := info.ID(1)
-	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kickOffID))
-	kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickOffID}
-	prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
-	// kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
-	// After 10 seconds we are allowed to kick the ball
 	s.freeKickStart = time.Now()
-	originalBallPos, ok := s.gi.State.GetTrackedBall().GetTrackedPosition()
-	if !ok {
-		fmt.Println("Failed getting original ball pos during FreeKick")
+	s.freeKick = nil
+
+	ballPos := kickoffBallPosition(s.gi)
+	kickerID, ok := selectFreeKickKicker(s.gi, s.team, s.activeRobots, ballPos)
+	if ok {
+		s.kickerID = kickerID
+		kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kickerID))
+		kickName := StateName(fmt.Sprintf("Kick ID %d", kickerID))
+		kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickerID}
+		prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
+		kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickName, ActivityHandler: s.activityHandler}
+
+		s.freeKick = NewStateMachine(prepareKick)
+		s.freeKick.AddTransition(kickPrepareName, "ALIGNED", kick)
 	}
 
-	s.freeKick = NewStateMachine(prepareKick)
-
+	originalBallPos, ok := s.gi.State.GetTrackedBall().GetTrackedPosition()
+	if !ok {
+		originalBallPos = ballPos
+	}
 	s.originalBallPos = originalBallPos
-
 }
 
 func (s *FreeKick) Update() EventName {
@@ -175,7 +191,9 @@ func (s *FreeKick) Update() EventName {
 	}
 
 	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
-		s.freeKick.Update()
+		if s.freeKick != nil {
+			s.freeKick.Update()
+		}
 	} else {
 		moveRobotsToDefensePosition(s.activeRobots, s.team, s.activityHandler)
 	}
@@ -412,6 +430,109 @@ func moveRobotsToDefensePosition(activeRobots []info.ID, team info.Team, activit
 	for i, robotID := range activeRobots {
 		pos := info.Position{X: -2000, Y: minPos + increment*float64(i), Z: 0, Angle: 0}
 		activityHandler.AddActivity(act.NewMoveToPosition(team, info.ID(robotID), pos))
+	}
+}
+
+func prepareKickerForUpcomingFreeKick(
+	gi *info.GameInfo,
+	team info.Team,
+	activeRobots []info.ID,
+	activityHandler *ai.ActivityHandler,
+) (info.ID, bool) {
+	if gi == nil || gi.Status == nil || activityHandler == nil {
+		return 0, false
+	}
+
+	gameEvent := gi.Status.GetGameEvent()
+	if gameEvent == nil || !isFreeKickForTeam(gameEvent.NextCommand, team) {
+		return 0, false
+	}
+
+	ballPos := freeKickPreparationBallPosition(gi, gameEvent)
+	kickerID, ok := selectFreeKickKicker(gi, team, activeRobots, ballPos)
+	if !ok {
+		return 0, false
+	}
+
+	activityHandler.AddActivity(act.NewMoveToPosition(team, kickerID, freeKickPreparePosition(gi, team, ballPos)))
+	return kickerID, true
+}
+
+func selectFreeKickKicker(
+	gi *info.GameInfo,
+	team info.Team,
+	activeRobots []info.ID,
+	ballPos info.Position,
+) (info.ID, bool) {
+	if gi == nil || gi.State == nil || len(activeRobots) == 0 {
+		return 0, false
+	}
+
+	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
+	candidates := fieldRobots(activeRobots, goalieID, hasGoalie)
+	if len(candidates) == 0 {
+		candidates = activeRobots
+	}
+
+	closestID := info.ID(0)
+	closestDistance := math.Inf(1)
+	found := false
+	for _, robotID := range candidates {
+		robotPos, err := gi.State.GetRobotPosition(team, robotID)
+		if err != nil {
+			continue
+		}
+
+		distance := robotPos.Dist2d(ballPos)
+		if !found || distance < closestDistance || (distance == closestDistance && robotID < closestID) {
+			closestID = robotID
+			closestDistance = distance
+			found = true
+		}
+	}
+	return closestID, found
+}
+
+func freeKickPreparationBallPosition(gi *info.GameInfo, gameEvent *info.GameEvent) info.Position {
+	if gameEvent != nil && gameEvent.CurrentState == info.STATE_BALL_PLACEMENT {
+		if designatedPosition := gameEvent.GetDesignatedPosition(); designatedPosition != nil && designatedPosition.Len() >= 2 {
+			return info.Position{X: designatedPosition.AtVec(0), Y: designatedPosition.AtVec(1)}
+		}
+	}
+	return kickoffBallPosition(gi)
+}
+
+func freeKickPreparePosition(gi *info.GameInfo, team info.Team, ballPos info.Position) info.Position {
+	targetPos := ballPos
+	targetPos.X += -ownHalfXSign(gi, team) * kickoffKickTargetDistanceMM
+
+	direction := targetPos.Sub(&ballPos)
+	direction.Z = 0
+	direction.Angle = 0
+	if direction.Norm2d() < 1 {
+		direction.X = -ownHalfXSign(gi, team)
+	}
+	direction.Div2d(direction.Norm2d())
+
+	preparePos := ballPos
+	preparePos.X -= direction.X * freeKickPrepareDistanceMM
+	preparePos.Y -= direction.Y * freeKickPrepareDistanceMM
+	preparePos.Z = 0
+	preparePos.Angle = preparePos.AngleToPosition(targetPos)
+	if gi != nil {
+		preparePos = gi.ClampToField(preparePos, kickoffFieldMarginMM)
+	}
+	return preparePos
+}
+
+func isFreeKickForTeam(command info.RefCommand, team info.Team) bool {
+	switch command {
+	case info.DIRECT_FREE_BLUE, info.INDIRECT_FREE_BLUE:
+		return team == info.Blue
+	case info.DIRECT_FREE_YELLOW, info.INDIRECT_FREE_YELLOW:
+		return team == info.Yellow
+	default:
+		return false
 	}
 }
 
@@ -712,12 +833,8 @@ func kickoffFormationSlots(
 }
 
 func ownHalfXSign(gi *info.GameInfo, team info.Team) float64 {
-	if gi != nil && gi.HasField() {
-		homeGoal := gi.HomeGoalDefPos(team)
-		if homeGoal.X < 0 {
-			return -1
-		}
-		return 1
+	if gi != nil {
+		return gi.OwnHalfXSign(team)
 	}
 
 	if team == info.Blue {

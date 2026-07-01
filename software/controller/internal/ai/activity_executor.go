@@ -18,6 +18,9 @@ const (
 	// additional room for vision and controller error on the real robots.
 	// This should make auto ref happy could be sligtly lower but not a lot.
 	goalLineBaseClearanceMM = 300.0
+	// During stopped play, keep the robot body 300 mm from either defense area.
+	defenseAreaBallOutBodyClearanceMM = 300.0
+	sslRobotRadiusMM                  = 90.0
 
 	// The real robot cannot react to a new destination instantaneously. Reserve
 	// the distance travelled during that delay and the estimated braking
@@ -140,18 +143,19 @@ func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action 
 	if move.AllowOutsideField {
 		margin = -gi.FieldBoundaryWidth()
 	}
-	goalClearance := goalLineClearance(move, gi)
+	goalLineMargin := goalLineClearance(move, gi)
+	defenseAreaMargin := defenseAreaClearance(goalLineMargin, gi)
 
 	originalDestX := move.Dest.X
 	move.Dest = gi.ClampToField(move.Dest, margin)
 	if !move.AllowBehindGoalLine {
-		move.Dest = clampToGoalLines(move.Dest, gi, goalClearance)
+		move.Dest = clampToGoalLines(move.Dest, gi, goalLineMargin)
 	}
 	goalAreaAdjusted := false
 	var goalAreas []goalAreaBounds
 	if !move.AllowGoalArea {
 		goalAreas = getGoalAreaBounds(gi)
-		move.Dest, goalAreaAdjusted = clampGoalAreaMotion(move.Pos, move.Dest, goalAreas, goalClearance)
+		move.Dest, goalAreaAdjusted = clampGoalAreaMotion(move.Pos, move.Dest, goalAreas, defenseAreaMargin)
 	}
 
 	// Kicks are a distinct firmware action which continues position control
@@ -159,7 +163,7 @@ func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action 
 	// robot is already inside a forbidden goal area, use a normal MoveTo command
 	// so it brakes/retreats without arming the kicker.
 	if move.KickSpeed != 0 && (move.Dest.X != originalDestX || goalAreaAdjusted ||
-		(!move.AllowGoalArea && positionInGoalArea(move.Pos, goalAreas, goalLineBaseClearanceMM))) {
+		(!move.AllowGoalArea && positionInGoalArea(move.Pos, goalAreas, defenseAreaMargin))) {
 		move.KickSpeed = 0
 	}
 
@@ -168,15 +172,29 @@ func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action 
 		for i, waypoint := range move.Path {
 			clamped[i] = gi.ClampToField(waypoint, margin)
 			if !move.AllowBehindGoalLine {
-				clamped[i] = clampToGoalLines(clamped[i], gi, goalClearance)
+				clamped[i] = clampToGoalLines(clamped[i], gi, goalLineMargin)
 			}
 			if !move.AllowGoalArea {
-				clamped[i], _ = clampOutsideGoalAreas(clamped[i], goalAreas, goalClearance)
+				clamped[i], _ = clampOutsideGoalAreas(clamped[i], goalAreas, defenseAreaMargin)
 			}
 		}
 		move.Path = clamped
 	}
 	return move
+}
+
+func defenseAreaClearance(motionClearance float64, gi *info.GameInfo) float64 {
+	if gi == nil || gi.Status == nil {
+		return motionClearance
+	}
+
+	gameEvent := gi.Status.GetGameEvent()
+	if gameEvent == nil || gameEvent.BallInPlay {
+		return motionClearance
+	}
+
+	requiredCenterClearance := defenseAreaBallOutBodyClearanceMM + sslRobotRadiusMM
+	return math.Max(motionClearance, requiredCenterClearance)
 }
 
 func goalLineClearance(move *action.MoveTo, gi *info.GameInfo) float64 {

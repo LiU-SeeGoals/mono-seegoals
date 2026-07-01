@@ -25,19 +25,6 @@ func NewGameInfo(capacity int) *GameInfo {
 	}
 }
 
-// Rotates all positions so that no matter
-// which side we are on we can use the same coordinate system
-func correctedPosition(team Team, pos Position) Position {
-
-	if team == Blue {
-		return pos.Rotate(math.Pi)
-	} else if team == Yellow {
-		return pos
-	} else {
-		panic(fmt.Sprintf("Incorrect team given %v", team))
-	}
-}
-
 func (gi GameInfo) PrintField() {
 	fmt.Println(gi.field)
 }
@@ -82,21 +69,13 @@ func (gi GameInfo) GetFieldLine(line string) *ssl_vision.SSL_FieldLineSegment {
 Return upper and lower point of enemy goal line as Position slice (x,y)
 */
 func (gi GameInfo) EnemyGoalLine(team Team) []Position {
-
-	// x := float64(gi.field.GetFieldLength()/2 - gi.field.GetGoalWidth())
-
-	center_line := gi.GetFieldLine("centerline").GetP1()
-
-	x := float64(*center_line.X)
+	x := -gi.OwnHalfXSign(team) * float64(gi.field.GetFieldLength()) / 2
 	y := float64(gi.field.GetGoalWidth() / 2)
 
 	upper := Position{X: x, Y: y, Z: 0, Angle: 0}
 	lower := Position{X: x, Y: -y, Z: 0, Angle: 0}
 
-	// upper := mat.NewVecDense(2, []float64{x, y})
-	// lower := mat.NewVecDense(2, []float64{x, -y})
-
-	return []Position{correctedPosition(team, upper), correctedPosition(team, lower)}
+	return []Position{upper, lower}
 }
 
 func (gi GameInfo) EnemyGoalCenter(team Team) Position {
@@ -142,12 +121,36 @@ func (gi GameInfo) ClampToField(pos Position, margin float64) Position {
 }
 
 func (gi GameInfo) HomeGoalDefPos(team Team) Position {
-
-	x := float64(gi.field.GetFieldLength()/2 - gi.field.GetGoalWidth())
+	x := gi.OwnHalfXSign(team) * float64(gi.field.GetFieldLength()/2-gi.field.GetGoalWidth())
 
 	pos := Position{X: x, Y: 0, Z: 0, Angle: 0}
 
-	return correctedPosition(team, pos)
+	return pos
+}
+
+// OwnHalfXSign returns the X-axis sign of the half assigned to team by the
+// referee. blue_team_on_positive_half indicates which goal belongs to blue;
+// yellow is always assigned the opposite half.
+func (gi GameInfo) OwnHalfXSign(team Team) float64 {
+	blueOnPositiveHalf := false
+	if gi.Status != nil {
+		blueOnPositiveHalf = gi.Status.GetBlueTeamOnPositiveHalf()
+	}
+
+	switch team {
+	case Blue:
+		if blueOnPositiveHalf {
+			return 1
+		}
+		return -1
+	case Yellow:
+		if blueOnPositiveHalf {
+			return -1
+		}
+		return 1
+	default:
+		panic(fmt.Sprintf("Incorrect team given %v", team))
+	}
 }
 
 func (gi GameInfo) HasField() bool {
