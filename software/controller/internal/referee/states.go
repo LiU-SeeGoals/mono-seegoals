@@ -671,6 +671,7 @@ func kickoffPreparePosition(gi *info.GameInfo, team info.Team) info.Position {
 	if gi != nil {
 		pos = gi.ClampToField(pos, kickoffFieldMarginMM)
 	}
+	fmt.Println(pos)
 	return pos
 }
 
@@ -841,7 +842,7 @@ func ownHalfXSign(gi *info.GameInfo, team info.Team) float64 {
 	if gi != nil {
 		return gi.OwnHalfXSign(team)
 	}
-
+	fmt.Println("Incorrect gi, giving incorrect field side")
 	if team == info.Blue {
 		return -1
 	}
@@ -853,13 +854,10 @@ func kickoffBallPosition(gi *info.GameInfo) info.Position {
 		return info.Position{}
 	}
 
-	if pos, err := gi.State.GetBall().GetEstimatedPosition(); err == nil {
+	if pos, ok := gi.State.GetTrackedBall().GetTrackedPosition(); ok {
 		return pos
 	}
 	if pos, err := gi.State.GetBall().GetPosition(); err == nil {
-		return pos
-	}
-	if pos, ok := gi.State.GetTrackedBall().GetTrackedPosition(); ok {
 		return pos
 	}
 	return info.Position{}
@@ -1013,6 +1011,7 @@ func (s *RefereeHandler) HandleReferee() bool {
 	// Appendix B: Game States https://robocup-ssl.github.io/ssl-rules/sslrules.html
 
 	gameEvent := s.gi.Status.GetGameEvent()
+	fmt.Println(gameEvent)
 	refEvent := s.refEventForGameEvent(gameEvent)
 	s.refereeSM.TriggerEvent(EventName(refEvent))
 

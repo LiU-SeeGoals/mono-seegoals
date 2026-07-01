@@ -16,8 +16,8 @@ const (
 	nearBallOrbitRetainDist = 300.0
 	// The real robot's position follower scales velocity with destination
 	// distance. Keep close orbit corrections large enough to avoid crawling.
-	minAroundBallMoveDist    = 100.0
-	minAroundBallMoveTrigger = 12.0
+	minAroundBallMoveDist    = 50.0
+	minAroundBallMoveTrigger = 1.0
 	aroundBallMinLinearSpeed = 0.5
 	// Keep the orbit carrot far enough ahead that the position controller
 	// commands useful tangential speed while the robot has substantial
@@ -26,7 +26,7 @@ const (
 	aroundBallShiftAngle     = 1.5
 	maxTargetOrientationStep = 0.6
 	roughAngleTolerance      = 0.05
-	ballLookaheadSec         = 0.0
+	ballLookaheadSec         = 0.2
 	minRollingBallSpeed      = 0.3
 )
 
