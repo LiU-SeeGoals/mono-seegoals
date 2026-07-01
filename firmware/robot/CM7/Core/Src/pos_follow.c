@@ -14,15 +14,15 @@ static LOG_Module internal_log_mod;
 
 // Weight up angle alot, it is important to have the correct angle
 static float K[3][3] = {
-    {2.0f * 150.f, 0.0f, 0.0f},
-    {0.0f, 2.0f * 150.f, 0.0f},
-    {0.0f, 0.0f, 10.0f * 50.f}
+    {5.0f * 150.f, 0.0f, 0.0f},
+    {0.0f, 5.0f * 150.f, 0.0f},
+    {0.0f, 0.0f, 3.0f * 50.f}
 };
 
 static float vel_max_xy = 150.0f;
 static float vel_max_w = 400.0f;
 // Damping gain for angular velocity (using gyro feedback)
-static float Kd_omega = 5.0f;
+static float Kd_omega = 2.0f;
 
 void set_params()
 {
@@ -41,7 +41,8 @@ void set_params()
     params_dist.K = 500.0f * 1000.50;
 }
 
-void POS_Init() {
+void POS_Init()
+{
     set_params();
     LOG_InitModule(&internal_log_mod, "POS", LOG_LEVEL_ERROR, 0);
 }

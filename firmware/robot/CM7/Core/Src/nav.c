@@ -221,7 +221,7 @@ void NAV_steer(float u, float v, float w)
     float wlf = 1.0 / r * (-u * arm_cos_f32(psi) + v * arm_sin_f32(psi) + w * R);
 
     // Wheel-space saturation: scale all wheels proportionally to preserve velocity ratio
-    const float WHEEL_MAX = 250.0f;
+    const float WHEEL_MAX = 400.0f;
     float max_wheel = fabsf(wrf);
     if (fabsf(wrb) > max_wheel) max_wheel = fabsf(wrb);
     if (fabsf(wlb) > max_wheel) max_wheel = fabsf(wlb);
