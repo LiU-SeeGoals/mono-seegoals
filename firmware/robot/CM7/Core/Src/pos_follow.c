@@ -77,6 +77,8 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     float ew = angle_error(cur_w, dest_w);  // Wrapped to [-pi, pi]
     float Ix = i_dist_x + (DELTA_T / 5.5) * ex;
     float Iy = i_dist_y + (DELTA_T / 5.5) * ey;
+    Ix = 0;
+    Iy = 0;
 
     float vx_world = K[0][0] * (ex);
     float vy_world = K[1][1] * (ey);
@@ -87,19 +89,17 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     // float gyro_z = STATE_get_gyro_z();
     // omega = omega - Kd_omega * gyro_z;
 
-    // float vel_xy = sqrtf(vx_world * vx_world + vy_world * vy_world);
+    float vel_xy = sqrtf(vx_world * vx_world + vy_world * vy_world);
 
-    // if (vel_xy > vel_max_xy) {
-    //     float scale = vel_max_xy / vel_xy;
-    //     vx_world *= scale;
-    //     vy_world *= scale;
-    // }
-    // else{
-    //     i_dist_y = Iy;
-    //     i_dist_x = Ix;
-    // }
-    // if (omega > vel_max_w) omega = vel_max_w;
-    // if (omega < -vel_max_w) omega = -vel_max_w;
+    if (vel_xy > vel_max_xy) {
+        float scale = vel_max_xy / vel_xy;
+        vx_world *= scale;
+        vy_world *= scale;
+    }
+    else{
+        i_dist_y = Iy;
+        i_dist_x = Ix;
+    }
 
     // Transform world frame velocity to robot frame
     float cos_w = arm_cos_f32(cur_w);
@@ -111,32 +111,7 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     float cmd_y = vy_robot;
     float cmd_w = omega;  // Angular scaling
 
-    // float deadzone = 5;
-    // if (cmd_w < deadzone && cmd_w > -deadzone){
-    //     cmd_w = 0;
-    // }
-    // if (cmd_x < deadzone && cmd_x > -deadzone){
-    //     cmd_x = 0;
-    // }
-    // if (cmd_y < deadzone && cmd_y > -deadzone){
-    //     cmd_y = 0;
-    // }
     POS_velocity_control(vx_robot, vy_robot, dest_w);
-
-    // NAV_steer(cmd_x, cmd_y, cmd_w);
-
-    // sigx.u = cmd_x;
-    // sigx.r = dest_x;
-    // sigx.e = ex;
-    //
-    // sigy.u = cmd_y;
-    // sigy.r = dest_y;
-    // sigy.e = ey;
-    //
-    // sigw.u = cmd_w;
-    // sigw.r = dest_w;
-    // sigw.e = ew;
-    // DATA_log_pos(sigx, sigy, sigw);
 }
 
 void POS_velocity_control(float vel_x, float vel_y, float dest_w)
