@@ -167,6 +167,19 @@ func (gs *GameState) SetBlueRobot(robotId uint32, x, y, angle float64, time int6
 	gs.Blue_team[robotId].SetPositionTime(x, y, angle, time)
 }
 
+func (gs *GameState) SetRobotFromTracked(team Team, robotId uint32, pos Position, time int64, replaceTime int64) {
+	if robotId >= uint32(TEAM_SIZE) {
+		return
+	}
+
+	switch team {
+	case Yellow:
+		gs.Yellow_team[robotId].SetOrReplacePositionTime(pos.X, pos.Y, pos.Angle, time, replaceTime)
+	case Blue:
+		gs.Blue_team[robotId].SetOrReplacePositionTime(pos.X, pos.Y, pos.Angle, time, replaceTime)
+	}
+}
+
 func (gs *GameState) SetBall(x, y, z float64, time int64) {
 	gs.Ball.SetPositionTime(x, y, z, time)
 }
@@ -184,6 +197,10 @@ func (gs *GameState) SetTimestamp(ts float64) {
 }
 
 func (gs *GameState) SetTrackedRobot(team Team, id uint32, pos Position, vel Position, angle float64, velAngular float64, ts float64) {
+	if id >= uint32(TEAM_SIZE) {
+		return
+	}
+
 	switch team {
 	case Yellow:
 		gs.TrackedYellow[id].SetTracked(pos, vel, angle, velAngular, ts)

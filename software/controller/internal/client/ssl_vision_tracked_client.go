@@ -6,12 +6,15 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
 	"github.com/LiU-SeeGoals/proto_go/gc"
+	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
 	"google.golang.org/protobuf/proto"
 )
 
-const READ_BUFFER_SIZE_TRACKED = 8192
+const (
+	READ_BUFFER_SIZE_TRACKED = 8192
+	trackedMetersToMM        = 1000.0
+)
 
 type SSLTrackedConnection struct {
 	conn *net.UDPConn
@@ -70,6 +73,7 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 	}
 
 	ts := frame.GetTimestamp()
+	replaceRobotTime := gi.State.GetMessageReceivedTime()
 	gi.State.SetTimestamp(ts)
 	gi.State.SetMessageReceivedTime(play_time)
 
@@ -77,11 +81,14 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		pos := robot.GetPos()
 		vel := robot.GetVel()
 		robotId := robot.GetRobotId()
+		if pos == nil || robotId == nil {
+			continue
+		}
 
 		p := info.Position{
-			X: float64(pos.GetX()),
-			Y: float64(pos.GetY()),
-			Z: 0,
+			X:     float64(pos.GetX()) * trackedMetersToMM,
+			Y:     float64(pos.GetY()) * trackedMetersToMM,
+			Z:     0,
 			Angle: float64(robot.GetOrientation()),
 		}
 
@@ -102,8 +109,12 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		default:
 			team = info.UNKNOWN
 		}
+		if team == info.UNKNOWN {
+			continue
+		}
 
 		gi.State.SetTrackedRobot(team, robotId.GetId(), p, v, p.Angle, vtheta, ts)
+		gi.State.SetRobotFromTracked(team, robotId.GetId(), p, play_time, replaceRobotTime)
 	}
 
 	balls := frame.GetBalls()
@@ -113,9 +124,9 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		vel := b.GetVel()
 
 		p := info.Position{
-			X: float64(pos.GetX()*1000),
-			Y: float64(pos.GetY()*1000),
-			Z: float64(pos.GetZ()*1000),
+			X:     float64(pos.GetX()) * trackedMetersToMM,
+			Y:     float64(pos.GetY()) * trackedMetersToMM,
+			Z:     float64(pos.GetZ()) * trackedMetersToMM,
 			Angle: 0,
 		}
 
@@ -193,4 +204,3 @@ func NewSSLTrackedVisionClient(addr string) *SSLTrackedVisionClient {
 	receiver.ConnectTracked()
 	return receiver
 }
-

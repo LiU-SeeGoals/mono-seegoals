@@ -37,6 +37,24 @@ func (r *rawRobot) SetPositionTime(x, y, angle float64, time int64) {
 	}
 }
 
+// SetOrReplacePositionTime lets filtered tracker data replace a raw sample from
+// the same frame, avoiding near-duplicate samples that distort velocity history.
+func (r *rawRobot) SetOrReplacePositionTime(x, y, angle float64, time int64, replaceTime int64) {
+	if r.history.Len() > 0 {
+		robot := r.history.Front().Value.(*rawRobotPos)
+		if replaceTime > 0 && robot.time == replaceTime {
+			r.active = true
+			robot.pos.X = x
+			robot.pos.Y = y
+			robot.pos.Angle = angle
+			robot.time = time
+			return
+		}
+	}
+
+	r.SetPositionTime(x, y, angle, time)
+}
+
 func (r *rawRobot) GetPositionTime() (Position, int64, error) {
 	if r.history.Len() == 0 {
 		return Position{}, 0, fmt.Errorf("No position in history for robot %d %s", r.id, r.team.String())
