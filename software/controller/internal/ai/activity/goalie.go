@@ -8,16 +8,17 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
-// Constants for goalie positioning
 const (
-	// Goalie position constraints - these will be adjusted based on team half
-	GOALIE_LINE_WIDTH = 1000 // Width of the goalie's movement range (500 to each side)
-	// GOALIE_DIST_FROM_CENTER = 5500 // Distance from center to goalie line
-	GOALIE_DIST_FROM_CENTER = 4000 // Distance from center to goalie line
-	GOAL_BEHIND_DIST        = 4300 // Distance from center to position behind the goal
-	BALL_JITTER_DISTANCE    = 1.0
-	SHOT_THREAT_DISTANCE    = 350.0
+	goalieForwardPenaltyAreaFraction = 0.5
+	BALL_JITTER_DISTANCE             = 1.0
+	SHOT_THREAT_DISTANCE             = 350.0
 )
+
+type goalieMovementBounds struct {
+	frontX        float64
+	backX         float64
+	goalHalfWidth float64
+}
 
 type Goalie struct {
 	GenericComposition
@@ -43,6 +44,11 @@ func NewGoalie(team info.Team, id info.ID) *Goalie {
 }
 
 func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
+	bounds, ok := newGoalieMovementBounds(gi, g.team)
+	if !ok {
+		return &action.Stop{Id: int(g.id)}
+	}
+
 	ball := gi.State.GetBall()
 
 	// Current ball position
@@ -52,28 +58,17 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 		return NewMoveToPosition(g.team, g.id, info.Position{X: 0, Y: 0}).GetAction(gi)
 	}
 
-	// Determine which half we're defending
-	isBlueTeam := g.team == info.Blue
-	isBlueOnPositiveHalf := gi.Status.GetBlueTeamOnPositiveHalf()
-	isDefendingPositiveHalf := (isBlueTeam && isBlueOnPositiveHalf) || (!isBlueTeam && !isBlueOnPositiveHalf)
-
-	xMultiplier := 1.0
-	if !isDefendingPositiveHalf {
-		xMultiplier = -1.0
-	}
 	// Follow the ball in X, but never leave the allowed goalie X interval.
-	goalLineX := xMultiplier * GOALIE_DIST_FROM_CENTER
-	behindLimitX := xMultiplier * GOAL_BEHIND_DIST
 	targetX := ballPos.X
-	minX := math.Min(goalLineX, behindLimitX)
-	maxX := math.Max(goalLineX, behindLimitX)
+	minX := math.Min(bounds.frontX, bounds.backX)
+	maxX := math.Max(bounds.frontX, bounds.backX)
 	if targetX < minX {
 		targetX = minX
 	} else if targetX > maxX {
 		targetX = maxX
 	}
 	goalieX := targetX
-	goalSize := 800.0
+	goalSize := bounds.goalHalfWidth
 	goalieY := ballPos.Y
 
 	// If an opponent has the ball, or is still close enough to be the likely shooter,
@@ -106,6 +101,30 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	move.AvoidGoallines(false)
 	move.SetUseRRT(goalieShouldUseRRT(gi))
 	return move.GetAction(gi)
+}
+
+func newGoalieMovementBounds(gi *info.GameInfo, team info.Team) (goalieMovementBounds, bool) {
+	if gi == nil {
+		return goalieMovementBounds{}, false
+	}
+
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.GoalWidth <= 0 || geometry.GoalDepth <= 0 {
+		return goalieMovementBounds{}, false
+	}
+
+	goalSign := gi.OwnHalfXSign(team)
+	goalLineX := goalSign * geometry.Length / 2
+	forwardInset := geometry.PenaltyAreaDepth * goalieForwardPenaltyAreaFraction
+	if forwardInset <= 0 {
+		forwardInset = geometry.GoalDepth
+	}
+
+	return goalieMovementBounds{
+		frontX:        goalLineX - goalSign*forwardInset,
+		backX:         goalLineX - goalSign*geometry.GoalDepth,
+		goalHalfWidth: geometry.GoalWidth / 2,
+	}, true
 }
 
 func goalieShouldUseRRT(gi *info.GameInfo) bool {

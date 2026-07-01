@@ -17,6 +17,17 @@ type GameInfo struct {
 	visionFrame uint64
 }
 
+// FieldGeometry contains the dimensions reported by SSL-Vision, in millimeters.
+type FieldGeometry struct {
+	Length           float64
+	Width            float64
+	GoalWidth        float64
+	GoalDepth        float64
+	BoundaryWidth    float64
+	PenaltyAreaDepth float64
+	PenaltyAreaWidth float64
+}
+
 func NewGameInfo(capacity int) *GameInfo {
 	return &GameInfo{
 		State:  NewGameState(capacity),
@@ -90,6 +101,23 @@ func (gi GameInfo) FieldSize() Position {
 	x := float64(gi.field.GetFieldLength())
 	y := float64(gi.field.GetFieldWidth())
 	return Position{X: x, Y: y, Z: 0, Angle: 0}
+}
+
+func (gi GameInfo) FieldGeometry() (FieldGeometry, bool) {
+	if !gi.HasField() {
+		return FieldGeometry{}, false
+	}
+
+	geometry := FieldGeometry{
+		Length:           float64(gi.field.GetFieldLength()),
+		Width:            float64(gi.field.GetFieldWidth()),
+		GoalWidth:        float64(gi.field.GetGoalWidth()),
+		GoalDepth:        float64(gi.field.GetGoalDepth()),
+		BoundaryWidth:    float64(gi.field.GetBoundaryWidth()),
+		PenaltyAreaDepth: float64(gi.field.GetPenaltyAreaDepth()),
+		PenaltyAreaWidth: float64(gi.field.GetPenaltyAreaWidth()),
+	}
+	return geometry, geometry.Length > 0 && geometry.Width > 0
 }
 
 func (gi GameInfo) FieldBoundaryWidth() float64 {
