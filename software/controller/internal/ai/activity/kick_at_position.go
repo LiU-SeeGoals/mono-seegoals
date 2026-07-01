@@ -17,7 +17,7 @@ const (
 	kickAlignConfirmTime = 30 * time.Millisecond
 	// Drive-through distance past the ball when kicking [mm].
 	kickRunUpDist = 0.0
-	kickSpeed     = 5
+	kickSpeed     = 3
 	// Far-approach goal must sit outside the planner's no-go band around the
 	// ball, otherwise RRT can never reach it and orbits the ball instead.
 	kickStagingClearance = pathplanner.BallSafetyRadius + pathplanner.MotionRadius + 50.0

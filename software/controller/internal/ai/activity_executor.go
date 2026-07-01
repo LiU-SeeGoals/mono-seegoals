@@ -16,7 +16,8 @@ const (
 	// Keep the robot center this far inside either goal line even when it is
 	// stationary. This covers the approximately 90 mm robot radius and leaves
 	// additional room for vision and controller error on the real robots.
-	goalLineBaseClearanceMM = 250.0
+	// This should make auto ref happy could be sligtly lower but not a lot.
+	goalLineBaseClearanceMM = 300.0
 
 	// The real robot cannot react to a new destination instantaneously. Reserve
 	// the distance travelled during that delay and the estimated braking
