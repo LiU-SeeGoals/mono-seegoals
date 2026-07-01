@@ -11,8 +11,8 @@ const (
 	ballPushMargin          = -10.0
 	captureMarginToBall     = 40.0
 	offCenterOrbitMargin    = 30.0
-	captureLineTolerance    = info.DribblerHalfWidth + info.BallRadius
-	capturePoseTolerance    = 65.0
+	captureLineTolerance    = info.DribblerHalfWidth + info.BallRadius - 0.5
+	capturePoseTolerance    = 35.0
 	nearBallOrbitRetainDist = 300.0
 	// The real robot's position follower scales velocity with destination
 	// distance. Keep close orbit corrections large enough to avoid crawling.
@@ -25,7 +25,7 @@ const (
 	// remaining angle below.
 	aroundBallShiftAngle     = 1.5
 	maxTargetOrientationStep = 0.6
-	roughAngleTolerance      = 0.1
+	roughAngleTolerance      = 0.05
 	ballLookaheadSec         = 0.0
 	minRollingBallSpeed      = 0.3
 )

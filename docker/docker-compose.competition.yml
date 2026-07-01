@@ -15,9 +15,9 @@ services:
   ssl-vision-client:
     network_mode: "host"
 
-  ssl-game-controller:
-    profiles:
-      - donotstart
+  # ssl-game-controller:
+  #   profiles:
+  #     - donotstart
 
   er-sim:
     profiles:
