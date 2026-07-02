@@ -114,8 +114,8 @@ func (m *ActivityHandler) ClearActivity(id info.ID) {
 }
 
 func (m *ActivityHandler) AddActivity(activity ai.Activity) {
-	// m.activity_lock.Lock()
-	// defer m.activity_lock.Unlock()
+	m.Activity_lock.Lock()
+	defer m.Activity_lock.Unlock()
 	idx := activity.GetID()
 	Logger.Infof("Adding activity %v", activity)
 	m.Activities[idx] = activity

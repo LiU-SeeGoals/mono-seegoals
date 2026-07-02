@@ -78,6 +78,14 @@ func (fb *activityExecutor) Run() {
 		gameInfo := <-fb.incomingGameInfo
 		frameMonitor.Observe(gameInfo.VisionFrame())
 
+		// HALT is a hard safety boundary. Do not depend on the slower planner
+		// replacing every activity before this executor snapshots them: an old
+		// kick activity must never produce a command from a halted frame.
+		if actions, halted := haltSafetyActions(&gameInfo); halted {
+			fb.outgoingActions <- actions
+			continue
+		}
+
 		// Make a snapshot of current activities under lock
 		fb.activity_lock.Lock()
 		var activitiesCopy [info.TEAM_SIZE]ai.Activity
@@ -131,6 +139,26 @@ func (fb *activityExecutor) Run() {
 		// Send actions
 		fb.outgoingActions <- actions
 	}
+}
+
+// haltSafetyActions returns explicit stop commands for every possible robot
+// ID. Stopping the complete ID range also covers robots that disappeared from
+// vision or became active after the referee handler was initialized.
+func haltSafetyActions(gi *info.GameInfo) ([]action.Action, bool) {
+	if gi == nil || gi.Status == nil {
+		return nil, false
+	}
+
+	gameEvent := gi.Status.GetGameEvent()
+	if gameEvent == nil || gameEvent.GetCurrentState() != info.STATE_HALTED {
+		return nil, false
+	}
+
+	actions := make([]action.Action, 0, info.TEAM_SIZE)
+	for id := info.ID(0); id < info.TEAM_SIZE; id++ {
+		actions = append(actions, &action.Stop{Id: int(id)})
+	}
+	return actions, true
 }
 
 func clampMoveActionToField(act action.Action, gi *info.GameInfo) action.Action {

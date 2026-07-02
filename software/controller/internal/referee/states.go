@@ -44,6 +44,7 @@ const (
 	PREPARE_KICKOFF = "PrepareKickoff"
 	FREE_KICK       = "FreeKick"
 	BALL_PLACEMENT  = "BallPlacement"
+	PREPARE_PENALTY = "PreparePenalty"
 	TIMEOUT         = "Timeout"
 	CONTINUE        = "Continue"
 	UNKNOWN         = "Unknown"
@@ -89,6 +90,16 @@ type PrepareKickoff struct {
 	receiverID info.ID
 }
 
+type PreparePenalty struct {
+	RefereeInfo
+}
+
+type Penalty struct {
+	RefereeInfo
+	penaltyStart    time.Time
+	originalBallPos info.Position
+}
+
 type Kickoff struct {
 	RefereeInfo
 	kickOff         *StateMachine
@@ -119,6 +130,7 @@ func (s *Stop) Initialize() {
 }
 
 func (s *Stop) Update() EventName {
+	goalieID, hasGoalie := moveGoalieToPosition(s.activeRobots, s.team, s.gi, s.activityHandler)
 	preparedKickerID, preparingFreeKick := prepareKickerForUpcomingFreeKick(
 		s.gi,
 		s.team,
@@ -127,6 +139,9 @@ func (s *Stop) Update() EventName {
 	)
 
 	for _, id := range s.activeRobots {
+		if hasGoalie && id == goalieID {
+			continue
+		}
 		if preparingFreeKick && id == preparedKickerID {
 			continue
 		}
@@ -134,6 +149,33 @@ func (s *Stop) Update() EventName {
 		s.activityHandler.AddActivity(activity)
 	}
 
+	return "NONE"
+}
+
+func (s *PreparePenalty) Initialize() {}
+
+func (s *PreparePenalty) Update() EventName {
+	moveRobotsToPenaltyPositions(s.gi, s.activeRobots, s.team, s.activityHandler)
+	return "NONE"
+}
+
+func (s *Penalty) Initialize() {
+	s.penaltyStart = time.Now()
+	s.originalBallPos = kickoffBallPosition(s.gi)
+}
+
+func (s *Penalty) Update() EventName {
+	trackedBall := s.gi.State.GetTrackedBall()
+	pos, ok := trackedBall.GetTrackedPosition()
+	ballMoved := ok && restartBallMovedIntoPlay(s.originalBallPos, pos)
+	gameEvent := s.gi.Status.GetGameEvent()
+	if gameEvent.BallInPlay || ballMoved ||
+		restartActionTimedOut(gameEvent, s.penaltyStart, PenaltyMaxTime(s.gi.Status.GetDivision())) {
+		gameEvent.SetBallMoved()
+		return GAME_RUNNING_DETECTED
+	}
+
+	moveRobotsToPenaltyPositions(s.gi, s.activeRobots, s.team, s.activityHandler)
 	return "NONE"
 }
 
@@ -216,7 +258,7 @@ func (s *PrepareKickoff) Initialize() {
 
 func (s *PrepareKickoff) Update() EventName {
 
-	goalieID, hasGoalie := moveGoalieToKickoffPosition(s.activeRobots, s.team, s.gi, s.activityHandler)
+	goalieID, hasGoalie := moveGoalieToPosition(s.activeRobots, s.team, s.gi, s.activityHandler)
 	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
 		moveKickerToKickoffPreparePosition(s.team, s.gi, s.activityHandler, s.kickOffID)
 		moveRobotsToKickoffSupportPositions(
@@ -286,7 +328,7 @@ func (s *Kickoff) Update() EventName {
 		return GAME_RUNNING_DETECTED
 	}
 
-	goalieID, hasGoalie := moveGoalieToKickoffPosition(s.activeRobots, s.team, s.gi, s.activityHandler)
+	goalieID, hasGoalie := moveGoalieToPosition(s.activeRobots, s.team, s.gi, s.activityHandler)
 	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
 		s.kickOff.Update()
 		moveRobotsToKickoffSupportPositions(
@@ -345,6 +387,8 @@ type RefereeHandler struct {
 	nextCommandAfterBallPlacement info.RefCommand
 	kickOff                       *Kickoff
 	freeKick                      *FreeKick
+	stateInfos                    []*RefereeInfo
+	activityHandler               *ai.ActivityHandler
 	kickoffTouchRestriction       kickoffTouchRestriction
 }
 
@@ -405,6 +449,8 @@ func refCommandToEventName(rc info.RefCommand) string {
 		return PREPARE_KICKOFF
 	case info.PREPARE_KICKOFF_YELLOW:
 		return PREPARE_KICKOFF
+	case info.PREPARE_PENALTY_YELLOW, info.PREPARE_PENALTY_BLUE:
+		return PREPARE_PENALTY
 	case info.DIRECT_FREE_YELLOW:
 		return FREE_KICK
 	case info.DIRECT_FREE_BLUE:
@@ -442,6 +488,41 @@ func moveRobotsToDefensePosition(
 	for i, robotID := range defenders {
 		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, slots[i]))
 	}
+}
+
+func moveRobotsToPenaltyPositions(
+	gi *info.GameInfo,
+	activeRobots []info.ID,
+	team info.Team,
+	activityHandler *ai.ActivityHandler,
+) {
+	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
+	if hasGoalie {
+		move := act.NewMoveToPosition(team, goalieID, penaltyGoalieHomePosition(gi, team))
+		move.AvoidGoallines(false)
+		activityHandler.AddActivity(move)
+	}
+
+	for _, robotID := range fieldRobots(activeRobots, goalieID, hasGoalie) {
+		activityHandler.AddActivity(act.NewRefStop(team, robotID))
+	}
+}
+
+func penaltyGoalieHomePosition(gi *info.GameInfo, team info.Team) info.Position {
+	// Match the keeper's legal penalty position with its center just inside the
+	// goal line. This follows Sumatra's dedicated prepare-penalty keeper state.
+	const goalieCenterInsetMM = 70.0
+
+	halfLength := 4500.0
+	if gi != nil {
+		if geometry, ok := gi.FieldGeometry(); ok && geometry.Length > 0 {
+			halfLength = geometry.Length / 2
+		}
+	}
+
+	pos := info.Position{X: ownHalfXSign(gi, team) * (halfLength - goalieCenterInsetMM)}
+	pos.Angle = pos.AngleToPosition(kickoffBallPosition(gi))
+	return pos
 }
 
 func freeKickDefenseSlots(gi *info.GameInfo, team info.Team, count int) []info.Position {
@@ -655,7 +736,7 @@ func kickoffGoalieHomePosition(gi *info.GameInfo, team info.Team) info.Position 
 	return info.Position{X: ownHalfXSign(gi, team) * 4000, Y: 0, Z: 0, Angle: 0}
 }
 
-func moveGoalieToKickoffPosition(
+func moveGoalieToPosition(
 	activeRobots []info.ID,
 	team info.Team,
 	gi *info.GameInfo,
@@ -907,6 +988,8 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	prepareKickoffName := StateName("PREPAREKICKOFF")
 	kickOffName := StateName("KICKOFF")
 	ballPlacementName := StateName("BALLPLACEMENT")
+	preparePenaltyName := StateName("PREPAREPENALTY")
+	penaltyName := StateName("PENALTY")
 
 	freeKick := &FreeKick{
 		RefereeInfo: RefereeInfo{
@@ -963,12 +1046,28 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 			activityHandler: activityHandler,
 		},
 	}
+	preparePenalty := &PreparePenalty{
+		RefereeInfo: RefereeInfo{
+			gi:              gi,
+			activeRobots:    activeRobots,
+			team:            team,
+			name:            preparePenaltyName,
+			activityHandler: activityHandler,
+		},
+	}
+	penalty := &Penalty{
+		RefereeInfo: RefereeInfo{
+			gi:              gi,
+			activeRobots:    activeRobots,
+			team:            team,
+			name:            penaltyName,
+			activityHandler: activityHandler,
+		},
+	}
 	running := &Running{}
 	uninitialized := &UninitializedRef{}
 
-	// Note that some states are not implemented
-	// e.g. Timeout, ballplacement, PreparePenalty and Penalty
-	// Since it is not required to play a game
+	// Timeout still uses stopped-play behavior.
 
 	refereeSM := NewStateMachine(uninitialized)
 
@@ -976,6 +1075,7 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	// refereeSM.AddTransition("STOP", "Timeout", timeout)
 
 	refereeSM.AddTransition("STOP", PREPARE_KICKOFF, prepareKickoff)
+	refereeSM.AddTransition("STOP", PREPARE_PENALTY, preparePenalty)
 	refereeSM.AddTransition("STOP", FREE_KICK, freeKick)
 	refereeSM.AddTransition("STOP", BALL_PLACEMENT, ballPlacement)
 	refereeSM.AddTransition("STOP", FORCE_START, running)
@@ -985,8 +1085,14 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	refereeSM.AddTransition("BALLPLACEMENT", FREE_KICK, freeKick)
 	refereeSM.AddTransition("BALLPLACEMENT", FORCE_START, running)
 	refereeSM.AddTransition("BALLPLACEMENT", PREPARE_KICKOFF, prepareKickoff)
+	refereeSM.AddTransition("BALLPLACEMENT", PREPARE_PENALTY, preparePenalty)
 
 	refereeSM.AddTransition("PREPAREKICKOFF", NORMAL_START, kickOff)
+	refereeSM.AddTransition("PREPAREPENALTY", NORMAL_START, penalty)
+	refereeSM.AddTransition("PREPAREPENALTY", STOP, stop)
+
+	refereeSM.AddTransition("PENALTY", GAME_RUNNING_DETECTED, running)
+	refereeSM.AddTransition("PENALTY", STOP, stop)
 
 	refereeSM.AddTransition("KICKOFF", GAME_RUNNING_DETECTED, running)
 	refereeSM.AddTransition("KICKOFF", STOP, stop)
@@ -1000,12 +1106,15 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	refereeSM.AddTransition("STOP", HALT, halt)
 	refereeSM.AddTransition("BALLPLACEMENT", HALT, halt)
 	refereeSM.AddTransition("PREPAREKICKOFF", HALT, halt)
+	refereeSM.AddTransition("PREPAREPENALTY", HALT, halt)
+	refereeSM.AddTransition("PENALTY", HALT, halt)
 	refereeSM.AddTransition("KICKOFF", HALT, halt)
 	refereeSM.AddTransition("FREEKICK", HALT, halt)
 	refereeSM.AddTransition("RUNNING", HALT, halt)
 
 	// When starting the state is unknown, try parse the latest ref command
 	refereeSM.AddTransition(uninitialized.GetName(), PREPARE_KICKOFF, prepareKickoff)
+	refereeSM.AddTransition(uninitialized.GetName(), PREPARE_PENALTY, preparePenalty)
 	refereeSM.AddTransition(uninitialized.GetName(), STOP, stop)
 	refereeSM.AddTransition(uninitialized.GetName(), HALT, halt)
 	refereeSM.AddTransition(uninitialized.GetName(), NORMAL_START, running)
@@ -1016,11 +1125,41 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	refereeSM.AddTransition(uninitialized.GetName(), BALL_PLACEMENT, ballPlacement)
 
 	return &RefereeHandler{
-		gi:           gi,
-		refereeSM:    refereeSM,
-		activeRobots: activeRobots,
-		kickOff:      kickOff,
-		freeKick:     freeKick,
+		gi:              gi,
+		refereeSM:       refereeSM,
+		activeRobots:    activeRobots,
+		kickOff:         kickOff,
+		freeKick:        freeKick,
+		activityHandler: activityHandler,
+		stateInfos: []*RefereeInfo{
+			&freeKick.RefereeInfo,
+			&prepareKickoff.RefereeInfo,
+			&stop.RefereeInfo,
+			&ballPlacement.RefereeInfo,
+			&halt.RefereeInfo,
+			&kickOff.RefereeInfo,
+			&preparePenalty.RefereeInfo,
+			&penalty.RefereeInfo,
+		},
+	}
+}
+
+// UpdateActiveRobots keeps every referee state synchronized with current
+// vision membership. A substituted-out robot must not retain its old activity,
+// while its replacement must be eligible for goalkeeper selection immediately.
+func (s *RefereeHandler) UpdateActiveRobots(activeRobots []info.ID) {
+	for _, oldID := range s.activeRobots {
+		if robotIDInList(activeRobots, oldID) {
+			continue
+		}
+		if s.activityHandler != nil {
+			s.activityHandler.ClearActivity(oldID)
+		}
+	}
+
+	s.activeRobots = append(s.activeRobots[:0], activeRobots...)
+	for _, stateInfo := range s.stateInfos {
+		stateInfo.activeRobots = s.activeRobots
 	}
 }
 

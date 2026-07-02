@@ -14,6 +14,8 @@ func (s *Stop) TranslateSim() *simulation.RobotCommand {
 	angular := float32(0)
 	forward := float32(0)
 	left := float32(0)
+	kickSpeed := float32(0)
+	dribblerSpeed := float32(0)
 
 	localVel := &simulation.MoveLocalVelocity{
 		Forward: &forward,
@@ -28,8 +30,10 @@ func (s *Stop) TranslateSim() *simulation.RobotCommand {
 	}
 
 	return &simulation.RobotCommand{
-		Id:          &id,
-		MoveCommand: moveCommand,
+		Id:            &id,
+		MoveCommand:   moveCommand,
+		KickSpeed:     &kickSpeed,
+		DribblerSpeed: &dribblerSpeed,
 	}
 
 }

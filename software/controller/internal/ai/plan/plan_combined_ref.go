@@ -77,6 +77,8 @@ func (m *CombinedPlanWithRef) refereeHandlesFrame() bool {
 			},
 		)
 	}
+	activeRobots := m.normalPlan.activeRobots(&m.currentGameInfo)
+	m.refereeHandler.UpdateActiveRobots(activeRobots)
 
 	handled := m.refereeHandler.HandleReferee()
 	if restrictedID, restricted := m.refereeHandler.KickoffRestrictedRobot(); restricted {

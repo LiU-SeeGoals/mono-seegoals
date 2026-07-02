@@ -409,6 +409,15 @@ func withoutRobot(robots []info.ID, excluded info.ID) []info.ID {
 }
 
 func (m *CombinedPlan) chooseGoalie(gi *GameInfo, activeRobots []info.ID) (info.ID, bool) {
+	if gi != nil && gi.Status != nil {
+		teamInfo := gi.Status.GetTeamInfo(m.team == info.Yellow)
+		if teamInfo != nil {
+			configuredID := info.ID(teamInfo.Goalkeeper)
+			if containsRobot(activeRobots, configuredID) {
+				return configuredID, true
+			}
+		}
+	}
 	if containsRobot(activeRobots, preferredGoalieID) {
 		return preferredGoalieID, true
 	}

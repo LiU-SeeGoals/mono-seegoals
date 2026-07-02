@@ -106,10 +106,10 @@ func (b *BaseStationClient) sendCommands() {
 		}
 		cmd := b.queue[0]
 		b.queue = b.queue[1:]
-		b.queueMutex.Unlock()
 
 		serializedCmd, _ := proto.Marshal(cmd)
 		b.sendMessage(serializedCmd)
+		b.queueMutex.Unlock()
 	}
 }
 
@@ -120,8 +120,20 @@ func (b *BaseStationClient) SendActions(actions []action.Action) {
 	}
 
 	b.queueMutex.Lock()
-	for _, action := range actions {
-		b.queue = append(b.queue, action.TranslateReal())
+	for _, robotAction := range actions {
+		command := robotAction.TranslateReal()
+		if command.GetCommandId() == robot_action.ActionType_STOP_ACTION {
+			// A stop supersedes every command that has not yet been sent for this
+			// robot. In particular, do not leave a pre-HALT kick ahead of it.
+			queue := b.queue[:0]
+			for _, queuedCommand := range b.queue {
+				if queuedCommand.GetRobotId() != command.GetRobotId() {
+					queue = append(queue, queuedCommand)
+				}
+			}
+			b.queue = queue
+		}
+		b.queue = append(b.queue, command)
 	}
 	b.queueMutex.Unlock()
 }
