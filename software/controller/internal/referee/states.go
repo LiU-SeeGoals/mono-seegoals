@@ -199,7 +199,7 @@ func (s *FreeKick) Update() EventName {
 			s.freeKick.Update()
 		}
 	} else {
-		moveRobotsToDefensePosition(s.activeRobots, s.team, s.activityHandler)
+		moveRobotsToDefensePosition(s.gi, s.activeRobots, s.team, s.activityHandler)
 	}
 
 	return "NONE"
@@ -426,16 +426,39 @@ func refCommandToEventName(rc info.RefCommand) string {
 	}
 }
 
-func moveRobotsToDefensePosition(activeRobots []info.ID, team info.Team, activityHandler *ai.ActivityHandler) {
-
-	numRobots := float64(len(activeRobots))
-	increment := 120.0
-	minPos := -increment * numRobots
-
-	for i, robotID := range activeRobots {
-		pos := info.Position{X: -2000, Y: minPos + increment*float64(i), Z: 0, Angle: 0}
-		activityHandler.AddActivity(act.NewMoveToPosition(team, info.ID(robotID), pos))
+func moveRobotsToDefensePosition(
+	gi *info.GameInfo,
+	activeRobots []info.ID,
+	team info.Team,
+	activityHandler *ai.ActivityHandler,
+) {
+	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
+	if hasGoalie {
+		activityHandler.AddActivity(act.NewGoalie(team, goalieID))
 	}
+
+	defenders := fieldRobots(activeRobots, goalieID, hasGoalie)
+	slots := freeKickDefenseSlots(gi, team, len(defenders))
+	for i, robotID := range defenders {
+		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, slots[i]))
+	}
+}
+
+func freeKickDefenseSlots(gi *info.GameInfo, team info.Team, count int) []info.Position {
+	const (
+		defenseDepth = 2000.0
+		spacing      = 300.0
+	)
+
+	slots := make([]info.Position, count)
+	startY := -spacing * float64(count-1) / 2
+	for i := range slots {
+		slots[i] = info.Position{
+			X: ownHalfXSign(gi, team) * defenseDepth,
+			Y: startY + spacing*float64(i),
+		}
+	}
+	return slots
 }
 
 func prepareKickerForUpcomingFreeKick(
