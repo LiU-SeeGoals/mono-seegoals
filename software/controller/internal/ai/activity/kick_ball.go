@@ -37,7 +37,7 @@ const (
 	kickMouthLateralTolerance = info.DribblerHalfWidth + 1.5*info.BallRadius
 	kickDribbleSettleTime     = 250 * time.Millisecond
 	kickHeldHeadingTolerance  = 0.4
-	kickFirmwareDelay         = 300 * time.Millisecond
+	kickFirmwareDelay         = 200 * time.Millisecond
 	kickAssumedFinalSpeed     = 0.65
 	kickMinFirmwareLeadDist   = 50.0
 	kickMaxFirmwareLeadDist   = 220.0
@@ -45,7 +45,7 @@ const (
 
 func GetKickConfig() KickConfig {
 	return KickConfig{
-		driveThrough:    0,
+		driveThrough:    50,
 		doneDist:        20,
 		ballAbortRadius: 200,
 		kickContactDist: 130,

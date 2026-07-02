@@ -17,7 +17,7 @@ const (
 	// stationary. This covers the approximately 90 mm robot radius and leaves
 	// additional room for vision and controller error on the real robots.
 	// This should make auto ref happy could be sligtly lower but not a lot.
-	goalLineBaseClearanceMM = 300.0
+	goalLineBaseClearanceMM = 150.0
 	// During stopped play, keep the robot body 300 mm from either defense area.
 	defenseAreaBallOutBodyClearanceMM = 300.0
 	sslRobotRadiusMM                  = 90.0

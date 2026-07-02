@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"runtime/trace"
+	"strings"
 	"syscall"
 
 	"github.com/LiU-SeeGoals/controller/internal/demos"
@@ -59,5 +60,19 @@ func main() {
 		fmt.Println("Running scenario... Press Ctrl+C to stop.")
 	}
 
-	demos.GameScenario()
+	switch selectedScenario() {
+	case "real-blue", "blue":
+		demos.GameScenarioRealBlue()
+	case "real-yellow", "yellow":
+		demos.GameScenarioRealYellow()
+	default:
+		demos.GameScenario()
+	}
+}
+
+func selectedScenario() string {
+	if len(os.Args) > 1 {
+		return strings.ToLower(os.Args[1])
+	}
+	return strings.ToLower(os.Getenv("SEEGOALS_SCENARIO"))
 }

@@ -350,11 +350,10 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	// a perfect final angle.
 	if m.nearLyingBall(myRobotPos, gi) {
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-		robot := gi.State.GetTeam(m.team)[m.id]
+		
 		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
-			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr)) &&
-			m.contactPointCentered(robot, ballPos)
+			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr))
 	}
 
 	xx := (myRobotPos.X - robotTargetPos.X) * (myRobotPos.X - robotTargetPos.X)
