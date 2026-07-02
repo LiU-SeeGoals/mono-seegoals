@@ -2,22 +2,26 @@ services:
   ai:
     environment:
       - ENVIRONMENT=competition
-    network_mode: "host"
+      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=192.168.1.1
+    network_mode: host
 
   game-viewer:
     environment:
       - ENVIRONMENT=competition
-      - SSL_VISION_MULTICAST_ADDR=${SSL_VISION_MULTICAST_ADDR}
       - SSL_VISION_MULTICAST_PORT=${SSL_VISION_REAL_MAIN_PORT}
-    command: pnpm run dev
-    network_mode: "host"
+      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=192.168.1.1
+    command: bash -c "cd /var/GameViewer && pnpm install && pnpm run dev"
+    network_mode: host
 
   ssl-vision-client:
-    network_mode: "host"
+    command:
+      - "-visionAddress"
+      - "${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_REAL_MAIN_PORT}"
+    network_mode: host
 
-  # ssl-game-controller:
-  #   profiles:
-  #     - donotstart
+  ssl-game-controller:
+    profiles:
+      - donotstart
 
   er-sim:
     profiles:
