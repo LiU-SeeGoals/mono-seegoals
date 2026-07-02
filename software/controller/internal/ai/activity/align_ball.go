@@ -344,17 +344,15 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 
 	// At a lying ball the clearance-point check below would force a robot
 	// already in possession to back off before ALIGNED could fire; count it
-	// aligned once it is behind the ball on the pass line and close in.
-	// captureApproachReady already allows only a rough heading error; the
-	// Kick state should drive through immediately instead of waiting here for
-	// a perfect final angle.
+	// aligned once it is behind the ball, inside the reachable dribbler
+	// corridor, and close in. Do not also require the much narrower centering
+	// tolerance used to decide when to retain the ball with the dribbler: the
+	// Kick state can safely finish an off-center approach inside this corridor.
 	if m.nearLyingBall(myRobotPos, gi) {
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-		robot := gi.State.GetTeam(m.team)[m.id]
 		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
-			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr)) &&
-			m.contactPointCentered(robot, ballPos)
+			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr))
 	}
 
 	xx := (myRobotPos.X - robotTargetPos.X) * (myRobotPos.X - robotTargetPos.X)

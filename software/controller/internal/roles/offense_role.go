@@ -70,6 +70,11 @@ type AttemptGoalIntent struct {
 const (
 	minGoalShotSamples = 3
 	maxGoalShotSamples = 9
+
+	// Keep support robots out of the primary attacker's sight line to the goal.
+	// This is intentionally wider than the robot body so positioning noise does
+	// not leave a support robot clipping the shot lane.
+	supportGoalSightClearance = 400.0
 )
 
 func goalShotBlockRadius() float64 {
@@ -373,6 +378,11 @@ func supportDepthOptions(slot OffenseSlot, lane float64) []float64 {
 	}
 }
 
+func supportPositionBlocksGoalSight(ballPos, goalPos, supportPos info.Position) bool {
+	distance := info.DistToLineSegment(goalPos.ToV2(), ballPos.ToV2(), supportPos.ToV2())
+	return distance < supportGoalSightClearance
+}
+
 func (kr *SupportAttackIntent) supportCandidate(
 	ballPos, goalPos info.Position,
 	forwardFraction float64,
@@ -435,15 +445,27 @@ func (kr *SupportAttackIntent) GetFromPosition() info.Position {
 	best := fallback
 	bestScore := math.Inf(-1)
 	foundClearShot := false
+	bestSafeFallback := fallback
+	bestSafeFallbackScore := math.Inf(-1)
+	foundSafeFallback := false
 
 	for _, lane := range laneOptions {
 		for _, depth := range supportDepthOptions(kr.slot, lane) {
 			candidate := kr.supportCandidate(ballPos, goalPos, depth, lane)
-			if !isGoalShotAvailable(kr.team, kr.id, candidate, kr.gi) {
+			if supportPositionBlocksGoalSight(ballPos, goalPos, candidate) {
 				continue
 			}
 
 			score := -candidate.Dist2d(goalPos)
+			if score > bestSafeFallbackScore {
+				bestSafeFallbackScore = score
+				bestSafeFallback = candidate
+				foundSafeFallback = true
+			}
+			if !isGoalShotAvailable(kr.team, kr.id, candidate, kr.gi) {
+				continue
+			}
+
 			if score > bestScore {
 				bestScore = score
 				best = candidate
@@ -454,6 +476,9 @@ func (kr *SupportAttackIntent) GetFromPosition() info.Position {
 
 	if foundClearShot {
 		return best
+	}
+	if foundSafeFallback {
+		return bestSafeFallback
 	}
 	return fallback
 }
