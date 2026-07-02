@@ -53,7 +53,7 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi)
     NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
 
     // Channel 2.525 GHz
-    NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7d);
+    NRF_WriteRegisterByte(NRF_REG_RF_CH, 107);
 
     // No retransmissions
     NRF_WriteRegisterByte(NRF_REG_SETUP_RETR, 0x00);

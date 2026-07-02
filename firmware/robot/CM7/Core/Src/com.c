@@ -63,7 +63,7 @@ void COM_RF_Init()
     NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
 
     // Channel 2.525 GHz
-    NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7d);
+    NRF_WriteRegisterByte(NRF_REG_RF_CH, 107);
 
     // No retransmissions
     NRF_WriteRegisterByte(NRF_REG_SETUP_RETR, 0x00);
@@ -72,7 +72,9 @@ void COM_RF_Init()
     NRF_WriteRegisterByte(NRF_REG_EN_AA, 0x00);
 
     // Channel rf 2525
-    NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7d);
+    // 125
+    // 2400 + 107
+    NRF_WriteRegisterByte(NRF_REG_RF_CH, 107);
 
     // Dynamic data length
     NRF_WriteRegisterByte(NRF_REG_DYNPD, 0x01);

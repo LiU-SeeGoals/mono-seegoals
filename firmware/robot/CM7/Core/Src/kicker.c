@@ -9,7 +9,7 @@
 // ...
 
 #define KICK_STRAIGHT_PASS_US 250000
-#define KICK_STRAIGHT_GOAL_US 350000
+#define KICK_STRAIGHT_GOAL_US 450000
 #define KICK_CHIP_PASS_US 650000
 
 /* Private variables */
