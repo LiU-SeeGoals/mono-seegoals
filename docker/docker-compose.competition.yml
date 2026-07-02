@@ -2,14 +2,14 @@ services:
   ai:
     environment:
       - ENVIRONMENT=competition
-      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=192.168.1.1
+      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=127.0.0.1
     network_mode: host
 
   game-viewer:
     environment:
       - ENVIRONMENT=competition
       - SSL_VISION_MULTICAST_PORT=${SSL_VISION_REAL_MAIN_PORT}
-      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=192.168.1.1
+      - VITE_AI_GAME_VIEWER_SOCKET_ADDR=127.0.0.1
     command: bash -c "cd /var/GameViewer && pnpm install && pnpm run dev"
     network_mode: host
 
