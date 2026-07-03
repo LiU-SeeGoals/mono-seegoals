@@ -127,7 +127,8 @@ func (fb *activityExecutor) Run() {
 
 		actions := make([]action.Action, 0, len(results))
 		for _, result := range results {
-			actions = append(actions, clampMoveActionToField(result.action, &gameInfo))
+			safeAction := moveStoppedRobotOutOfEnemyDefenseArea(result.action, fb.team, &gameInfo)
+			actions = append(actions, clampMoveActionToField(safeAction, &gameInfo))
 		}
 
 		for _, action := range actions {
@@ -139,6 +140,91 @@ func (fb *activityExecutor) Run() {
 		// Send actions
 		fb.outgoingActions <- actions
 	}
+}
+
+// moveStoppedRobotOutOfEnemyDefenseArea turns a stationary command into a
+// short retreat when a robot is inside the opponent's defense area. RefStop
+// otherwise emits Stop as soon as the robot is far enough from the ball, which
+// used to leave robots parked in an illegal position. Restricting this fallback
+// to the opponent's area also keeps a stale Stop command from pulling our
+// goalkeeper out of its own area immediately after HALT.
+func moveStoppedRobotOutOfEnemyDefenseArea(act action.Action, team info.Team, gi *info.GameInfo) action.Action {
+	stop, ok := act.(*action.Stop)
+	if !ok || gi == nil || gi.State == nil || gi.Status == nil || !gi.HasField() {
+		return act
+	}
+
+	gameEvent := gi.Status.GetGameEvent()
+	if gameEvent == nil || gameEvent.GetCurrentState() != info.STATE_STOPPED ||
+		stop.Id < 0 || stop.Id >= int(info.TEAM_SIZE) {
+		return act
+	}
+
+	robot := gi.State.GetTeam(team)[info.ID(stop.Id)]
+	if robot == nil {
+		return act
+	}
+	robotPos, err := robot.GetPosition()
+	if err != nil {
+		return act
+	}
+
+	clearance := defenseAreaClearance(goalLineBaseClearanceMM, gi)
+	enemyGoalSign := -gi.OwnHalfXSign(team)
+	for _, area := range getGoalAreaBounds(gi) {
+		if area.frontX*enemyGoalSign <= 0 {
+			continue
+		}
+		target, inside := nearestDefenseAreaExit(robotPos, area, clearance)
+		if !inside {
+			continue
+		}
+		target.Angle = robotPos.Angle
+		return &action.MoveTo{
+			Id:   stop.Id,
+			Team: team,
+			Pos:  robotPos,
+			Dest: target,
+		}
+	}
+	return act
+}
+
+// nearestDefenseAreaExit returns the shortest exit through the field-facing
+// front or either side. It intentionally excludes the back edge so a robot is
+// never directed behind the goal line. This follows Sumatra's nearest-point-
+// outside behavior for invalid penalty-area positions.
+func nearestDefenseAreaExit(pos info.Position, area goalAreaBounds, clearance float64) (info.Position, bool) {
+	minX := math.Min(area.frontX, area.backX) - clearance
+	maxX := math.Max(area.frontX, area.backX) + clearance
+	minY := area.minY - clearance
+	maxY := area.maxY + clearance
+	if pos.X < minX || pos.X > maxX || pos.Y < minY || pos.Y > maxY {
+		return pos, false
+	}
+
+	const outsideEpsilonMM = 1.0
+	frontExit := pos
+	if area.backX < area.frontX {
+		frontExit.X = maxX + outsideEpsilonMM
+	} else {
+		frontExit.X = minX - outsideEpsilonMM
+	}
+	candidates := []info.Position{
+		frontExit,
+		{X: pos.X, Y: minY - outsideEpsilonMM},
+		{X: pos.X, Y: maxY + outsideEpsilonMM},
+	}
+
+	best := candidates[0]
+	bestDistance := pos.Dist2d(best)
+	for _, candidate := range candidates[1:] {
+		if distance := pos.Dist2d(candidate); distance < bestDistance {
+			best = candidate
+			bestDistance = distance
+		}
+	}
+	return best, true
 }
 
 // haltSafetyActions returns explicit stop commands for every possible robot
@@ -381,5 +467,31 @@ func getGoalAreaBounds(gi *info.GameInfo) []goalAreaBounds {
 			maxY:   math.Max(float64(front.GetP1().GetY()), float64(front.GetP2().GetY())),
 		})
 	}
-	return areas
+	if len(areas) == 2 {
+		return areas
+	}
+
+	// Some SSL-Vision sources report the field dimensions without individual
+	// line segments. The dimensions still fully describe the rectangular
+	// defense areas, so do not disable this safety behavior in that case.
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.PenaltyAreaDepth <= 0 || geometry.PenaltyAreaWidth <= 0 {
+		return areas
+	}
+	halfLength := geometry.Length / 2
+	halfPenaltyWidth := geometry.PenaltyAreaWidth / 2
+	return []goalAreaBounds{
+		{
+			frontX: -halfLength + geometry.PenaltyAreaDepth,
+			backX:  -halfLength,
+			minY:   -halfPenaltyWidth,
+			maxY:   halfPenaltyWidth,
+		},
+		{
+			frontX: halfLength - geometry.PenaltyAreaDepth,
+			backX:  halfLength,
+			minY:   -halfPenaltyWidth,
+			maxY:   halfPenaltyWidth,
+		},
+	}
 }
