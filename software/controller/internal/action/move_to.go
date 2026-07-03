@@ -71,90 +71,128 @@ func convAngle(angle float64) float64 {
 }
 
 func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
-	// Initialize pre-allocated structs on first call
-	if !mv.simAllocated {
-		mv.simId = uint32(mv.Id)
-		mv.simLocalVel = simulation.MoveLocalVelocity{
-			Forward: &mv.simForward,
-			Left:    &mv.simLeft,
-			Angular: &mv.simAngular,
-		}
-		mv.simMoveCmd = simulation.RobotMoveCommand{
-			Command: &simulation.RobotMoveCommand_LocalVelocity{
-				LocalVelocity: &mv.simLocalVel,
-			},
-		}
-		mv.simCmd = simulation.RobotCommand{
-			Id:            &mv.simId,
-			MoveCommand:   &mv.simMoveCmd,
-			DribblerSpeed: &mv.simDribblerSpeed,
-		}
-		mv.simAllocated = true
-	}
 
-	const maxLinearSpeed = 0.65
-	const slowdownDistance = 1000.0
-	const defaultMinLinearSpeed = 0.1
-	const angleKp = 3.0
-	minLinearSpeed := defaultMinLinearSpeed
-	if mv.MinLinearSpeed > 0 {
-		minLinearSpeed = math.Min(maxLinearSpeed, mv.MinLinearSpeed)
-	}
-	mv.Dest.Angle = convAngle(mv.Dest.Angle)
-	mv.Pos.Angle = convAngle(mv.Pos.Angle)
+    if !mv.simAllocated {
+        mv.simId = uint32(mv.Id)
 
-	dx := mv.Dest.X - mv.Pos.X
-	dy := mv.Dest.Y - mv.Pos.Y
-	angleDiff := info.NormalizeAngleDelta(mv.Dest.Angle, mv.Pos.Angle)
-	distance := math.Sqrt(dx*dx + dy*dy)
+        mv.simLocalVel = simulation.MoveLocalVelocity{
+            Forward: &mv.simForward,
+            Left:    &mv.simLeft,
+            Angular: &mv.simAngular,
+        }
 
-	speed := 0.0
-	if distance > 1 {
-		speed = math.Min(maxLinearSpeed, maxLinearSpeed/slowdownDistance*distance)
-		speed = math.Max(speed, minLinearSpeed)
-	}
+        mv.simMoveCmd = simulation.RobotMoveCommand{
+            Command: &simulation.RobotMoveCommand_LocalVelocity{
+                LocalVelocity: &mv.simLocalVel,
+            },
+        }
 
-	maxAngleSpeed := 3.0
-	angleCtrl := float32(math.Max(-maxAngleSpeed, math.Min(maxAngleSpeed, angleKp*float64(angleDiff))))
+        mv.simCmd = simulation.RobotCommand{
+            Id:            &mv.simId,
+            MoveCommand:   &mv.simMoveCmd,
+            DribblerSpeed: &mv.simDribblerSpeed,
+        }
 
-	forward := float32(0)
-	left := float32(0)
-	if distance > 1 {
-		unitX := dx / distance
-		unitY := dy / distance
-		forward = float32(speed * (unitX*math.Cos(-mv.Pos.Angle) - unitY*math.Sin(-mv.Pos.Angle)))
-		left = float32(speed * (unitX*math.Sin(-mv.Pos.Angle) + unitY*math.Cos(-mv.Pos.Angle)))
-	}
+        mv.simAllocated = true
+    }
 
-	// Update pre-allocated scalar values in place (pointers already wired up)
-	mv.simForward = forward
-	mv.simLeft = left
-	mv.simAngular = angleCtrl
+    //------------------------------------------------------
+    // Current pose
+    //------------------------------------------------------
 
-	if mv.Dribble {
-		mv.simDribblerSpeed = 100
-	} else {
-		mv.simDribblerSpeed = 0
-	}
+    curX := mv.Pos.X
+    curY := mv.Pos.Y
+    curW := mv.Pos.Angle
 
-	if mv.KickSpeed != 0 {
-		mv.simKickSpeed = mv.SimKickSpeed
-		if mv.simKickSpeed == 0 {
-			mv.simKickSpeed = float32(mv.KickSpeed)
-		}
-		mv.simCmd.KickSpeed = &mv.simKickSpeed
-		if mv.KickAngle != 0 {
-			mv.simKickAngle = mv.KickAngle
-			mv.simCmd.KickAngle = &mv.simKickAngle
-		} else {
-			mv.simCmd.KickAngle = nil
-		}
-	} else {
-		mv.simCmd.KickSpeed = nil
-		mv.simCmd.KickAngle = nil
-	}
+    //------------------------------------------------------
+    // Goal pose
+    //------------------------------------------------------
 
-	return &mv.simCmd
+    destX := mv.Dest.X
+    destY := mv.Dest.Y
+    destW := mv.Dest.Angle
+
+    //------------------------------------------------------
+    // Position errors (world frame)
+    //------------------------------------------------------
+
+    ex := destX - curX
+    ey := destY - curY
+
+    ew := info.NormalizeAngleDelta(destW, curW)
+
+    //------------------------------------------------------
+    // Firmware gains
+    //------------------------------------------------------
+
+    const Kx = 0.001
+    const Ky = 0.001
+    const Kw = 14.0
+
+    //------------------------------------------------------
+    // World frame velocity
+    //------------------------------------------------------
+
+    vxWorld := Kx * ex
+    vyWorld := Ky * ey
+
+    //------------------------------------------------------
+    // Optional velocity saturation
+    //------------------------------------------------------
+
+    const maxLinear = 100000000
+
+    speed := math.Hypot(vxWorld, vyWorld)
+
+    if speed > maxLinear {
+        scale := maxLinear / speed
+        vxWorld *= scale
+        vyWorld *= scale
+    }
+
+    //------------------------------------------------------
+    // World -> Robot frame
+    //------------------------------------------------------
+
+    cosW := math.Cos(curW)
+    sinW := math.Sin(curW)
+
+    forward := float32(
+        vxWorld*cosW +
+            vyWorld*sinW)
+
+    left := float32(
+        -vxWorld*sinW +
+            vyWorld*cosW)
+
+    //------------------------------------------------------
+    // Heading controller
+    //------------------------------------------------------
+
+    omega := Kw * ew
+
+    const maxOmega = 3.0
+
+    omega = math.Max(
+        -maxOmega,
+        math.Min(maxOmega, omega),
+    )
+
+    //------------------------------------------------------
+    // Send command
+    //------------------------------------------------------
+
+    mv.simForward = forward
+    mv.simLeft = left
+    mv.simAngular = float32(omega)
+
+    if mv.Dribble {
+        mv.simDribblerSpeed = 100
+    } else {
+        mv.simDribblerSpeed = 0
+    }
+
+    return &mv.simCmd
 }
 
 func (mv *MoveTo) TranslateSim() *simulation.RobotCommand {
