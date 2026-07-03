@@ -13,7 +13,7 @@ import (
 
 const interceptNoGoWaitClearance = pathplanner.MotionRadius
 
-const alignTransitionConfirmTime = 100 * time.Millisecond
+const alignTransitionConfirmTime = 0 * time.Millisecond
 
 type TargetContext interface {
 	GetTargetPosition() info.Position
