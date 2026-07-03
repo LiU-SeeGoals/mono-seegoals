@@ -3,6 +3,7 @@ package roles
 import (
 	"fmt"
 	"math"
+	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
@@ -80,6 +81,11 @@ const (
 	// Keeping this as a percentage of field width makes the formation scale with
 	// the geometry reported by SSL-Vision.
 	supportShooterSideOffsetPercent = 25.0
+
+	supportLaneSwitchScoreMargin      = 350.0
+	supportLaneSwitchConfirmTime      = 400 * time.Millisecond
+	supportLaneInitialSideThresholdMM = 100.0
+	supportLaneEpsilon                = 1e-6
 )
 
 func goalShotBlockRadius() float64 {
@@ -324,14 +330,27 @@ func (kr *AttemptGoalIntent) GetFromPosition() info.Position {
 }
 
 type SupportAttackIntent struct {
-	gi   *GameInfo
-	team Team
-	id   ID
-	slot OffenseSlot
+	gi               *GameInfo
+	team             Team
+	id               ID
+	slot             OffenseSlot
+	hasStickyLane    bool
+	stickyLane       float64
+	hasPendingLane   bool
+	pendingLane      float64
+	pendingLaneSince time.Time
 }
 
 func (kr *SupportAttackIntent) SetSlot(slot OffenseSlot) {
+	oldSlot := normalizedSupportSlot(kr.slot)
+	newSlot := normalizedSupportSlot(slot)
+	oldKind := kr.slot.Kind
 	kr.slot = slot
+
+	if oldKind != slot.Kind || oldSlot.Count != newSlot.Count ||
+		(newSlot.Count > 1 && oldSlot.Index != newSlot.Index) {
+		kr.resetStickyLane()
+	}
 }
 
 func clamp(value, minValue, maxValue float64) float64 {
@@ -395,6 +414,229 @@ func supportLateralOffset(fieldWidth float64, slot OffenseSlot, lane float64) fl
 	return normalizedLane * fieldWidth * supportShooterSideOffsetPercent / 100.0
 }
 
+type supportLaneCandidate struct {
+	lane  float64
+	pos   info.Position
+	score float64
+}
+
+type supportLaneResult struct {
+	lane     float64
+	fallback info.Position
+	safe     supportLaneCandidate
+	clear    supportLaneCandidate
+	hasSafe  bool
+	hasClear bool
+}
+
+func sameSupportLane(a, b float64) bool {
+	return math.Abs(a-b) < supportLaneEpsilon
+}
+
+func laneInOptions(lane float64, options []float64) bool {
+	for _, option := range options {
+		if sameSupportLane(lane, option) {
+			return true
+		}
+	}
+	return false
+}
+
+func initialSupportLane(slot OffenseSlot, id ID, currentPos, ballPos, goalPos info.Position) float64 {
+	slot = normalizedSupportSlot(slot)
+	if slot.Count > 1 {
+		return supportLane(slot)
+	}
+
+	options := supportLaneOptions(slot, id)
+	fallback := supportLane(slot)
+	if len(options) > 0 {
+		fallback = options[0]
+	}
+
+	toGoalX := goalPos.X - ballPos.X
+	toGoalY := goalPos.Y - ballPos.Y
+	dist := math.Hypot(toGoalX, toGoalY)
+	if dist < 1 {
+		return fallback
+	}
+
+	lateralX := -toGoalY / dist
+	lateralY := toGoalX / dist
+	toRobotX := currentPos.X - ballPos.X
+	toRobotY := currentPos.Y - ballPos.Y
+	side := toRobotX*lateralX + toRobotY*lateralY
+	if math.Abs(side) < supportLaneInitialSideThresholdMM {
+		return fallback
+	}
+	if side > 0 {
+		return 0.5
+	}
+	return -0.5
+}
+
+func (kr *SupportAttackIntent) resetStickyLane() {
+	kr.hasStickyLane = false
+	kr.stickyLane = 0
+	kr.clearPendingLane()
+}
+
+func (kr *SupportAttackIntent) clearPendingLane() {
+	kr.hasPendingLane = false
+	kr.pendingLane = 0
+	kr.pendingLaneSince = time.Time{}
+}
+
+func (kr *SupportAttackIntent) commitStickyLane(lane float64) {
+	kr.hasStickyLane = true
+	kr.stickyLane = lane
+	kr.clearPendingLane()
+}
+
+func (kr *SupportAttackIntent) ensureStickyLane(
+	currentPos, ballPos, goalPos info.Position,
+	laneOptions []float64,
+) {
+	if len(laneOptions) == 0 {
+		return
+	}
+	if kr.hasStickyLane && laneInOptions(kr.stickyLane, laneOptions) {
+		return
+	}
+	kr.commitStickyLane(initialSupportLane(kr.slot, kr.id, currentPos, ballPos, goalPos))
+	if !laneInOptions(kr.stickyLane, laneOptions) {
+		kr.commitStickyLane(laneOptions[0])
+	}
+}
+
+func (kr *SupportAttackIntent) evaluateSupportLane(
+	ballPos, goalPos info.Position,
+	lane float64,
+) supportLaneResult {
+	result := supportLaneResult{lane: lane}
+	for i, depth := range supportDepthOptions(kr.slot, lane) {
+		candidate := kr.supportCandidate(ballPos, goalPos, depth, lane)
+		if i == 0 {
+			result.fallback = candidate
+		}
+		if supportPositionBlocksGoalSight(ballPos, goalPos, candidate) {
+			continue
+		}
+
+		scored := supportLaneCandidate{
+			lane:  lane,
+			pos:   candidate,
+			score: -candidate.Dist2d(goalPos),
+		}
+		if !result.hasSafe || scored.score > result.safe.score {
+			result.safe = scored
+			result.hasSafe = true
+		}
+		if !isGoalShotAvailable(kr.team, kr.id, candidate, kr.gi) {
+			continue
+		}
+		if !result.hasClear || scored.score > result.clear.score {
+			result.clear = scored
+			result.hasClear = true
+		}
+	}
+	return result
+}
+
+func bestClearSupportCandidate(results []supportLaneResult) (supportLaneCandidate, bool) {
+	var best supportLaneCandidate
+	found := false
+	for _, result := range results {
+		if !result.hasClear {
+			continue
+		}
+		if !found || result.clear.score > best.score {
+			best = result.clear
+			found = true
+		}
+	}
+	return best, found
+}
+
+func bestSafeSupportCandidate(results []supportLaneResult) (supportLaneCandidate, bool) {
+	var best supportLaneCandidate
+	found := false
+	for _, result := range results {
+		if !result.hasSafe {
+			continue
+		}
+		if !found || result.safe.score > best.score {
+			best = result.safe
+			found = true
+		}
+	}
+	return best, found
+}
+
+func resultForSupportLane(results []supportLaneResult, lane float64) (supportLaneResult, bool) {
+	for _, result := range results {
+		if sameSupportLane(result.lane, lane) {
+			return result, true
+		}
+	}
+	return supportLaneResult{}, false
+}
+
+func (kr *SupportAttackIntent) laneSwitchConfirmed(lane float64, now time.Time) bool {
+	if !kr.hasPendingLane || !sameSupportLane(kr.pendingLane, lane) {
+		kr.hasPendingLane = true
+		kr.pendingLane = lane
+		kr.pendingLaneSince = now
+		return false
+	}
+	return now.Sub(kr.pendingLaneSince) >= supportLaneSwitchConfirmTime
+}
+
+func (kr *SupportAttackIntent) chooseCurrentOrSwitch(
+	current supportLaneCandidate,
+	best supportLaneCandidate,
+	now time.Time,
+) info.Position {
+	if sameSupportLane(current.lane, best.lane) ||
+		best.score <= current.score+supportLaneSwitchScoreMargin {
+		kr.commitStickyLane(current.lane)
+		return current.pos
+	}
+	if kr.laneSwitchConfirmed(best.lane, now) {
+		kr.commitStickyLane(best.lane)
+		return best.pos
+	}
+	return current.pos
+}
+
+func (kr *SupportAttackIntent) chooseStickySupportPosition(
+	results []supportLaneResult,
+	fallback info.Position,
+	now time.Time,
+) info.Position {
+	sticky, hasSticky := resultForSupportLane(results, kr.stickyLane)
+	if bestClear, ok := bestClearSupportCandidate(results); ok {
+		if hasSticky && sticky.hasClear {
+			return kr.chooseCurrentOrSwitch(sticky.clear, bestClear, now)
+		}
+		if hasSticky && sticky.hasSafe {
+			return kr.chooseCurrentOrSwitch(sticky.safe, bestClear, now)
+		}
+		kr.commitStickyLane(bestClear.lane)
+		return bestClear.pos
+	}
+	if bestSafe, ok := bestSafeSupportCandidate(results); ok {
+		if hasSticky && sticky.hasSafe {
+			return kr.chooseCurrentOrSwitch(sticky.safe, bestSafe, now)
+		}
+		kr.commitStickyLane(bestSafe.lane)
+		return bestSafe.pos
+	}
+
+	kr.clearPendingLane()
+	return fallback
+}
+
 func (kr *SupportAttackIntent) supportCandidate(
 	ballPos, goalPos info.Position,
 	forwardFraction float64,
@@ -451,45 +693,13 @@ func (kr *SupportAttackIntent) GetFromPosition() info.Position {
 		fallbackLane = laneOptions[0]
 	}
 	fallback := kr.supportCandidate(ballPos, goalPos, supportDepthOptions(kr.slot, fallbackLane)[0], fallbackLane)
-	best := fallback
-	bestScore := math.Inf(-1)
-	foundClearShot := false
-	bestSafeFallback := fallback
-	bestSafeFallbackScore := math.Inf(-1)
-	foundSafeFallback := false
 
+	kr.ensureStickyLane(currentPos, ballPos, goalPos, laneOptions)
+	results := make([]supportLaneResult, 0, len(laneOptions))
 	for _, lane := range laneOptions {
-		for _, depth := range supportDepthOptions(kr.slot, lane) {
-			candidate := kr.supportCandidate(ballPos, goalPos, depth, lane)
-			if supportPositionBlocksGoalSight(ballPos, goalPos, candidate) {
-				continue
-			}
-
-			score := -candidate.Dist2d(goalPos)
-			if score > bestSafeFallbackScore {
-				bestSafeFallbackScore = score
-				bestSafeFallback = candidate
-				foundSafeFallback = true
-			}
-			if !isGoalShotAvailable(kr.team, kr.id, candidate, kr.gi) {
-				continue
-			}
-
-			if score > bestScore {
-				bestScore = score
-				best = candidate
-				foundClearShot = true
-			}
-		}
+		results = append(results, kr.evaluateSupportLane(ballPos, goalPos, lane))
 	}
-
-	if foundClearShot {
-		return best
-	}
-	if foundSafeFallback {
-		return bestSafeFallback
-	}
-	return fallback
+	return kr.chooseStickySupportPosition(results, fallback, time.Now())
 }
 
 func (kr *SupportAttackIntent) GetTargetPosition() info.Position {
