@@ -10,6 +10,8 @@ import (
 
 const (
 	goalieForwardPenaltyAreaFraction = 0.5
+	goalieWaypointGain               = 3.0
+	goalieWaypointMaxDistance        = 1000.0
 	BALL_JITTER_DISTANCE             = 1.0
 	SHOT_THREAT_DISTANCE             = 350.0
 )
@@ -82,6 +84,7 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 
 	myRobotPos, _ := gi.State.GetTeam(g.team)[g.id].GetPosition()
 	goaliePos.Angle = myRobotPos.AngleToPosition(ballPos)
+	goaliePos = goalieDriveWaypoint(myRobotPos, goaliePos, bounds)
 
 	move := NewMoveToPosition(g.team, g.id, goaliePos)
 	// The keeper must be able to enter its defense area. Disabling goal-line
@@ -89,6 +92,36 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	move.AvoidGoallines(false)
 	move.SetUseRRT(goalieShouldUseRRT(gi))
 	return move.GetAction(gi)
+}
+
+// goalieDriveWaypoint increases the distance seen by the existing position
+// controllers without changing their real-robot or simulator tuning. The
+// target remains inside the goalkeeping area, and long moves that already run
+// at maximum speed keep their real destination.
+func goalieDriveWaypoint(current, target info.Position, bounds goalieMovementBounds) info.Position {
+	dx := target.X - current.X
+	dy := target.Y - current.Y
+	distance := math.Hypot(dx, dy)
+	if distance < 1e-6 {
+		return target
+	}
+
+	waypointDistance := math.Max(
+		distance,
+		math.Min(goalieWaypointMaxDistance, distance*goalieWaypointGain),
+	)
+	waypoint := info.Position{
+		X:     current.X + dx/distance*waypointDistance,
+		Y:     current.Y + dy/distance*waypointDistance,
+		Z:     target.Z,
+		Angle: target.Angle,
+	}
+
+	waypoint.Y = math.Max(-bounds.goalHalfWidth, math.Min(bounds.goalHalfWidth, waypoint.Y))
+	forwardDistance := -bounds.goalSign * (waypoint.X - bounds.goalLineX)
+	forwardDistance = math.Max(0, math.Min(bounds.arcRadius, forwardDistance))
+	waypoint.X = bounds.goalLineX - bounds.goalSign*forwardDistance
+	return waypoint
 }
 
 func newGoalieMovementBounds(gi *info.GameInfo, team info.Team) (goalieMovementBounds, bool) {

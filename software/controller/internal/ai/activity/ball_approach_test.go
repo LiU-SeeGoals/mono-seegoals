@@ -40,7 +40,7 @@ func TestCaptureApproachReadyRejectsLargeHeadingError(t *testing.T) {
 func TestAlignAchievedAcceptsReachableOffCenterBall(t *testing.T) {
 	gi := info.NewGameInfo(2)
 	ball := info.Position{}
-	robot := info.Position{X: -120, Y: 30, Angle: 0}
+	robot := info.Position{X: -120, Y: alignTransitionLateralTolerance, Angle: 0}
 	gi.State.SetBlueRobot(3, robot.X, robot.Y, robot.Angle, 1)
 	gi.State.SetBall(ball.X, ball.Y, ball.Z, 1)
 	gi.State.GetBall().SetEstimatedPosition(ball)
@@ -49,6 +49,21 @@ func TestAlignAchievedAcceptsReachableOffCenterBall(t *testing.T) {
 	align := NewAlign(info.Blue, 3, info.Position{X: 1000}, ball)
 	if !align.Achieved(gi) {
 		t.Fatal("expected reachable off-center ball to transition to KickBall")
+	}
+}
+
+func TestAlignAchievedRejectsBallOutsideTransitionCenterTolerance(t *testing.T) {
+	gi := info.NewGameInfo(2)
+	ball := info.Position{}
+	robot := info.Position{X: -120, Y: alignTransitionLateralTolerance + 1, Angle: 0}
+	gi.State.SetBlueRobot(3, robot.X, robot.Y, robot.Angle, 1)
+	gi.State.SetBall(ball.X, ball.Y, ball.Z, 1)
+	gi.State.GetBall().SetEstimatedPosition(ball)
+	gi.State.SetTrackedBall(ball, info.Position{}, 1)
+
+	align := NewAlign(info.Blue, 3, info.Position{X: 1000}, ball)
+	if align.Achieved(gi) {
+		t.Fatal("expected off-center ball outside transition tolerance to remain in AlignBall")
 	}
 }
 

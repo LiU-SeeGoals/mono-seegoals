@@ -46,7 +46,7 @@ const (
 func GetKickConfig() KickConfig {
 	return KickConfig{
 		driveThrough:    80,
-		doneDist:        20,
+		doneDist:        50,
 		ballAbortRadius: 200,
 		kickContactDist: 130,
 	}
@@ -143,7 +143,10 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 		fmt.Println(err)
 	}
 
-	ballUntracked, err := gi.State.GetBall().GetPosition()
+	// Use the same filtered ball position as AlignBall and GetTargetPos. Mixing
+	// raw and estimated positions can invalidate the alignment gate immediately
+	// after the state transition.
+	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
 
 	if err != nil {
 		fmt.Println(err)
@@ -169,11 +172,11 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	act.KickAngle = m.kickAngle
 
 	dribblerPos := robot.DribblerPos()
-	dribblerDist := dribblerPos.Dist2d(ballUntracked)
-	forward, lateral, ok := robot.BallLocalOffset(ballUntracked)
+	dribblerDist := dribblerPos.Dist2d(ballPos)
+	forward, lateral, ok := robot.BallLocalOffset(ballPos)
 	ballCentered := ok && math.Abs(lateral) < info.KickCenterTolerance
 	headingErr := math.Abs(info.NormalizeAngleDelta(robotTargetPos.Angle, robotPos.Angle))
-	captureReady := captureApproachReady(robotPos, ballUntracked, m.to, headingErr)
+	captureReady := captureApproachReady(robotPos, ballPos, m.to, headingErr)
 
 	ballHeldInMouth := ok &&
 		kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
@@ -194,7 +197,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 		m.id,
 		robot,
 		robotPos,
-		ballUntracked,
+		ballPos,
 		m.to,
 		robotTargetPos,
 		headingErr,
@@ -223,6 +226,7 @@ func kickBallReachableByMouth(forward, lateral, headingErr float64) bool {
 
 func kickBallImpactReady(forward, lateral, headingErr, leadDist float64) bool {
 	return kickBallReachableByMouth(forward, lateral, headingErr) &&
+		math.Abs(lateral) <= alignTransitionLateralTolerance &&
 		forward <= info.Center2DribblerDist+info.BallRadius+leadDist
 }
 

@@ -7,13 +7,16 @@ import (
 )
 
 const (
-	maxMarginToBall         = 90.0
-	ballPushMargin          = -10.0
-	captureMarginToBall     = 40.0
-	offCenterOrbitMargin    = 30.0
-	captureLineTolerance    = info.DribblerHalfWidth + info.BallRadius - 0.5
-	capturePoseTolerance    = 35.0
-	nearBallOrbitRetainDist = 300.0
+	maxMarginToBall      = 90.0
+	ballPushMargin       = -10.0
+	captureMarginToBall  = 40.0
+	offCenterOrbitMargin = 30.0
+	captureLineTolerance = info.DribblerHalfWidth + info.BallRadius - 0.5
+	// Wider than the strict kick-center diagnostic, but narrow enough to avoid
+	// handing a ball at the edge of the dribbler corridor to KickBall.
+	alignTransitionLateralTolerance = 30.0
+	capturePoseTolerance            = 35.0
+	nearBallOrbitRetainDist         = 300.0
 	// The real robot's position follower scales velocity with destination
 	// distance. Keep close orbit corrections large enough to avoid crawling.
 	minAroundBallMoveDist    = 50.0

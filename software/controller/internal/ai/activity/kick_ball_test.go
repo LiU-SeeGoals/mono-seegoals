@@ -68,8 +68,30 @@ func TestKickBallImpactReadyRequiresFrontContactWindow(t *testing.T) {
 	}
 
 	forwardInWindow := info.Center2DribblerDist + info.BallRadius
-	if !kickBallImpactReady(forwardInWindow, captureLineTolerance-1, 0, kickMinFirmwareLeadDist) {
+	if !kickBallImpactReady(forwardInWindow, alignTransitionLateralTolerance-1, 0, kickMinFirmwareLeadDist) {
 		t.Fatal("expected reachable ball at the dribbler front to be impact-ready")
+	}
+}
+
+func TestKickBallImpactReadyRejectsOffCenterBall(t *testing.T) {
+	forwardInWindow := info.Center2DribblerDist + info.BallRadius
+	if kickBallImpactReady(forwardInWindow, alignTransitionLateralTolerance+1, 0, kickMinFirmwareLeadDist) {
+		t.Fatal("expected immediate kick to wait for the ball to center")
+	}
+}
+
+func TestKickBallUsesEstimatedBallPositionForFiring(t *testing.T) {
+	gi, estimatedBall := newKickTestGameInfo()
+	gi.State.SetBall(estimatedBall.X, 1000, 0, 2)
+	gi.State.GetBall().SetEstimatedPosition(estimatedBall)
+
+	kick := NewKickBall(info.Blue, 3, info.Position{X: 1000}, estimatedBall)
+	firing, ok := kick.GetAction(gi).(*action.MoveTo)
+	if !ok {
+		t.Fatal("expected move-to action while firing")
+	}
+	if firing.KickSpeed == 0 {
+		t.Fatal("expected firing decision to use the centered estimated ball position")
 	}
 }
 

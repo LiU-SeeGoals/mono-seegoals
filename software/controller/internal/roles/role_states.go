@@ -2,6 +2,7 @@ package roles
 
 import (
 	"math"
+	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
@@ -11,6 +12,8 @@ import (
 )
 
 const interceptNoGoWaitClearance = pathplanner.MotionRadius
+
+const alignTransitionConfirmTime = 100 * time.Millisecond
 
 type TargetContext interface {
 	GetTargetPosition() info.Position
@@ -29,9 +32,11 @@ type AlignState struct {
 	Name            sm.StateName
 	ActivityHandler *ai.ActivityHandler
 	Ctx             TargetContext
+	alignedSince    time.Time
 }
 
 func (s *AlignState) Initialize() {
+	s.alignedSince = time.Time{}
 	if ctx, ok := s.Ctx.(FreezableTargetContext); ok {
 		ctx.FreezeTarget()
 	}
@@ -71,11 +76,24 @@ func (s *AlignState) Update() sm.EventName {
 	}
 	//activity := act.NewAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
 	s.ActivityHandler.AddActivity(activity)
-	achieved := activity.Achieved(s.Gi)
-	if achieved {
+	if updateAlignConfirmation(&s.alignedSince, activity.Achieved(s.Gi), time.Now()) {
 		return "ALIGNED"
 	}
 	return "NONE"
+}
+
+func updateAlignConfirmation(alignedSince *time.Time, aligned bool, now time.Time) bool {
+	// Require consecutive aligned frames so a fast orbit correction cannot
+	// complete merely by crossing the lateral threshold once.
+	if !aligned {
+		*alignedSince = time.Time{}
+		return false
+	}
+	if alignedSince.IsZero() {
+		*alignedSince = now
+		return false
+	}
+	return now.Sub(*alignedSince) >= alignTransitionConfirmTime
 }
 
 type SupportState struct {
