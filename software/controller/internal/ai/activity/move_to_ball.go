@@ -86,10 +86,13 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 		margin,
 	)
 	act := action.MoveTo{
-		Id:   int(m.id),
-		Team: m.team,
-		Pos:  robotPos,
-		Dest: moveAction.Dest,
+		Id:                  int(m.id),
+		Team:                m.team,
+		Pos:                 robotPos,
+		Dest:                moveAction.Dest,
+		AllowOutsideField:   moveAction.AllowOutsideField,
+		AllowBehindGoalLine: moveAction.AllowBehindGoalLine,
+		AllowGoalArea:       moveAction.AllowGoalArea,
 
 		Dribble: dribble,
 		// Visualization only: keep the planned path without changing motion behavior.

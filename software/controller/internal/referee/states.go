@@ -197,6 +197,20 @@ func (s *KickOffIntent) GetFromPosition() info.Position {
 	return kickoffBallPosition(s.gi)
 }
 
+type FreeKickIntent struct {
+	gi   *info.GameInfo
+	team info.Team
+	id   info.ID
+}
+
+func (s *FreeKickIntent) GetTargetPosition() info.Position {
+	return freeKickTargetPosition(s.gi, s.team, kickoffBallPosition(s.gi))
+}
+
+func (s *FreeKickIntent) GetFromPosition() info.Position {
+	return kickoffBallPosition(s.gi)
+}
+
 func (s *FreeKick) Initialize() {
 	s.freeKickStart = time.Now()
 	s.freeKick = nil
@@ -208,9 +222,9 @@ func (s *FreeKick) Initialize() {
 		s.kickerID = kickerID
 		kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kickerID))
 		kickName := StateName(fmt.Sprintf("Kick ID %d", kickerID))
-		kickoff := KickOffIntent{gi: s.gi, team: s.team, id: kickerID}
-		prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
-		kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickName, ActivityHandler: s.activityHandler}
+		freeKick := FreeKickIntent{gi: s.gi, team: s.team, id: kickerID}
+		prepareKick := &roles.AlignState{Ctx: &freeKick, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
+		kick := &roles.KickState{Ctx: &freeKick, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickName, ActivityHandler: s.activityHandler}
 
 		s.freeKick = NewStateMachine(prepareKick)
 		s.freeKick.AddTransition(kickPrepareName, "ALIGNED", kick)
@@ -563,7 +577,9 @@ func prepareKickerForUpcomingFreeKick(
 		return 0, false
 	}
 
-	activityHandler.AddActivity(act.NewMoveToPosition(team, kickerID, freeKickPreparePosition(gi, team, ballPos)))
+	move := act.NewMoveToPosition(team, kickerID, freeKickPreparePosition(gi, team, ballPos))
+	move.AllowOutsideField(true)
+	activityHandler.AddActivity(move)
 	return kickerID, true
 }
 
@@ -612,8 +628,7 @@ func freeKickPreparationBallPosition(gi *info.GameInfo, gameEvent *info.GameEven
 }
 
 func freeKickPreparePosition(gi *info.GameInfo, team info.Team, ballPos info.Position) info.Position {
-	targetPos := ballPos
-	targetPos.X += -ownHalfXSign(gi, team) * kickoffKickTargetDistanceMM
+	targetPos := freeKickTargetPosition(gi, team, ballPos)
 
 	direction := targetPos.Sub(&ballPos)
 	direction.Z = 0
@@ -628,10 +643,23 @@ func freeKickPreparePosition(gi *info.GameInfo, team info.Team, ballPos info.Pos
 	preparePos.Y -= direction.Y * freeKickPrepareDistanceMM
 	preparePos.Z = 0
 	preparePos.Angle = preparePos.AngleToPosition(targetPos)
-	if gi != nil {
-		preparePos = gi.ClampToField(preparePos, kickoffFieldMarginMM)
-	}
 	return preparePos
+}
+
+func freeKickTargetPosition(gi *info.GameInfo, team info.Team, ballPos info.Position) info.Position {
+	if gi != nil && gi.HasField() {
+		target := gi.EnemyGoalCenter(team)
+		target.Z = 0
+		target.Angle = 0
+		return target
+	}
+
+	// Preserve a safe fallback before SSL-Vision geometry is available.
+	target := ballPos
+	target.X += -ownHalfXSign(gi, team) * kickoffKickTargetDistanceMM
+	target.Z = 0
+	target.Angle = 0
+	return target
 }
 
 func isFreeKickForTeam(command info.RefCommand, team info.Team) bool {

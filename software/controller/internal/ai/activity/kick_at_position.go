@@ -121,12 +121,13 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			firmwareLeadDist,
 		)
 		return &action.MoveTo{
-			Id:        int(kp.id),
-			Team:      kp.team,
-			Pos:       robotPos,
-			Dest:      dest,
-			Dribble:   true,
-			KickSpeed: kickSpeedCmd,
+			Id:                int(kp.id),
+			Team:              kp.team,
+			Pos:               robotPos,
+			Dest:              dest,
+			AllowOutsideField: true,
+			Dribble:           true,
+			KickSpeed:         kickSpeedCmd,
 		}
 	}
 	kp.dribbleSince = time.Time{}
@@ -163,12 +164,13 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	)
 
 	return &action.MoveTo{
-		Id:             int(kp.id),
-		Team:           kp.team,
-		Pos:            robotPos,
-		Dest:           carrot,
-		MinLinearSpeed: aroundBallLinearSpeed(robotPos, carrot),
-		Dribble:        dribble,
+		Id:                int(kp.id),
+		Team:              kp.team,
+		Pos:               robotPos,
+		Dest:              carrot,
+		AllowOutsideField: true,
+		MinLinearSpeed:    aroundBallLinearSpeed(robotPos, carrot),
+		Dribble:           dribble,
 	}
 }
 

@@ -54,13 +54,14 @@ func (m *AlignBall) String() string {
 
 func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) *AlignBall {
 	return &AlignBall{
-		team:       team,
-		id:         id,
-		to:         to,
-		from:       from,
-		AlignAngle: 0,
-		useRRT:     true,
-		avoidBall:  true,
+		team:              team,
+		id:                id,
+		to:                to,
+		from:              from,
+		AlignAngle:        0,
+		useRRT:            true,
+		avoidBall:         true,
+		allowOutsideField: true,
 	}
 }
 

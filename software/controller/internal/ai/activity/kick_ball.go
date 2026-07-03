@@ -59,14 +59,15 @@ func (m *KickBall) String() string {
 func NewKickBall(team info.Team, id info.ID, to, ballPos info.Position) *KickBall {
 	// fmt.Println("New kick ball")
 	return &KickBall{
-		team:           team,
-		id:             id,
-		orignalBallPos: ballPos,
-		inited:         false,
-		to:             to,
-		dribbleSince:   time.Time{},
-		kickSpeed:      defaultKickBallSpeed,
-		simKickSpeed:   defaultKickBallSimSpeed,
+		team:              team,
+		id:                id,
+		orignalBallPos:    ballPos,
+		inited:            false,
+		to:                to,
+		dribbleSince:      time.Time{},
+		allowOutsideField: true,
+		kickSpeed:         defaultKickBallSpeed,
+		simKickSpeed:      defaultKickBallSimSpeed,
 	}
 }
 

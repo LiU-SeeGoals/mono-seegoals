@@ -128,17 +128,31 @@ func (gi GameInfo) FieldBoundaryWidth() float64 {
 }
 
 func (gi GameInfo) FieldBounds(margin float64) (minX, maxX, minY, maxY float64, ok bool) {
+	return gi.FieldBoundsWithMargins(margin, margin)
+}
+
+// FieldBoundsWithMargins returns field bounds with independent goal-line (X)
+// and touchline (Y) margins. Negative margins expand the corresponding bounds
+// into the physical SSL boundary area.
+func (gi GameInfo) FieldBoundsWithMargins(marginX, marginY float64) (minX, maxX, minY, maxY float64, ok bool) {
 	if !gi.HasField() {
 		return 0, 0, 0, 0, false
 	}
 
-	halfX := math.Max(0, float64(gi.field.GetFieldLength())/2-margin)
-	halfY := math.Max(0, float64(gi.field.GetFieldWidth())/2-margin)
+	halfX := math.Max(0, float64(gi.field.GetFieldLength())/2-marginX)
+	halfY := math.Max(0, float64(gi.field.GetFieldWidth())/2-marginY)
 	return -halfX, halfX, -halfY, halfY, true
 }
 
 func (gi GameInfo) ClampToField(pos Position, margin float64) Position {
-	minX, maxX, minY, maxY, ok := gi.FieldBounds(margin)
+	return gi.ClampToFieldWithMargins(pos, margin, margin)
+}
+
+// ClampToFieldWithMargins clamps the goal-line and touchline axes
+// independently. This lets normal field robots use the area beyond the
+// touchlines without also permitting movement behind a goal line.
+func (gi GameInfo) ClampToFieldWithMargins(pos Position, marginX, marginY float64) Position {
+	minX, maxX, minY, maxY, ok := gi.FieldBoundsWithMargins(marginX, marginY)
 	if !ok {
 		return pos
 	}
