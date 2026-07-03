@@ -104,7 +104,7 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     float cmd_x = vx_robot;
     float cmd_y = vy_robot;
 
-    POS_velocity_control(vx_robot, vy_world, dest_w);
+    POS_velocity_control(vx_robot, vy_robot, dest_w);
 }
 
 void POS_velocity_control(float vel_x, float vel_y, float dest_w)
