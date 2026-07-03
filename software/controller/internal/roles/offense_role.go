@@ -75,6 +75,11 @@ const (
 	// This is intentionally wider than the robot body so positioning noise does
 	// not leave a support robot clipping the shot lane.
 	supportGoalSightClearance = 400.0
+
+	// Place the outer support shooters this far from the field center line.
+	// Keeping this as a percentage of field width makes the formation scale with
+	// the geometry reported by SSL-Vision.
+	supportShooterSideOffsetPercent = 25.0
 )
 
 func goalShotBlockRadius() float64 {
@@ -356,14 +361,14 @@ func supportLaneOptions(slot OffenseSlot, id ID) []float64 {
 	lane := supportLane(slot)
 	if slot.Count == 1 {
 		if int(id)%2 == 0 {
-			return []float64{-0.5, 0.5, 0}
+			return []float64{-0.5, 0.5}
 		}
-		return []float64{0.5, -0.5, 0}
+		return []float64{0.5, -0.5}
 	}
 	if lane == 0 {
 		return []float64{0, -0.5, 0.5}
 	}
-	return []float64{lane, lane * 0.5, -lane}
+	return []float64{lane, -lane}
 }
 
 func supportDepthOptions(slot OffenseSlot, lane float64) []float64 {
@@ -381,6 +386,13 @@ func supportDepthOptions(slot OffenseSlot, lane float64) []float64 {
 func supportPositionBlocksGoalSight(ballPos, goalPos, supportPos info.Position) bool {
 	distance := info.DistToLineSegment(goalPos.ToV2(), ballPos.ToV2(), supportPos.ToV2())
 	return distance < supportGoalSightClearance
+}
+
+func supportLateralOffset(fieldWidth float64, slot OffenseSlot, lane float64) float64 {
+	slot = normalizedSupportSlot(slot)
+	outerLane := math.Max(0.5, float64(slot.Count-1)/2.0)
+	normalizedLane := clamp(lane/outerLane, -1, 1)
+	return normalizedLane * fieldWidth * supportShooterSideOffsetPercent / 100.0
 }
 
 func (kr *SupportAttackIntent) supportCandidate(
@@ -406,10 +418,7 @@ func (kr *SupportAttackIntent) supportCandidate(
 	lateralX := -forwardY
 	lateralY := forwardX
 
-	slot := normalizedSupportSlot(kr.slot)
-	lateralSpacing := field.Y / float64(slot.Count+2)
-	maxLateral := field.Y * 0.35
-	lateralOffset := clamp(lane*lateralSpacing, -maxLateral, maxLateral)
+	lateralOffset := supportLateralOffset(field.Y, kr.slot, lane)
 	forwardOffset := dist * forwardFraction
 	x := ballPos.X + forwardX*forwardOffset + lateralX*lateralOffset
 	y := ballPos.Y + forwardY*forwardOffset + lateralY*lateralOffset

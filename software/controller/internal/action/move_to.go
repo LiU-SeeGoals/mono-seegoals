@@ -95,7 +95,7 @@ func (mv *MoveTo) simulateRealMovement() *simulation.RobotCommand {
 	const maxLinearSpeed = 0.65
 	const slowdownDistance = 1000.0
 	const defaultMinLinearSpeed = 0.1
-	const angleKp = 1.0
+	const angleKp = 3.0
 	minLinearSpeed := defaultMinLinearSpeed
 	if mv.MinLinearSpeed > 0 {
 		minLinearSpeed = math.Min(maxLinearSpeed, mv.MinLinearSpeed)

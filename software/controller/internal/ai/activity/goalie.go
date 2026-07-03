@@ -15,8 +15,9 @@ const (
 )
 
 type goalieMovementBounds struct {
-	frontX        float64
-	backX         float64
+	goalLineX     float64
+	goalSign      float64
+	arcRadius     float64
 	goalHalfWidth float64
 }
 
@@ -58,39 +59,26 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 		return NewMoveToPosition(g.team, g.id, info.Position{X: 0, Y: 0}).GetAction(gi)
 	}
 
-	// Follow the ball in X, but never leave the allowed goalie X interval.
-	targetX := ballPos.X
-	minX := math.Min(bounds.frontX, bounds.backX)
-	maxX := math.Max(bounds.frontX, bounds.backX)
-	if targetX < minX {
-		targetX = minX
-	} else if targetX > maxX {
-		targetX = maxX
-	}
-	goalieX := targetX
-	goalSize := bounds.goalHalfWidth
-	goalieY := ballPos.Y
+	// Cover the angle between the ball and both posts. This is the normal
+	// blocking line used when no reliable shot trajectory is available.
+	positionToCover := ballPos
+	goalTargetY := goalBisectionY(ballPos, bounds)
 
 	// If an opponent has the ball, or is still close enough to be the likely shooter,
 	// predict where they are aiming on our goal line.
 	if shooter := threateningOpponent(gi, g.team, ballPos); shooter != nil {
 		if oppPos, err := shooter.GetPosition(); err == nil {
-			if yHit, ok := predictShotY(oppPos, goalieX, goalSize, ballPos.Y); ok {
-				goalieY = yHit
+			if yHit, ok := predictShotY(oppPos, bounds.goalLineX, bounds.goalHalfWidth, goalTargetY); ok {
+				positionToCover = oppPos
+				goalTargetY = yHit
 			}
 		}
-	} else if yHit, ok := predictBallPathY(ball, goalieX, goalSize); ok {
+	} else if yHit, ok := predictBallPathY(ball, bounds.goalLineX, bounds.goalHalfWidth); ok {
 		// Otherwise, predict the ball trajectory when it is already moving toward our goal.
-		goalieY = yHit
+		goalTargetY = yHit
 	}
 
-	if goalieY > goalSize {
-		goalieY = goalSize
-	} else if goalieY < -goalSize {
-		goalieY = -goalSize
-	}
-
-	goaliePos := info.Position{X: goalieX, Y: goalieY, Z: 0.0, Angle: 0.0}
+	goaliePos := positionOnGoalieArc(bounds, positionToCover, goalTargetY)
 
 	myRobotPos, _ := gi.State.GetTeam(g.team)[g.id].GetPosition()
 	goaliePos.Angle = myRobotPos.AngleToPosition(ballPos)
@@ -119,12 +107,68 @@ func newGoalieMovementBounds(gi *info.GameInfo, team info.Team) (goalieMovementB
 	if forwardInset <= 0 {
 		forwardInset = geometry.GoalDepth
 	}
+	goalHalfWidth := geometry.GoalWidth / 2
 
 	return goalieMovementBounds{
-		frontX:        goalLineX - goalSign*forwardInset,
-		backX:         goalLineX - goalSign*geometry.GoalDepth,
-		goalHalfWidth: geometry.GoalWidth / 2,
+		goalLineX:     goalLineX,
+		goalSign:      goalSign,
+		arcRadius:     math.Max(forwardInset, goalHalfWidth),
+		goalHalfWidth: goalHalfWidth,
 	}, true
+}
+
+// goalBisectionY returns the point where the angle bisector from the threat
+// intersects the goal mouth. It balances the visible angle to both posts.
+func goalBisectionY(threat info.Position, bounds goalieMovementBounds) float64 {
+	upperPost := info.Position{X: bounds.goalLineX, Y: bounds.goalHalfWidth}
+	lowerPost := info.Position{X: bounds.goalLineX, Y: -bounds.goalHalfWidth}
+	distanceToUpper := threat.Dist2d(upperPost)
+	distanceToLower := threat.Dist2d(lowerPost)
+	distanceSum := distanceToUpper + distanceToLower
+	if distanceSum < 1e-6 {
+		return 0
+	}
+
+	return bounds.goalHalfWidth * (distanceToLower - distanceToUpper) / distanceSum
+}
+
+// positionOnGoalieArc intersects the line from a point in the goal mouth to
+// the threat with the keeper's goal-centered arc. The result is constrained to
+// the field-facing part of the arc and between the posts.
+func positionOnGoalieArc(bounds goalieMovementBounds, threat info.Position, goalTargetY float64) info.Position {
+	goalTargetY = math.Max(-bounds.goalHalfWidth, math.Min(bounds.goalHalfWidth, goalTargetY))
+
+	dx := threat.X - bounds.goalLineX
+	dy := threat.Y - goalTargetY
+	a := dx*dx + dy*dy
+	if a < 1e-6 {
+		return info.Position{
+			X: bounds.goalLineX - bounds.goalSign*bounds.arcRadius,
+		}
+	}
+
+	// The line starts inside (or on) the arc. Select its first intersection
+	// while travelling from the goal mouth toward the threat.
+	b := 2 * goalTargetY * dy
+	c := goalTargetY*goalTargetY - bounds.arcRadius*bounds.arcRadius
+	discriminant := math.Max(0, b*b-4*a*c)
+	t1 := (-b - math.Sqrt(discriminant)) / (2 * a)
+	t2 := (-b + math.Sqrt(discriminant)) / (2 * a)
+	t := t2
+	if t1 >= -1e-9 {
+		t = math.Max(0, t1)
+	} else if t2 < 0 {
+		t = 0
+	}
+
+	y := goalTargetY + t*dy
+	y = math.Max(-bounds.goalHalfWidth, math.Min(bounds.goalHalfWidth, y))
+	xInset := math.Sqrt(math.Max(0, bounds.arcRadius*bounds.arcRadius-y*y))
+
+	return info.Position{
+		X: bounds.goalLineX - bounds.goalSign*xInset,
+		Y: y,
+	}
 }
 
 func goalieShouldUseRRT(gi *info.GameInfo) bool {
