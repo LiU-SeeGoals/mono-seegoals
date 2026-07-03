@@ -34,6 +34,8 @@ const (
 	kickoffKickTargetDistanceMM    = 1000.0
 	kickoffPrepareDistanceMM       = 500.0
 	freeKickPrepareDistanceMM      = 550.0
+	penaltyPrepareDistanceMM       = 700.0
+	penaltyBehindBallDistanceMM    = 1200.0
 )
 
 const (
@@ -92,10 +94,15 @@ type PrepareKickoff struct {
 
 type PreparePenalty struct {
 	RefereeInfo
+	kickerID  info.ID
+	hasKicker bool
 }
 
 type Penalty struct {
 	RefereeInfo
+	penaltyKick     *StateMachine
+	kickerID        info.ID
+	ballInPlay      bool
 	penaltyStart    time.Time
 	originalBallPos info.Position
 }
@@ -152,16 +159,83 @@ func (s *Stop) Update() EventName {
 	return "NONE"
 }
 
-func (s *PreparePenalty) Initialize() {}
+func (s *PreparePenalty) Initialize() {
+	s.kickerID = 0
+	s.hasKicker = false
+	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
+		s.kickerID, s.hasKicker = selectPenaltyKicker(s.gi, s.team, s.activeRobots)
+	}
+}
 
 func (s *PreparePenalty) Update() EventName {
-	moveRobotsToPenaltyPositions(s.gi, s.activeRobots, s.team, s.activityHandler)
+	if s.gi.Status.GetGameEvent().TeamWithPossession != s.team {
+		s.kickerID = 0
+		s.hasKicker = false
+	} else if !s.hasKicker || !robotIDInList(s.activeRobots, s.kickerID) {
+		s.kickerID, s.hasKicker = selectPenaltyKicker(s.gi, s.team, s.activeRobots)
+	}
+
+	penaltyMark := kickoffBallPosition(s.gi)
+	positionPenaltyNonParticipants(
+		s.gi,
+		s.activeRobots,
+		s.team,
+		s.activityHandler,
+		s.kickerID,
+		s.hasKicker,
+		penaltyMark,
+		false,
+	)
+	if s.hasKicker {
+		move := act.NewMoveToPosition(s.team, s.kickerID, penaltyKickerPreparePosition(s.gi, s.team))
+		move.AllowOutsideField(true)
+		s.activityHandler.AddActivity(move)
+	}
 	return "NONE"
 }
 
 func (s *Penalty) Initialize() {
+	s.penaltyKick = nil
+	s.kickerID = 0
+	s.ballInPlay = false
 	s.penaltyStart = time.Now()
 	s.originalBallPos = kickoffBallPosition(s.gi)
+
+	if s.gi.Status.GetGameEvent().TeamWithPossession != s.team {
+		return
+	}
+	s.initializeKick()
+}
+
+func (s *Penalty) initializeKick() {
+	s.penaltyKick = nil
+	s.kickerID = 0
+	kickerID, ok := selectPenaltyKicker(s.gi, s.team, s.activeRobots)
+	if !ok {
+		return
+	}
+	s.kickerID = kickerID
+
+	kickPrepareName := StateName(fmt.Sprintf("PenaltyKickPrepare ID %d", kickerID))
+	kickName := StateName(fmt.Sprintf("PenaltyKick ID %d", kickerID))
+	intent := &PenaltyIntent{
+		gi:     s.gi,
+		target: penaltyKickTargetPosition(s.gi, s.team),
+	}
+	prepareKick := &roles.AlignState{
+		Ctx: intent, Gi: s.gi, Team: s.team, RobotId: kickerID,
+		Name: kickPrepareName, ActivityHandler: s.activityHandler,
+	}
+	kick := &roles.KickState{
+		Ctx: intent, Gi: s.gi, Team: s.team, RobotId: kickerID,
+		Name: kickName, ActivityHandler: s.activityHandler,
+	}
+
+	// AlignBall can orbit around the ball when the attacker starts on the wrong
+	// side. KickBall assumes that alignment has already happened and otherwise
+	// drives directly at a point behind the ball, where it can stall.
+	s.penaltyKick = NewStateMachine(prepareKick)
+	s.penaltyKick.AddTransition(kickPrepareName, "ALIGNED", kick)
 }
 
 func (s *Penalty) Update() EventName {
@@ -169,14 +243,53 @@ func (s *Penalty) Update() EventName {
 	pos, ok := trackedBall.GetTrackedPosition()
 	ballMoved := ok && restartBallMovedIntoPlay(s.originalBallPos, pos)
 	gameEvent := s.gi.Status.GetGameEvent()
-	if gameEvent.BallInPlay || ballMoved ||
-		restartActionTimedOut(gameEvent, s.penaltyStart, PenaltyMaxTime(s.gi.Status.GetDivision())) {
-		gameEvent.SetBallMoved()
-		return GAME_RUNNING_DETECTED
+	if restartActionTimedOut(gameEvent, s.penaltyStart, PenaltyMaxTime(s.gi.Status.GetDivision())) {
+		stopPenaltyRobots(s.activeRobots, s.activityHandler)
+		return "NONE"
 	}
 
-	moveRobotsToPenaltyPositions(s.gi, s.activeRobots, s.team, s.activityHandler)
+	if !s.ballInPlay && (gameEvent.BallInPlay || ballMoved) {
+		s.ballInPlay = true
+		gameEvent.SetBallMoved()
+	}
+
+	if !s.ballInPlay && gameEvent.TeamWithPossession == s.team &&
+		(s.penaltyKick == nil || !robotIDInList(s.activeRobots, s.kickerID)) {
+		s.initializeKick()
+	}
+
+	hasKicker := gameEvent.TeamWithPossession == s.team &&
+		s.penaltyKick != nil && robotIDInList(s.activeRobots, s.kickerID)
+	positionPenaltyNonParticipants(
+		s.gi,
+		s.activeRobots,
+		s.team,
+		s.activityHandler,
+		s.kickerID,
+		hasKicker,
+		s.originalBallPos,
+		s.ballInPlay,
+	)
+	if hasKicker {
+		s.penaltyKick.Update()
+	}
 	return "NONE"
+}
+
+// PenaltyIntent keeps the selected shot target stable while the robot aligns.
+// Re-evaluating the keeper on every frame can otherwise make the shooter
+// oscillate between both corners of the goal.
+type PenaltyIntent struct {
+	gi     *info.GameInfo
+	target info.Position
+}
+
+func (s *PenaltyIntent) GetTargetPosition() info.Position {
+	return s.target
+}
+
+func (s *PenaltyIntent) GetFromPosition() info.Position {
+	return kickoffBallPosition(s.gi)
 }
 
 type KickOffIntent struct {
@@ -504,21 +617,70 @@ func moveRobotsToDefensePosition(
 	}
 }
 
-func moveRobotsToPenaltyPositions(
+func positionPenaltyNonParticipants(
 	gi *info.GameInfo,
 	activeRobots []info.ID,
 	team info.Team,
 	activityHandler *ai.ActivityHandler,
+	exemptID info.ID,
+	hasExempt bool,
+	penaltyMark info.Position,
+	goalieFree bool,
 ) {
-	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
-	if hasGoalie {
-		move := act.NewMoveToPosition(team, goalieID, penaltyGoalieHomePosition(gi, team))
-		move.AvoidGoallines(false)
-		activityHandler.AddActivity(move)
+	attackingTeam := gi.Status.GetGameEvent().TeamWithPossession
+	waitingRobots := append([]info.ID(nil), activeRobots...)
+	if team != attackingTeam {
+		goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
+		if hasGoalie {
+			if goalieFree {
+				activityHandler.AddActivity(act.NewGoalie(team, goalieID))
+			} else {
+				movePenaltyGoalieToGoalLine(gi, team, goalieID, activityHandler)
+			}
+			waitingRobots = sortedRobotIDsExcluding(waitingRobots, goalieID)
+		}
 	}
 
-	for _, robotID := range fieldRobots(activeRobots, goalieID, hasGoalie) {
-		activityHandler.AddActivity(act.NewRefStop(team, robotID))
+	if hasExempt {
+		waitingRobots = sortedRobotIDsExcluding(waitingRobots, exemptID)
+	}
+	movePenaltyWaitingRobots(gi, waitingRobots, team, attackingTeam, penaltyMark, activityHandler)
+}
+
+func stopPenaltyRobots(
+	activeRobots []info.ID,
+	activityHandler *ai.ActivityHandler,
+) {
+	for _, robotID := range activeRobots {
+		activityHandler.AddActivity(act.NewStop(robotID))
+	}
+}
+
+func movePenaltyGoalieToGoalLine(
+	gi *info.GameInfo,
+	team info.Team,
+	goalieID info.ID,
+	activityHandler *ai.ActivityHandler,
+) {
+	move := act.NewMoveToPosition(team, goalieID, penaltyGoalieHomePosition(gi, team))
+	move.AvoidGoallines(false)
+	activityHandler.AddActivity(move)
+}
+
+func movePenaltyWaitingRobots(
+	gi *info.GameInfo,
+	robotIDs []info.ID,
+	team info.Team,
+	attackingTeam info.Team,
+	penaltyMark info.Position,
+	activityHandler *ai.ActivityHandler,
+) {
+	slots := penaltyWaitingSlots(gi, team, attackingTeam, penaltyMark, len(robotIDs))
+	for i, robotID := range robotIDs {
+		move := act.NewMoveToPosition(team, robotID, slots[i])
+		move.AllowOutsideField(true)
+		move.AllowBehindGoalLine(true)
+		activityHandler.AddActivity(move)
 	}
 }
 
@@ -537,6 +699,130 @@ func penaltyGoalieHomePosition(gi *info.GameInfo, team info.Team) info.Position 
 	pos := info.Position{X: ownHalfXSign(gi, team) * (halfLength - goalieCenterInsetMM)}
 	pos.Angle = pos.AngleToPosition(kickoffBallPosition(gi))
 	return pos
+}
+
+func penaltyKickerPreparePosition(gi *info.GameInfo, team info.Team) info.Position {
+	ballPos := kickoffBallPosition(gi)
+	targetPos := penaltyKickTargetPosition(gi, team)
+	direction := targetPos.Sub(&ballPos)
+	direction.Z = 0
+	direction.Angle = 0
+	if direction.Norm2d() < 1 {
+		direction.X = -ownHalfXSign(gi, team)
+	}
+	direction.Div2d(direction.Norm2d())
+
+	preparePos := ballPos
+	preparePos.X -= direction.X * penaltyPrepareDistanceMM
+	preparePos.Y -= direction.Y * penaltyPrepareDistanceMM
+	preparePos.Z = 0
+	preparePos.Angle = preparePos.AngleToPosition(targetPos)
+	return preparePos
+}
+
+func penaltyWaitingSlots(
+	gi *info.GameInfo,
+	team info.Team,
+	attackingTeam info.Team,
+	penaltyMark info.Position,
+	count int,
+) []info.Position {
+	if count <= 0 {
+		return nil
+	}
+
+	const (
+		defaultHalfWidth = 3000.0
+		fieldMargin      = 300.0
+		minimumLaneY     = 1500.0
+	)
+	halfWidth := defaultHalfWidth
+	if gi != nil {
+		if geometry, ok := gi.FieldGeometry(); ok {
+			halfWidth = geometry.Width / 2
+		}
+	}
+
+	// SSL defines forward movement for a penalty by the field X coordinate.
+	// Keep the waiting line behind the mark on that same axis, independent of
+	// which point inside the goal the attacker aims at.
+	direction := info.Position{X: -ownHalfXSign(gi, attackingTeam)}
+	base := info.Position{
+		X: penaltyMark.X - direction.X*penaltyBehindBallDistanceMM,
+		Y: penaltyMark.Y - direction.Y*penaltyBehindBallDistanceMM,
+	}
+	maxLaneY := math.Max(0, halfWidth-fieldMargin-math.Abs(penaltyMark.Y))
+	minLaneY := math.Min(minimumLaneY, maxLaneY)
+	laneStep := 0.0
+	if count > 1 {
+		laneStep = (maxLaneY - minLaneY) / float64(count-1)
+	}
+	laneSign := 1.0
+	if team != attackingTeam {
+		laneSign = -1
+	}
+	slots := make([]info.Position, count)
+	for i := range slots {
+		laneOffset := laneSign * (minLaneY + laneStep*float64(i))
+		pos := info.Position{
+			X: base.X,
+			Y: clampFloat(base.Y+laneOffset, -halfWidth+fieldMargin, halfWidth-fieldMargin),
+		}
+		pos.Angle = pos.AngleToPosition(penaltyMark)
+		slots[i] = pos
+	}
+	return slots
+}
+
+func selectPenaltyKicker(gi *info.GameInfo, team info.Team, activeRobots []info.ID) (info.ID, bool) {
+	return selectFreeKickKicker(gi, team, activeRobots, kickoffBallPosition(gi))
+}
+
+func penaltyKickTargetPosition(gi *info.GameInfo, team info.Team) info.Position {
+	ballPos := kickoffBallPosition(gi)
+	if gi == nil || !gi.HasField() {
+		ballPos.X += -ownHalfXSign(gi, team) * kickoffKickTargetDistanceMM
+		return ballPos
+	}
+
+	target := gi.EnemyGoalCenter(team)
+	goalLine := gi.EnemyGoalLine(team)
+	if len(goalLine) < 2 || gi.State == nil {
+		return target
+	}
+
+	// Aim away from the opponent closest to the goal. This is the small,
+	// deterministic equivalent of Sumatra's open-goal target rating.
+	closestDistance := math.Inf(1)
+	closestY := 0.0
+	foundKeeper := false
+	for _, robot := range gi.State.GetOtherTeam(team) {
+		if robot == nil || !robot.IsActive() {
+			continue
+		}
+		pos, err := robot.GetPosition()
+		if err != nil {
+			continue
+		}
+		distance := pos.Dist2d(target)
+		if distance < closestDistance {
+			closestDistance = distance
+			closestY = pos.Y
+			foundKeeper = true
+		}
+	}
+	if !foundKeeper {
+		return target
+	}
+
+	goalWidth := goalLine[0].Dist2d(goalLine[1])
+	offset := goalWidth * 0.30
+	if closestY >= target.Y {
+		target.Y -= offset
+	} else {
+		target.Y += offset
+	}
+	return target
 }
 
 func freeKickDefenseSlots(gi *info.GameInfo, team info.Team, count int) []info.Position {
@@ -1119,7 +1405,6 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	refereeSM.AddTransition("PREPAREPENALTY", NORMAL_START, penalty)
 	refereeSM.AddTransition("PREPAREPENALTY", STOP, stop)
 
-	refereeSM.AddTransition("PENALTY", GAME_RUNNING_DETECTED, running)
 	refereeSM.AddTransition("PENALTY", STOP, stop)
 
 	refereeSM.AddTransition("KICKOFF", GAME_RUNNING_DETECTED, running)

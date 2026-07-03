@@ -18,7 +18,10 @@ const (
 	ballPlacementCornerMarginMM    = 200.0
 	// Goal kicks are free kicks placed 1 m from the goal line.
 	ballPlacementGoalKickDepthMM = 1000.0
-	mmToM                        = 1.0 / 1000.0
+	// SSL penalty marks are measured from the center of the goal being attacked.
+	penaltyMarkGoalDistanceDivisionAMM = 8000.0
+	penaltyMarkGoalDistanceDivisionBMM = 6000.0
+	mmToM                              = 1.0 / 1000.0
 )
 
 func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
@@ -42,7 +45,13 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 		}
 	case info.STATE_FREE_KICK:
 	case info.STATE_HALTED, info.STATE_STOPPED:
-	case info.STATE_PENALTY_PREPARATION, info.STATE_TIMEOUT:
+	case info.STATE_PENALTY_PREPARATION:
+		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
+			if mark, ok := penaltyMarkPosition(gameInfo, ge.GetTeamWithPossession()); ok {
+				teleportBallMillimeters(simController, mark)
+			}
+		}
+	case info.STATE_TIMEOUT:
 	case info.STATE_PLAYING:
 	case info.STATE_BALL_PLACEMENT:
 		if previousState != info.STATE_BALL_PLACEMENT {
@@ -53,6 +62,28 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 		}
 	default:
 	}
+}
+
+func penaltyMarkPosition(gameInfo *info.GameInfo, attackingTeam info.Team) (info.Position, bool) {
+	if gameInfo == nil || !gameInfo.HasField() {
+		return info.Position{}, false
+	}
+
+	field := gameInfo.FieldSize()
+	if field.X <= 0 {
+		return info.Position{}, false
+	}
+
+	ownGoalSign := gameInfo.OwnHalfXSign(attackingTeam)
+	opponentGoalX := -ownGoalSign * field.X / 2
+	goalDistance := penaltyMarkGoalDistanceDivisionBMM
+	if gameInfo.Status.GetDivision() == info.DivisionA {
+		goalDistance = penaltyMarkGoalDistanceDivisionAMM
+	}
+	return info.Position{
+		X: opponentGoalX + ownGoalSign*goalDistance,
+		Y: 0,
+	}, true
 }
 
 func teleportBallMillimeters(simController *simulator.SimControl, pos info.Position) {
