@@ -16,6 +16,14 @@ import (
 const (
 	BALL_IN_PLAY_DISTANCE_MM = 50.0
 
+	// Restart kicks hand control to the normal planner as soon as the ball has
+	// moved BALL_IN_PLAY_DISTANCE_MM. Keep the kicker on its kick heading long
+	// enough for the ball and the robot's kicker/dribbler to separate before a
+	// normal-play role may request a completely different orientation.
+	restartPostKickMinHeadingHold  = 300 * time.Millisecond
+	restartPostKickMaxHeadingHold  = 600 * time.Millisecond
+	restartPostKickBallClearanceMM = 300.0
+
 	KICKOFF_MAX_TIME_DIVISION_A  = 10 * time.Second
 	KICKOFF_MAX_TIME_DIVISION_B  = 10 * time.Second
 	FREEKICK_MAX_TIME_DIVISION_A = 5 * time.Second
@@ -81,11 +89,14 @@ type Halt struct {
 
 type FreeKick struct {
 	RefereeInfo
-	freeKick        *StateMachine
-	kickerID        info.ID
-	freeKickStart   time.Time
-	originalBallPos info.Position
-	kickTaken       bool
+	freeKick          *StateMachine
+	kickerID          info.ID
+	freeKickStart     time.Time
+	originalBallPos   info.Position
+	kickTaken         bool
+	postKickStart     time.Time
+	postKickHeading   float64
+	postKickHeadingOK bool
 }
 
 type Stop struct {
@@ -106,21 +117,26 @@ type PreparePenalty struct {
 
 type Penalty struct {
 	RefereeInfo
-	penaltyKick     *StateMachine
-	kickerID        info.ID
-	ballInPlay      bool
-	penaltyStart    time.Time
-	originalBallPos info.Position
+	penaltyKick       *StateMachine
+	kickerID          info.ID
+	ballInPlay        bool
+	penaltyStart      time.Time
+	originalBallPos   info.Position
+	postKickHeading   float64
+	postKickHeadingOK bool
 }
 
 type Kickoff struct {
 	RefereeInfo
-	kickOff         *StateMachine
-	kickOffID       info.ID
-	receiverID      info.ID
-	originalBallPos info.Position
-	kickStart       time.Time
-	kickTaken       bool
+	kickOff           *StateMachine
+	kickOffID         info.ID
+	receiverID        info.ID
+	originalBallPos   info.Position
+	kickStart         time.Time
+	kickTaken         bool
+	postKickStart     time.Time
+	postKickHeading   float64
+	postKickHeadingOK bool
 }
 
 type Running struct {
@@ -204,6 +220,8 @@ func (s *Penalty) Initialize() {
 	s.penaltyKick = nil
 	s.kickerID = 0
 	s.ballInPlay = false
+	s.postKickHeading = 0
+	s.postKickHeadingOK = false
 	s.penaltyStart = time.Now()
 	s.originalBallPos = kickoffBallPosition(s.gi)
 
@@ -256,6 +274,7 @@ func (s *Penalty) Update() EventName {
 
 	if !s.ballInPlay && (gameEvent.BallInPlay || ballMoved) {
 		s.ballInPlay = true
+		s.postKickHeading, s.postKickHeadingOK = restartKickerHeading(s.gi, s.team, s.kickerID)
 		gameEvent.SetBallMoved()
 	}
 
@@ -276,7 +295,16 @@ func (s *Penalty) Update() EventName {
 		s.originalBallPos,
 		s.ballInPlay,
 	)
-	if hasKicker {
+	if hasKicker && s.ballInPlay {
+		holdRestartKickerHeading(
+			s.gi,
+			s.team,
+			s.kickerID,
+			s.postKickHeading,
+			s.postKickHeadingOK,
+			s.activityHandler,
+		)
+	} else if hasKicker {
 		s.penaltyKick.Update()
 	}
 	return "NONE"
@@ -334,6 +362,9 @@ func (s *FreeKick) Initialize() {
 	s.freeKickStart = time.Now()
 	s.freeKick = nil
 	s.kickTaken = false
+	s.postKickStart = time.Time{}
+	s.postKickHeading = 0
+	s.postKickHeadingOK = false
 
 	ballPos := kickoffBallPosition(s.gi)
 	kickerID, ok := selectFreeKickKicker(s.gi, s.team, s.activeRobots, ballPos)
@@ -361,10 +392,32 @@ func (s *FreeKick) Update() EventName {
 	trackedBall := s.gi.State.GetTrackedBall()
 	pos, ok := trackedBall.GetTrackedPosition()
 	ballMoved := ok && restartBallMovedIntoPlay(s.originalBallPos, pos)
+	if !ok {
+		pos = s.originalBallPos
+	}
 
-	if ballMoved ||
-		restartActionTimedOut(s.gi.Status.GetGameEvent(), s.freeKickStart, FreeKickMaxTime(s.gi.Status.GetDivision())) {
-		s.kickTaken = ballMoved
+	if !s.kickTaken && ballMoved {
+		s.kickTaken = true
+		s.postKickStart = time.Now()
+		s.postKickHeading, s.postKickHeadingOK = restartKickerHeading(s.gi, s.team, s.kickerID)
+		s.gi.Status.GetGameEvent().SetBallMoved()
+	}
+	if s.kickTaken {
+		if restartPostKickHoldComplete(s.postKickStart, s.originalBallPos, pos, time.Now()) {
+			return GAME_RUNNING_DETECTED
+		}
+		holdRestartKickerHeading(
+			s.gi,
+			s.team,
+			s.kickerID,
+			s.postKickHeading,
+			s.postKickHeadingOK,
+			s.activityHandler,
+		)
+		return "NONE"
+	}
+
+	if restartActionTimedOut(s.gi.Status.GetGameEvent(), s.freeKickStart, FreeKickMaxTime(s.gi.Status.GetDivision())) {
 		s.gi.Status.GetGameEvent().SetBallMoved()
 		return GAME_RUNNING_DETECTED
 	}
@@ -420,6 +473,9 @@ func (s *PrepareKickoff) Update() EventName {
 
 func (s *Kickoff) Initialize() {
 	s.kickTaken = false
+	s.postKickStart = time.Time{}
+	s.postKickHeading = 0
+	s.postKickHeadingOK = false
 
 	goalieID, hasGoalie := selectGoalieID(s.gi, s.team, s.activeRobots)
 	kickOffID, receiverID := selectKickoffRobots(fieldRobots(s.activeRobots, goalieID, hasGoalie))
@@ -453,10 +509,32 @@ func (s *Kickoff) Update() EventName {
 	trackedBall := s.gi.State.GetTrackedBall()
 	pos, ok := trackedBall.GetTrackedPosition()
 	ballMoved := ok && restartBallMovedIntoPlay(s.originalBallPos, pos)
+	if !ok {
+		pos = s.originalBallPos
+	}
 
-	if ballMoved ||
-		restartActionTimedOut(s.gi.Status.GetGameEvent(), s.kickStart, KickoffMaxTime(s.gi.Status.GetDivision())) {
-		s.kickTaken = ballMoved
+	if !s.kickTaken && ballMoved {
+		s.kickTaken = true
+		s.postKickStart = time.Now()
+		s.postKickHeading, s.postKickHeadingOK = restartKickerHeading(s.gi, s.team, s.kickOffID)
+		s.gi.Status.GetGameEvent().SetBallMoved()
+	}
+	if s.kickTaken {
+		if restartPostKickHoldComplete(s.postKickStart, s.originalBallPos, pos, time.Now()) {
+			return GAME_RUNNING_DETECTED
+		}
+		holdRestartKickerHeading(
+			s.gi,
+			s.team,
+			s.kickOffID,
+			s.postKickHeading,
+			s.postKickHeadingOK,
+			s.activityHandler,
+		)
+		return "NONE"
+	}
+
+	if restartActionTimedOut(s.gi.Status.GetGameEvent(), s.kickStart, KickoffMaxTime(s.gi.Status.GetDivision())) {
 		s.gi.Status.GetGameEvent().SetBallMoved()
 		return GAME_RUNNING_DETECTED
 	}
@@ -555,6 +633,71 @@ func PenaltyMaxTime(division info.Division) time.Duration {
 func restartBallMovedIntoPlay(originalBallPos, currentBallPos info.Position) bool {
 	diff := currentBallPos.Sub(&originalBallPos)
 	return diff.Norm2d() >= BALL_IN_PLAY_DISTANCE_MM
+}
+
+func restartPostKickHoldComplete(
+	started time.Time,
+	originalBallPos info.Position,
+	currentBallPos info.Position,
+	now time.Time,
+) bool {
+	if started.IsZero() {
+		return false
+	}
+
+	elapsed := now.Sub(started)
+	if elapsed >= restartPostKickMaxHeadingHold {
+		return true
+	}
+	if elapsed < restartPostKickMinHeadingHold {
+		return false
+	}
+	return originalBallPos.Dist2d(currentBallPos) >= restartPostKickBallClearanceMM
+}
+
+func restartKickerHeading(gi *info.GameInfo, team info.Team, id info.ID) (float64, bool) {
+	if gi == nil || gi.State == nil || id >= info.TEAM_SIZE {
+		return 0, false
+	}
+	robot := gi.State.GetTeam(team)[id]
+	if robot == nil {
+		return 0, false
+	}
+	pos, err := robot.GetPosition()
+	if err != nil {
+		return 0, false
+	}
+	return pos.Angle, true
+}
+
+func holdRestartKickerHeading(
+	gi *info.GameInfo,
+	team info.Team,
+	id info.ID,
+	heading float64,
+	headingOK bool,
+	activityHandler *ai.ActivityHandler,
+) {
+	if !headingOK || gi == nil || gi.State == nil || activityHandler == nil || id >= info.TEAM_SIZE {
+		return
+	}
+	robot := gi.State.GetTeam(team)[id]
+	if robot == nil {
+		return
+	}
+	pos, err := robot.GetPosition()
+	if err != nil {
+		return
+	}
+
+	// Hold translation at the measured position while retaining the heading at
+	// which the restart was taken. Disabling RRT prevents a zero-distance hold
+	// from acquiring a path waypoint with an unrelated orientation.
+	pos.Angle = heading
+	move := act.NewMoveToPosition(team, id, pos)
+	move.SetUseRRT(false)
+	move.AvoidBall(false)
+	activityHandler.AddActivity(move)
 }
 
 func restartActionTimedOut(gameEvent *info.GameEvent, fallbackStart time.Time, fallbackTimeout time.Duration) bool {
