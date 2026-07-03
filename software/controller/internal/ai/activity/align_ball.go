@@ -187,8 +187,15 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 		}
 	} else {
 		if !m.readyToFaceKick(myPos, robotTargetPos, gi) {
-			// Drive to the behind-ball staging/final point before rotating toward the pass angle.
-			act.Dest.Angle = myPos.AngleToPosition(act.Dest)
+			// The robot is omnidirectional, so its travel waypoint must not also
+			// dictate its heading. Turn toward the eventual kick direction along
+			// the shortest path, with a bounded per-frame target step. This avoids
+			// the large spin that occurred when an RRT waypoint sat behind the bot.
+			act.Dest.Angle = limitedOrientationStep(
+				myPos.Angle,
+				robotTargetPos.Angle,
+				maxTargetOrientationStep,
+			)
 		} else {
 			// Ball is slow and we are in the approach corridor, align to kick direction.
 			act.Dest.Angle = robotTargetPos.Angle
@@ -354,7 +361,7 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 		myRobot := gi.State.GetTeam(m.team)[m.id]
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
 			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr)) &&
-			 m.contactPointCentered(myRobot, ballPos)
+			m.contactPointCentered(myRobot, ballPos)
 	}
 
 	xx := (myRobotPos.X - robotTargetPos.X) * (myRobotPos.X - robotTargetPos.X)

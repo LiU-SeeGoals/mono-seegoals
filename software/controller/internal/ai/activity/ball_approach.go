@@ -180,6 +180,10 @@ func aroundBallLinearSpeed(botPos, dest info.Position) float64 {
 
 func steppedOrientation(botPos, ballPos info.Position, finalOrientation float64) float64 {
 	currentDirection := botPos.AngleToPosition(ballPos)
-	diff := info.NormalizeAngleDelta(finalOrientation, currentDirection)
-	return currentDirection + math.Copysign(math.Min(maxTargetOrientationStep, math.Abs(diff)), diff)
+	return limitedOrientationStep(currentDirection, finalOrientation, maxTargetOrientationStep)
+}
+
+func limitedOrientationStep(currentOrientation, finalOrientation, maxStep float64) float64 {
+	diff := info.NormalizeAngleDelta(finalOrientation, currentOrientation)
+	return currentOrientation + math.Copysign(math.Min(maxStep, math.Abs(diff)), diff)
 }
