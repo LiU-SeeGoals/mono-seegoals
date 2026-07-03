@@ -37,6 +37,21 @@ func TestCaptureApproachReadyRejectsLargeHeadingError(t *testing.T) {
 	}
 }
 
+func TestAlignAchievedAcceptsReachableOffCenterBall(t *testing.T) {
+	gi := info.NewGameInfo(2)
+	ball := info.Position{}
+	robot := info.Position{X: -120, Y: 30, Angle: 0}
+	gi.State.SetBlueRobot(3, robot.X, robot.Y, robot.Angle, 1)
+	gi.State.SetBall(ball.X, ball.Y, ball.Z, 1)
+	gi.State.GetBall().SetEstimatedPosition(ball)
+	gi.State.SetTrackedBall(ball, info.Position{}, 1)
+
+	align := NewAlign(info.Blue, 3, info.Position{X: 1000}, ball)
+	if !align.Achieved(gi) {
+		t.Fatal("expected reachable off-center ball to transition to KickBall")
+	}
+}
+
 func TestCaptureOrbitMarginStaysWideUntilApproachReady(t *testing.T) {
 	if got := captureOrbitMargin(0, false, false); got != captureMarginToBall {
 		t.Fatalf("expected capture margin while approach is not ready, got %.1f", got)

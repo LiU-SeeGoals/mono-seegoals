@@ -358,10 +358,8 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	if m.nearLyingBall(myRobotPos, gi) {
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
-		myRobot := gi.State.GetTeam(m.team)[m.id]
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
-			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr)) &&
-			m.contactPointCentered(myRobot, ballPos)
+			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr))
 	}
 
 	xx := (myRobotPos.X - robotTargetPos.X) * (myRobotPos.X - robotTargetPos.X)
