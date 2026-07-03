@@ -8,15 +8,19 @@
 /* Private defines */
 // ...
 
-#define KICK_STRAIGHT_PASS_US 250000
-#define KICK_STRAIGHT_GOAL_US 450000
+#define KICK_STRAIGHT_PASS_US 650000
+#define KICK_STRAIGHT_GOAL_US 650000
 #define KICK_CHIP_PASS_US 650000
+
+#define DISCHARGE_STRAIGHT_PASS_US 65
+#define DISCHARGE_STRAIGHT_GOAL_US 65
+#define DISCHARGE_CHIP_PASS_US 90
 
 /* Private variables */
 // Kicker tuning Chip discharge: 650000. Kicker tuning straight discharge: 650000
 // Kicker tuning straight goal kick: 350000. kicker straight pass: 250000
 static LOG_Module internal_log_mod;
-static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=15, .charge_wait_us = 350000, .discharge_wait_us = 300, .charges_since_last_kick = 0};
+static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=25, .charge_wait_us = 350000, .discharge_wait_us = 10, .charges_since_last_kick = 0};
 static volatile bool charging = false;
 static volatile bool kicking = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
@@ -28,6 +32,8 @@ static volatile KickerMode kickerMode;
  */
 
 int get_charge_us(KickerSpeed kickSpeed);
+
+int get_discharge_us(KickerSpeed kickSpeed);
 
 /*
  * Public functions implementations
@@ -84,10 +90,10 @@ void KICKER_ChargeStop()
     charging = false;
 }
 
-void KICKER_KickStart()
+void KICKER_KickStart(KickerSpeed kickSpeed)
 {
-    if (kicking) {
-        LOG_DEBUG("Already kicking\r\n");
+    if (kicking || charging) {
+        LOG_DEBUG("Already kicking or charging\r\n");
         return;
     }
     kicking = true;
@@ -104,7 +110,8 @@ void KICKER_KickStart()
         HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_RESET);
     }
 
-    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us);
+    int discharge = get_discharge_us(kickSpeed);
+    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, discharge);
     __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
     htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
     __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
@@ -121,6 +128,7 @@ void KICKER_KickStop()
     LOG_DEBUG("Kicking stop\r\n");
     HAL_TIM_Base_Stop_IT(htim_kicker_kick);
     kicking = false;
+    KICKER_ChargeStart(KICKER_SPEED_CHIP_PASS);
 }
 
 void KICKER_SetKickerMode(KickerMode mode)
@@ -148,11 +156,11 @@ int get_charge_us(KickerSpeed kickSpeed)
 
     if (kickSpeed == KICKER_SPEED_STRAIGHT_GOAL)
     {
-        charge_us = KICK_STRAIGHT_PASS_US;
+        charge_us = KICK_STRAIGHT_GOAL_US;
     }
     else if (kickSpeed == KICKER_SPEED_STRAIGHT_PASS)
     {
-        charge_us = KICK_STRAIGHT_GOAL_US;
+        charge_us = KICK_STRAIGHT_PASS_US;
     }
     else if (kickSpeed == KICKER_SPEED_CHIP_PASS)
     {
@@ -162,3 +170,22 @@ int get_charge_us(KickerSpeed kickSpeed)
     return charge_us;
 }
 
+int get_discharge_us(KickerSpeed kickSpeed)
+{
+    int discharge_us = settings.discharge_wait_us;
+
+    if (kickSpeed == KICKER_SPEED_STRAIGHT_GOAL)
+    {
+        discharge_us = DISCHARGE_STRAIGHT_GOAL_US;
+    }
+    else if (kickSpeed == KICKER_SPEED_STRAIGHT_PASS)
+    {
+        discharge_us = DISCHARGE_STRAIGHT_PASS_US;
+    }
+    else if (kickSpeed == KICKER_SPEED_CHIP_PASS)
+    {
+        discharge_us = DISCHARGE_CHIP_PASS_US;
+    }
+
+    return discharge_us;
+}

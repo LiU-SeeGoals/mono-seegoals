@@ -305,7 +305,6 @@ void NAV_HandleCommand(Command* cmd)
     case ACTION_TYPE__ROTATE_ACTION:
         break;
     case ACTION_TYPE__KICK_ACTION:
-
         // First bit is set -> hard/soft kick
         // if second bit -> chip/straight kick mode
         if(check_bit(cmd->kick_speed, 0u))
@@ -328,7 +327,7 @@ void NAV_HandleCommand(Command* cmd)
             KICKER_SetKickerMode(KICKER_STRAIGHT);
         }
 
-        KICKER_ChargeStart(kickerSpeed);
+        KICKER_KickStart(kickerSpeed);
         NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
         break;
     default:

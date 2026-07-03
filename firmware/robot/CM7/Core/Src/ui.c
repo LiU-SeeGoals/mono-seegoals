@@ -332,17 +332,17 @@ void parse_key()
         switch (key) {
         case 'D':
             LOG_UI("Discharging\r\n");
-            KICKER_KickStart();
+            KICKER_KickSafe();
             break;
         case 'S':
             LOG_UI("Straight kicking\r\n");
             KICKER_SetKickerMode(KICKER_STRAIGHT);
-            KICKER_ChargeStart(KICKER_SPEED_DEFAULT);
+            KICKER_KickStart(KICKER_SPEED_STRAIGHT_GOAL);
             break;
         case 'C':
             LOG_UI("Chipper kicking\r\n");
             KICKER_SetKickerMode(KICKER_CHIPPER);
-            KICKER_ChargeStart(KICKER_SPEED_CHIP_PASS);
+            KICKER_KickStart(KICKER_SPEED_CHIP_PASS);
             break;
         case 'P': // Print vars
         {

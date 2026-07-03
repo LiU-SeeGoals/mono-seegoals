@@ -44,7 +44,7 @@ void KICKER_ChargeStop();
 /**
  *
  */
-void KICKER_KickStart();
+void KICKER_KickStart(KickerSpeed kickSpeed);
 
 /**
  *

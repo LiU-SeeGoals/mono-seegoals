@@ -136,7 +136,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     /* USER CODE END Callback 0 */
     if (htim->Instance == TIM5) {
         KICKER_ChargeStop();
-        KICKER_KickStart();
     }
 
     if (htim->Instance == TIM3) {
@@ -241,7 +240,7 @@ int main(void)
     UI_Init(&huart3);
     ITR_Init();
     LOG_INFO("Discharging kicker\r\n");
-    const int DISCHARGE_AMNT = 10;
+    const int DISCHARGE_AMNT = 80;
     COMMON_buzzer_warning_with_delay();
 
     for (int i = 0; i < DISCHARGE_AMNT; i++)
@@ -252,7 +251,7 @@ int main(void)
         }
 
         KICKER_KickSafe();
-        HAL_Delay(40);
+        HAL_Delay(12);
     }
 
     STATE_calibrate_imu_gyr();
