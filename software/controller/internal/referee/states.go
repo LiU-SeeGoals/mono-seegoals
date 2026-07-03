@@ -34,6 +34,12 @@ const (
 	kickoffKickTargetDistanceMM    = 1000.0
 	kickoffPrepareDistanceMM       = 500.0
 	freeKickPrepareDistanceMM      = 550.0
+	freeKickWallDistanceMM         = 700.0
+	freeKickWallSpacingMM          = 300.0
+	freeKickWallRobotCount         = 3
+	freeKickFieldClearanceMM       = 200.0
+	freeKickDefenseAreaClearanceMM = 390.0
+	freeKickBallClearanceMM        = 510.0
 	penaltyPrepareDistanceMM       = 700.0
 	penaltyBehindBallDistanceMM    = 1200.0
 )
@@ -611,9 +617,16 @@ func moveRobotsToDefensePosition(
 	}
 
 	defenders := fieldRobots(activeRobots, goalieID, hasGoalie)
-	slots := freeKickDefenseSlots(gi, team, len(defenders))
-	for i, robotID := range defenders {
-		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, slots[i]))
+	ballPos := kickoffBallPosition(gi)
+	wallSlots := freeKickDefenseSlots(gi, team, ballPos, len(defenders))
+	wallRobots, reserveRobots := assignFreeKickWallRobots(gi, team, defenders, wallSlots)
+	for i, robotID := range wallRobots {
+		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, wallSlots[i]))
+	}
+
+	reserveSlots := freeKickReserveSlots(gi, team, ballPos, len(reserveRobots))
+	for i, robotID := range reserveRobots {
+		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, reserveSlots[i]))
 	}
 }
 
@@ -825,19 +838,273 @@ func penaltyKickTargetPosition(gi *info.GameInfo, team info.Team) info.Position 
 	return target
 }
 
-func freeKickDefenseSlots(gi *info.GameInfo, team info.Team, count int) []info.Position {
-	const (
-		defenseDepth = 2000.0
-		spacing      = 300.0
-	)
+func freeKickDefenseSlots(
+	gi *info.GameInfo,
+	team info.Team,
+	ballPos info.Position,
+	availableRobots int,
+) []info.Position {
+	count := min(availableRobots, freeKickWallRobotCount)
+	if count <= 0 {
+		return nil
+	}
+
+	goal := ownGoalCenter(gi, team)
+	directionX := goal.X - ballPos.X
+	directionY := goal.Y - ballPos.Y
+	directionLength := math.Hypot(directionX, directionY)
+	if directionLength == 0 {
+		directionX = ownHalfXSign(gi, team)
+		directionY = 0
+	} else {
+		directionX /= directionLength
+		directionY /= directionLength
+	}
+
+	// Prefer Sumatra's stop-radius + 200 mm free-kick protection distance.
+	// If that would put any wall robot too close to a defense area or field
+	// line, search along the shot line for the nearest legal straight wall.
+	for delta := 0.0; delta <= 1500; delta += 10 {
+		for _, distance := range []float64{freeKickWallDistanceMM - delta, freeKickWallDistanceMM + delta} {
+			if distance < freeKickBallClearanceMM {
+				continue
+			}
+			slots := wallSlotsAtDistance(ballPos, directionX, directionY, distance, count)
+			if freeKickSlotsLegal(gi, ballPos, slots) {
+				return slots
+			}
+		}
+	}
+
+	// This fallback is only expected for invalid/non-regulation ball positions.
+	// Runtime motion safety still applies the restart ball and defense-area
+	// obstacles while the robots travel to these clamped destinations.
+	slots := wallSlotsAtDistance(ballPos, directionX, directionY, freeKickWallDistanceMM, count)
+	for i := range slots {
+		slots[i] = clampFreeKickSlot(gi, slots[i])
+		slots[i].Angle = slots[i].AngleToPosition(ballPos)
+	}
+	return slots
+}
+
+func wallSlotsAtDistance(
+	ballPos info.Position,
+	directionX float64,
+	directionY float64,
+	distance float64,
+	count int,
+) []info.Position {
+	centerX := ballPos.X + directionX*distance
+	centerY := ballPos.Y + directionY*distance
+	// A normal to the ball-to-goal line makes the robots form a wall across
+	// the most direct shot path.
+	normalX := -directionY
+	normalY := directionX
+	// Keep slot ordering stable from low to high field Y on both field halves.
+	if normalY < 0 || (normalY == 0 && normalX < 0) {
+		normalX = -normalX
+		normalY = -normalY
+	}
+	startOffset := -freeKickWallSpacingMM * float64(count-1) / 2
 
 	slots := make([]info.Position, count)
-	startY := -spacing * float64(count-1) / 2
 	for i := range slots {
+		offset := startOffset + freeKickWallSpacingMM*float64(i)
 		slots[i] = info.Position{
-			X: ownHalfXSign(gi, team) * defenseDepth,
-			Y: startY + spacing*float64(i),
+			X: centerX + normalX*offset,
+			Y: centerY + normalY*offset,
 		}
+		slots[i].Angle = slots[i].AngleToPosition(ballPos)
+	}
+	return slots
+}
+
+func ownGoalCenter(gi *info.GameInfo, team info.Team) info.Position {
+	halfLength := 4500.0
+	if gi != nil && gi.HasField() {
+		if field := gi.FieldSize(); field.X > 0 {
+			halfLength = field.X / 2
+		}
+	}
+	return info.Position{X: ownHalfXSign(gi, team) * halfLength}
+}
+
+func freeKickSlotsLegal(gi *info.GameInfo, ballPos info.Position, slots []info.Position) bool {
+	for _, slot := range slots {
+		if slot.Dist2d(ballPos) < freeKickBallClearanceMM || !freeKickSlotLegal(gi, slot) {
+			return false
+		}
+	}
+	return true
+}
+
+func freeKickSlotLegal(gi *info.GameInfo, slot info.Position) bool {
+	if gi == nil || !gi.HasField() {
+		return true
+	}
+	geometry, ok := gi.FieldGeometry()
+	if !ok {
+		return true
+	}
+
+	halfLength := geometry.Length / 2
+	halfWidth := geometry.Width / 2
+	if math.Abs(slot.X) > halfLength-freeKickFieldClearanceMM ||
+		math.Abs(slot.Y) > halfWidth-freeKickFieldClearanceMM {
+		return false
+	}
+
+	return !insideInflatedDefenseArea(slot, geometry, -1) &&
+		!insideInflatedDefenseArea(slot, geometry, 1)
+}
+
+func insideInflatedDefenseArea(slot info.Position, geometry info.FieldGeometry, goalSign float64) bool {
+	halfLength := geometry.Length / 2
+	halfPenaltyWidth := geometry.PenaltyAreaWidth / 2
+	goalLineX := goalSign * halfLength
+	frontX := goalSign * (halfLength - geometry.PenaltyAreaDepth)
+	minX := math.Min(goalLineX, frontX) - freeKickDefenseAreaClearanceMM
+	maxX := math.Max(goalLineX, frontX) + freeKickDefenseAreaClearanceMM
+	minY := -halfPenaltyWidth - freeKickDefenseAreaClearanceMM
+	maxY := halfPenaltyWidth + freeKickDefenseAreaClearanceMM
+	return slot.X >= minX && slot.X <= maxX && slot.Y >= minY && slot.Y <= maxY
+}
+
+func clampFreeKickSlot(gi *info.GameInfo, slot info.Position) info.Position {
+	if gi == nil || !gi.HasField() {
+		return slot
+	}
+	slot = gi.ClampToField(slot, freeKickFieldClearanceMM)
+	geometry, ok := gi.FieldGeometry()
+	if !ok {
+		return slot
+	}
+
+	for _, goalSign := range []float64{-1, 1} {
+		if !insideInflatedDefenseArea(slot, geometry, goalSign) {
+			continue
+		}
+		frontX := goalSign * (geometry.Length/2 - geometry.PenaltyAreaDepth)
+		slot.X = frontX - goalSign*freeKickDefenseAreaClearanceMM
+	}
+	return slot
+}
+
+func assignFreeKickWallRobots(
+	gi *info.GameInfo,
+	team info.Team,
+	defenders []info.ID,
+	slots []info.Position,
+) ([]info.ID, []info.ID) {
+	ordered := append([]info.ID(nil), defenders...)
+	sort.SliceStable(ordered, func(i, j int) bool {
+		distanceI := robotDistanceToClosestSlot(gi, team, ordered[i], slots)
+		distanceJ := robotDistanceToClosestSlot(gi, team, ordered[j], slots)
+		if distanceI == distanceJ {
+			return ordered[i] < ordered[j]
+		}
+		return distanceI < distanceJ
+	})
+
+	wallCount := min(len(ordered), len(slots))
+	wallRobots := ordered[:wallCount]
+	reserveRobots := ordered[wallCount:]
+
+	// Match the selected robots to the wall from one end to the other. This
+	// reduces crossing paths as the wall rotates for an angled free kick.
+	if len(slots) > 1 {
+		normalX := slots[len(slots)-1].X - slots[0].X
+		normalY := slots[len(slots)-1].Y - slots[0].Y
+		sort.SliceStable(wallRobots, func(i, j int) bool {
+			projectionI, okI := robotProjection(gi, team, wallRobots[i], normalX, normalY)
+			projectionJ, okJ := robotProjection(gi, team, wallRobots[j], normalX, normalY)
+			if !okI || !okJ || projectionI == projectionJ {
+				return wallRobots[i] < wallRobots[j]
+			}
+			return projectionI < projectionJ
+		})
+	}
+	return wallRobots, reserveRobots
+}
+
+func robotDistanceToClosestSlot(
+	gi *info.GameInfo,
+	team info.Team,
+	robotID info.ID,
+	slots []info.Position,
+) float64 {
+	if gi == nil || gi.State == nil || len(slots) == 0 {
+		return math.Inf(1)
+	}
+	robot := gi.State.GetTeam(team)[robotID]
+	if robot == nil {
+		return math.Inf(1)
+	}
+	pos, err := robot.GetPosition()
+	if err != nil {
+		return math.Inf(1)
+	}
+	best := math.Inf(1)
+	for _, slot := range slots {
+		best = math.Min(best, pos.Dist2d(slot))
+	}
+	return best
+}
+
+func robotProjection(
+	gi *info.GameInfo,
+	team info.Team,
+	robotID info.ID,
+	directionX float64,
+	directionY float64,
+) (float64, bool) {
+	if gi == nil || gi.State == nil {
+		return 0, false
+	}
+	robot := gi.State.GetTeam(team)[robotID]
+	if robot == nil {
+		return 0, false
+	}
+	pos, err := robot.GetPosition()
+	if err != nil {
+		return 0, false
+	}
+	return pos.X*directionX + pos.Y*directionY, true
+}
+
+func freeKickReserveSlots(
+	gi *info.GameInfo,
+	team info.Team,
+	ballPos info.Position,
+	count int,
+) []info.Position {
+	if count <= 0 {
+		return nil
+	}
+
+	halfLength := 4500.0
+	halfWidth := 3000.0
+	if gi != nil && gi.HasField() {
+		field := gi.FieldSize()
+		halfLength = field.X / 2
+		halfWidth = field.Y / 2
+	}
+	templates := []struct{ depth, lane float64 }{
+		{depth: 0.55, lane: -0.60},
+		{depth: 0.55, lane: 0.60},
+		{depth: 0.30, lane: -0.75},
+		{depth: 0.30, lane: 0.75},
+	}
+
+	slots := make([]info.Position, count)
+	for i := range slots {
+		template := templates[i%len(templates)]
+		slots[i] = info.Position{
+			X: ownHalfXSign(gi, team) * halfLength * template.depth,
+			Y: halfWidth * template.lane,
+		}
+		slots[i] = clampFreeKickSlot(gi, slots[i])
+		slots[i].Angle = slots[i].AngleToPosition(ballPos)
 	}
 	return slots
 }

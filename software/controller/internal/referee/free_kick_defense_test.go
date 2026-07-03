@@ -1,12 +1,15 @@
 package referee
 
 import (
+	"math"
 	"sync"
 	"testing"
 
 	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
 	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestFreeKickDefenseMirrorsAssignedHalfAndKeepsGoalie(t *testing.T) {
@@ -15,8 +18,8 @@ func TestFreeKickDefenseMirrorsAssignedHalfAndKeepsGoalie(t *testing.T) {
 		bluePositiveHalf bool
 		wantDefenseX     float64
 	}{
-		{name: "negative half", bluePositiveHalf: false, wantDefenseX: -2000},
-		{name: "positive half", bluePositiveHalf: true, wantDefenseX: 2000},
+		{name: "negative half", bluePositiveHalf: false, wantDefenseX: -freeKickWallDistanceMM},
+		{name: "positive half", bluePositiveHalf: true, wantDefenseX: freeKickWallDistanceMM},
 	}
 
 	for _, tc := range tests {
@@ -40,7 +43,7 @@ func TestFreeKickDefenseMirrorsAssignedHalfAndKeepsGoalie(t *testing.T) {
 				}
 			}
 
-			slots := freeKickDefenseSlots(gi, info.Blue, 2)
+			slots := freeKickDefenseSlots(gi, info.Blue, info.Position{}, 2)
 			if slots[0].X != tc.wantDefenseX || slots[1].X != tc.wantDefenseX {
 				t.Fatalf("defense X positions = %.0f, %.0f, want %.0f", slots[0].X, slots[1].X, tc.wantDefenseX)
 			}
@@ -49,4 +52,72 @@ func TestFreeKickDefenseMirrorsAssignedHalfAndKeepsGoalie(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestFreeKickDefenseUsesThreeRobotWallAcrossShotLine(t *testing.T) {
+	gi := newFreeKickDefenseGameInfo(false)
+	ball := info.Position{X: 1200, Y: 800}
+	slots := freeKickDefenseSlots(gi, info.Blue, ball, 5)
+	if len(slots) != freeKickWallRobotCount {
+		t.Fatalf("wall size = %d, want %d", len(slots), freeKickWallRobotCount)
+	}
+
+	center := info.Position{}
+	for _, slot := range slots {
+		center.X += slot.X / float64(len(slots))
+		center.Y += slot.Y / float64(len(slots))
+		if math.Abs(info.NormalizeAngleDelta(slot.AngleToPosition(ball), slot.Angle)) > 1e-9 {
+			t.Fatalf("slot %+v does not face the ball", slot)
+		}
+	}
+	if math.Abs(center.Dist2d(ball)-freeKickWallDistanceMM) > 1e-6 {
+		t.Fatalf("wall center distance = %.3f, want %.3f", center.Dist2d(ball), freeKickWallDistanceMM)
+	}
+
+	goal := ownGoalCenter(gi, info.Blue)
+	shotX, shotY := goal.X-ball.X, goal.Y-ball.Y
+	wallX := slots[len(slots)-1].X - slots[0].X
+	wallY := slots[len(slots)-1].Y - slots[0].Y
+	if math.Abs(shotX*wallX+shotY*wallY) > 1e-6 {
+		t.Fatalf("wall is not perpendicular to shot line: dot = %.3f", shotX*wallX+shotY*wallY)
+	}
+}
+
+func TestFreeKickDefenseStaysClearOfDefenseAreaAndFieldLines(t *testing.T) {
+	gi := newFreeKickDefenseGameInfo(false)
+	// A valid free-kick placement exactly 1 m in front of our defense area.
+	ball := info.Position{X: -2500, Y: 0}
+	slots := freeKickDefenseSlots(gi, info.Blue, ball, 3)
+
+	for _, slot := range slots {
+		if !freeKickSlotLegal(gi, slot) {
+			t.Fatalf("illegal wall slot: %+v", slot)
+		}
+		if slot.Dist2d(ball) < freeKickBallClearanceMM {
+			t.Fatalf("slot distance to ball = %.1f, want at least %.1f", slot.Dist2d(ball), freeKickBallClearanceMM)
+		}
+	}
+
+	// Near a touchline, the complete angled wall must remain inside the
+	// 200 mm field-line margin.
+	ball = info.Position{X: 0, Y: 2800}
+	slots = freeKickDefenseSlots(gi, info.Blue, ball, 3)
+	for _, slot := range slots {
+		if !freeKickSlotLegal(gi, slot) {
+			t.Fatalf("touchline wall slot is illegal: %+v", slot)
+		}
+	}
+}
+
+func newFreeKickDefenseGameInfo(bluePositiveHalf bool) *info.GameInfo {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.Status.SetGameStatus(0, 0, 0, 0, 0, bluePositiveHalf, "")
+	gi.SetField(&ssl_vision.SSL_GeometryFieldSize{
+		FieldLength:      proto.Int32(9000),
+		FieldWidth:       proto.Int32(6000),
+		GoalWidth:        proto.Int32(1000),
+		PenaltyAreaDepth: proto.Int32(1000),
+		PenaltyAreaWidth: proto.Int32(2000),
+	})
+	return gi
 }
