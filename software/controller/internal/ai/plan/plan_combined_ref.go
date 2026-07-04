@@ -53,7 +53,8 @@ func (m *CombinedPlanWithRef) run() {
 
 func (m *CombinedPlanWithRef) routeFrame(gi info.GameInfo) bool {
 	m.currentGameInfo = gi
-	if m.refereeHandlesFrame() {
+	refereeHandled := m.refereeHandlesFrame()
+	if refereeHandled && !isStoppedFrame(&m.currentGameInfo) {
 		return false
 	}
 
@@ -76,6 +77,7 @@ func (m *CombinedPlanWithRef) refereeHandlesFrame() bool {
 				Activity_lock: m.ActivityHandler.Activity_lock,
 			},
 		)
+		m.refereeHandler.DelegateStopPositioning()
 	}
 	activeRobots := m.normalPlan.activeRobots(&m.currentGameInfo)
 	m.refereeHandler.UpdateActiveRobots(activeRobots)
@@ -87,6 +89,11 @@ func (m *CombinedPlanWithRef) refereeHandlesFrame() bool {
 		m.normalPlan.clearBallTouchRestriction()
 	}
 	return handled
+}
+
+func isStoppedFrame(gi *info.GameInfo) bool {
+	return gi != nil && gi.Status != nil && gi.Status.GetGameEvent() != nil &&
+		gi.Status.GetGameEvent().GetCurrentState() == info.STATE_STOPPED
 }
 
 func (m *CombinedPlanWithRef) Kill() {

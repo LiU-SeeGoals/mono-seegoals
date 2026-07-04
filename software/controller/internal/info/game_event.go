@@ -85,9 +85,11 @@ type GameEvent struct {
 
 func NewGameEvent() *GameEvent {
 	return &GameEvent{
-		RefCommand:    UNINITIALIZED,
-		CurrentState:  STATE_HALTED,
-		PreviousState: STATE_HALTED,
+		RefCommand:        UNINITIALIZED,
+		LastUniqueCommand: UNINITIALIZED,
+		NextCommand:       UNINITIALIZED,
+		CurrentState:      STATE_HALTED,
+		PreviousState:     STATE_HALTED,
 		// TeamWithPossession will have its zero value
 		DesignatedPosition: mat.NewVecDense(2, nil),
 		BallInPlay:         false,
@@ -130,6 +132,30 @@ func (rc RefCommand) String() string {
 		return "Ball Placement Blue"
 	default:
 		return fmt.Sprintf("Unknown RefCommand (%d)", rc)
+	}
+}
+
+// FreeKickTeam returns the team awarded a direct or legacy indirect free kick.
+func (rc RefCommand) FreeKickTeam() (Team, bool) {
+	switch rc {
+	case DIRECT_FREE_BLUE, INDIRECT_FREE_BLUE:
+		return Blue, true
+	case DIRECT_FREE_YELLOW, INDIRECT_FREE_YELLOW:
+		return Yellow, true
+	default:
+		return Blue, false
+	}
+}
+
+// KickoffTeam returns the team awarded a kickoff preparation.
+func (rc RefCommand) KickoffTeam() (Team, bool) {
+	switch rc {
+	case PREPARE_KICKOFF_BLUE:
+		return Blue, true
+	case PREPARE_KICKOFF_YELLOW:
+		return Yellow, true
+	default:
+		return Blue, false
 	}
 }
 
@@ -205,12 +231,17 @@ func (ge *GameEvent) UpdateFromRefCommand(
 	nextCommand RefCommand,
 	currentActionTimeRemaining int64,
 	currentActionTimeRemainingValid bool) {
+	newCommand := refCommand != ge.RefCommand || commandTimestamp != ge.CommandTimestamp
 
 	ge.RefCommand = refCommand
 	ge.CommandTimestamp = commandTimestamp
-	ge.NextCommand = nextCommand
 	ge.CurrentActionTimeRemaining = currentActionTimeRemaining
 	ge.CurrentActionTimeRemainingValid = currentActionTimeRemainingValid
+	if nextCommand != UNINITIALIZED {
+		ge.NextCommand = nextCommand
+	} else if newCommand || (refCommand != STOP && !isBallPlacementRefCommand(refCommand)) {
+		ge.NextCommand = UNINITIALIZED
+	}
 
 	if refCommand != ge.LastUniqueCommand {
 		ge.LastUniqueCommand = refCommand
@@ -300,6 +331,10 @@ func (ge *GameEvent) UpdateFromRefCommand(
 	}
 
 	// Check for timeouts and automatically update state if needed
+}
+
+func isBallPlacementRefCommand(command RefCommand) bool {
+	return command == BALL_PLACEMENT_BLUE || command == BALL_PLACEMENT_YELLOW
 }
 
 func (ge *GameEvent) GetCurrentState() RefState {

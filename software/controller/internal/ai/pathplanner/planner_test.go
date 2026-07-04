@@ -264,6 +264,34 @@ func TestRestartBallKeepoutActiveForOpponentKickoffOnly(t *testing.T) {
 	}
 }
 
+func TestStopBallKeepoutAppliesToBothTeams(t *testing.T) {
+	gi := newRestartKeepoutTestGameInfo(info.STOP)
+
+	for _, team := range []info.Team{info.Blue, info.Yellow} {
+		if !RestartBallKeepoutActive(team, gi) {
+			t.Fatalf("expected %s team to keep distance during STOP", team)
+		}
+		got := ClampBallKeepoutDestination(team, info.Position{X: -1000}, info.Position{}, gi)
+		wantX := -(StopBallKeepoutRadius + ballKeepoutDestinationEpsilon)
+		if math.Abs(got.X-wantX) > 1e-9 || math.Abs(got.Y) > 1e-9 {
+			t.Fatalf("%s destination = %#v, want (%.1f, 0)", team, got, wantX)
+		}
+	}
+}
+
+func TestObstaclesForRobotUsesStopKeepoutEvenWhenAvoidBallIsFalse(t *testing.T) {
+	gi := newRestartKeepoutTestGameInfo(info.STOP)
+
+	obstacles := ObstaclesForRobot(info.Blue, 0, false, false, gi)
+
+	if len(obstacles) != 1 {
+		t.Fatalf("expected only the stop ball obstacle, got %d obstacles: %#v", len(obstacles), obstacles)
+	}
+	if obstacles[0].Size != StopBallKeepoutRadius {
+		t.Fatalf("expected stop ball obstacle radius %.1f, got %.1f", StopBallKeepoutRadius, obstacles[0].Size)
+	}
+}
+
 func TestObstaclesForRobotUsesRestartKeepoutEvenWhenAvoidBallIsFalse(t *testing.T) {
 	gi := newRestartKeepoutTestGameInfo(info.DIRECT_FREE_YELLOW)
 

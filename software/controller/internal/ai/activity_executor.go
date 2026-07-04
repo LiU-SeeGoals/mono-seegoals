@@ -8,6 +8,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
@@ -137,7 +138,8 @@ func (fb *activityExecutor) Run() {
 
 		actions := make([]action.Action, 0, len(results))
 		for _, result := range results {
-			safeAction := fb.defenseAreaEscape.apply(result.action, fb.team, &gameInfo)
+			safeAction := stoppedPlaySafetyAction(result.action, fb.team, &gameInfo)
+			safeAction = fb.defenseAreaEscape.apply(safeAction, fb.team, &gameInfo)
 			actions = append(actions, clampMoveActionToField(safeAction, &gameInfo))
 		}
 
@@ -149,6 +151,31 @@ func (fb *activityExecutor) Run() {
 
 		// Send actions
 		fb.outgoingActions <- actions
+	}
+}
+
+// stoppedPlaySafetyAction is the final safety boundary for tactical formation
+// activities during STOP. It prevents a stale attack activity from manipulating
+// the ball and projects every movement target outside the stop-radius obstacle.
+func stoppedPlaySafetyAction(act action.Action, team info.Team, gi *info.GameInfo) action.Action {
+	if gi == nil || gi.Status == nil || gi.Status.GetGameEvent() == nil ||
+		gi.Status.GetGameEvent().GetCurrentState() != info.STATE_STOPPED {
+		return act
+	}
+
+	switch typed := act.(type) {
+	case *action.MoveTo:
+		typed.KickSpeed = 0
+		typed.SimKickSpeed = 0
+		typed.KickAngle = 0
+		typed.Dribble = false
+		typed.MinLinearSpeed = 0
+		typed.Dest = pathplanner.ClampBallKeepoutDestination(team, typed.Pos, typed.Dest, gi)
+		return typed
+	case *action.Kick:
+		return &action.Stop{Id: typed.Id}
+	default:
+		return act
 	}
 }
 

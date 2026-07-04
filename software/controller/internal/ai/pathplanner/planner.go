@@ -15,6 +15,7 @@ const (
 	RobotSafetyRadius        = 240.0
 	BallSafetyRadius         = 150.0
 	RestartBallKeepoutRadius = 500.0
+	StopBallKeepoutRadius    = 700.0
 	GoalLineSafetyRadius     = 100.0
 	PlanningRadius           = 400.0
 	MotionRadius             = 100.0
@@ -404,24 +405,30 @@ func ignoreRobotObstaclesForBallApproach(
 	return distanceSquared(ballPos, finalDestination) <= perm.ballGoalProximityDistance*perm.ballGoalProximityDistance
 }
 
-// RestartBallKeepoutActive reports whether this team must keep the restart
-// distance from the ball. This is intentionally narrower than
-// GameEvent.ShouldKeepDistanceFromBall, because the team taking a restart still
-// needs to approach and kick the ball.
+// RestartBallKeepoutActive reports whether this team must keep a referee-state
+// distance from the ball. During STOP this applies to both teams; during a
+// restart it applies only to the non-possessing team.
 func RestartBallKeepoutActive(team info.Team, gi *info.GameInfo) bool {
+	_, active := requiredBallKeepoutRadius(team, gi)
+	return active
+}
+
+func requiredBallKeepoutRadius(team info.Team, gi *info.GameInfo) (float64, bool) {
 	if gi == nil || gi.Status == nil {
-		return false
+		return 0, false
 	}
 	gameEvent := gi.Status.GetGameEvent()
 	if gameEvent == nil || gameEvent.BallInPlay {
-		return false
+		return 0, false
 	}
 
 	switch gameEvent.CurrentState {
+	case info.STATE_STOPPED:
+		return StopBallKeepoutRadius, true
 	case info.STATE_FREE_KICK, info.STATE_KICKOFF_PREPARATION:
-		return gameEvent.TeamWithPossession != team
+		return RestartBallKeepoutRadius, gameEvent.TeamWithPossession != team
 	default:
-		return false
+		return 0, false
 	}
 }
 
@@ -433,14 +440,15 @@ func ClampBallKeepoutDestination(
 	destination info.Position,
 	gi *info.GameInfo,
 ) info.Position {
-	if !RestartBallKeepoutActive(team, gi) || gi == nil || gi.State == nil || gi.State.Ball == nil {
+	radius, active := requiredBallKeepoutRadius(team, gi)
+	if !active || gi == nil || gi.State == nil || gi.State.Ball == nil {
 		return destination
 	}
 	ballPos, err := gi.State.Ball.GetPosition()
 	if err != nil {
 		return destination
 	}
-	return projectOutsideBallKeepout(destination, ballPos, myPos, RestartBallKeepoutRadius+ballKeepoutDestinationEpsilon)
+	return projectOutsideBallKeepout(destination, ballPos, myPos, radius+ballKeepoutDestinationEpsilon)
 }
 
 func projectOutsideBallKeepout(destination, ballPos, fallback info.Position, radius float64) info.Position {
@@ -868,8 +876,8 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoalline
 }
 
 func ballObstacleRadius(team info.Team, avoidBall bool, gi *info.GameInfo) (float64, bool) {
-	if RestartBallKeepoutActive(team, gi) {
-		return RestartBallKeepoutRadius, true
+	if radius, active := requiredBallKeepoutRadius(team, gi); active {
+		return radius, true
 	}
 	if avoidBall {
 		return BallSafetyRadius, true

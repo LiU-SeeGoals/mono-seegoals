@@ -101,6 +101,7 @@ type FreeKick struct {
 
 type Stop struct {
 	RefereeInfo
+	positioningDelegated bool
 }
 
 type PrepareKickoff struct {
@@ -159,8 +160,12 @@ func (s *Stop) Initialize() {
 }
 
 func (s *Stop) Update() EventName {
+	if s.positioningDelegated {
+		return "NONE"
+	}
+
 	goalieID, hasGoalie := moveGoalieToPosition(s.activeRobots, s.team, s.gi, s.activityHandler)
-	preparedKickerID, preparingFreeKick := prepareKickerForUpcomingFreeKick(
+	preparedKickerID, preparingFreeKick := PrepareKickerForUpcomingFreeKick(
 		s.gi,
 		s.team,
 		s.activeRobots,
@@ -598,6 +603,7 @@ type RefereeHandler struct {
 	nextCommandAfterBallPlacement info.RefCommand
 	kickOff                       *Kickoff
 	freeKick                      *FreeKick
+	stop                          *Stop
 	stateInfos                    []*RefereeInfo
 	activityHandler               *ai.ActivityHandler
 	kickoffTouchRestriction       kickoffTouchRestriction
@@ -1252,7 +1258,9 @@ func freeKickReserveSlots(
 	return slots
 }
 
-func prepareKickerForUpcomingFreeKick(
+// PrepareKickerForUpcomingFreeKick moves the selected kicker behind the ball
+// when STOP announces our free kick as the next command.
+func PrepareKickerForUpcomingFreeKick(
 	gi *info.GameInfo,
 	team info.Team,
 	activeRobots []info.ID,
@@ -1263,7 +1271,11 @@ func prepareKickerForUpcomingFreeKick(
 	}
 
 	gameEvent := gi.Status.GetGameEvent()
-	if gameEvent == nil || !isFreeKickForTeam(gameEvent.NextCommand, team) {
+	if gameEvent == nil {
+		return 0, false
+	}
+	freeKickTeam, hasFreeKick := gameEvent.NextCommand.FreeKickTeam()
+	if !hasFreeKick || freeKickTeam != team {
 		return 0, false
 	}
 
@@ -1277,6 +1289,56 @@ func prepareKickerForUpcomingFreeKick(
 	move.AllowOutsideField(true)
 	activityHandler.AddActivity(move)
 	return kickerID, true
+}
+
+// PrepareForUpcomingKickoff applies the same legal kickoff formation while the
+// referee is still in STOP. It returns false when no kickoff is announced.
+func PrepareForUpcomingKickoff(
+	gi *info.GameInfo,
+	team info.Team,
+	activeRobots []info.ID,
+	activityHandler *ai.ActivityHandler,
+) bool {
+	if gi == nil || gi.Status == nil || activityHandler == nil {
+		return false
+	}
+	gameEvent := gi.Status.GetGameEvent()
+	if gameEvent == nil {
+		return false
+	}
+	kickoffTeam, announced := gameEvent.NextCommand.KickoffTeam()
+	if !announced {
+		return false
+	}
+
+	goalieID, hasGoalie := moveGoalieToPosition(activeRobots, team, gi, activityHandler)
+	fieldRobotIDs := fieldRobots(activeRobots, goalieID, hasGoalie)
+	kickOffID, receiverID := selectKickoffRobots(fieldRobotIDs)
+	if kickoffTeam == team {
+		if len(fieldRobotIDs) > 0 {
+			moveKickerToKickoffPreparePosition(team, gi, activityHandler, kickOffID)
+		}
+		moveRobotsToKickoffSupportPositions(
+			activeRobots,
+			team,
+			gi,
+			activityHandler,
+			kickOffID,
+			receiverID,
+			goalieID,
+			hasGoalie,
+		)
+	} else {
+		moveRobotsToKickoffDefensePositions(
+			activeRobots,
+			team,
+			gi,
+			activityHandler,
+			goalieID,
+			hasGoalie,
+		)
+	}
+	return true
 }
 
 func selectFreeKickKicker(
@@ -1356,17 +1418,6 @@ func freeKickTargetPosition(gi *info.GameInfo, team info.Team, ballPos info.Posi
 	target.Z = 0
 	target.Angle = 0
 	return target
-}
-
-func isFreeKickForTeam(command info.RefCommand, team info.Team) bool {
-	switch command {
-	case info.DIRECT_FREE_BLUE, info.INDIRECT_FREE_BLUE:
-		return team == info.Blue
-	case info.DIRECT_FREE_YELLOW, info.INDIRECT_FREE_YELLOW:
-		return team == info.Yellow
-	default:
-		return false
-	}
 }
 
 func selectKickoffRobots(activeRobots []info.ID) (info.ID, info.ID) {
@@ -1853,6 +1904,7 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 		activeRobots:    activeRobots,
 		kickOff:         kickOff,
 		freeKick:        freeKick,
+		stop:            stop,
 		activityHandler: activityHandler,
 		stateInfos: []*RefereeInfo{
 			&freeKick.RefereeInfo,
@@ -1864,6 +1916,15 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 			&preparePenalty.RefereeInfo,
 			&penalty.RefereeInfo,
 		},
+	}
+}
+
+// DelegateStopPositioning leaves STOP formation activities to the caller while
+// the referee state machine continues to process transitions normally. Other
+// stopped-style states, such as ball placement, keep their dedicated handling.
+func (s *RefereeHandler) DelegateStopPositioning() {
+	if s != nil && s.stop != nil {
+		s.stop.positioningDelegated = true
 	}
 }
 

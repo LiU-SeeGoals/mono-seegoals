@@ -13,6 +13,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	. "github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/referee"
 	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
@@ -461,6 +462,24 @@ func desiredModeForTrackedOwner(owner trackedBallOwner, ourTeam Team, fallback t
 	return tacticalModeDefend
 }
 
+func stoppedRestartMode(gameEvent *info.GameEvent, ourTeam Team) (tacticalMode, bool) {
+	if gameEvent == nil || gameEvent.GetCurrentState() != info.STATE_STOPPED {
+		return "", false
+	}
+
+	restartTeam, announced := gameEvent.NextCommand.FreeKickTeam()
+	if !announced {
+		restartTeam, announced = gameEvent.NextCommand.KickoffTeam()
+	}
+	if !announced {
+		return "", false
+	}
+	if restartTeam == ourTeam {
+		return tacticalModeAttack, true
+	}
+	return tacticalModeDefend, true
+}
+
 func stableMode(
 	current tacticalMode,
 	desired tacticalMode,
@@ -732,6 +751,55 @@ func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Po
 	return positions
 }
 
+func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
+	gi *GameInfo,
+	roleManager *combinedRoleManager,
+	goalieID info.ID,
+	goalieRole *roles.GoalieRole,
+	stopped bool,
+) {
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	threatPos := ballPos
+	if attackerPos, found := m.getAttackerPosition(gi); found && m.attackerIsThreatening(gi, attackerPos) {
+		threatPos = attackerPos
+	}
+
+	wallRobots := roleManager.idsForSlot(tacticalSlotDefenderWall)
+	wallPositions := m.calcGoalWallPositionsForRobots(gi, threatPos, len(wallRobots))
+	for i, id := range wallRobots {
+		if defender, ok := roleManager.defenders[id]; ok {
+			defender.SetWallPosition(wallPositions[i])
+			defender.TriggerEvent("ATTACKER_NEAR")
+		}
+	}
+	for id, defender := range roleManager.defenders {
+		if containsRobot(wallRobots, id) {
+			continue
+		}
+		defender.TriggerEvent("ATTACKER_FAR")
+	}
+	for _, defender := range roleManager.defenders {
+		defender.Run()
+	}
+
+	if goalieRole == nil {
+		return
+	}
+
+	debugstate.SetRobotRole(m.team, goalieID, tacticalSlotGoalie.label())
+	goalieRole.SetGameInfo(*gi)
+	if stopped {
+		goalieRole.TriggerEvent("BALL_LOST")
+	} else if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
+		goalieRole.TriggerEvent("BALL_OWNER")
+	} else if goalieRole.ShouldCollectDeadBall() {
+		goalieRole.TriggerEvent("DEAD_BALL_TRAPPED")
+	} else if !goalieRole.IsDeadBallRescueActive() {
+		goalieRole.TriggerEvent("BALL_LOST")
+	}
+	goalieRole.Run()
+}
+
 func (m *CombinedPlan) run() {
 	gi := <-m.incomingGameInfo
 	roleManager := newCombinedRoleManager(&m.ActivityHandler, &gi, m.team)
@@ -776,7 +844,13 @@ func (m *CombinedPlan) run() {
 		}
 
 		desiredMode := desiredModeForTrackedOwner(possession.owner, m.team, mode)
-		mode = stableMode(mode, desiredMode, &candidateMode, &candidateModeSince, tickStart)
+		if restartMode, announced := stoppedRestartMode(gi.Status.GetGameEvent(), m.team); announced {
+			mode = restartMode
+			candidateMode = ""
+			candidateModeSince = time.Time{}
+		} else {
+			mode = stableMode(mode, desiredMode, &candidateMode, &candidateModeSince, tickStart)
+		}
 
 		assignment := roleAssignmentForMode(len(fieldRobots), mode)
 		slotAssignments := m.assignTacticalSlots(
@@ -809,6 +883,26 @@ func (m *CombinedPlan) run() {
 			}
 		}
 		roleManager.configureOffenseReceivers(receiverIDs)
+
+		if isStoppedFrame(&gi) {
+			hasActiveReceiver = false
+			actorTracker.switchTo(roleManager.attackers, noOffenseBallActor())
+			if referee.PrepareForUpcomingKickoff(&gi, m.team, activeRobots, &m.ActivityHandler) {
+				continue
+			}
+			for _, attacker := range roleManager.attackers {
+				attacker.TriggerEvent("BALL_LOST")
+				attacker.Run()
+			}
+			m.updateDefenseAndGoaliePositioning(&gi, roleManager, goalieID, goalieRole, true)
+			referee.PrepareKickerForUpcomingFreeKick(
+				&gi,
+				m.team,
+				activeRobots,
+				&m.ActivityHandler,
+			)
+			continue
+		}
 
 		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
 		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
@@ -873,42 +967,7 @@ func (m *CombinedPlan) run() {
 			attacker.Run()
 		}
 
-		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-		threatPos := ballPos
-		if attackerPos, found := m.getAttackerPosition(&gi); found && m.attackerIsThreatening(&gi, attackerPos) {
-			threatPos = attackerPos
-		}
-
-		wallRobots := roleManager.idsForSlot(tacticalSlotDefenderWall)
-		wallPositions := m.calcGoalWallPositionsForRobots(&gi, threatPos, len(wallRobots))
-		for i, id := range wallRobots {
-			if defender, ok := roleManager.defenders[id]; ok {
-				defender.SetWallPosition(wallPositions[i])
-				defender.TriggerEvent("ATTACKER_NEAR")
-			}
-		}
-		for id, defender := range roleManager.defenders {
-			if containsRobot(wallRobots, id) {
-				continue
-			}
-			defender.TriggerEvent("ATTACKER_FAR")
-		}
-		for _, d := range roleManager.defenders {
-			d.Run()
-		}
-
-		if goalieRole != nil {
-			debugstate.SetRobotRole(m.team, goalieID, tacticalSlotGoalie.label())
-			goalieRole.SetGameInfo(gi)
-			if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
-				goalieRole.TriggerEvent("BALL_OWNER")
-			} else if goalieRole.ShouldCollectDeadBall() {
-				goalieRole.TriggerEvent("DEAD_BALL_TRAPPED")
-			} else if !goalieRole.IsDeadBallRescueActive() {
-				goalieRole.TriggerEvent("BALL_LOST")
-			}
-			goalieRole.Run()
-		}
+		m.updateDefenseAndGoaliePositioning(&gi, roleManager, goalieID, goalieRole, false)
 	}
 }
 

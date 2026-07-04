@@ -110,7 +110,7 @@ func (receiver *SSLRefereeClient) handlePacket(packet *gc.Referee, ok bool, gi *
 		packet.GetCommandTimestamp(),
 		float64(packet.GetDesignatedPosition().GetX()),
 		float64(packet.GetDesignatedPosition().GetY()),
-		info.RefCommand(packet.GetNextCommand().Number()),
+		nextRefCommand(packet),
 		packet.GetCurrentActionTimeRemaining(),
 		packet.CurrentActionTimeRemaining != nil)
 
@@ -165,6 +165,13 @@ func (receiver *SSLRefereeClient) handlePacket(packet *gc.Referee, ok bool, gi *
 		packet.Blue.GetBallPlacementFailuresReached(),
 		packet.Blue.GetBotSubstitutionAllowed(),
 	)
+}
+
+func nextRefCommand(packet *gc.Referee) info.RefCommand {
+	if packet == nil || packet.NextCommand == nil {
+		return info.UNINITIALIZED
+	}
+	return info.RefCommand(packet.GetNextCommand().Number())
 }
 
 // Test printing out packets
