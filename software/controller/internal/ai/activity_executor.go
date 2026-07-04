@@ -38,11 +38,17 @@ type goalAreaBounds struct {
 }
 
 type activityExecutor struct {
-	team             info.Team
-	incomingGameInfo <-chan info.GameInfo
-	outgoingActions  chan<- []action.Action
-	activities       *[info.TEAM_SIZE]ai.Activity // <-- pointer to a slice
-	activity_lock    *sync.Mutex                  // shared mutex for synchronization
+	team              info.Team
+	incomingGameInfo  <-chan info.GameInfo
+	outgoingActions   chan<- []action.Action
+	activities        *[info.TEAM_SIZE]ai.Activity // <-- pointer to a slice
+	activity_lock     *sync.Mutex                  // shared mutex for synchronization
+	defenseAreaEscape defenseAreaEscapeState
+}
+
+type defenseAreaEscapeState struct {
+	heading    [info.TEAM_SIZE]float64
+	headingSet [info.TEAM_SIZE]bool
 }
 
 type activityResult struct {
@@ -77,6 +83,10 @@ func (fb *activityExecutor) Run() {
 	for {
 		gameInfo := <-fb.incomingGameInfo
 		frameMonitor.Observe(gameInfo.VisionFrame())
+		if gameInfo.Status == nil || gameInfo.Status.GetGameEvent() == nil ||
+			gameInfo.Status.GetGameEvent().GetCurrentState() != info.STATE_STOPPED {
+			fb.defenseAreaEscape.reset()
+		}
 
 		// HALT is a hard safety boundary. Do not depend on the slower planner
 		// replacing every activity before this executor snapshots them: an old
@@ -127,7 +137,7 @@ func (fb *activityExecutor) Run() {
 
 		actions := make([]action.Action, 0, len(results))
 		for _, result := range results {
-			safeAction := moveStoppedRobotOutOfEnemyDefenseArea(result.action, fb.team, &gameInfo)
+			safeAction := fb.defenseAreaEscape.apply(result.action, fb.team, &gameInfo)
 			actions = append(actions, clampMoveActionToField(safeAction, &gameInfo))
 		}
 
@@ -142,25 +152,23 @@ func (fb *activityExecutor) Run() {
 	}
 }
 
-// moveStoppedRobotOutOfEnemyDefenseArea turns a stationary command into a
-// short retreat when a robot is inside the opponent's defense area. RefStop
-// otherwise emits Stop as soon as the robot is far enough from the ball, which
-// used to leave robots parked in an illegal position. Restricting this fallback
-// to the opponent's area also keeps a stale Stop command from pulling our
-// goalkeeper out of its own area immediately after HALT.
-func moveStoppedRobotOutOfEnemyDefenseArea(act action.Action, team info.Team, gi *info.GameInfo) action.Action {
-	stop, ok := act.(*action.Stop)
-	if !ok || gi == nil || gi.State == nil || gi.Status == nil || !gi.HasField() {
+// apply moves a stationary robot out of the opponent's defense area and holds
+// the heading it had when the escape began. RefStop can produce either Stop or
+// MoveTo depending on ball distance; both paths must suppress rotation.
+func (s *defenseAreaEscapeState) apply(act action.Action, team info.Team, gi *info.GameInfo) action.Action {
+	id, supported := actionRobotID(act)
+	if !supported || id < 0 || id >= int(info.TEAM_SIZE) ||
+		gi == nil || gi.State == nil || gi.Status == nil || !gi.HasField() {
 		return act
 	}
 
 	gameEvent := gi.Status.GetGameEvent()
-	if gameEvent == nil || gameEvent.GetCurrentState() != info.STATE_STOPPED ||
-		stop.Id < 0 || stop.Id >= int(info.TEAM_SIZE) {
+	if gameEvent == nil || gameEvent.GetCurrentState() != info.STATE_STOPPED {
+		s.headingSet[id] = false
 		return act
 	}
 
-	robot := gi.State.GetTeam(team)[info.ID(stop.Id)]
+	robot := gi.State.GetTeam(team)[info.ID(id)]
 	if robot == nil {
 		return act
 	}
@@ -179,15 +187,41 @@ func moveStoppedRobotOutOfEnemyDefenseArea(act action.Action, team info.Team, gi
 		if !inside {
 			continue
 		}
-		target.Angle = robotPos.Angle
+		if !s.headingSet[id] {
+			s.heading[id] = robotPos.Angle
+			s.headingSet[id] = true
+		}
+		if move, ok := act.(*action.MoveTo); ok {
+			move.Dest.Angle = s.heading[id]
+			return move
+		}
+		target.Angle = s.heading[id]
 		return &action.MoveTo{
-			Id:   stop.Id,
+			Id:   id,
 			Team: team,
 			Pos:  robotPos,
 			Dest: target,
 		}
 	}
+	s.headingSet[id] = false
 	return act
+}
+
+func actionRobotID(act action.Action) (id int, supported bool) {
+	switch typed := act.(type) {
+	case *action.Stop:
+		return typed.Id, true
+	case *action.MoveTo:
+		return typed.Id, true
+	default:
+		return 0, false
+	}
+}
+
+func (s *defenseAreaEscapeState) reset() {
+	for i := range s.headingSet {
+		s.headingSet[i] = false
+	}
 }
 
 // nearestDefenseAreaExit returns the shortest exit through the field-facing
