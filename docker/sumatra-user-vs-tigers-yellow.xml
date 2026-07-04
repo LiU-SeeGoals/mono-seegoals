@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edu.tigers.sumatra.simulation.SimulationControlModule base="edu.tigers.sumatra.simulation.SimulationControlModule">
+    <controlBlueTeam>true</controlBlueTeam>
+    <controlYellowTeam>false</controlYellowTeam>
+</edu.tigers.sumatra.simulation.SimulationControlModule>

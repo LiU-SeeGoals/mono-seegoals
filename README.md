@@ -59,6 +59,12 @@ Once you've started the correct environment, you can edit the corresponding syst
 
 The command `sg-enter` can be used to enter a specific systems docker container. When you've entered a SeeGoals docker container, you should be able to press the up arrow to get the command needed to start that system.
 
+#### Playing against TIGERs AI
+
+`sg-start` includes modes for SeeGoals Blue vs TIGERs AI Yellow and SeeGoals Yellow vs TIGERs AI Blue. Both AIs use the existing ER-Force simulator and SSL game controller.
+
+The modes require a local [Sumatra](https://github.com/TIGERs-Mannheim/Sumatra) checkout. It is read from `../../Sumatra` relative to the `docker` directory by default; set `SUMATRA_DIR` to use another location. The first launch builds the local `seegoals-tiger-ai` image and can take several minutes. Later launches use Docker's build cache.
+
 Please see the `README.md` files in the different system folders for more information on how to develop for that system.
 
 ### Running the project live

@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1.7
+
+FROM eclipse-temurin:21-jdk AS build
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+COPY --from=sumatra . .
+RUN --mount=type=cache,target=/root/.gradle ./gradlew installDist --no-daemon
+
+FROM eclipse-temurin:21-jre
+WORKDIR /Sumatra
+COPY --from=build /src/build/install/sumatra /Sumatra
+COPY --from=build /src/config /Sumatra/config
+ENTRYPOINT ["/Sumatra/bin/sumatra"]

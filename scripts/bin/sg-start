@@ -37,6 +37,7 @@ VISION_CLIENT = envs.get("DOCKER_NAME_SSL_VISION_CLIENT")
 GC = envs.get("DOCKER_NAME_SSL_GAME_CONTROLLER")
 SIM = envs.get("DOCKER_NAME_SIM")
 AUTOREF = envs.get("DOCKER_NAME_TIGER_AUTOREF")
+TIGER_AI = "tiger-ai"
 VERBOSE = False
 
 flags = {
@@ -46,7 +47,7 @@ flags = {
     "verbose": ["-v", "--verbose"]
 }
 
-remove_containers = [AI, GW, VISION_CLIENT, GC, SIM, AUTOREF]
+remove_containers = [AI, GW, VISION_CLIENT, GC, SIM, AUTOREF, TIGER_AI]
 project_name = "seegoals"
 
 choices = [
@@ -145,6 +146,32 @@ choices = [
             "-p", project_name, "up", "-d"
         ],
         "container_to_enter": GW
+    },
+    {
+        "choice-text": "Run SeeGoals Blue vs TIGERs AI Yellow.",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.autostart_gameviewer.yml",
+            "-f", f"{docker_dir}/docker-compose.vs-tigers-blue.yml",
+            "-p", project_name, "up", "-d"
+        ],
+        "container_to_enter": None
+    },
+    {
+        "choice-text": "Run SeeGoals Yellow vs TIGERs AI Blue.",
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
+            "-f", f"{docker_dir}/docker-compose.autostart_gameviewer.yml",
+            "-f", f"{docker_dir}/docker-compose.vs-tigers-yellow.yml",
+            "-p", project_name, "up", "-d"
+        ],
+        "container_to_enter": None
     }
 ]
 

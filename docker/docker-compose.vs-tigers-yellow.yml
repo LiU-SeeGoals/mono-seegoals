@@ -1,0 +1,27 @@
+services:
+  ai:
+    environment:
+      - SEEGOALS_SCENARIO=vs-tigers-yellow
+    command: bash -c "go run main.go"
+
+  tiger-ai:
+    platform: linux/amd64
+    image: seegoals-tiger-ai
+    build:
+      context: .
+      dockerfile: Dockerfile.sumatra
+      additional_contexts:
+        sumatra: ${SUMATRA_DIR:-../../Sumatra}
+    container_name: tiger-ai
+    restart: "no"
+    environment:
+      - SUMATRA_HEADLESS=true
+      - SUMATRA_MODULI=simulation_match
+      - SUMATRA_AI_BLUE=true
+      - SUMATRA_AI_YELLOW=false
+      - SUMATRA_VISION_ADDRESS=${SSL_VISION_MULTICAST_ADDR}:${SSL_VISION_SIM_MAIN_PORT}
+      - SUMATRA_REFEREE_ADDRESS=${SSL_GAME_CONTROLLER_PUBLISH_ADDR}:${SSL_GAME_CONTROLLER_PUBLISH_PORT}
+      - LOG_LEVEL=info
+    volumes:
+      - ./sumatra-user-vs-tigers-yellow.xml:/Sumatra/config/user.xml:ro
+      - ./sumatra-root-vs-tigers-yellow.props:/Sumatra/config/root.props:ro
