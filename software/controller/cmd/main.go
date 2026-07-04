@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/LiU-SeeGoals/controller/internal/demos"
+	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
 // Use RUN_PROFILER to trace program execution time and memory usage
@@ -61,6 +62,10 @@ func main() {
 	}
 
 	switch selectedScenario() {
+	case "vs-tigers-blue", "vs-tigers-as-blue":
+		demos.GameScenarioVsTigers(info.Blue)
+	case "vs-tigers-yellow", "vs-tigers-as-yellow":
+		demos.GameScenarioVsTigers(info.Yellow)
 	case "real-blue", "blue":
 		demos.GameScenarioRealBlue()
 	case "real-yellow", "yellow":

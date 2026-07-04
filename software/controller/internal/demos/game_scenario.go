@@ -165,30 +165,67 @@ func clampFloat(value, minValue, maxValue float64) float64 {
 	return math.Max(minValue, math.Min(maxValue, value))
 }
 
+type gameTeamController struct {
+	team           info.Team
+	ai             *ai.Ai
+	simClient      *client.SimClient
+	activateGame   func()
+	activateManual func()
+}
+
+func newGameTeamController(team info.Team) *gameTeamController {
+	slowBrain := plan.NewCombinedPlanWithRef(team)
+	manualMovement := plan.NewPlannerManualMovement(team)
+	teamAI := ai.NewAi(team, slowBrain, ai.NewActivityExecutor())
+
+	return &gameTeamController{
+		team: team,
+		ai:   teamAI,
+		activateGame: func() {
+			teamAI.HotswapPlanner(team, slowBrain)
+		},
+		activateManual: func() {
+			teamAI.HotswapPlanner(team, manualMovement)
+		},
+	}
+}
+
+func simAddressForTeam(team info.Team) string {
+	switch team {
+	case info.Blue:
+		return config.GetSimBlueTeamAddress()
+	case info.Yellow:
+		return config.GetSimYellowTeamAddress()
+	default:
+		panic(fmt.Sprintf("unsupported team: %s", team))
+	}
+}
+
 func GameScenario() {
+	gameScenarioForTeams(info.Yellow, info.Blue)
+}
+
+// GameScenarioVsTigers runs SeeGoals for one simulated team. The opposing
+// team's command port is intentionally left untouched for the TIGERs AI.
+func GameScenarioVsTigers(team info.Team) {
+	if !config.IsSimulated() {
+		panic("vs-TIGERs scenarios require ENVIRONMENT=simulation")
+	}
+	gameScenarioForTeams(team)
+}
+
+func gameScenarioForTeams(teams ...info.Team) {
 	gameInfo := info.NewGameInfo(10)
 	client.StartGameViewerServer()
 
 	var sslClientTracked *client.SSLTrackedClient
 	var sslClientRaw *client.SSLClient
-	var aiYellow *ai.Ai
-	var aiBlue *ai.Ai
 	var basestationClient *client.BaseStationClient
 	var simController *simulator.SimControl
-	var simClientYellow *client.SimClient
-	var simClientBlue *client.SimClient
-
-	slowBrainYellow := plan.NewCombinedPlanWithRef(info.Yellow)
-	slowBrainBlue := plan.NewCombinedPlanWithRef(info.Blue)
-
-	manualMovementYellow := plan.NewPlannerManualMovement(info.Yellow)
-	// manualMovementBlue := plan.NewPlannerManualMovement(info.Blue)
-
-	fastBrainYellow := ai.NewActivityExecutor()
-	fastBrainBlue := ai.NewActivityExecutor()
-
-	aiYellow = ai.NewAi(info.Yellow, slowBrainYellow, fastBrainYellow)
-	aiBlue = ai.NewAi(info.Blue, slowBrainBlue, fastBrainBlue)
+	teamControllers := make([]*gameTeamController, 0, len(teams))
+	for _, team := range teams {
+		teamControllers = append(teamControllers, newGameTeamController(team))
+	}
 
 	if config.IsSimulated() {
 		teamYellow := []int{1, 2, 3, 4, 5, 6}
@@ -197,8 +234,9 @@ func GameScenario() {
 		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
 
-		simClientYellow = client.NewSimClient(config.GetSimYellowTeamAddress(), gameInfo)
-		simClientBlue = client.NewSimClient(config.GetSimBlueTeamAddress(), gameInfo)
+		for _, teamController := range teamControllers {
+			teamController.simClient = client.NewSimClient(simAddressForTeam(teamController.team), gameInfo)
+		}
 
 		simController = simulator.NewSimControl()
 		teleportBallMillimeters(simController, info.Position{Y: 0})
@@ -222,12 +260,12 @@ func GameScenario() {
 		command := client.GetCommand(client.CHANGE_SCENARIO)
 
 		if command != nil {
-			if command.Type == "Manual" {
-				aiYellow.HotswapPlanner(info.Yellow, manualMovementYellow)
-				// aiBlue.HotswapPlanner(info.Blue, manualMovementBlue)
-			} else if command.Type == "Game" {
-				aiYellow.HotswapPlanner(info.Yellow, slowBrainYellow)
-				aiBlue.HotswapPlanner(info.Blue, slowBrainBlue)
+			for _, teamController := range teamControllers {
+				if command.Type == "Manual" {
+					teamController.activateManual()
+				} else if command.Type == "Game" {
+					teamController.activateGame()
+				}
 			}
 		}
 
@@ -235,20 +273,19 @@ func GameScenario() {
 			continue
 		}
 
-		actionsYellow := aiYellow.GetActions(gameInfo)
-		actionsBlue := aiBlue.GetActions(gameInfo)
+		for _, teamController := range teamControllers {
+			actions := teamController.ai.GetActions(gameInfo)
+			client.BroadcastActions(actions)
 
-		client.BroadcastActions(actionsYellow)
-		client.BroadcastActions(actionsBlue)
+			if config.IsSimulated() {
+				teamController.simClient.SendActions(actions)
+			} else {
+				basestationClient.SendActions(actions)
+			}
+		}
 
 		if config.IsSimulated() {
-			simClientYellow.SendActions(actionsYellow)
-			simClientBlue.SendActions(actionsBlue)
-
 			handleSimulatedBall(gameInfo, simController)
-		} else {
-			basestationClient.SendActions(actionsYellow)
-			basestationClient.SendActions(actionsBlue)
 		}
 	}
 }
