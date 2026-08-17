@@ -53,4 +53,8 @@ float PID_pi(float current, float desired, float* I_prev, float (*error_func)(fl
  * Run one iteration of a P loop
  */
 float PID_p(float current, float desired, float (*error_func)(float, float), control_params* param);
+
+
+void POS_velocity_control(float vel_x, float vel_y, float dest_w);
+
 #endif /* COM_H */
