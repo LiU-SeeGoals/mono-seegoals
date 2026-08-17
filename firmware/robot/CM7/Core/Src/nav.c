@@ -376,11 +376,6 @@ void NAV_SetMovement(Command* cmd, MovementType movementType)
         const int32_t y = cmd->dest->y - 1000;
         const int32_t angle = cmd->dest->w - 1000;
 
-        // const float f_nav_x = ((float)nav_x) / 1000.f;
-        // const float f_nav_y = ((float)nav_y) / 1000.f;
-        // const float f_nav_w = ((float)nav_w) / 1000.f;
-        const float resolution = 1000.f;
-
         robot_cmd.x = x * speed;
         robot_cmd.y = y * speed;
         robot_cmd.w = ((float)angle) / 1000.f;
