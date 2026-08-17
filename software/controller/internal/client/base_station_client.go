@@ -101,7 +101,7 @@ func (b *BaseStationClient) sendCommands() {
 		b.queueMutex.Lock()
 		if len(b.queue) == 0 {
 			b.queueMutex.Unlock()
-			time.Sleep(1 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 			continue
 		}
 		cmd := b.queue[0]
