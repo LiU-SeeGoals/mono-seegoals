@@ -62,7 +62,7 @@ void COM_RF_Init()
     uint8_t address[5] = ROBOT_ADDR(COM_Get_ID());
     NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
 
-    // Channel 2.525 GHz
+    // Channel 2.400 + 0.107 GHz
     NRF_WriteRegisterByte(NRF_REG_RF_CH, 107);
 
     // No retransmissions
