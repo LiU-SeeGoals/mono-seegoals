@@ -371,14 +371,13 @@ void NAV_SetMovement(Command* cmd, MovementType movementType)
         }
 
         const int32_t speed = cmd->kick_speed;
-        const int32_t x = cmd->dest->x;
-        const int32_t y = cmd->dest->y;
-        const int32_t angle = cmd->dest->w;
+        const int32_t x = cmd->dest->x - 1000;
+        const int32_t y = cmd->dest->y - 1000;
+        const int32_t angle = cmd->dest->w - 1000;
 
         robot_cmd.x = x * speed;
         robot_cmd.y = y * speed;
-        robot_cmd.w = angle * speed / 2.f;
-
+        robot_cmd.w = ((float)angle) / 1000.f;
     }
 }
 
@@ -513,11 +512,21 @@ void NAV_SetMovementType(MovementType type)
 
 void NAV_VelocityMovementUpdate()
 {
+    if (STATE_is_calibrated() != 1)
+    {
+        return;
+    }
+
+    IMU_AccelVec3 acc = IMU_read_accel_mps2();
+    IMU_GyroVec3 gyr = IMU_read_gyro_radps();
+
+    STATE_FusionEKFIntertialUpdate(acc, gyr);
     float x = NAV_GetNavX();
     float y = NAV_GetNavY();
     float w = NAV_GetNavW();
 
-    NAV_steer(x, y, w);
+    POS_velocity_control(x,y,w);
+    // NAV_steer(x, y, w);
 }
 
 void NAV_PositionMovementUpdate()

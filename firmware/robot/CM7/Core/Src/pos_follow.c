@@ -12,16 +12,17 @@ static float DELTA_T = 0.001;
 
 static LOG_Module internal_log_mod;
 
+// Weight up angle alot, it is important to have the correct angle
 static float K[3][3] = {
-    {2.0f, 0.0f, 0.0f},
-    {0.0f, 2.0f, 0.0f},
-    {0.0f, 0.0f, 5.0f}
+    {4.0f * 150.f, 0.0f, 0.0f},
+    {0.0f, 4.0f * 150.f, 0.0f},
+    {0.0f, 0.0f, 3.0f * 50.f}
 };
 
-static float vel_max_xy = 1.0f;
-static float vel_max_w = 4.0f;
+static float vel_max_xy = 50.0f;
+static float vel_max_w = 400.0f;
 // Damping gain for angular velocity (using gyro feedback)
-static float Kd_omega = 0.5f;
+static float Kd_omega = 2.0f;
 
 void set_params()
 {
@@ -40,7 +41,8 @@ void set_params()
     params_dist.K = 500.0f * 1000.50;
 }
 
-void POS_Init() {
+void POS_Init()
+{
     set_params();
     LOG_InitModule(&internal_log_mod, "POS", LOG_LEVEL_ERROR, 0);
 }
@@ -62,8 +64,8 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     ControlSignal sigy;
     ControlSignal sigw;
 
-    static float i_dist_y = 0;
-    static float i_dist_x = 0;
+    static float i_prev_y = 0;
+    static float i_prev_x = 0;
     // Get current state from EKF
     const float cur_x = STATE_get_posx();
     const float cur_y = STATE_get_posy();
@@ -74,68 +76,52 @@ void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
     float ex = dest_x - cur_x;
     float ey = dest_y - cur_y;
     float ew = angle_error(cur_w, dest_w);  // Wrapped to [-pi, pi]
-    float Ix = i_dist_x + (DELTA_T / 5.5) * ex;
-    float Iy = i_dist_y + (DELTA_T / 5.5) * ey;
+    float Ix = i_prev_x + (DELTA_T / 0.0004) * ex;
+    float Iy = i_prev_y + (DELTA_T / 0.0004) * ey;
+    Ix = 0;
+    Iy = 0;
 
-    float vx_world = K[0][0] * (ex + Ix);
-    float vy_world = K[1][1] * (ey + Iy);
-    float omega  = K[2][2] * ew;
-
-    // Add gyro-based damping to reduce angular oscillations
-    // Essentialy makes it PD loop
-    float gyro_z = STATE_get_gyro_z();
-    omega = omega - Kd_omega * gyro_z;
-
-    float vel_xy = sqrtf(vx_world * vx_world + vy_world * vy_world);
-
-    if (vel_xy > vel_max_xy) {
-        float scale = vel_max_xy / vel_xy;
-        vx_world *= scale;
-        vy_world *= scale;
-    }
-    else{
-        i_dist_y = Iy;
-        i_dist_x = Ix;
-    }
-    if (omega > vel_max_w) omega = vel_max_w;
-    if (omega < -vel_max_w) omega = -vel_max_w;
+    float vx_world = K[0][0] * (ex);
+    float vy_world = K[1][1] * (ey);
 
     // Transform world frame velocity to robot frame
     float cos_w = arm_cos_f32(cur_w);
     float sin_w = arm_sin_f32(cur_w);
+
+    float vel_xy = sqrtf(vx_world * vx_world + vy_world * vy_world);
+
+    if (vel_xy < vel_max_xy) {
+        i_prev_x = Ix;
+        i_prev_y = Iy;
+    }
+    else {
+        // Anti integrator windup, do nothing
+    }
+
     float vx_robot = vx_world * cos_w + vy_world * sin_w;
     float vy_robot = -vx_world * sin_w + vy_world * cos_w;
 
-    const float vel_to_motor_scale = 250.0f;
-    float cmd_x = vx_robot * vel_to_motor_scale;
-    float cmd_y = vy_robot * vel_to_motor_scale;
-    float cmd_w = omega * 50.0f;  // Angular scaling
+    float cmd_x = vx_robot;
+    float cmd_y = vy_robot;
 
-    float deadzone = 5;
-    if (cmd_w < deadzone && cmd_w > -deadzone){
-        cmd_w = 0;
-    }
-    if (cmd_x < deadzone && cmd_x > -deadzone){
-        cmd_x = 0;
-    }
-    if (cmd_y < deadzone && cmd_y > -deadzone){
-        cmd_y = 0;
-    }
+    POS_velocity_control(vx_robot, vy_robot, dest_w);
+}
 
-    NAV_steer(cmd_x, cmd_y, cmd_w);
+void POS_velocity_control(float vel_x, float vel_y, float dest_w)
+{
+    const float cur_w = STATE_get_robot_angle();
 
-    sigx.u = cmd_x;
-    sigx.r = dest_x;
-    sigx.e = ex;
+    float ew = angle_error(cur_w, dest_w);
 
-    sigy.u = cmd_y;
-    sigy.r = dest_y;
-    sigy.e = ey;
+    float omega  = K[2][2] * ew;
 
-    sigw.u = cmd_w;
-    sigw.r = dest_w;
-    sigw.e = ew;
-    DATA_log_pos(sigx, sigy, sigw);
+    // Add gyro-based damping to reduce angular oscillations
+    float gyro_z = STATE_get_gyro_z();
+    omega = omega - Kd_omega * gyro_z;
+
+    float cmd_w = omega;
+
+    NAV_steer(vel_x, vel_y, cmd_w);
 }
 
 float PID_p(float current, float desired, float (*error_func)(float, float), control_params* param)

@@ -342,7 +342,7 @@ void parse_key()
         case 'C':
             LOG_UI("Chipper kicking\r\n");
             KICKER_SetKickerMode(KICKER_CHIPPER);
-            KICKER_ChargeStart(KICKER_SPEED_DEFAULT);
+            KICKER_ChargeStart(KICKER_SPEED_CHIP_PASS);
             break;
         case 'P': // Print vars
         {
