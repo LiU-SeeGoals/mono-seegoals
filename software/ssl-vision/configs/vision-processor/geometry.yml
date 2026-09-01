@@ -1,0 +1,37 @@
+# SeeGoals field geometry. All lengths are in millimetres.
+vision_ip: "224.5.23.2"
+vision_port: 10006
+
+optional_field_lines:
+  goal2goal: true
+  halfway: true
+  centercircle: true
+  penalty: true
+
+field:
+  field_length: 6100
+  field_width: 4350
+  goal_width: 2120
+  goal_depth: 10
+  goal_height: 155
+  penalty_area_depth: 600
+  penalty_area_width: 2120
+  goal_center_to_penalty_mark: 1350
+  boundary_width: 220
+  boundary_width_goal_line: 220
+  center_circle_radius: 760
+  line_thickness: 50
+  ball_radius: 50.0
+  max_robot_radius: 300.0
+  goal_substitution_area_width: 0
+
+models:
+  straight_two_phase:
+    acc_slide: -3.40
+    acc_roll: -0.45
+    k_switch: 0.64
+  chip_fixed_loss:
+    damping_xy_first_hop: 0.55
+    damping_xy_other_hops: 0.88
+    damping_z: 0.54
+

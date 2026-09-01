@@ -1,0 +1,43 @@
+# SeeGoals right-half camera configuration for ssl-vision-processor.
+cam_id: 1
+bot_heights_file: configs/vision-processor/robot-heights.yml
+
+camera:
+  driver: OPENCV
+  # If the camera requires authentication, keep a local untracked copy of this
+  # file and use http://USER:PASSWORD@192.168.1.11/mjpg/video.mjpg there.
+  path: "http://192.168.1.11/mjpg/video.mjpg"
+  width: 1920
+  height: 1080
+  exposure: 0.0
+  gain: 0.0
+  gamma: 1.0
+  white_balance: OUTDOOR
+
+geometry:
+  camera_amount: 2
+  camera_height: 2600.0
+  line_corners:
+    - [453, 0]
+    - [1575, 22]
+    - [1622, 814]
+    - [398, 819]
+  refinement: true
+
+network:
+  gc_ip: "224.5.23.1"
+  gc_port: 10003
+  vision_ip: "224.5.23.2"
+  vision_port: 10006
+
+stream:
+  active: true
+  raw_feed: false
+  ip_base_prefix: "224.5.23."
+  ip_base_end: 100
+  port: 10100
+
+debug:
+  wait_for_geometry: true
+  debug_images: true
+
