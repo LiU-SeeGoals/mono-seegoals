@@ -161,7 +161,7 @@ void MOTOR_SendPWM(MotorPWM* motor, float pulse_width)
         pulse_width = 0;
     }
 
-    float max_scale = 0.1;                 // Use a max scaling for the motor speed
+    float max_scale = 0.4;                 // Use a max scaling for the motor speed
     float scale = max_scale * pulse_width; // make max_scale largest scaling
 
     // TODO: How to handle rounding errors, do they even matter?
