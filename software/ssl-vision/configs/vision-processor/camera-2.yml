@@ -1,12 +1,12 @@
-# SeeGoals right-half camera configuration for ssl-vision-processor.
-cam_id: 1
+# SeeGoals overlapping centre-camera configuration for ssl-vision-processor.
+cam_id: 2
 bot_heights_file: configs/vision-processor/robot-heights.yml
 
 camera:
   driver: OPENCV
-  # If the camera requires authentication, keep a local untracked copy of this
-  # file and use http://USER:PASSWORD@192.168.1.11/mjpg/video.mjpg there.
-  path: "http://192.168.1.11/mjpg/video.mjpg"
+  # This camera exposes the MJPEG feed through the Axis CGI endpoint. Keep
+  # credentials in an untracked camera-2.local.yml file.
+  path: "http://192.168.1.12/axis-cgi/mjpg/video.cgi"
   width: 1920
   height: 1080
   exposure: 0.0
@@ -18,12 +18,12 @@ geometry:
   # geometry.yml publishes the saved calibration for this non-uniform
   # three-camera layout, so automatic camera-grid calibration is bypassed.
   camera_amount: 3
-  camera_height: 2600.0
+  camera_height: 2602.0
   line_corners:
-    - [453, 0]
-    - [1575, 22]
-    - [1622, 814]
-    - [398, 819]
+    - [1539, 841]
+    - [339, 789]
+    - [324, 140]
+    - [1597, 167]
   refinement: true
 
 network:
@@ -42,3 +42,4 @@ stream:
 debug:
   wait_for_geometry: true
   debug_images: true
+

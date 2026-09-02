@@ -2,6 +2,62 @@
 vision_ip: "224.5.23.2"
 vision_port: 10006
 
+# Saved camera models migrated from robocup-ssl.xml. Preloading all three
+# calibrations is required because camera 2 overlaps the two half-field cameras
+# and cannot be represented by ssl-vision-processor's automatic camera grid.
+calib:
+  - camera_id: 0
+    focal_length: 829.414963
+    principal_point_x: 977.850796
+    principal_point_y: 532.533356
+    distortion: 0.460000
+    q0: -0.713593
+    q1: -0.696232
+    q2: -0.049687
+    q3: 0.059802
+    tx: 273.825171
+    ty: 2130.658538
+    tz: 2604.000000
+    derived_camera_world_tx: -2512.977129
+    derived_camera_world_ty: -181.840448
+    derived_camera_world_tz: 2246.637939
+    pixel_image_width: 1920
+    pixel_image_height: 1080
+  - camera_id: 1
+    focal_length: 974.039838
+    principal_point_x: 914.547924
+    principal_point_y: 564.966102
+    distortion: 0.650000
+    q0: -0.703263
+    q1: -0.710449
+    q2: 0.016721
+    q3: 0.020096
+    tx: 404.956911
+    ty: -2153.063583
+    tz: 2600.000000
+    derived_camera_world_tx: 2143.898293
+    derived_camera_world_ty: -246.983336
+    derived_camera_world_tz: 2627.236616
+    pixel_image_width: 1920
+    pixel_image_height: 1080
+  - camera_id: 2
+    focal_length: 954.299070
+    principal_point_x: 969.617554
+    principal_point_y: 564.639721
+    distortion: 0.530000
+    q0: 0.716350
+    q1: -0.693612
+    q2: -0.057034
+    q3: -0.049930
+    tx: -111.535217
+    ty: -252.573066
+    tz: 2602.000000
+    derived_camera_world_tx: 146.779382
+    derived_camera_world_ty: -139.495391
+    derived_camera_world_tz: 2608.761029
+    pixel_image_width: 1920
+    pixel_image_height: 1080
+
 optional_field_lines:
   goal2goal: true
   halfway: true
@@ -34,4 +90,3 @@ models:
     damping_xy_first_hop: 0.55
     damping_xy_other_hops: 0.88
     damping_z: 0.54
-

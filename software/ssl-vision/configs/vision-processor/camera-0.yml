@@ -15,7 +15,9 @@ camera:
   white_balance: OUTDOOR
 
 geometry:
-  camera_amount: 2
+  # geometry.yml publishes the saved calibration for this non-uniform
+  # three-camera layout, so automatic camera-grid calibration is bypassed.
+  camera_amount: 3
   camera_height: 2604.0
   line_corners:
     - [386, 282]
@@ -40,4 +42,3 @@ stream:
 debug:
   wait_for_geometry: true
   debug_images: true
-
