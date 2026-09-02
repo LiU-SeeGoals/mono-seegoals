@@ -1,11 +1,11 @@
 # SeeGoals overlapping centre-camera configuration for ssl-vision-processor.
 cam_id: 2
-bot_heights_file: /home/jakos322/mono-seegoals/software/ssl-vision-processor/robot-heights.yml
+bot_heights_file: robot-heights.yml
 
 camera:
   driver: OPENCV
   # This camera exposes the MJPEG feed through the Axis CGI endpoint. Keep
-  # credentials in an untracked camera-2.local.yml file.
+  # credentials in an untracked config-camera-2.local.yml file.
   path: "http://192.168.1.12/axis-cgi/mjpg/video.cgi"
   width: 1920
   height: 1080
@@ -42,4 +42,3 @@ stream:
 debug:
   wait_for_geometry: true
   debug_images: true
-

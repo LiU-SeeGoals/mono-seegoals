@@ -1,11 +1,11 @@
 # SeeGoals left-half camera configuration for ssl-vision-processor.
 cam_id: 0
-bot_heights_file: /home/jakos322/mono-seegoals/software/ssl-vision-processor/robot-heights.yml
+bot_heights_file: robot-heights.yml
 
 camera:
   driver: OPENCV
-  # If the camera requires authentication, keep a local untracked copy of this
-  # file and use http://USER:PASSWORD@192.168.1.10/mjpg/video.mjpg there.
+  # If the camera requires authentication, keep a local untracked copy named
+  # config-camera-0.local.yml and add USER:PASSWORD@ to this URL there.
   path: "http://192.168.1.10/mjpg/video.mjpg"
   width: 1920
   height: 1080

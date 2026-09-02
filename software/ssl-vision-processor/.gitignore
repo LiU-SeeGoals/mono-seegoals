@@ -9,6 +9,9 @@ __pycache__
 # Cam viewer
 *.sdp
 
+# Local camera authentication
+config-camera-*.local.yml
+
 # Debug and test image directories
 /img
 /test-data
