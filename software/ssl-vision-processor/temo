@@ -1,0 +1,36 @@
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ ./build/vision_processor config-camera-0.yml
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:58] Using device: NVIDIA CUDA » NVIDIA GeForce RTX 3060 Ti
+[ WARN:0@0.340] global ./modules/videoio/src/cap_gstreamer.cpp (2401) handleMessage OpenCV | GStreamer warning: Embedded video playback halted; module source reported: Unauthorized
+[ WARN:0@0.340] global ./modules/videoio/src/cap_gstreamer.cpp (1356) open OpenCV | GStreamer warning: unable to start pipeline
+[ WARN:0@0.341] global ./modules/videoio/src/cap_gstreamer.cpp (862) isPipelinePlaying OpenCV | GStreamer warning: GStreamer: pipeline have not been created
+[ERROR:0@0.349] global ./modules/videoio/src/cap.cpp (164) open VIDEOIO(CV_IMAGES): raised OpenCV exception:
+
+OpenCV(4.6.0) ./modules/videoio/src/cap_images.cpp:253: error: (-5:Bad argument) CAP_IMAGES: can't find starting number (in the name of file): http://192.168.1.10/mjpg/video.mjpg in function 'icvExtractPattern'
+
+
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:127] New geometry received
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:140] Error during image allocation: -61
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ 
+oc
+jakos322@fia:~/mono-seeg
+oals/software/ssl-vision-processor$ 
+./build/visi
+on_processor config-camera-1.yml
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:58] Using device: NVIDIA CUDA » NVIDIA GeForce RTX 3060 Ti
+[AVHWDeviceContext @ 0x5c7d154d1e00] Failed to initialise VAAPI connection: -1 (unknown libva error).
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:127] New geometry received
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/Perspective.cpp:92] Field scale: 2.51307mm/px < 3.33231mm/px < 5.32295mm/px
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/Perspective.cpp:124] Visible field extent: -574.679     3280    -2405     2405mm (xmin,xmax,ymin,ymax) Field scale: 3.33231mm/px
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ ./build/vision_processor config-camera-2.yml
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:58] Using device: NVIDIA CUDA » NVIDIA GeForce RTX 3060 Ti
+[ WARN:0@0.250] global ./modules/videoio/src/cap_gstreamer.cpp (2401) handleMessage OpenCV | GStreamer warning: Embedded video playback halted; module source reported: Unauthorized
+[ WARN:0@0.250] global ./modules/videoio/src/cap_gstreamer.cpp (1356) open OpenCV | GStreamer warning: unable to start pipeline
+[ WARN:0@0.250] global ./modules/videoio/src/cap_gstreamer.cpp (862) isPipelinePlaying OpenCV | GStreamer warning: GStreamer: pipeline have not been created
+[ERROR:0@0.259] global ./modules/videoio/src/cap.cpp (164) open VIDEOIO(CV_IMAGES): raised OpenCV exception:
+
+OpenCV(4.6.0) ./modules/videoio/src/cap_images.cpp:253: error: (-5:Bad argument) CAP_IMAGES: can't find starting number (in the name of file): http://192.168.1.12/axis-cgi/mjpg/video.cgi in function 'icvExtractPattern'
+
+
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:127] New geometry received
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:140] Error during image allocation: -61
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ 
