@@ -44,4 +44,4 @@ stream:
 debug:
   wait_for_geometry: true
   debug_images: true
-  dubug_stream_interval_ms: 2000
+  debug_stream_interval_ms: 2000
