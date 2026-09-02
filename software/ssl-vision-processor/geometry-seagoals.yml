@@ -49,10 +49,12 @@ calib:
     q1: -0.693612
     q2: -0.057034
     q3: -0.049930
-    tx: -111.535217
-    ty: -252.573066
-    tz: 2602.000000
-    derived_camera_world_tx: 146.779382
+    # Align the centre camera with cameras 0/1 in their overlap. The centre
+    # line and a shared robot were both projected about +80 mm in field X.
+    tx: -109.031232
+    ty: -331.616402
+    tz: 2589.921873
+    derived_camera_world_tx: 66.779382
     derived_camera_world_ty: -139.495391
     derived_camera_world_tz: 2608.761029
     pixel_image_width: 1920
