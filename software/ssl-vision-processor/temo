@@ -1,12 +1,5 @@
-jakos322@fia:~$ docker run --rm --network host \
-> --name ssl-vison-client-real \
-> -visonAddress 224.5.23.2:10006 \
-> -address :8082
-Unable to find image '224.5.23.2:10006' locally
-docker: Error response from daemon: pull access denied for 224.5.23.2, repository does not exist or may require 'docker login': denied: requested access to the resource is denied
-
-Run 'docker run --help' for more information
-jakos322@fia:~$ docker run --rm --network host --name ssl-vison-client-real -visonAddress 224.5.23.2:10006 -address :8082
-Unable to find image '224.5.23.2:10006' locally
-docker: Error response from daemon: Get "https://registry-1.docker.io/v2/": dial tcp: lookup registry-1.docker.io on 127.0.0.53:53: server misbehaving
-
+docker run --rm --network host \
+  --name ssl-vision-client-real \
+  robocupssl/ssl-vision-client:1.8.3 \
+  -visionAddress 224.5.23.2:10006 \
+  -address :8082
