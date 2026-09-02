@@ -1,0 +1,23 @@
+{
+  "camera_id": 2,
+  "image_width": 1920,
+  "image_height": 1080,
+  "line_corners": [[453, 0], [1575, 22], [1622, 814], [398, 819]],
+  "camera_height": 2600,
+  "refinement_enabled": true,
+  "half_line_width": 2,
+  "line_pixel_count": 160443,
+  "raw_line_segments": 226,
+  "merged_line_count": 139,
+  "focal_length": 498.231232,
+  "position": [7616.70752, -351.53891, 2600],
+  "euler": [3.08516836, 0.00636809878, -1.56310856],
+  "distortion_k2": 0,
+  "principal_point": [960, 540],
+  "total_error": 160312,
+  "error_rate": 0.999183536,
+  "thresholded_image_path": "img/2.pixels.png",
+  "lines_image_path": "img/2.lines.png",
+  "corner_overlay_path": "img/2.pixels.corner.png",
+  "refined_overlay_path": "img/2.pixels.refined.png"
+}

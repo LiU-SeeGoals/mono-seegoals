@@ -13,7 +13,6 @@ __pycache__
 config-camera-*.local.yml
 
 # Debug and test image directories
-/img
 /test-data
 
 #Output binaries

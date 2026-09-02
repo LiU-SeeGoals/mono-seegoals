@@ -6,7 +6,7 @@ camera:
   driver: OPENCV
   # This camera exposes the MJPEG feed through the Axis CGI endpoint. Keep
   # credentials in an untracked config-camera-2.local.yml file.
-  path: "http://root:raswa151@192.168.1.12/axis-cgi/mjpg/video.cgi"
+  path: "http://root:raswa151@192.168.1.11/mjpg/video.mjpg"
   width: 1920
   height: 1080
   exposure: 0.0
@@ -44,3 +44,4 @@ stream:
 debug:
   wait_for_geometry: true
   debug_images: true
+  dubug_stream_interval_ms: 2000
