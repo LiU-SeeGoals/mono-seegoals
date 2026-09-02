@@ -115,7 +115,20 @@ Resources::Resources(const std::string& configPath) : fieldReference(), configPa
 
 	YAML::Node stream = getOptional(config["stream"]);
 	rtpStreamer = std::make_shared<RTPStreamer>(stream["active"].as<bool>(true), "rtp://" + stream["ip_base_prefix"].as<std::string>("224.5.23.") + std::to_string(stream["ip_base_end"].as<int>(100) + camId) + ":" + std::to_string(stream["port"].as<int>(10100)));
-	rawFeed = stream["raw_feed"].as<bool>(false);
+	const bool rawFeed = stream["raw_feed"].as<bool>(false);
+	const std::string streamViewName = stream["view"].as<std::string>("cycle");
+	if(rawFeed || streamViewName == "raw")
+		streamView = StreamView::Raw;
+	else if(streamViewName == "cycle")
+		streamView = StreamView::Cycle;
+	else if(streamViewName == "reprojected")
+		streamView = StreamView::Reprojected;
+	else if(streamViewName == "gradient")
+		streamView = StreamView::Gradient;
+	else if(streamViewName == "blob_score")
+		streamView = StreamView::BlobScore;
+	else
+		FATAL("Invalid stream view: " << streamViewName << " (expected cycle, raw, reprojected, gradient, or blob_score)");
 	snapshotWriter = std::make_shared<SnapshotWriter>();
 
 	raw2quadKernel = openCl->compile(kernel_raw2quad_cl, camera->format().kernelOptions);

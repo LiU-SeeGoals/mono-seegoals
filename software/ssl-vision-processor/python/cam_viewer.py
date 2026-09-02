@@ -23,11 +23,12 @@ import subprocess
 directory = os.path.dirname(__file__)
 
 
-def mpv(path):
+def mpv(path, title):
     while True:
         subprocess.run([
             "mpv",
             path,
+            f"--title={title}",
             "--profile=low-latency",
             "--untimed",
             "--no-cache-pause",
@@ -61,4 +62,5 @@ a=tool:libavformat 60.3.100
 m=video {args.stream_port} RTP/AVP 96
 a=rtpmap:96 H264/90000
 a=fmtp:96 packetization-mode=1""")
-        threading.Thread(target=mpv, name=sdp_filename, args=(sdp_filename, )).start()
+        title = f"Camera {cam_id + 1} (cam_id {cam_id}) - {ip}:{args.stream_port}"
+        threading.Thread(target=mpv, name=sdp_filename, args=(sdp_filename, title)).start()

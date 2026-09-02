@@ -36,6 +36,15 @@ typedef struct __attribute__ ((packed)) RGB {
 } RGB;
 
 
+enum class StreamView {
+	Cycle = -1,
+	Raw = 0,
+	Reprojected = 1,
+	Gradient = 2,
+	BlobScore = 3,
+};
+
+
 class Resources {
 public:
 	explicit Resources(const std::string& configPath);
@@ -86,7 +95,7 @@ public:
 	std::string groundTruth;
 	bool debugImages;
 	int debugStreamIntervalMs;
-	bool rawFeed;
+	StreamView streamView;
 
 	std::shared_ptr<GCSocket> gcSocket;
 	std::shared_ptr<VisionSocket> socket;

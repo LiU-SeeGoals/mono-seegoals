@@ -133,6 +133,9 @@ stream:
   #active: true
   # Only stream raw camera footage. Useful for recordings.
   #raw_feed: false
+  # Debug view: cycle, raw, reprojected, gradient, or blob_score.
+  # A fixed processed view avoids H.264 reconnects caused by resolution changes.
+  #view: cycle
 
   # Camera stream ip prefix
   #ip_base_prefix: 224.5.23.

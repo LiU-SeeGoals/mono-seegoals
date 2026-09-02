@@ -35,6 +35,8 @@ network:
 stream:
   active: true
   raw_feed: false
+  # Keep a fixed processed view to avoid restarting the H.264 stream.
+  view: reprojected
   ip_base_prefix: "224.5.23."
   ip_base_end: 100
   port: 10100

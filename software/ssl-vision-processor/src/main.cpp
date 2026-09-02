@@ -374,25 +374,28 @@ int main(int argc, char* argv[]) {
 			if(processingTime > r.camera->expectedFrametime())
 				LOG("frame time overrun: " << processingTime * 1000.0 << " ms " << matches.size() << " blobs " << detection->balls().size() << " balls " << (detection->robots_yellow_size() + detection->robots_blue_size()) << " bots");
 
-			if(r.rawFeed) {
-				r.streamQuad(channels);
-			} else {
+			StreamView streamView = r.streamView;
+			if(streamView == StreamView::Cycle) {
 				// Live OpenCV streams may report a fixed or invalid frame timestamp.
 				// Use wall-clock time so the debug stream still cycles through all views.
-				switch(((long)(realStartTime/20.0) % 4)) {
-					case 0:
-						r.streamQuad(channels);
-						break;
-					case 1:
-						r.streamImage(*flat);
-						break;
-					case 2:
-						r.streamImage(*gradDot);
-						break;
-					case 3:
-						r.streamImage(*blobCenter);
-						break;
-				}
+				streamView = static_cast<StreamView>((long)(realStartTime/20.0) % 4);
+			}
+
+			switch(streamView) {
+				case StreamView::Raw:
+					r.streamQuad(channels);
+					break;
+				case StreamView::Reprojected:
+					r.streamImage(*flat);
+					break;
+				case StreamView::Gradient:
+					r.streamImage(*gradDot);
+					break;
+				case StreamView::BlobScore:
+					r.streamImage(*blobCenter);
+					break;
+				case StreamView::Cycle:
+					break;
 			}
 
 			if(r.debugStreamIntervalMs > 0 && (realStartTime - lastDebugSaveTime) * 1000.0 >= r.debugStreamIntervalMs) {
