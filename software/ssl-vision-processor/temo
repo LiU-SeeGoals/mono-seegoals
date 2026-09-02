@@ -1,5 +1,13 @@
 docker run --rm --network host \
+  --name auto-ref-real \
+  tigersmannheim/auto-referee \
+  -hl \
+  -va 224.5.23.2:10006
+
+
+docker run --rm --network host \
   --name ssl-vision-client-real \
   robocupssl/ssl-vision-client:1.8.3 \
   -visionAddress 224.5.23.2:10006 \
+  -trackedAddress 224.5.23.2:10010 \
   -address :8082

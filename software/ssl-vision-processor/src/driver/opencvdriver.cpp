@@ -15,6 +15,8 @@
  */
 #include "opencvdriver.h"
 
+#include <cmath>
+
 OpenCVDriver::OpenCVDriver(const CameraConfig& config): capture(config.path, cv::CAP_ANY, {cv::CAP_PROP_HW_ACCELERATION, cv::VIDEO_ACCELERATION_ANY}), name(config.path) {
 	std::replace(name.begin(), name.end(), '/', '_');
 
@@ -72,7 +74,7 @@ const PixelFormat OpenCVDriver::format() {
 double OpenCVDriver::expectedFrametime() {
 	double fps = capture.get(cv::CAP_PROP_FPS);
 
-	if(fps == 0.0) // Unavailable for cameras, estimate 30 FPS
+	if(!std::isfinite(fps) || fps <= 0.0) // Unavailable for cameras, estimate 30 FPS
 		fps = 30.0;
 
 	return 1 / fps;
@@ -80,10 +82,18 @@ double OpenCVDriver::expectedFrametime() {
 
 
 double OpenCVDriver::getTime() {
-	double pos = capture.get(cv::CAP_PROP_POS_FRAMES);
+	const double pos = capture.get(cv::CAP_PROP_POS_FRAMES);
+	const double fps = capture.get(cv::CAP_PROP_FPS);
+	const double frameCount = capture.get(cv::CAP_PROP_FRAME_COUNT);
 
-	if(pos == -1) // Not a video file, use real time
+	// Live devices and network streams often report a frame position of zero
+	// instead of -1. They may also expose an invalid FPS or frame count. Such
+	// values are not timestamps and previously produced capture times near the
+	// Unix epoch, which prevents multi-camera trackers from aligning frames.
+	if(!std::isfinite(pos) || pos < 0.0 ||
+			!std::isfinite(fps) || fps <= 0.0 ||
+			!std::isfinite(frameCount) || frameCount <= 0.0)
 		return getRealTime();
 
-	return pos / capture.get(cv::CAP_PROP_FPS);
+	return pos / fps;
 }
