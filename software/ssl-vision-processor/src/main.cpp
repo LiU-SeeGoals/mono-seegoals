@@ -377,7 +377,9 @@ int main(int argc, char* argv[]) {
 			if(r.rawFeed) {
 				r.streamQuad(channels);
 			} else {
-				switch(((long)(startTime/20.0) % 4)) {
+				// Live OpenCV streams may report a fixed or invalid frame timestamp.
+				// Use wall-clock time so the debug stream still cycles through all views.
+				switch(((long)(realStartTime/20.0) % 4)) {
 					case 0:
 						r.streamQuad(channels);
 						break;
