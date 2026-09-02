@@ -190,11 +190,19 @@ static void trackBots(const double timestamp, const float defaultBotHeight, cons
 				bot.confidence(), 1
 			});
 		} else {
-			auto timeDelta = (float)(timestamp - nextOldBot->timestamp);
+			const auto timeDelta = (float)(timestamp - nextOldBot->timestamp);
+			float vx = 0.0f;
+			float vy = 0.0f;
+			float vw = 0.0f;
+			if(std::isfinite(timeDelta) && timeDelta > 0.001f) {
+				vx = (bot.x() - nextOldBot->x) / timeDelta;
+				vy = (bot.y() - nextOldBot->y) / timeDelta;
+				vw = std::remainder(bot.orientation() - nextOldBot->w, 2.0f * (float)M_PI) / timeDelta;
+			}
 			objects.push_back({
 				nextOldBot->id, timestamp,
 				bot.x(), bot.y(), height, bot.orientation(),
-				(bot.x() - nextOldBot->x) / timeDelta, (bot.y() - nextOldBot->y) / timeDelta, 0.0f, (bot.orientation() - nextOldBot->w) / timeDelta,
+				vx, vy, 0.0f, vw,
 				bot.confidence(), nextOldBot->age + 1
 			});
 		}
@@ -237,11 +245,19 @@ void VisionSocket::detectionTracking(const SSL_DetectionFrame &detection) {
 				ball.confidence(), 1
 			});
 		} else {
-			auto timeDelta = (float)(timestamp - nextOldBall->timestamp);
+			const auto timeDelta = (float)(timestamp - nextOldBall->timestamp);
+			float vx = 0.0f;
+			float vy = 0.0f;
+			float vz = 0.0f;
+			if(std::isfinite(timeDelta) && timeDelta > 0.001f) {
+				vx = (ball.x() - nextOldBall->x) / timeDelta;
+				vy = (ball.y() - nextOldBall->y) / timeDelta;
+				vz = (z - nextOldBall->z) / timeDelta;
+			}
 			objects.push_back({
 				-1, timestamp,
 				ball.x(), ball.y(), z, 0.0f,
-				(ball.x() - nextOldBall->x) / timeDelta, (ball.y() - nextOldBall->y) / timeDelta, (z - nextOldBall->z) / timeDelta, 0.0f,
+				vx, vy, vz, 0.0f,
 				ball.confidence(), nextOldBall->age + 1
 			});
 		}

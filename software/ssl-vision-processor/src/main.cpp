@@ -13,6 +13,7 @@
      See the License for the specific language governing permissions and
      limitations under the License.
  */
+#include <cmath>
 #include <csignal>
 #include "log.h"
 #include <opencv2/bgsegm.hpp>
@@ -86,12 +87,22 @@ void generateRadiusSearchTrackedBotHypotheses(const Resources& r, std::list<std:
 				continue;
 
 			auto timeDelta = (float)(currentTimestamp - tracked.timestamp);
+			// Network cameras can briefly stall and clock synchronization can make
+			// consecutive timestamps equal or slightly out of order. Clamp before
+			// extrapolating; doing it afterwards permits a stale velocity to predict
+			// a robot far outside the local blob search area.
+			if(!std::isfinite(timeDelta) || timeDelta <= 0.0f)
+				timeDelta = 0.0f;
+			else
+				timeDelta = std::min(timeDelta, 0.05f);
+
 			Eigen::Vector2f reprojectedPosition = r.perspective->model.image2field(r.perspective->model.field2image({tracked.x, tracked.y, tracked.z}), r.gcSocket->maxBotHeight).head<2>();
-			Eigen::Vector3f trackedPosition = Eigen::Vector3f(reprojectedPosition.x(), reprojectedPosition.y(), tracked.w) + Eigen::Vector3f(tracked.vx, tracked.vy, tracked.vw) * timeDelta;
+			Eigen::Vector3f velocity(tracked.vx, tracked.vy, tracked.vw);
+			if(!velocity.allFinite())
+				velocity.setZero();
+			Eigen::Vector3f trackedPosition = Eigen::Vector3f(reprojectedPosition.x(), reprojectedPosition.y(), tracked.w) + velocity * timeDelta;
 			Eigen::Rotation2Df rotation(trackedPosition.z());
 
-			//prevent runtime escalation due to excessive timeDelta when FPS drop below 20 FPS or times are not synced
-			timeDelta = std::max(std::min(timeDelta, 0.05f), 0.0f);
 			//Double acceleration due to velocity determination from two frame difference
 			float blobSearchRadius = (float)r.maxBotAcceleration * timeDelta * timeDelta + (float)r.minTrackingRadius;
 
