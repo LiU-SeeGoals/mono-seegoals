@@ -26,10 +26,6 @@ geometry:
     - [532, 1056]
   refinement: true
 
-tracking:
-  # Allow for small residual calibration differences during camera handoff.
-  min_tracking_radius: 35.0
-
 network:
   gc_ip: "224.5.23.1"
   gc_port: 10003
