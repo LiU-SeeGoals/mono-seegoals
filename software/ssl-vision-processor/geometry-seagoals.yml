@@ -77,8 +77,8 @@ field:
   boundary_width_goal_line: 220
   center_circle_radius: 760
   line_thickness: 50
-  ball_radius: 50.0
-  max_robot_radius: 300.0
+  ball_radius: 6.0
+  max_robot_radius: 90.0
   goal_substitution_area_width: 0
 
 models:
