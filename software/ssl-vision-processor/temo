@@ -1,36 +1,86 @@
-jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ ./build/vision_processor config-camera-0.yml
+~/mono-seegoals/software/ssl-vision-processor$ python3 python/geom_publisher.py geometry-seagoals.yml 
+^CTraceback (most recent call last):
+  File "/home/jakos322/mono-seegoals/software/ssl-vision-processor/python/geom_publisher.py", line 145, in <module>
+    time.sleep(1.0)
+KeyboardInterrupt
+
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ python3 python/geom_publisher.py geometry-seagoals.yml 
+Traceback (most recent call last):
+  File "/home/jakos322/mono-seegoals/software/ssl-vision-processor/python/geom_publisher.py", line 144, in <module>
+    receiver.send(wrapper)
+  File "/home/jakos322/mono-seegoals/software/ssl-vision-processor/python/visionsocket.py", line 86, in send
+    self.socket.sendto(wrapper.SerializeToString(), self.address)
+OSError: [Errno 101] Network is unreachable
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/jakos322/mono-seegoals/software/ssl-vision-processor/python/geom_publisher.py", line 142, in <module>
+    with receiver:
+  File "/home/jakos322/mono-seegoals/software/ssl-vision-processor/python/visionsocket.py", line 106, in __exit__
+    self.socket.sendto(b'', self.address)
+OSError: [Errno 101] Network is unreachable
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ python3 python/geom_publisher.py geometry-seagoals.yml 
+sion-processor$ ./build/vision_processor config-camera-0.yml
 [/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:58] Using device: NVIDIA CUDA » NVIDIA GeForce RTX 3060 Ti
-[ WARN:0@0.340] global ./modules/videoio/src/cap_gstreamer.cpp (2401) handleMessage OpenCV | GStreamer warning: Embedded video playback halted; module source reported: Unauthorized
-[ WARN:0@0.340] global ./modules/videoio/src/cap_gstreamer.cpp (1356) open OpenCV | GStreamer warning: unable to start pipeline
-[ WARN:0@0.341] global ./modules/videoio/src/cap_gstreamer.cpp (862) isPipelinePlaying OpenCV | GStreamer warning: GStreamer: pipeline have not been created
-[ERROR:0@0.349] global ./modules/videoio/src/cap.cpp (164) open VIDEOIO(CV_IMAGES): raised OpenCV exception:
-
-OpenCV(4.6.0) ./modules/videoio/src/cap_images.cpp:253: error: (-5:Bad argument) CAP_IMAGES: can't find starting number (in the name of file): http://192.168.1.10/mjpg/video.mjpg in function 'icvExtractPattern'
-
-
+[AVHWDeviceContext @ 0x65495c44b040] Failed to initialise VAAPI connection: -1 (unknown libva error).
 [/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:127] New geometry received
-[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:140] Error during image allocation: -61
-jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ 
-oc
-jakos322@fia:~/mono-seeg
-oals/software/ssl-vision-processor$ 
-./build/visi
-on_processor config-camera-1.yml
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/Perspective.cpp:92] Field scale: 2.48853mm/px < 3.45577mm/px < 6.86281mm/px
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/Perspective.cpp:124] Visible field extent:   -3280 946.734   -2405    2405mm (xmin,xmax,ymin,ymax) Field scale: 3.45577mm/px
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/main.cpp:375] frame time overrun: 11129.1 ms 273 blobs 0 balls 1 bots
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/rtpstreamer.cpp:97] Using codec: NVIDIA NVENC H.264 encoder
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/main.cpp:375] frame time overrun: 14839.1 ms 292 blobs 0 balls 1 bots
+processor/src/main.cpp:427] Stopping vision_processor
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ ./build/vision_processor config-camera-1.yml
 [/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:58] Using device: NVIDIA CUDA » NVIDIA GeForce RTX 3060 Ti
-[AVHWDeviceContext @ 0x5c7d154d1e00] Failed to initialise VAAPI connection: -1 (unknown libva error).
+[AVHWDeviceContext @ 0x55f9d1912f00] Failed to initialise VAAPI connection: -1 (unknown libva error).
 [/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:127] New geometry received
 [/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/Perspective.cpp:92] Field scale: 2.51307mm/px < 3.33231mm/px < 5.32295mm/px
 [/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/Perspective.cpp:124] Visible field extent: -574.679     3280    -2405     2405mm (xmin,xmax,ymin,ymax) Field scale: 3.33231mm/px
-jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ ./build/vision_processor config-camera-2.yml
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:277] Large backwards time jump suppressed: -2.98059e+08s
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/main.cpp:375] frame time overrun: 23875.9 ms 315 blobs 4 balls 1 bots
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/rtpstreamer.cpp:97] Using codec: NVIDIA NVENC H.264 encoder
+processor$ ./build/vision_processor config-camera-2.yml
 [/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:58] Using device: NVIDIA CUDA » NVIDIA GeForce RTX 3060 Ti
-[ WARN:0@0.250] global ./modules/videoio/src/cap_gstreamer.cpp (2401) handleMessage OpenCV | GStreamer warning: Embedded video playback halted; module source reported: Unauthorized
-[ WARN:0@0.250] global ./modules/videoio/src/cap_gstreamer.cpp (1356) open OpenCV | GStreamer warning: unable to start pipeline
-[ WARN:0@0.250] global ./modules/videoio/src/cap_gstreamer.cpp (862) isPipelinePlaying OpenCV | GStreamer warning: GStreamer: pipeline have not been created
-[ERROR:0@0.259] global ./modules/videoio/src/cap.cpp (164) open VIDEOIO(CV_IMAGES): raised OpenCV exception:
-
-OpenCV(4.6.0) ./modules/videoio/src/cap_images.cpp:253: error: (-5:Bad argument) CAP_IMAGES: can't find starting number (in the name of file): http://192.168.1.12/axis-cgi/mjpg/video.cgi in function 'icvExtractPattern'
-
-
+[AVHWDeviceContext @ 0x5de833ec9d00] Failed to initialise VAAPI connection: -1 (unknown libva error).
 [/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:127] New geometry received
-[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/opencl.cpp:140] Error during image allocation: -61
-jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ 
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/Perspective.cpp:92] Field scale: 2.54638mm/px < 3.36997mm/px < 6.03243mm/px
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/Perspective.cpp:124] Visible field extent: -3108.73  2031.91    -24052405mm (xmin,xmax,ymin,ymax) Field scale: 3.36997mm/px
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:277] Large backwards time jump suppressed: -8.94177e+08s
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/main.cpp:375] frame time overrun: 40506.9 ms 318 blobs 0 balls 1 bots
+[http @ 0x5de833ec4980] Stream ends prematurely at 396713, should be 18446744073709551615
+[mjpeg @ 0x5de833ec86c0] overread 8
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/rtpstreamer.cpp:97] Using codec: NVIDIA NVENC H.264 encoder
+^C^C^C[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/udpsocket.cpp:277] Large backwards time jump suppressed: -5.96118e+08s
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/main.cpp:375] frame time overrun: 39543 ms 280 blobs 0 balls 2 bots
+[/home/jakos322/mono-seegoals/software/ssl-vision-processor/src/main.cpp:427] Stopping vision_processor
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ :~/mono-seegoals/software/ssl-vision-processor$ ^C
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ ^C
+jakos322@fia:~/mono-seegoals/software/ssl-vision-processor$ python3 python/cam_viewer.py --cameras 3
+ (+) Video --vid=1 (h264)
+File tags:
+ Title: Cam2
+ (+) Video --vid=1 (h264)
+File tags:
+ Title: Cam0
+ (+) Video --vid=1 (h264)
+File tags:
+ Title: Cam1
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.
+[lavf] error reading packet: Connection timed out.

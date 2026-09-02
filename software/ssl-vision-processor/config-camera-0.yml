@@ -6,7 +6,7 @@ camera:
   driver: OPENCV
   # If the camera requires authentication, keep a local untracked copy named
   # config-camera-0.local.yml and add USER:PASSWORD@ to this URL there.
-  path: "http://192.168.1.10/mjpg/video.mjpg"
+  path: "http://root:raswa151@192.168.1.10/mjpg/video.mjpg"
   width: 1920
   height: 1080
   exposure: 0.0
