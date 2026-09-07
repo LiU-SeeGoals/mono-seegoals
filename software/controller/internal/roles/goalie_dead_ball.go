@@ -282,9 +282,9 @@ func ballInOwnGoalArea(gi *info.GameInfo, team info.Team, ballPos info.Position)
 
 func ownGoalNoGoZone(gi *info.GameInfo, team info.Team) (interceptGoalNoGoZone, bool) {
 	if defenseXSign(gi, team) > 0 {
-		return interceptGoalNoGoZoneFromLines(gi, "RightPenaltyStretch", "RightGoalLine")
+		return interceptGoalNoGoZoneForSide(gi, true)
 	}
-	return interceptGoalNoGoZoneFromLines(gi, "LeftPenaltyStretch", "LeftGoalLine")
+	return interceptGoalNoGoZoneForSide(gi, false)
 }
 
 func chooseSimpleGoalieChipTarget(gi *info.GameInfo, team info.Team, selfID info.ID) (info.Position, bool) {

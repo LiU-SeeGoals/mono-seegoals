@@ -3,6 +3,7 @@ package ai
 import (
 	"fmt"
 	"math"
+	"os"
 	"sync"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 )
 
 const (
-	captureDebugEnabled           = true
 	captureDebugPrintPeriod       = 250 * time.Millisecond
 	captureDebugHeadingAnomaly    = math.Pi / 2
 	captureDebugHeadingAnomalyDeg = 90.0
@@ -26,8 +26,9 @@ type captureDebugState struct {
 }
 
 var (
-	captureDebugMu     sync.Mutex
-	captureDebugStates = map[string]captureDebugState{}
+	captureDebugEnabled = os.Getenv("SEEGOALS_CAPTURE_DEBUG") == "1"
+	captureDebugMu      sync.Mutex
+	captureDebugStates  = map[string]captureDebugState{}
 )
 
 func printCaptureDebug(

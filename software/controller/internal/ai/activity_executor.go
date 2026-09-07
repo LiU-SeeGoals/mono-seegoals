@@ -140,13 +140,8 @@ func (fb *activityExecutor) Run() {
 		for _, result := range results {
 			safeAction := stoppedPlaySafetyAction(result.action, fb.team, &gameInfo)
 			safeAction = fb.defenseAreaEscape.apply(safeAction, fb.team, &gameInfo)
-			actions = append(actions, clampMoveActionToField(safeAction, &gameInfo))
-		}
-
-		for _, action := range actions {
-			if action != nil {
-				// fmt.Println(fmt.Sprintf("Action: %v", action))
-			}
+			safeAction = clampMoveActionToField(safeAction, &gameInfo)
+			actions = append(actions, finalStoppedPlayAction(safeAction, &gameInfo))
 		}
 
 		// Send actions
@@ -177,6 +172,72 @@ func stoppedPlaySafetyAction(act action.Action, team info.Team, gi *info.GameInf
 	default:
 		return act
 	}
+}
+
+// Validate after all field and defense-area projections. A projection can undo
+// ball clearance, and checking only the endpoint also permits crossing the ball.
+func finalStoppedPlayAction(act action.Action, gi *info.GameInfo) action.Action {
+	move, ok := act.(*action.MoveTo)
+	if !ok || gi == nil || gi.Status == nil || gi.State == nil ||
+		gi.Status.GetGameEvent().GetCurrentState() != info.STATE_STOPPED {
+		return act
+	}
+	ball, err := gi.State.GetBall().GetPosition()
+	if err != nil {
+		return &action.Stop{Id: move.Id}
+	}
+	const radius = pathplanner.StopBallKeepoutRadius
+	areas := getGoalAreaBounds(gi)
+	clearance := defenseAreaClearance(goalLineClearance(move, gi), gi)
+	obstacles := pathplanner.ObstaclesForRobot(move.Team, info.ID(move.Id), false, false, gi)
+	legal := func(dest info.Position) bool {
+		if dest.Dist2d(ball) < radius ||
+			(!move.AllowGoalArea && positionInGoalArea(dest, areas, clearance)) {
+			return false
+		}
+		if move.Pos.Dist2d(ball) < radius {
+			// A robot already too close may escape, but must not first approach
+			// the ball on its way to a nominally legal destination.
+			if (dest.X-move.Pos.X)*(move.Pos.X-ball.X)+
+				(dest.Y-move.Pos.Y)*(move.Pos.Y-ball.Y) < 0 {
+				return false
+			}
+		}
+		return pathplanner.IsPathClear(move.Pos, dest, obstacles, 0)
+	}
+	if legal(move.Dest) {
+		return move
+	}
+
+	// Search the keepout perimeter for a reachable waypoint. Run each candidate
+	// through the same field/defense constraints, then validate their intersection.
+	bestDistance := math.Inf(1)
+	var best *action.MoveTo
+	for i := 0; i < 72; i++ {
+		angle := float64(i) * 2 * math.Pi / 72
+		// Build a fresh action; MoveTo's cached protobuf contains a mutex and
+		// must not be shallow-copied after serialization.
+		candidate := action.MoveTo{
+			Id: move.Id, Team: move.Team, Pos: move.Pos, Dest: move.Dest,
+			AllowOutsideField:   move.AllowOutsideField,
+			AllowBehindGoalLine: move.AllowBehindGoalLine,
+			AllowGoalArea:       move.AllowGoalArea,
+		}
+		candidate.Dest.X = ball.X + (radius+1)*math.Cos(angle)
+		candidate.Dest.Y = ball.Y + (radius+1)*math.Sin(angle)
+		clampMoveActionToField(&candidate, gi)
+		if !legal(candidate.Dest) {
+			continue
+		}
+		if distance := candidate.Dest.Dist2d(move.Dest); distance < bestDistance {
+			bestDistance = distance
+			best = &candidate
+		}
+	}
+	if best == nil {
+		return &action.Stop{Id: move.Id}
+	}
+	return best
 }
 
 // apply moves a stationary robot out of the opponent's defense area and holds
@@ -507,52 +568,12 @@ func positionInGoalArea(pos info.Position, areas []goalAreaBounds, clearance flo
 }
 
 func getGoalAreaBounds(gi *info.GameInfo) []goalAreaBounds {
-	if gi == nil || !gi.HasField() {
+	if gi == nil {
 		return nil
 	}
-
 	areas := make([]goalAreaBounds, 0, 2)
-	for _, names := range [][2]string{
-		{"LeftPenaltyStretch", "LeftGoalLine"},
-		{"RightPenaltyStretch", "RightGoalLine"},
-	} {
-		front := gi.GetFieldLine(names[0])
-		back := gi.GetFieldLine(names[1])
-		if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
-			continue
-		}
-		areas = append(areas, goalAreaBounds{
-			frontX: float64(front.GetP1().GetX()),
-			backX:  float64(back.GetP1().GetX()),
-			minY:   math.Min(float64(front.GetP1().GetY()), float64(front.GetP2().GetY())),
-			maxY:   math.Max(float64(front.GetP1().GetY()), float64(front.GetP2().GetY())),
-		})
+	for _, area := range gi.DefenseAreas() {
+		areas = append(areas, goalAreaBounds{frontX: area.FrontX, backX: area.BackX, minY: area.MinY, maxY: area.MaxY})
 	}
-	if len(areas) == 2 {
-		return areas
-	}
-
-	// Some SSL-Vision sources report the field dimensions without individual
-	// line segments. The dimensions still fully describe the rectangular
-	// defense areas, so do not disable this safety behavior in that case.
-	geometry, ok := gi.FieldGeometry()
-	if !ok || geometry.PenaltyAreaDepth <= 0 || geometry.PenaltyAreaWidth <= 0 {
-		return areas
-	}
-	halfLength := geometry.Length / 2
-	halfPenaltyWidth := geometry.PenaltyAreaWidth / 2
-	return []goalAreaBounds{
-		{
-			frontX: -halfLength + geometry.PenaltyAreaDepth,
-			backX:  -halfLength,
-			minY:   -halfPenaltyWidth,
-			maxY:   halfPenaltyWidth,
-		},
-		{
-			frontX: halfLength - geometry.PenaltyAreaDepth,
-			backX:  halfLength,
-			minY:   -halfPenaltyWidth,
-			maxY:   halfPenaltyWidth,
-		},
-	}
+	return areas
 }

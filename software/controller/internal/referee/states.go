@@ -87,6 +87,12 @@ type Halt struct {
 	RefereeInfo
 }
 
+// Timeout leaves the robots idle until STOP resumes match preparation. It
+// does not reuse STOP positioning, which can be delegated to the normal AI.
+type Timeout struct {
+	Halt
+}
+
 type FreeKick struct {
 	RefereeInfo
 	freeKick          *StateMachine
@@ -274,7 +280,9 @@ func (s *Penalty) Update() EventName {
 	gameEvent := s.gi.Status.GetGameEvent()
 	if restartActionTimedOut(gameEvent, s.penaltyStart, PenaltyMaxTime(s.gi.Status.GetDivision())) {
 		stopPenaltyRobots(s.activeRobots, s.activityHandler)
-		return "NONE"
+		gameEvent.CurrentState = info.STATE_STOPPED
+		gameEvent.BallInPlay = false
+		return STOP
 	}
 
 	if !s.ballInPlay && (gameEvent.BallInPlay || ballMoved) {
@@ -1842,12 +1850,17 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	running := &Running{}
 	uninitialized := &UninitializedRef{}
 
-	// Timeout still uses stopped-play behavior.
+	timeout := &Timeout{Halt{RefereeInfo: RefereeInfo{
+		gi: gi, activeRobots: activeRobots, team: team,
+		name: "TIMEOUT", activityHandler: activityHandler,
+	}}}
 
 	refereeSM := NewStateMachine(uninitialized)
 
 	refereeSM.AddTransition("HALT", STOP, stop)
-	// refereeSM.AddTransition("STOP", "Timeout", timeout)
+	refereeSM.AddTransition("STOP", TIMEOUT, timeout)
+	refereeSM.AddTransition("TIMEOUT", STOP, stop)
+	refereeSM.AddTransition("TIMEOUT", HALT, halt)
 
 	refereeSM.AddTransition("STOP", PREPARE_KICKOFF, prepareKickoff)
 	refereeSM.AddTransition("STOP", PREPARE_PENALTY, preparePenalty)
@@ -1863,6 +1876,7 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	refereeSM.AddTransition("BALLPLACEMENT", PREPARE_PENALTY, preparePenalty)
 
 	refereeSM.AddTransition("PREPAREKICKOFF", NORMAL_START, kickOff)
+	refereeSM.AddTransition("PREPAREKICKOFF", STOP, stop)
 	refereeSM.AddTransition("PREPAREPENALTY", NORMAL_START, penalty)
 	refereeSM.AddTransition("PREPAREPENALTY", STOP, stop)
 
@@ -1892,7 +1906,7 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	refereeSM.AddTransition(uninitialized.GetName(), STOP, stop)
 	refereeSM.AddTransition(uninitialized.GetName(), HALT, halt)
 	refereeSM.AddTransition(uninitialized.GetName(), NORMAL_START, running)
-	refereeSM.AddTransition(uninitialized.GetName(), TIMEOUT, stop)
+	refereeSM.AddTransition(uninitialized.GetName(), TIMEOUT, timeout)
 	refereeSM.AddTransition(uninitialized.GetName(), GAME_RUNNING_DETECTED, running)
 	refereeSM.AddTransition(uninitialized.GetName(), FORCE_START, running)
 	refereeSM.AddTransition(uninitialized.GetName(), FREE_KICK, freeKick)
@@ -1907,6 +1921,7 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 		stop:            stop,
 		activityHandler: activityHandler,
 		stateInfos: []*RefereeInfo{
+			&timeout.RefereeInfo,
 			&freeKick.RefereeInfo,
 			&prepareKickoff.RefereeInfo,
 			&stop.RefereeInfo,
@@ -1957,7 +1972,6 @@ func (s *RefereeHandler) HandleReferee() bool {
 	// Appendix B: Game States https://robocup-ssl.github.io/ssl-rules/sslrules.html
 
 	gameEvent := s.gi.Status.GetGameEvent()
-	fmt.Println(gameEvent)
 	refEvent := s.refEventForGameEvent(gameEvent)
 	s.refereeSM.TriggerEvent(EventName(refEvent))
 

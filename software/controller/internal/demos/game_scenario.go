@@ -5,6 +5,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/ai"
 	plan "github.com/LiU-SeeGoals/controller/internal/ai/plan"
 	"github.com/LiU-SeeGoals/controller/internal/client"
@@ -17,7 +18,8 @@ const (
 	ballPlacementTouchlineMarginMM = 200.0
 	ballPlacementCornerMarginMM    = 200.0
 	// Goal kicks are free kicks placed 1 m from the goal line.
-	ballPlacementGoalKickDepthMM = 1000.0
+	ballPlacementGoalKickDepthMM     = 1000.0
+	ballPlacementTeleportToleranceMM = 10.0
 	// SSL penalty marks are measured from the center of the goal being attacked.
 	penaltyMarkGoalDistanceDivisionAMM = 8000.0
 	penaltyMarkGoalDistanceDivisionBMM = 6000.0
@@ -28,15 +30,11 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 
 	ball := gameInfo.State.GetBall()
 	ballPos, ballTime, _ := ball.GetPositionTime()
-	if placement, ok := outsideFieldPlacement(gameInfo, ballPos); ok {
-		teleportBallMillimeters(simController, placement)
-	} else if time.Now().UnixMilli()-ballTime > 5000 {
-		teleportBallMillimeters(simController, info.Position{Y: 0})
-	}
 
 	ge := gameInfo.Status.GetGameEvent()
 	previousState := ge.GetPreviousState()
 	currentState := ge.GetCurrentState()
+	placementHandled := false
 	switch currentState {
 	case info.STATE_KICKOFF_PREPARATION:
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
@@ -44,7 +42,20 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 			teleportBallMillimeters(simController, info.Position{Y: 0})
 		}
 	case info.STATE_FREE_KICK:
-	case info.STATE_HALTED, info.STATE_STOPPED:
+	case info.STATE_HALTED:
+	case info.STATE_STOPPED:
+		if target, ok := refereePlacementTarget(ge, ballPos); ok {
+			fmt.Printf("teleported ball (%f, %f) (referee placement)\n", target.X, target.Y)
+			teleportBallMillimeters(simController, target)
+			placementHandled = true
+		} else if target, ok := outsideFieldPlacement(gameInfo, ballPos); ok {
+			// Some GameController versions expose the placement position only in
+			// their state store, not in the SSL referee packet. In that case wait
+			// for STOP and use the same field geometry as a compatibility fallback.
+			fmt.Printf("teleported ball (%f, %f) (derived referee placement)\n", target.X, target.Y)
+			teleportBallMillimeters(simController, target)
+			placementHandled = true
+		}
 	case info.STATE_PENALTY_PREPARATION:
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
 			if mark, ok := penaltyMarkPosition(gameInfo, ge.GetTeamWithPossession()); ok {
@@ -54,40 +65,47 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	case info.STATE_TIMEOUT:
 	case info.STATE_PLAYING:
 	case info.STATE_BALL_PLACEMENT:
-		if previousState != info.STATE_BALL_PLACEMENT {
-			toX := ge.GetDesignatedPosition().At(0, 0)
-			toY := ge.GetDesignatedPosition().At(1, 0)
-			fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", toX, toY, ge.GetTeamWithPossession())
-			teleportBallMillimeters(simController, info.Position{X: toX, Y: toY})
+		if target, ok := refereePlacementTarget(ge, ballPos); ok {
+			fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", target.X, target.Y, ge.GetTeamWithPossession())
+			teleportBallMillimeters(simController, target)
+			placementHandled = true
+		} else if target, ok := outsideFieldPlacement(gameInfo, ballPos); ok {
+			fmt.Printf("teleported ball (%f, %f) (derived ball placement)\n", target.X, target.Y)
+			teleportBallMillimeters(simController, target)
+			placementHandled = true
 		}
 	default:
 	}
+
+	// Only recover a ball that has disappeared after handling referee-directed
+	// placement. An out-of-bounds ball must remain where AutoRef observed it so
+	// the designated placement position can be used instead of a local guess.
+	hasRefereePlacement := (currentState == info.STATE_STOPPED || currentState == info.STATE_BALL_PLACEMENT) &&
+		ge.GetDesignatedPosition() != nil
+	if !placementHandled && !hasRefereePlacement && time.Now().UnixMilli()-ballTime > 5000 {
+		teleportBallMillimeters(simController, info.Position{Y: 0})
+	}
 }
 
-func penaltyMarkPosition(gameInfo *info.GameInfo, attackingTeam info.Team) (info.Position, bool) {
-	if gameInfo == nil || !gameInfo.HasField() {
+func refereePlacementTarget(gameEvent *info.GameEvent, ballPos info.Position) (info.Position, bool) {
+	if gameEvent == nil {
+		return info.Position{}, false
+	}
+	state := gameEvent.GetCurrentState()
+	if state != info.STATE_STOPPED && state != info.STATE_BALL_PLACEMENT {
 		return info.Position{}, false
 	}
 
-	field := gameInfo.FieldSize()
-	if field.X <= 0 {
+	designatedPosition := gameEvent.GetDesignatedPosition()
+	if designatedPosition == nil || designatedPosition.Len() < 2 {
 		return info.Position{}, false
 	}
 
-	ownGoalSign := gameInfo.OwnHalfXSign(attackingTeam)
-	opponentGoalX := -ownGoalSign * field.X / 2
-	goalDistance := penaltyMarkGoalDistanceDivisionBMM
-	if gameInfo.Status.GetDivision() == info.DivisionA {
-		goalDistance = penaltyMarkGoalDistanceDivisionAMM
+	target := info.Position{
+		X: designatedPosition.AtVec(0),
+		Y: designatedPosition.AtVec(1),
 	}
-	return info.Position{
-		X: opponentGoalX + ownGoalSign*goalDistance,
-		Y: 0,
-	}, true
-}
-
-func teleportBallMillimeters(simController *simulator.SimControl, pos info.Position) {
-	simController.TeleportBall(float32(pos.X*mmToM), float32(pos.Y*mmToM))
+	return target, ballPos.Dist2d(target) > ballPlacementTeleportToleranceMM
 }
 
 func outsideFieldPlacement(gameInfo *info.GameInfo, ballPos info.Position) (info.Position, bool) {
@@ -163,6 +181,32 @@ func signOrOne(value float64) float64 {
 
 func clampFloat(value, minValue, maxValue float64) float64 {
 	return math.Max(minValue, math.Min(maxValue, value))
+}
+
+func penaltyMarkPosition(gameInfo *info.GameInfo, attackingTeam info.Team) (info.Position, bool) {
+	if gameInfo == nil || !gameInfo.HasField() {
+		return info.Position{}, false
+	}
+
+	field := gameInfo.FieldSize()
+	if field.X <= 0 {
+		return info.Position{}, false
+	}
+
+	ownGoalSign := gameInfo.OwnHalfXSign(attackingTeam)
+	opponentGoalX := -ownGoalSign * field.X / 2
+	goalDistance := penaltyMarkGoalDistanceDivisionBMM
+	if gameInfo.Status.GetDivision() == info.DivisionA {
+		goalDistance = penaltyMarkGoalDistanceDivisionAMM
+	}
+	return info.Position{
+		X: opponentGoalX + ownGoalSign*goalDistance,
+		Y: 0,
+	}, true
+}
+
+func teleportBallMillimeters(simController *simulator.SimControl, pos info.Position) {
+	simController.TeleportBall(float32(pos.X*mmToM), float32(pos.Y*mmToM))
 }
 
 type gameTeamController struct {
@@ -251,7 +295,16 @@ func gameScenarioForTeams(teams ...info.Team) {
 	}
 	for {
 		// Pace the control loop from raw vision frames.
-		sslClientRaw.WaitForVision(gameInfo)
+		if !sslClientRaw.WaitForVision(gameInfo) {
+			for _, teamController := range teamControllers {
+				if config.IsSimulated() {
+					teamController.simClient.SendActions(stopAllRobots())
+				} else {
+					basestationClient.SendActions(stopAllRobots())
+				}
+			}
+			continue
+		}
 
 		playTime := time.Now().UnixMilli()
 
@@ -288,4 +341,13 @@ func gameScenarioForTeams(teams ...info.Team) {
 			handleSimulatedBall(gameInfo, simController)
 		}
 	}
+}
+
+// Stop every ID, including robots absent from the last vision frame.
+func stopAllRobots() []action.Action {
+	actions := make([]action.Action, 0, info.TEAM_SIZE)
+	for id := info.ID(0); id < info.TEAM_SIZE; id++ {
+		actions = append(actions, &action.Stop{Id: int(id)})
+	}
+	return actions
 }

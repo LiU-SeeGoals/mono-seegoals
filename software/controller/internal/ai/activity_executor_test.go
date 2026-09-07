@@ -14,7 +14,8 @@ func TestStoppedRobotMovesOutOfDefenseArea(t *testing.T) {
 	gi := newStoppedDefenseAreaTestGameInfo()
 	gi.State.SetBlueRobot(1, 4000, 0, 0.25, time.Now().UnixMilli())
 
-	got := moveStoppedRobotOutOfEnemyDefenseArea(&action.Stop{Id: 1}, info.Blue, gi)
+	escape := defenseAreaEscapeState{}
+	got := escape.apply(&action.Stop{Id: 1}, info.Blue, gi)
 	move, ok := got.(*action.MoveTo)
 	if !ok {
 		t.Fatalf("action = %T, want *action.MoveTo", got)
@@ -37,7 +38,8 @@ func TestStoppedRobotMovesOutOfEnemyDefenseAreaAfterHalfSwap(t *testing.T) {
 	gi.Status.SetGameStatus(0, 0, 0, 0, 0, true, "")
 	gi.State.SetBlueRobot(1, -4000, 0, 0, time.Now().UnixMilli())
 
-	got := moveStoppedRobotOutOfEnemyDefenseArea(&action.Stop{Id: 1}, info.Blue, gi)
+	escape := defenseAreaEscapeState{}
+	got := escape.apply(&action.Stop{Id: 1}, info.Blue, gi)
 	move, ok := got.(*action.MoveTo)
 	if !ok {
 		t.Fatalf("action = %T, want *action.MoveTo", got)
@@ -51,7 +53,8 @@ func TestStoppedRobotOutsideDefenseAreaRemainsStopped(t *testing.T) {
 	gi := newStoppedDefenseAreaTestGameInfo()
 	gi.State.SetBlueRobot(1, 0, 0, 0, time.Now().UnixMilli())
 
-	got := moveStoppedRobotOutOfEnemyDefenseArea(&action.Stop{Id: 1}, info.Blue, gi)
+	escape := defenseAreaEscapeState{}
+	got := escape.apply(&action.Stop{Id: 1}, info.Blue, gi)
 	if _, ok := got.(*action.Stop); !ok {
 		t.Fatalf("action = %T, want *action.Stop", got)
 	}
@@ -61,7 +64,8 @@ func TestStoppedRobotInOwnDefenseAreaRemainsStopped(t *testing.T) {
 	gi := newStoppedDefenseAreaTestGameInfo()
 	gi.State.SetBlueRobot(1, -4000, 0, 0, time.Now().UnixMilli())
 
-	got := moveStoppedRobotOutOfEnemyDefenseArea(&action.Stop{Id: 1}, info.Blue, gi)
+	escape := defenseAreaEscapeState{}
+	got := escape.apply(&action.Stop{Id: 1}, info.Blue, gi)
 	if _, ok := got.(*action.Stop); !ok {
 		t.Fatalf("action = %T, want *action.Stop in own defense area", got)
 	}
@@ -72,7 +76,8 @@ func TestHaltedRobotInDefenseAreaRemainsStopped(t *testing.T) {
 	gi.Status.GetGameEvent().CurrentState = info.STATE_HALTED
 	gi.State.SetBlueRobot(1, 4000, 0, 0, time.Now().UnixMilli())
 
-	got := moveStoppedRobotOutOfEnemyDefenseArea(&action.Stop{Id: 1}, info.Blue, gi)
+	escape := defenseAreaEscapeState{}
+	got := escape.apply(&action.Stop{Id: 1}, info.Blue, gi)
 	if _, ok := got.(*action.Stop); !ok {
 		t.Fatalf("action = %T, want *action.Stop during HALT", got)
 	}
@@ -104,4 +109,56 @@ func newStoppedDefenseAreaTestGameInfo() *info.GameInfo {
 	gi.Status.GetGameEvent().CurrentState = info.STATE_STOPPED
 	gi.Status.GetGameEvent().BallInPlay = false
 	return gi
+}
+
+func TestFinalStopMovementPreservesBallAndDefenseClearance(t *testing.T) {
+	for _, sign := range []float64{-1, 1} {
+		gi := newStoppedDefenseAreaTestGameInfo()
+		ball := info.Position{X: sign * 3000}
+		gi.State.SetBall(ball.X, ball.Y, 0, 1)
+		gi.State.SetBlueRobot(1, sign*2500, 0, 0, time.Now().UnixMilli())
+		move := &action.MoveTo{Id: 1, Team: info.Blue,
+			Pos: info.Position{X: sign * 2500}, Dest: info.Position{X: sign * 3800}}
+		safe := stoppedPlaySafetyAction(move, info.Blue, gi)
+		escape := defenseAreaEscapeState{}
+		safe = escape.apply(safe, info.Blue, gi)
+		safe = clampMoveActionToField(safe, gi)
+		safe = finalStoppedPlayAction(safe, gi)
+		got, ok := safe.(*action.MoveTo)
+		if !ok {
+			t.Fatalf("expected reachable escape, got %T", safe)
+		}
+		if got.Dest.Dist2d(ball) < 700 || positionInGoalArea(got.Dest, getGoalAreaBounds(gi), 390) {
+			t.Fatalf("unsafe final destination: %+v", got.Dest)
+		}
+		if (got.Dest.X-got.Pos.X)*(got.Pos.X-ball.X) < 0 {
+			t.Fatal("escape initially moves toward the ball")
+		}
+	}
+}
+
+func TestFinalStopMovementDoesNotCrossBall(t *testing.T) {
+	gi := newStoppedDefenseAreaTestGameInfo()
+	gi.State.SetBall(0, 0, 0, 1)
+	move := &action.MoveTo{Team: info.Blue, Id: 1, Pos: info.Position{X: -1000}, Dest: info.Position{X: 1000}}
+	safe := finalStoppedPlayAction(move, gi)
+	got, ok := safe.(*action.MoveTo)
+	if !ok {
+		t.Fatalf("expected a reachable waypoint around the ball, got %T", safe)
+	}
+	if got.Dest.X == move.Dest.X && got.Dest.Y == move.Dest.Y {
+		t.Fatal("retained a destination that drives through the ball")
+	}
+}
+
+func TestDefenseEscapeHoldsInitialHeadingAcrossFrames(t *testing.T) {
+	gi := newStoppedDefenseAreaTestGameInfo()
+	escape := defenseAreaEscapeState{}
+	gi.State.SetBlueRobot(1, 4000, 0, 0.25, 1)
+	escape.apply(&action.Stop{Id: 1}, info.Blue, gi)
+	gi.State.SetBlueRobot(1, 3900, 0, 0.3, 2)
+	got := escape.apply(&action.MoveTo{Id: 1, Team: info.Blue}, info.Blue, gi).(*action.MoveTo)
+	if got.Dest.Angle != 0.25 {
+		t.Fatalf("escape heading drifted to %f", got.Dest.Angle)
+	}
 }

@@ -3,19 +3,16 @@ package client
 import (
 	"math"
 	"net"
-	"strconv"
 	"testing"
+	"time"
 
 	"gonum.org/v1/gonum/mat"
 
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
 	"google.golang.org/protobuf/proto"
 )
-
-var globalCommand *robot_action.Command
 
 // This test starts a client and a sever and then sends a action to the server
 // and then checks if the response matches what was sent.
@@ -82,54 +79,56 @@ func TestSocketCommunication(t *testing.T) {
 		{rotateAction, rotateCommand},
 	}
 
-	commandChan := make(chan *robot_action.Command)
-	var port int = 25565
-	go startServer(port, commandChan)
-
-	for _, tc := range testCases {
-
-		command := testCommunication(tc.input, commandChan, port)
-
-		if command.GetRobotId() != tc.expected.GetRobotId() {
-			t.Errorf("Expected: %v, got: %v", tc.expected, command)
-		}
-
-		if command.GetCommandId() != tc.expected.GetCommandId() {
-			t.Errorf("Expected: %v, got: %v", tc.expected, command)
-		}
-	}
-}
-
-func testCommunication(newCommand action.Action, commandChan chan *robot_action.Command, port int) *robot_action.Command {
-
-	BaseStationClient := NewBaseStationClient("127.0.0.1:" + strconv.Itoa(port))
-	BaseStationClient.Init()
-	BaseStationClient.SendActions([]action.Action{newCommand})
-
-	command := <-commandChan
-
-	return command
-}
-
-func startServer(port int, commandChan chan<- *robot_action.Command) {
-	addr := net.UDPAddr{
-		Port: port,
-		IP:   net.ParseIP("127.0.0.1"),
-	}
-	ser, err := net.ListenUDP("udp", &addr)
+	// Bind before sending and use an ephemeral loopback port. Construct the
+	// transport directly so this test never reads deployment config or multicasts.
+	server, err := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1")})
 	if err != nil {
-		// fmt.Printf("Some error %v\n", err)
-		Logger.Errorf("Some error %v\n", err)
-		return
+		t.Fatal(err)
 	}
-	for {
-		p := make([]byte, 32) // Reinitialize before each read
-
-		ser.ReadFromUDP(p)
+	defer server.Close()
+	connection, err := net.DialUDP("udp", nil, server.LocalAddr().(*net.UDPAddr))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	client := &BaseStationClient{connections: []Connection{connection}, hasBeenInited: true}
+	for _, tc := range testCases {
+		client.SendActions([]action.Action{tc.input})
+		if len(client.queue) != 1 {
+			t.Fatalf("expected one queued command, got %d", len(client.queue))
+		}
+		data, err := proto.Marshal(client.queue[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.queue = nil
+		if err := client.sendMessage(data); err != nil {
+			t.Fatal(err)
+		}
+		if err := server.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		buffer := make([]byte, MAX_SEND_SIZE+1)
+		n, _, err := server.ReadFromUDP(buffer)
+		if err != nil {
+			t.Fatal(err)
+		}
 		command := &robot_action.Command{}
-		proto.Unmarshal(p, command)
+		if err := proto.Unmarshal(buffer[:n], command); err != nil {
+			t.Fatal(err)
+		}
+		if command.GetRobotId() != tc.expected.GetRobotId() || command.GetCommandId() != tc.expected.GetCommandId() {
+			t.Fatalf("expected robot %d command %v, got %v", tc.expected.GetRobotId(), tc.expected.GetCommandId(), command)
+		}
+	}
+}
 
-		// Send the command to the channel
-		commandChan <- command
+func TestStopReplacesQueuedCommandsForItsRobot(t *testing.T) {
+	client := &BaseStationClient{hasBeenInited: true}
+	client.SendActions([]action.Action{&action.Kick{Id: 1, KickSpeed: 3}, &action.MoveTo{Id: 2}, &action.MoveTo{Id: 1}})
+	client.SendActions([]action.Action{&action.Stop{Id: 1}})
+	if len(client.queue) != 2 || client.queue[0].GetRobotId() != 2 ||
+		client.queue[1].GetRobotId() != 1 || client.queue[1].GetCommandId() != robot_action.ActionType_STOP_ACTION {
+		t.Fatalf("STOP did not replace stale commands: %v", client.queue)
 	}
 }

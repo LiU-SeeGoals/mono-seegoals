@@ -237,34 +237,30 @@ func interceptGoalNoGoZones(gi *info.GameInfo) []interceptGoalNoGoZone {
 	}
 
 	zones := make([]interceptGoalNoGoZone, 0, 2)
-	if zone, ok := interceptGoalNoGoZoneFromLines(gi, "LeftPenaltyStretch", "LeftGoalLine"); ok {
+	if zone, ok := interceptGoalNoGoZoneForSide(gi, false); ok {
 		zones = append(zones, zone)
 	}
-	if zone, ok := interceptGoalNoGoZoneFromLines(gi, "RightPenaltyStretch", "RightGoalLine"); ok {
+	if zone, ok := interceptGoalNoGoZoneForSide(gi, true); ok {
 		zones = append(zones, zone)
 	}
 	return zones
 }
 
-func interceptGoalNoGoZoneFromLines(gi *info.GameInfo, frontLineName, backLineName string) (interceptGoalNoGoZone, bool) {
-	front := gi.GetFieldLine(frontLineName)
-	back := gi.GetFieldLine(backLineName)
-	if front == nil || back == nil || front.GetP1() == nil || front.GetP2() == nil || back.GetP1() == nil {
+func interceptGoalNoGoZoneForSide(gi *info.GameInfo, positive bool) (interceptGoalNoGoZone, bool) {
+	if gi == nil {
 		return interceptGoalNoGoZone{}, false
 	}
-
-	frontX := float64(front.GetP1().GetX())
-	backX := float64(back.GetP1().GetX())
-	y1 := float64(front.GetP1().GetY())
-	y2 := float64(front.GetP2().GetY())
-	margin := pathplanner.GoalLineSafetyRadius
-
-	return interceptGoalNoGoZone{
-		minX: math.Min(frontX, backX) - margin,
-		maxX: math.Max(frontX, backX) + margin,
-		minY: math.Min(y1, y2) - margin,
-		maxY: math.Max(y1, y2) + margin,
-	}, true
+	for _, area := range gi.DefenseAreas() {
+		if (area.FrontX > 0) == positive {
+			margin := pathplanner.GoalLineSafetyRadius
+			return interceptGoalNoGoZone{
+				minX: math.Min(area.FrontX, area.BackX) - margin,
+				maxX: math.Max(area.FrontX, area.BackX) + margin,
+				minY: area.MinY - margin, maxY: area.MaxY + margin,
+			}, true
+		}
+	}
+	return interceptGoalNoGoZone{}, false
 }
 
 func (z interceptGoalNoGoZone) contains(pos info.Position) bool {

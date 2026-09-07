@@ -105,11 +105,12 @@ func (receiver *SSLRefereeClient) handlePacket(packet *gc.Referee, ok bool, gi *
 	// 	return
 	// }
 
-	gi.Status.SetGameEventWithActionTime(
+	gi.Status.SetGameEventWithActionTimeAndDesignatedPosition(
 		info.RefCommand(packet.GetCommand().Number()),
 		packet.GetCommandTimestamp(),
 		float64(packet.GetDesignatedPosition().GetX()),
 		float64(packet.GetDesignatedPosition().GetY()),
+		packet.DesignatedPosition != nil,
 		nextRefCommand(packet),
 		packet.GetCurrentActionTimeRemaining(),
 		packet.CurrentActionTimeRemaining != nil)

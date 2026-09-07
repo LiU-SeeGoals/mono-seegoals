@@ -27,7 +27,10 @@ func gameScenarioReal(team info.Team) {
 
 	for {
 		// Pace the control loop from raw vision frames.
-		sslClientRaw.WaitForVision(gameInfo)
+		if !sslClientRaw.WaitForVision(gameInfo) {
+			basestationClient.SendActions(stopAllRobots())
+			continue
+		}
 
 		playTime := time.Now().UnixMilli()
 		sslClientTracked.UpdateState(gameInfo, playTime)

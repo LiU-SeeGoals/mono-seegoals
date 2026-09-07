@@ -157,12 +157,33 @@ func (gs *GameStatus) SetGameEventWithActionTime(refCommand RefCommand,
 	nextCommand RefCommand,
 	currentActionTimeRemaining int64,
 	currentActionTimeRemainingValid bool) {
-
-	gs.gameEvent.UpdateFromRefCommand(
+	gs.SetGameEventWithActionTimeAndDesignatedPosition(
 		refCommand,
 		commandTimestamp,
 		desPosX,
 		desPosY,
+		true,
+		nextCommand,
+		currentActionTimeRemaining,
+		currentActionTimeRemainingValid,
+	)
+}
+
+func (gs *GameStatus) SetGameEventWithActionTimeAndDesignatedPosition(refCommand RefCommand,
+	commandTimestamp uint64,
+	desPosX float64,
+	desPosY float64,
+	hasDesignatedPosition bool,
+	nextCommand RefCommand,
+	currentActionTimeRemaining int64,
+	currentActionTimeRemainingValid bool) {
+
+	gs.gameEvent.UpdateFromRefCommandWithDesignatedPosition(
+		refCommand,
+		commandTimestamp,
+		desPosX,
+		desPosY,
+		hasDesignatedPosition,
 		nextCommand,
 		currentActionTimeRemaining,
 		currentActionTimeRemainingValid)

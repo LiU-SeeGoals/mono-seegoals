@@ -94,25 +94,7 @@ func (m *AlignBall) getStagingPos(gi *info.GameInfo) info.Position {
 
 func (m *AlignBall) getTargetPosWithClearance(gi *info.GameInfo, clearance float64) info.Position {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
 	alignBallPos := ballPos
-	useLookahead := ok && ballVel.Norm2d() > minRollingBallSpeed
-	if useLookahead {
-		if myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition(); err == nil && myPos.Dist2d(ballPos) <= kickFarApproachDist {
-			useLookahead = false
-		}
-	}
-	if useLookahead {
-		lookahead := 0.0
-		alignBallPos.X += ballVel.X * 1000 * lookahead
-		alignBallPos.Y += ballVel.Y * 1000 * lookahead
-
-		// if we are in line with the ball don't lookahead, it just makes us miss the ball
-		if math.Abs(info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), ballPos.Angle)) < 10*math.Pi/180 {
-			alignBallPos = ballPos
-		}
-
-	}
 
 	ballV2 := info.Vec2{X: alignBallPos.X, Y: alignBallPos.Y}
 	goalPos := info.Vec2{X: m.to.X, Y: m.to.Y}

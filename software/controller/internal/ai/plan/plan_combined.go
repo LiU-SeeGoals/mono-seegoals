@@ -118,6 +118,7 @@ func newCombinedRoleManager(activityHandler *coreai.ActivityHandler, gi *GameInf
 }
 
 func (rm *combinedRoleManager) applySlotAssignments(assignments map[info.ID]tacticalSlotKind, now time.Time) {
+	assignments = rm.reserveRetainedSlots(assignments, now)
 	desired := make(map[info.ID]roleKind)
 	for id, slot := range assignments {
 		role := slot.roleKind()
@@ -140,9 +141,6 @@ func (rm *combinedRoleManager) applySlotAssignments(assignments map[info.ID]tact
 		if exists && current == role && hasSlot && currentSlot == nextSlot {
 			continue
 		}
-		if exists && currentSlot != nextSlot && now.Sub(rm.lastChanged[id]) < roleSwitchMinDuration {
-			continue
-		}
 
 		if !exists || current != role {
 			switch role {
@@ -155,6 +153,50 @@ func (rm *combinedRoleManager) applySlotAssignments(assignments map[info.ID]tact
 
 		rm.setSlot(id, nextSlot, now)
 	}
+}
+
+// Reserve cooldown-protected slots before allocating the remaining slots. A
+// swap must not give a slot to one robot while its previous owner still holds it.
+func (rm *combinedRoleManager) reserveRetainedSlots(desired map[info.ID]tacticalSlotKind, now time.Time) map[info.ID]tacticalSlotKind {
+	remaining := make(map[tacticalSlotKind]int)
+	ids := make([]info.ID, 0, len(desired))
+	for id, slot := range desired {
+		remaining[slot]++
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	resolved := make(map[info.ID]tacticalSlotKind, len(desired))
+	for _, id := range ids {
+		current, exists := rm.slotByRobot[id]
+		if exists && now.Sub(rm.lastChanged[id]) < roleSwitchMinDuration && remaining[current] > 0 {
+			resolved[id] = current
+			remaining[current]--
+		}
+	}
+	for _, id := range ids {
+		if _, reserved := resolved[id]; !reserved && remaining[desired[id]] > 0 {
+			resolved[id] = desired[id]
+			remaining[desired[id]]--
+		}
+	}
+	slots := make([]tacticalSlotKind, 0, len(remaining))
+	for slot := range remaining {
+		slots = append(slots, slot)
+	}
+	sort.Slice(slots, func(i, j int) bool { return slots[i] < slots[j] })
+	for _, id := range ids {
+		if _, assigned := resolved[id]; assigned {
+			continue
+		}
+		for _, slot := range slots {
+			if remaining[slot] > 0 {
+				resolved[id] = slot
+				remaining[slot]--
+				break
+			}
+		}
+	}
+	return resolved
 }
 
 func (rm *combinedRoleManager) assignOffense(id info.ID, now time.Time) {

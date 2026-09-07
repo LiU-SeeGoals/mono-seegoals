@@ -139,7 +139,12 @@ func TestKickBallDribblesBeforeAndDuringKick(t *testing.T) {
 		t.Fatalf("expected dribbler-only settling action, got dribble=%t kick=%d", settling.Dribble, settling.KickSpeed)
 	}
 
-	kick.dribbleSince = time.Now().Add(-kickDribbleSettleTime)
+	// Bring the ball inside the firmware lead window; elapsed time alone
+	// cannot make an out-of-reach ball safe to kick.
+	ballPos.X = info.Center2DribblerDist + info.BallRadius
+	gi.State.SetBall(ballPos.X, ballPos.Y, 0, 2)
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+	gi.State.SetTrackedBall(ballPos, info.Position{}, 2)
 	firing, ok := kick.GetAction(gi).(*action.MoveTo)
 	if !ok {
 		t.Fatal("expected move-to action while firing")
@@ -206,14 +211,14 @@ func TestKickAtPositionFiresInsideFirmwareLeadBeforeContact(t *testing.T) {
 func TestKickAtPositionFiresReachableOffCenterImpact(t *testing.T) {
 	gi, _ := newKickTestGameInfo()
 	ballPos := info.Position{
-		X: info.Center2DribblerDist + info.BallRadius,
+		X: 200,
 		Y: info.KickCenterTolerance + 1,
 	}
 	gi.State.SetBall(ballPos.X, ballPos.Y, 0, 1)
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
 	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)
 
-	kick := NewKickAtPosition(info.Blue, 3, info.Position{X: 1000})
+	kick := NewKickAtPosition(info.Blue, 3, info.Position{X: 1000, Y: ballPos.Y})
 	kick.alignedSince = time.Now().Add(-kickAlignConfirmTime)
 
 	firing, ok := kick.GetAction(gi).(*action.MoveTo)

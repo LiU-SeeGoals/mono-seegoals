@@ -3,7 +3,6 @@ package client
 import (
 	"fmt"
 	"net"
-	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -139,19 +138,6 @@ func (receiver *SSLVisionClient) UpdateGameInfo(gi *info.GameInfo, play_time int
 	case packet, ok := <-receiver.ssl_channel:
 		receiver.handlePacket(packet, ok, gi, play_time)
 	default:
-	}
-}
-
-func (receiver *SSLVisionClient) WaitForVision(gi *info.GameInfo) {
-	for {
-		packet, ok := <-receiver.ssl_channel
-		if ok {
-			receiver.handlePacket(packet, ok, gi, time.Now().UnixMilli())
-			return
-		}
-
-		receiver.handlePacket(packet, ok, gi, time.Now().UnixMilli())
-		time.Sleep(100 * time.Millisecond)
 	}
 }
 

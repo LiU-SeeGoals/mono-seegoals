@@ -91,7 +91,7 @@ func NewGameEvent() *GameEvent {
 		CurrentState:      STATE_HALTED,
 		PreviousState:     STATE_HALTED,
 		// TeamWithPossession will have its zero value
-		DesignatedPosition: mat.NewVecDense(2, nil),
+		DesignatedPosition: nil,
 		BallInPlay:         false,
 	}
 }
@@ -231,6 +231,27 @@ func (ge *GameEvent) UpdateFromRefCommand(
 	nextCommand RefCommand,
 	currentActionTimeRemaining int64,
 	currentActionTimeRemainingValid bool) {
+	ge.UpdateFromRefCommandWithDesignatedPosition(
+		refCommand,
+		commandTimestamp,
+		desPosX,
+		desPosY,
+		true,
+		nextCommand,
+		currentActionTimeRemaining,
+		currentActionTimeRemainingValid,
+	)
+}
+
+func (ge *GameEvent) UpdateFromRefCommandWithDesignatedPosition(
+	refCommand RefCommand,
+	commandTimestamp uint64,
+	desPosX float64,
+	desPosY float64,
+	hasDesignatedPosition bool,
+	nextCommand RefCommand,
+	currentActionTimeRemaining int64,
+	currentActionTimeRemainingValid bool) {
 	newCommand := refCommand != ge.RefCommand || commandTimestamp != ge.CommandTimestamp
 
 	ge.RefCommand = refCommand
@@ -248,11 +269,15 @@ func (ge *GameEvent) UpdateFromRefCommand(
 		ge.LastUniqueCommandTimestamp = commandTimestamp
 	}
 
-	if ge.DesignatedPosition == nil {
-		ge.DesignatedPosition = mat.NewVecDense(2, nil)
+	if hasDesignatedPosition {
+		if ge.DesignatedPosition == nil {
+			ge.DesignatedPosition = mat.NewVecDense(2, nil)
+		}
+		ge.DesignatedPosition.SetVec(0, desPosX)
+		ge.DesignatedPosition.SetVec(1, desPosY)
+	} else {
+		ge.DesignatedPosition = nil
 	}
-	ge.DesignatedPosition.SetVec(0, desPosX)
-	ge.DesignatedPosition.SetVec(1, desPosY)
 
 	ge.PreviousState = ge.CurrentState
 
