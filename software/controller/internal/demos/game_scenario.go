@@ -26,7 +26,18 @@ const (
 	mmToM                              = 1.0 / 1000.0
 )
 
-func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
+type simulatedBallHandler struct {
+	target   info.Position
+	pending  bool
+	since    time.Time
+	lastSend time.Time
+}
+
+type ballTeleporter interface {
+	TeleportBall(x, y float32)
+}
+
+func (h *simulatedBallHandler) handle(gameInfo *info.GameInfo, simController ballTeleporter) {
 
 	ball := gameInfo.State.GetBall()
 	ballPos, ballTime, _ := ball.GetPositionTime()
@@ -34,56 +45,56 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	ge := gameInfo.Status.GetGameEvent()
 	previousState := ge.GetPreviousState()
 	currentState := ge.GetCurrentState()
-	placementHandled := false
+	if ge.IsPlacementStop() {
+		target, needed := refereePlacementTarget(ge, ballPos)
+		// Derive a fallback only when the referee has supplied no target.
+		if ge.GetDesignatedPosition() == nil {
+			target, needed = outsideFieldPlacement(gameInfo, ballPos)
+		}
+		if !needed {
+			h.pending = false
+			return
+		}
+		now := time.Now()
+		if !h.pending || h.target.Dist2d(target) > 10 {
+			h.target, h.pending, h.since = target, true, now
+		}
+		if now.Sub(h.since) < 300*time.Millisecond || now.Sub(h.lastSend) < 250*time.Millisecond {
+			return
+		}
+		// Let STOP positioning clear the destination before inserting the ball.
+		for _, team := range []info.Team{info.Blue, info.Yellow} {
+			for _, robot := range gameInfo.State.GetTeam(team) {
+				if robot == nil {
+					continue
+				}
+				pos, err := robot.GetPosition()
+				if err == nil && pos.Dist2d(target) < 600 {
+					return
+				}
+			}
+		}
+		teleportBallMillimeters(simController, target)
+		h.lastSend = now
+		return
+	}
+	h.pending = false
 	switch currentState {
 	case info.STATE_KICKOFF_PREPARATION:
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
-			// fmt.Println("teleported ball (new kickoff)")
-			teleportBallMillimeters(simController, info.Position{Y: 0})
-		}
-	case info.STATE_FREE_KICK:
-	case info.STATE_HALTED:
-	case info.STATE_STOPPED:
-		if target, ok := refereePlacementTarget(ge, ballPos); ok {
-			fmt.Printf("teleported ball (%f, %f) (referee placement)\n", target.X, target.Y)
-			teleportBallMillimeters(simController, target)
-			placementHandled = true
-		} else if target, ok := outsideFieldPlacement(gameInfo, ballPos); ok {
-			// Some GameController versions expose the placement position only in
-			// their state store, not in the SSL referee packet. In that case wait
-			// for STOP and use the same field geometry as a compatibility fallback.
-			fmt.Printf("teleported ball (%f, %f) (derived referee placement)\n", target.X, target.Y)
-			teleportBallMillimeters(simController, target)
-			placementHandled = true
+			teleportBallMillimeters(simController, info.Position{})
+			return
 		}
 	case info.STATE_PENALTY_PREPARATION:
 		if previousState == info.STATE_HALTED || previousState == info.STATE_STOPPED {
 			if mark, ok := penaltyMarkPosition(gameInfo, ge.GetTeamWithPossession()); ok {
 				teleportBallMillimeters(simController, mark)
+				return
 			}
 		}
-	case info.STATE_TIMEOUT:
-	case info.STATE_PLAYING:
-	case info.STATE_BALL_PLACEMENT:
-		if target, ok := refereePlacementTarget(ge, ballPos); ok {
-			fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", target.X, target.Y, ge.GetTeamWithPossession())
-			teleportBallMillimeters(simController, target)
-			placementHandled = true
-		} else if target, ok := outsideFieldPlacement(gameInfo, ballPos); ok {
-			fmt.Printf("teleported ball (%f, %f) (derived ball placement)\n", target.X, target.Y)
-			teleportBallMillimeters(simController, target)
-			placementHandled = true
-		}
-	default:
 	}
-
-	// Only recover a ball that has disappeared after handling referee-directed
-	// placement. An out-of-bounds ball must remain where AutoRef observed it so
-	// the designated placement position can be used instead of a local guess.
-	hasRefereePlacement := (currentState == info.STATE_STOPPED || currentState == info.STATE_BALL_PLACEMENT) &&
-		ge.GetDesignatedPosition() != nil
-	if !placementHandled && !hasRefereePlacement && time.Now().UnixMilli()-ballTime > 5000 {
-		teleportBallMillimeters(simController, info.Position{Y: 0})
+	if time.Now().UnixMilli()-ballTime > 5000 {
+		teleportBallMillimeters(simController, info.Position{})
 	}
 }
 
@@ -205,7 +216,7 @@ func penaltyMarkPosition(gameInfo *info.GameInfo, attackingTeam info.Team) (info
 	}, true
 }
 
-func teleportBallMillimeters(simController *simulator.SimControl, pos info.Position) {
+func teleportBallMillimeters(simController ballTeleporter, pos info.Position) {
 	simController.TeleportBall(float32(pos.X*mmToM), float32(pos.Y*mmToM))
 }
 
@@ -259,6 +270,7 @@ func GameScenarioVsTigers(team info.Team) {
 }
 
 func gameScenarioForTeams(teams ...info.Team) {
+	ballHandler := simulatedBallHandler{}
 	gameInfo := info.NewGameInfo(10)
 	client.StartGameViewerServer()
 
@@ -338,7 +350,7 @@ func gameScenarioForTeams(teams ...info.Team) {
 		}
 
 		if config.IsSimulated() {
-			handleSimulatedBall(gameInfo, simController)
+			ballHandler.handle(gameInfo, simController)
 		}
 	}
 }

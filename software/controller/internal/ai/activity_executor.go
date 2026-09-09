@@ -85,7 +85,7 @@ func (fb *activityExecutor) Run() {
 		gameInfo := <-fb.incomingGameInfo
 		frameMonitor.Observe(gameInfo.VisionFrame())
 		if gameInfo.Status == nil || gameInfo.Status.GetGameEvent() == nil ||
-			gameInfo.Status.GetGameEvent().GetCurrentState() != info.STATE_STOPPED {
+			!gameInfo.Status.GetGameEvent().IsPlacementStop() {
 			fb.defenseAreaEscape.reset()
 		}
 
@@ -154,7 +154,7 @@ func (fb *activityExecutor) Run() {
 // the ball and projects every movement target outside the stop-radius obstacle.
 func stoppedPlaySafetyAction(act action.Action, team info.Team, gi *info.GameInfo) action.Action {
 	if gi == nil || gi.Status == nil || gi.Status.GetGameEvent() == nil ||
-		gi.Status.GetGameEvent().GetCurrentState() != info.STATE_STOPPED {
+		!gi.Status.GetGameEvent().IsPlacementStop() {
 		return act
 	}
 
@@ -179,7 +179,7 @@ func stoppedPlaySafetyAction(act action.Action, team info.Team, gi *info.GameInf
 func finalStoppedPlayAction(act action.Action, gi *info.GameInfo) action.Action {
 	move, ok := act.(*action.MoveTo)
 	if !ok || gi == nil || gi.Status == nil || gi.State == nil ||
-		gi.Status.GetGameEvent().GetCurrentState() != info.STATE_STOPPED {
+		!gi.Status.GetGameEvent().IsPlacementStop() {
 		return act
 	}
 	ball, err := gi.State.GetBall().GetPosition()
@@ -251,7 +251,7 @@ func (s *defenseAreaEscapeState) apply(act action.Action, team info.Team, gi *in
 	}
 
 	gameEvent := gi.Status.GetGameEvent()
-	if gameEvent == nil || gameEvent.GetCurrentState() != info.STATE_STOPPED {
+	if !gameEvent.IsPlacementStop() {
 		s.headingSet[id] = false
 		return act
 	}

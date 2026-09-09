@@ -33,6 +33,8 @@ type AlignState struct {
 	ActivityHandler *ai.ActivityHandler
 	Ctx             TargetContext
 	alignedSince    time.Time
+	// Keep obstacle-aware staging for restarts even when a defender is nearby.
+	PlanApproach bool
 }
 
 func (s *AlignState) Initialize() {
@@ -69,7 +71,7 @@ func (s *AlignState) Update() sm.EventName {
 
 	var activity act.Activity
 
-	if enemyCloseToBall(s.Gi, s.Team, fromPos, 1000) {
+	if !s.PlanApproach && enemyCloseToBall(s.Gi, s.Team, fromPos, 1000) {
 		activity = act.NewDirectAlign(s.Team, s.RobotId, targetPos, fromPos)
 	} else {
 		activity = act.NewAlign(s.Team, s.RobotId, targetPos, fromPos)

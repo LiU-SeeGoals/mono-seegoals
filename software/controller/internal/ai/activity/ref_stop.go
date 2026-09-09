@@ -41,6 +41,14 @@ func (m *RefStop) GetAction(gi *info.GameInfo) action.Action {
 		return NewStop(m.id).GetAction(gi)
 	}
 
+	// Clear the announced destination before the simulator places the ball.
+	if ge := gi.Status.GetGameEvent(); ge.IsPlacementStop() && ge.GetDesignatedPosition() != nil {
+		p := ge.GetDesignatedPosition()
+		target := info.Position{X: p.AtVec(0), Y: p.AtVec(1)}
+		if robotPos.Dist2d(target) < robotPos.Dist2d(ballPos) {
+			ballPos = target
+		}
+	}
 	ballDist := robotPos.Distance(ballPos)
 	act := NewStop(m.id).GetAction(gi)
 	if ballDist < m.keepDistance {

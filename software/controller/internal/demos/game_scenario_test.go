@@ -2,9 +2,42 @@ package demos
 
 import (
 	"testing"
+	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
+
+type recordingTeleporter struct{ positions []info.Position }
+
+func (r *recordingTeleporter) TeleportBall(x, y float32) {
+	r.positions = append(r.positions, info.Position{X: float64(x), Y: float64(y)})
+}
+
+func TestPlacementWaitsThenSendsRefereeTargetAndThrottlesRetries(t *testing.T) {
+	gi := info.NewGameInfo(2)
+	gi.State.SetBall(4600, 2000, 0, time.Now().Add(-10*time.Second).UnixMilli())
+	gi.Status.SetGameEvent(info.STOP, 42, 2000, 2800, info.DIRECT_FREE_BLUE, 0)
+	h := simulatedBallHandler{}
+	sim := &recordingTeleporter{}
+	h.handle(gi, sim)
+	if len(sim.positions) != 0 {
+		t.Fatal("teleported before target settled")
+	}
+	h.since = time.Now().Add(-time.Second)
+	h.handle(gi, sim)
+	if len(sim.positions) != 1 || sim.positions[0].X != 2 || sim.positions[0].Y < 2.799 {
+		t.Fatalf("expected one referee placement in meters, got %v", sim.positions)
+	}
+	h.handle(gi, sim)
+	if len(sim.positions) != 1 {
+		t.Fatal("repeated teleport before retry interval")
+	}
+	gi.State.SetBall(2000, 2800, 0, time.Now().UnixMilli())
+	h.handle(gi, sim)
+	if len(sim.positions) != 1 {
+		t.Fatal("teleported after placement completed")
+	}
+}
 
 func TestBallPlacementTargetUsesAutoRefPositionAfterRepeatedPacket(t *testing.T) {
 	gameEvent := info.NewGameEvent()

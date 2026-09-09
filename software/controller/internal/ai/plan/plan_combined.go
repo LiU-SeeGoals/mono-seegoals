@@ -802,7 +802,10 @@ func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
 ) {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 	threatPos := ballPos
-	if attackerPos, found := m.getAttackerPosition(gi); found && m.attackerIsThreatening(gi, attackerPos) {
+	if stopped && gi.Status.GetGameEvent().GetDesignatedPosition() != nil {
+		pos := gi.Status.GetGameEvent().GetDesignatedPosition()
+		threatPos = info.Position{X: pos.AtVec(0), Y: pos.AtVec(1)}
+	} else if attackerPos, found := m.getAttackerPosition(gi); !stopped && found && m.attackerIsThreatening(gi, attackerPos) {
 		threatPos = attackerPos
 	}
 
@@ -932,9 +935,9 @@ func (m *CombinedPlan) run() {
 			if referee.PrepareForUpcomingKickoff(&gi, m.team, activeRobots, &m.ActivityHandler) {
 				continue
 			}
-			for _, attacker := range roleManager.attackers {
+			for id, attacker := range roleManager.attackers {
 				attacker.TriggerEvent("BALL_LOST")
-				attacker.Run()
+				m.ActivityHandler.AddActivity(act.NewRefStop(m.team, id))
 			}
 			m.updateDefenseAndGoaliePositioning(&gi, roleManager, goalieID, goalieRole, true)
 			referee.PrepareKickerForUpcomingFreeKick(
