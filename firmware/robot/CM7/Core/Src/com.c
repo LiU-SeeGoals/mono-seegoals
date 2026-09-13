@@ -130,7 +130,6 @@ void COM_RF_Receive(uint8_t pipe)
 
     NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_RX_DR);
 
-    // Timestamp of last received message
     last_rec_time = HAL_GetTick();
 
     parse_controller_packet(payload, len);
@@ -264,20 +263,17 @@ uint8_t COM_Get_ID()
 
 static void parse_controller_packet(uint8_t* payload, uint8_t len)
 {
-    // Validate packet size (32 bytes for custom binary protocol)
     if (len != ROBOT_COMMAND_SIZE) {
         LOG_DEBUG("Invalid packet size: %d (expected %d)\r\n", len, ROBOT_COMMAND_SIZE);
         return;
     }
 
-    // Decode the custom binary command
     RobotCommand cmd = {0};
     if (!robot_command_decode(payload, &cmd)) {
         LOG_DEBUG("Failed to decode robot command\r\n");
         return;
     }
 
-    // Process the command
     NAV_HandleCommand(&cmd);
 }
 

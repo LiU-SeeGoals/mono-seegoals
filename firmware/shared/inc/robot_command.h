@@ -31,7 +31,6 @@
 extern "C" {
 #endif
 
-// Protocol constants
 #define ROBOT_COMMAND_SIZE 32
 #define ACTION_TYPE_KICK 0
 #define ACTION_TYPE_STOP 1
