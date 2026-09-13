@@ -371,9 +371,9 @@ void NAV_SetMovement(RobotCommand* cmd, MovementType movementType)
         }
 
         const int32_t speed = cmd->kick_speed;
-        const int32_t x = cmd->dest->x - 1000;
-        const int32_t y = cmd->dest->y - 1000;
-        const int32_t angle = cmd->dest->w - 1000;
+        const int32_t x = cmd->dest->x;
+        const int32_t y = cmd->dest->y;
+        const int32_t angle = cmd->dest->w;
 
         robot_cmd.x = x * speed;
         robot_cmd.y = y * speed;

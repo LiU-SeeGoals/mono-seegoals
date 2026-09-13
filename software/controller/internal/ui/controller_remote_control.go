@@ -20,6 +20,7 @@ const (
 	deadzone       = 8000
 	updateRateHz   = 50
 	rotationRate   = 5.0 // rad/s at full stick deflection
+	directionScale = 30
 )
 
 var (
@@ -180,13 +181,16 @@ func runControllerLoop(
 
 			Direction: mat.NewVecDense(
 				2,
-				[]float64{0, 0},
+				[]float64{
+					lx * float64(speed) * directionScale,
+					ly * float64(speed) * directionScale,
+				},
 			),
 
 			Dest: info.Position{
-				X: lx * 30 + 1000,
-				Y: ly * 30 + 1000,
-				Z: targetHeading * 1000 + 1000,
+				X: lx * 30,
+				Y: ly * 30,
+				Z: targetHeading * 1000,
 			},
 
 			Speed:   speed,

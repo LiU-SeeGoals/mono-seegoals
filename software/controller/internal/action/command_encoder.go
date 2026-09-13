@@ -46,36 +46,48 @@ func EncodeCommand(cmd *robot_action.Command) ([]byte, error) {
 		return nil, fmt.Errorf("command cannot be nil")
 	}
 
-	buf := make([]byte, CommandEncodedSize)
 
 	if cmd.CommandId < 0 || cmd.CommandId > 5 {
 		return nil, fmt.Errorf("invalid action type: %d", cmd.CommandId)
 	}
-	buf[offsetActionType] = uint8(cmd.CommandId)
 
 	if cmd.RobotId < 0 || cmd.RobotId > 255 {
 		return nil, fmt.Errorf("invalid robot id: %d", cmd.RobotId)
 	}
-	buf[offsetRobotID] = uint8(cmd.RobotId)
 
+	var posX, posY, posW, destX, destY, dirX, dirY int16
+	if cmd.Pos != nil {
+		posX = int16(cmd.Pos.X)
+		posY = int16(cmd.Pos.Y)
+		posW = int16(cmd.Pos.W * 1000.0)
+	}
+	if cmd.Dest != nil {
+		destX = int16(cmd.Dest.X)
+		destY = int16(cmd.Dest.Y)
+	}
+	if cmd.Direction != nil {
+		dirX = int16(cmd.Direction.X)
+		dirY = int16(cmd.Direction.Y)
+	}
+
+	buf := make([]byte, CommandEncodedSize)
+
+	buf[offsetActionType] = uint8(cmd.CommandId)
+	buf[offsetRobotID] = uint8(cmd.RobotId)
 	binary.LittleEndian.PutInt16(buf[offsetKickSpeed:], int16(cmd.KickSpeed))
 
-	binary.LittleEndian.PutInt16(buf[offsetPosX:], int16(cmd.Pos.X))
+	binary.LittleEndian.PutInt16(buf[offsetPosX:], posX)
+	binary.LittleEndian.PutInt16(buf[offsetPosY:], posY)
 
-	binary.LittleEndian.PutInt16(buf[offsetPosY:], int16(cmd.Pos.Y))
+	binary.LittleEndian.PutInt16(buf[offsetDestX:], destX)
+	binary.LittleEndian.PutInt16(buf[offsetDestY:], destY)
 
-	binary.LittleEndian.PutInt16(buf[offsetDestX:], int16(cmd.Dest.X))
-
-	binary.LittleEndian.PutInt16(buf[offsetDestY:], int16(cmd.Dest.Y))
-
-	binary.LittleEndian.PutInt16(buf[offsetDirectionX:], int16(cmd.Direction.X))
-
-	binary.LittleEndian.PutInt16(buf[offsetDirectionY:], int16(cmd.Direction.Y))
+	binary.LittleEndian.PutInt16(buf[offsetDirectionX:], dirX)
+	binary.LittleEndian.PutInt16(buf[offsetDirectionY:], dirY)
 
 	binary.LittleEndian.PutInt16(buf[offsetAngularVel:], int16(cmd.AngularVel))
 
-	orientW := int16(cmd.Pos.W * 1000.0)
-	binary.LittleEndian.PutInt16(buf[offsetOrientationW:], orientW)
+	binary.LittleEndian.PutInt16(buf[offsetOrientationW:], posW)
 
 	return buf, nil
 }
