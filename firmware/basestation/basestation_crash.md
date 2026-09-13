@@ -1,5 +1,11 @@
 # Basestation Crash Investigation
 
+> **How to read this document:** The "Architecture" and "Root Causes" sections
+> describe the state of the code **before** the fix (line numbers refer to that
+> original version). The "Fix status" section at the bottom lists what has
+> actually changed. Use the "How to test" section at the end as a verification
+> checklist when you get to the hardware.
+
 ## Symptom
 
 Operation works for some time (minutes to hours), then crashes randomly. A simple
@@ -169,3 +175,50 @@ subsequent receive interrupts fire.
 
 NOT verified on hardware yet. No ARM toolchain available to compile locally;
 build with the normal CMake flow before flashing.
+
+## How to test
+
+### Build / flash
+
+- Build with the normal CMake flow (top-level `firmware/CMakeLists.txt`),
+  `basestation` target, both Debug and Release.
+- Flash with `make flash_basestation` (uses `STM32_Programmer_CLI`).
+
+### Functional checks
+
+1. **Boot + heartbeat:** Basestation starts, green LED on, no immediate reset
+   loop. Watchdog feed is logged/observable via the link thread LED pattern.
+2. **Ethernet:** Brain computer sends commands over UDP 9999 → robots move as
+   before. Check no `LOG_ERROR` spam about packet size.
+3. **nRF receive path:** Trigger a `LOG_BASESTATION(...)` from a robot and
+   confirm it now appears on the basestation UART **repeatedly** (was: worked
+   once then stopped — Bug/wrong status-bit fix).
+4. **Button (RF_EVENT_TEST):** Press user button → the "Sending data..." /
+   status dump prints, radio transmits. Confirms button path now runs in a
+   thread, not in an ISR.
+5. **Sustained soak test:** Run full match load (continuous command stream at
+   normal rate) for hours — the original crash (SPI collision) should no longer
+   occur.
+
+### Watchdog checks
+
+6. **Normal operation:** Confirm no resets during soak test (watchdog should
+   never fire under healthy conditions — 4 s timeout with ~0.6–1.2 s feeds).
+7. **Crash recovery:** Temporarily introduce a deliberate hang (e.g. block the
+   link thread via a breakpoint with the debugger *not* halting the core, or a
+   `while(1)` in `nx_link_thread_entry`) → device should auto-reset within
+   ~4 s (red LED flash / boot log) instead of staying dead.
+8. **Debugger note:** While a debugger holds the core, the watchdog counter is
+   frozen (`DBGMCU_APB1FZR1_DBG_IWDG_STOP`), so breakpoint debugging won't cause
+   spurious resets.
+
+### If it still crashes
+
+- Check the reset cause register (`RCC->RSR`) / log it — an IWDG reset shows
+  `IWDGRSTF`.
+- Look for the RF thread health: if SPI is ever left mid-transaction, the nRF
+  status register prints (button) will show CSN stuck low / command misses.
+- Worst case, capture `HardFault_Handler` + `MemManage/BusFault/UsageFault`
+  registers — their handlers are still bare `while(1)`, so a fault will reset
+  via watchdog (red LED). That is a later diagnostic improvement, not part of
+  this fix.
