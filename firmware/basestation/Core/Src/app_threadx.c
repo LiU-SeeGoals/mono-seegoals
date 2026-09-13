@@ -74,10 +74,18 @@ UINT App_ThreadX_Init(VOID* memory_ptr)
     TX_BYTE_POOL* byte_pool = (TX_BYTE_POOL*)memory_ptr;
     CHAR *pointer2, *pointer3;
 
-    // if (tx_byte_allocate(byte_pool, (VOID **) &pointer3, TX_APP_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
-    //{
-    //   return TX_POOL_ERROR;
-    // }
+    CHAR* rf_stack;
+    if (tx_byte_allocate(byte_pool, (VOID**)&rf_stack, RF_THREAD_STACK_SIZE, TX_NO_WAIT) != TX_SUCCESS)
+    {
+        return TX_POOL_ERROR;
+    }
+
+    ret = tx_thread_create(&COM_RF_Thread, "COM RF thread", COM_RF_Thread_Entry, 0, rf_stack, RF_THREAD_STACK_SIZE, RF_THREAD_PRIORITY, RF_THREAD_PRIORITY, TX_NO_TIME_SLICE,
+                           TX_AUTO_START);
+    if (ret != TX_SUCCESS)
+    {
+        return TX_THREAD_ERROR;
+    }
     /* USER CODE END App_ThreadX_MEM_POOL */
 
     /* USER CODE BEGIN App_ThreadX_Init */

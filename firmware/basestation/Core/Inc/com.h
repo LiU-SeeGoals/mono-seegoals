@@ -12,6 +12,13 @@
 #define ROBOT_ACTION_ADDR(id) {1, 255, 255, id, 255}
 #define ROBOT_PING_ADDR(id) {1, 255, 255, id, 0}
 
+extern TX_EVENT_FLAGS_GROUP COM_RF_IRQ_Events;
+#define RF_EVENT_IRQ  0x01
+#define RF_EVENT_TEST 0x02
+
+#define RF_THREAD_STACK_SIZE 2048
+#define RF_THREAD_PRIORITY   9
+
 typedef enum TransmitStatus
 {
     TRANSMIT_INIT,
@@ -73,5 +80,7 @@ void COM_RF_PrintInfo(void);
 void COM_Test();
 
 UINT COM_ParsePacket(NX_PACKET* packet, PACKET_TYPE packet_type);
+
+void COM_RF_Thread_Entry(ULONG thread_input);
 
 #endif /* COM_H */

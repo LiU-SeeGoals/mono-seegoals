@@ -68,7 +68,7 @@ void LOG_Printf(LOG_Module* mod, LOG_Level msg_level, const char* format, ...)
         }
 
         int offset = 0;
-        char msg_buffer[LOG_MSG_SIZE];
+        static char msg_buffer[LOG_MSG_SIZE];
 
         if (msg_level != LOG_LEVEL_UI && msg_level != LOG_LEVEL_BASESTATION) {
             offset += snprintf(msg_buffer, LOG_MSG_SIZE, "[%s-%s] ", mod->name, LOG_LEVEL[msg_level].short_name);

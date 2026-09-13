@@ -93,9 +93,6 @@ NRF_Status NRF_SendCommand(uint8_t cmd)
 
     csn_reset();
     ret = (NRF_Status)HAL_SPI_TransmitReceive(HSPI, &cmd, &status, 1, NRF_SPI_TIMEOUT_DUR);
-    if (ret != NRF_OK) {
-        return ret;
-    }
     csn_set();
 
     return ret;
@@ -108,12 +105,8 @@ NRF_Status NRF_SendWriteCommand(uint8_t cmd, uint8_t* write, uint8_t length)
 
     csn_reset();
     ret = (NRF_Status)HAL_SPI_TransmitReceive(HSPI, &cmd, &status, 1, NRF_SPI_TIMEOUT_DUR);
-    if (ret != NRF_OK) {
-        return ret;
-    }
-    ret = (NRF_Status)HAL_SPI_Transmit(HSPI, write, length, NRF_SPI_TIMEOUT_DUR);
-    if (ret != NRF_OK) {
-        return ret;
+    if (ret == NRF_OK) {
+        ret = (NRF_Status)HAL_SPI_Transmit(HSPI, write, length, NRF_SPI_TIMEOUT_DUR);
     }
     csn_set();
 
@@ -127,12 +120,8 @@ NRF_Status NRF_SendReadCommand(uint8_t cmd, uint8_t* read, uint8_t length)
 
     csn_reset();
     ret = (NRF_Status)HAL_SPI_TransmitReceive(HSPI, &cmd, &status, 1, NRF_SPI_TIMEOUT_DUR);
-    if (ret != NRF_OK) {
-        return ret;
-    }
-    ret = (NRF_Status)HAL_SPI_Receive(HSPI, read, length, NRF_SPI_TIMEOUT_DUR);
-    if (ret != NRF_OK) {
-        return ret;
+    if (ret == NRF_OK) {
+        ret = (NRF_Status)HAL_SPI_Receive(HSPI, read, length, NRF_SPI_TIMEOUT_DUR);
     }
     csn_set();
 

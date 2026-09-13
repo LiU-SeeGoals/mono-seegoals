@@ -300,6 +300,8 @@ static VOID nx_link_thread_entry(ULONG thread_input)
     UINT linkdown = -1;
 
     for (;;) {
+        IWDG_Feed();
+
         ret = nx_ip_interface_status_check(&NetXDuoEthIpInstance, 0, NX_IP_LINK_ENABLED, &status, 10);
 
         if (ret != NX_SUCCESS) {

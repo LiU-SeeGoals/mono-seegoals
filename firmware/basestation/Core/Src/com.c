@@ -26,6 +26,8 @@ typedef enum RobotComStatus
 
 /* Private variables */
 TX_SEMAPHORE semaphore;
+TX_EVENT_FLAGS_GROUP COM_RF_IRQ_Events;
+TX_THREAD COM_RF_Thread;
 static LOG_Module internal_log_mod;
 
 /*
@@ -44,6 +46,10 @@ void COM_RF_Init(SPI_HandleTypeDef* hspi)
 
     if (tx_semaphore_create(&semaphore, "NRF-semaphore", 1) != TX_SUCCESS) {
         LOG_ERROR("Failed creating NRF-semaphore\r\n");
+    }
+
+    if (tx_event_flags_create(&COM_RF_IRQ_Events, "RF-events") != TX_SUCCESS) {
+        LOG_ERROR("Failed creating RF-event-flags\r\n");
     }
 
     NRF_Reset();
@@ -104,6 +110,8 @@ void COM_Test()
 
 void COM_RF_HandleIRQ()
 {
+    tx_semaphore_get(&semaphore, TX_WAIT_FOREVER);
+
     uint8_t status = NRF_ReadStatus();
 
     if (status & STATUS_MASK_MAX_RT) {
@@ -120,6 +128,26 @@ void COM_RF_HandleIRQ()
         // Received packet
         uint8_t pipe = (status & STATUS_MASK_RX_P_NO) >> 1;
         COM_RF_Receive(pipe);
+    }
+
+    tx_semaphore_put(&semaphore);
+}
+
+void COM_RF_Thread_Entry(ULONG thread_input)
+{
+    ULONG requested_flags = 0;
+
+    for (;;) {
+        tx_event_flags_get(&COM_RF_IRQ_Events, RF_EVENT_IRQ | RF_EVENT_TEST, TX_OR_CLEAR, &requested_flags, TX_WAIT_FOREVER);
+
+        if (requested_flags & RF_EVENT_IRQ) {
+            COM_RF_HandleIRQ();
+        }
+
+        if (requested_flags & RF_EVENT_TEST) {
+            COM_RF_PrintInfo();
+            COM_Test();
+        }
     }
 }
 
@@ -191,7 +219,7 @@ void COM_RF_Receive(uint8_t pipe)
         LOG_INFO("Received unknown RF package\r\n");
     }
 
-    NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_TX_DS);
+    NRF_SetRegisterBit(NRF_REG_STATUS, STATUS_RX_DR);
 }
 
 UINT COM_ParsePacket(NX_PACKET* packet, PACKET_TYPE packet_type)
@@ -202,8 +230,8 @@ UINT COM_ParsePacket(NX_PACKET* packet, PACKET_TYPE packet_type)
     case ROBOT_COMMAND: {
         int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
 
-        if (length > 32) {
-            LOG_ERROR("Robot command packet over 32 bytes (%d bytes)\r\n", length);
+        if (length > 31) {
+            LOG_ERROR("Robot command packet over max payload (%d bytes)\r\n", length);
             ret = NX_INVALID_PACKET;
             return ret;
         }

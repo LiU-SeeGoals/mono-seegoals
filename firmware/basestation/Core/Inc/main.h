@@ -54,6 +54,8 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 extern SPI_HandleTypeDef hspi1;
+void IWDG_Init(void);
+void IWDG_Feed(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

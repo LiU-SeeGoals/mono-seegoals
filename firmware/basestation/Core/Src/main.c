@@ -78,27 +78,54 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 {
     switch (GPIO_Pin) {
     case BTN_USER_Pin:
-        COM_RF_PrintInfo();
-        COM_Test();
+        tx_event_flags_set(&COM_RF_IRQ_Events, RF_EVENT_TEST, TX_OR);
         break;
     default:
-        LOG_ERROR("Unhandled rising interrupt...\r\n");
         break;
     }
 }
 
 void HAL_GPIO_EXTI_Falling_Callback(uint16_t GPIO_Pin)
 {
-    __disable_interrupts();
     switch (GPIO_Pin) {
     case NRF_IRQ_Pin:
-        COM_RF_HandleIRQ();
+        tx_event_flags_set(&COM_RF_IRQ_Events, RF_EVENT_IRQ, TX_OR);
         break;
     default:
-        LOG_WARNING("Unhandled falling interrupt...\r\n");
         break;
     }
-    __enable_interrupts();
+}
+
+void IWDG_Init(void)
+{
+    /* Start the watchdog (this also turns the LSI on) */
+    IWDG->KR = 0x0000CCCC;
+
+    /* Enable write access to PR/RLR/WINR */
+    IWDG->KR = 0x00005555;
+
+    /* Prescaler 64: LSI 32 kHz / 64 = 500 Hz */
+    IWDG->PR = IWDG_PR_PR_2;
+
+    /* Reload 2000 -> ~4 s timeout */
+    IWDG->RLR = 2000;
+
+    /* Wait for PR/RLR updates to complete */
+    while ((IWDG->SR & IWDG_SR_RVU) != 0) {
+    }
+    while ((IWDG->SR & (IWDG_SR_PVU | IWDG_SR_RVU | IWDG_SR_WVU)) != 0) {
+    }
+
+    /* Disable the window feature */
+    IWDG->WINR = IWDG_WINR_WIN;
+
+    /* Freeze the watchdog counter when the core is halted in debug */
+    DBGMCU->APB1FZR1 |= DBGMCU_APB1FZR1_DBG_IWDG_STOP;
+}
+
+void IWDG_Feed(void)
+{
+    IWDG->KR = 0x0000AAAA;
 }
 
 /* USER CODE END 0 */
@@ -137,6 +164,7 @@ int main(void)
     MX_ICACHE_Init();
     MX_SPI1_Init();
     /* USER CODE BEGIN 2 */
+    IWDG_Init();
     LOG_Init(&huart3);
     LOG_InitModule(&internal_log_mod, "MAIN", LOG_LEVEL_INFO, 0);
     COM_RF_Init(&hspi1);
