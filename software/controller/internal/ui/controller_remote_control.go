@@ -182,8 +182,8 @@ func runControllerLoop(
 			Direction: mat.NewVecDense(
 				2,
 				[]float64{
-					lx * float64(speed) * directionScale,
-					ly * float64(speed) * directionScale,
+					lx * directionScale,
+					ly * directionScale,
 				},
 			),
 
