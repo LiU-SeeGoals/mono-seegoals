@@ -190,7 +190,7 @@ func runControllerLoop(
 			Dest: info.Position{
 				X: lx * 30,
 				Y: ly * 30,
-				Z: targetHeading * 1000,
+				Z: targetHeading,
 			},
 
 			Speed:   speed,

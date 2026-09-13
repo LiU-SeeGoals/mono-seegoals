@@ -36,7 +36,7 @@ func (s *MoveRemote) TranslateReal() *robot_action.Command {
 		CommandId: robot_action.ActionType_MOVE_ACTION,
 		RobotId:   int32(s.Id),
 		Pos: &robot_action.Vector3D{
-			W: float32(s.Dest.Z) / 1000.0, // encoder scales radians by 1000 to milliradians
+			W: float32(s.Dest.Z),
 		},
 		Direction: &robot_action.Vector2D{
 			X: int32(s.Direction.AtVec(1)),
