@@ -277,6 +277,8 @@ void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
 void NAV_HandleCommand(RobotCommand* cmd)
 {
+    // TODO: Make sure all handling of new cmd is correct.
+    // TODO: Currently some places reads the wrong angle etc
     KickerSpeed kickerSpeed = KICKER_SPEED_DEFAULT;
 
     switch (cmd->command_id) {
