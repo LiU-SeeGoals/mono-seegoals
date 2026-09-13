@@ -20,7 +20,7 @@ import (
 // [12-13] : Direction X (int16) - raw value
 // [14-15] : Direction Y (int16) - raw value
 // [16-17] : Angular Vel (int16) - degrees/sec
-// [18-19] : Orientation W (int16) - [0, 3600) tenths of degrees
+// [18-19] : Orientation W (int16) - radians * 1000 (milliradians)
 //
 // Total: 20 bytes of fields, 12 bytes reserved (zero-filled)
 
@@ -74,13 +74,7 @@ func EncodeCommand(cmd *robot_action.Command) ([]byte, error) {
 
 	binary.LittleEndian.PutInt16(buf[offsetAngularVel:], int16(cmd.AngularVel))
 
-	orientW := int16(cmd.Pos.W * 10.0)
-	if orientW < 0 {
-		orientW = 0
-	}
-	if orientW >= 3600 {
-		orientW = 3599
-	}
+	orientW := int16(cmd.Pos.W * 1000.0)
 	binary.LittleEndian.PutInt16(buf[offsetOrientationW:], orientW)
 
 	return buf, nil
@@ -99,7 +93,7 @@ func DecodeCommand(buf []byte) (*robot_action.Command, error) {
 		Pos: &robot_action.Vector3D{
 			X: int32(binary.LittleEndian.Int16(buf[offsetPosX:])),
 			Y: int32(binary.LittleEndian.Int16(buf[offsetPosY:])),
-			W: float32(int16(binary.LittleEndian.Int16(buf[offsetOrientationW:]))) / 10.0,
+			W: float32(int16(binary.LittleEndian.Int16(buf[offsetOrientationW:]))) / 1000.0,
 		},
 		Dest: &robot_action.Vector3D{
 			X: int32(binary.LittleEndian.Int16(buf[offsetDestX:])),

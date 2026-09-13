@@ -55,11 +55,7 @@ bool robot_command_encode(const RobotCommand* cmd, uint8_t* buf)
     write_int16_le(&buf[12], cmd->direction_x);
     write_int16_le(&buf[14], cmd->direction_y);
     write_int16_le(&buf[16], cmd->angular_vel);
-
-    int16_t orient_w = cmd->orientation_w;
-    if (orient_w < 0) orient_w = 0;
-    if (orient_w >= 3600) orient_w = 3599;
-    write_int16_le(&buf[18], orient_w);
+    write_int16_le(&buf[18], cmd->orientation_w);
 
     return true;
 }
@@ -101,7 +97,7 @@ void robot_command_print(const RobotCommand* cmd)
     LOG_DEBUG("  Dest: (%d, %d)\r\n", cmd->dest_x, cmd->dest_y);
     LOG_DEBUG("  Direction: (%d, %d)\r\n", cmd->direction_x, cmd->direction_y);
     LOG_DEBUG("  Angular Vel: %d\r\n", cmd->angular_vel);
-    LOG_DEBUG("  Orientation W: %d (%.1f degrees)\r\n", cmd->orientation_w, cmd->orientation_w / 10.0);
+    LOG_DEBUG("  Orientation W: %d (%.3f rad)\r\n", cmd->orientation_w, cmd->orientation_w / 1000.0);
 }
 #else
 void robot_command_print(const RobotCommand* cmd)
