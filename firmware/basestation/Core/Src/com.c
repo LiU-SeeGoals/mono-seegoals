@@ -203,7 +203,7 @@ UINT COM_ParsePacket(NX_PACKET* packet, PACKET_TYPE packet_type)
     case ROBOT_COMMAND: {
         int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
 
-        // Custom binary protocol uses fixed 20-byte packets
+        // Custom binary protocol uses fixed 32-byte packets
         if (length != ROBOT_COMMAND_SIZE) {
             LOG_ERROR("Invalid robot command packet size: %d (expected %d)\r\n", 
                       length, ROBOT_COMMAND_SIZE);
@@ -224,12 +224,9 @@ UINT COM_ParsePacket(NX_PACKET* packet, PACKET_TYPE packet_type)
             return NX_INVALID_PACKET;
         }
 
-        // Forward to robot via NRF24 (add message type prefix)
-        uint8_t data[32];
-        data[0] = 1;  // Message type: ACTION
-        memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
-
-        COM_RF_Transmit(command.robot_id, data, length + 1);
+        // Forward to robot via NRF24. The message already fills the entire
+        // 32-byte NRF24 payload, so transmit the packet bytes as-is.
+        COM_RF_Transmit(command.robot_id, packet->nx_packet_prepend_ptr, length);
 
     } break;
     default:

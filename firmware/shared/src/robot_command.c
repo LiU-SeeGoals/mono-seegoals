@@ -71,18 +71,10 @@ bool robot_command_encode(const RobotCommand* cmd, uint8_t* buf)
     write_int16_le(&buf[10], cmd->dest_y);
 
     // [12-13] Direction X (int16, little-endian)
-    // Clamp to [-100, 100]
-    int16_t dir_x = cmd->direction_x;
-    if (dir_x < -100) dir_x = -100;
-    if (dir_x > 100) dir_x = 100;
-    write_int16_le(&buf[12], dir_x);
+    write_int16_le(&buf[12], cmd->direction_x);
 
     // [14-15] Direction Y (int16, little-endian)
-    // Clamp to [-100, 100]
-    int16_t dir_y = cmd->direction_y;
-    if (dir_y < -100) dir_y = -100;
-    if (dir_y > 100) dir_y = 100;
-    write_int16_le(&buf[14], dir_y);
+    write_int16_le(&buf[14], cmd->direction_y);
 
     // [16-17] Angular Vel (int16, little-endian)
     write_int16_le(&buf[16], cmd->angular_vel);

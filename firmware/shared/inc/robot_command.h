@@ -2,7 +2,7 @@
  * @file robot_command.h
  * @brief Custom binary protocol for robot command encoding/decoding
  *
- * Protocol: 22 bytes total (10 bytes under NRF24 32-byte limit)
+ * Protocol: 32 bytes total (fills the NRF24 32-byte limit)
  *
  * Byte Layout:
  * [0]     : Action Type (uint8) - enum 0-5 (KICK, STOP, MOVE_TO, INIT, MOVE, ROTATE)
@@ -12,12 +12,12 @@
  * [6-7]   : Pos Y (int16, little-endian) - mm
  * [8-9]   : Dest X (int16, little-endian) - mm
  * [10-11] : Dest Y (int16, little-endian) - mm
- * [12-13] : Direction X (int16, little-endian) - normalized [-100, 100]
- * [14-15] : Direction Y (int16, little-endian) - normalized [-100, 100]
+ * [12-13] : Direction X (int16, little-endian) - raw value
+ * [14-15] : Direction Y (int16, little-endian) - raw value
  * [16-17] : Angular Vel (int16, little-endian) - degrees/sec
  * [18-19] : Orientation W (int16, little-endian) - [0, 3600) tenths of degrees
  *
- * Total: 20 bytes
+ * Total: 20 bytes of fields, 12 bytes reserved (zero-filled)
  */
 
 #ifndef ROBOT_COMMAND_H
@@ -32,7 +32,7 @@ extern "C" {
 #endif
 
 // Protocol constants
-#define ROBOT_COMMAND_SIZE 20
+#define ROBOT_COMMAND_SIZE 32
 #define ACTION_TYPE_KICK 0
 #define ACTION_TYPE_STOP 1
 #define ACTION_TYPE_MOVE_TO 2
@@ -52,14 +52,14 @@ typedef struct {
     int16_t pos_y;          // mm
     int16_t dest_x;         // mm
     int16_t dest_y;         // mm
-    int16_t direction_x;    // [-100, 100]
-    int16_t direction_y;    // [-100, 100]
+    int16_t direction_x;    // raw value
+    int16_t direction_y;    // raw value
     int16_t angular_vel;    // degrees/sec
     int16_t orientation_w;  // [0, 3600) tenths of degrees
 } RobotCommand;
 
 /**
- * @brief Encode a RobotCommand to 30-byte binary buffer
+ * @brief Encode a RobotCommand to 32-byte binary buffer
  *
  * @param cmd Pointer to RobotCommand struct to encode
  * @param buf Output buffer (must be at least ROBOT_COMMAND_SIZE bytes)
@@ -73,7 +73,7 @@ typedef struct {
 bool robot_command_encode(const RobotCommand* cmd, uint8_t* buf);
 
 /**
- * @brief Decode a 30-byte binary buffer to RobotCommand
+ * @brief Decode a 32-byte binary buffer to RobotCommand
  *
  * @param buf Input buffer (must be exactly ROBOT_COMMAND_SIZE bytes)
  * @param cmd Pointer to RobotCommand struct to populate

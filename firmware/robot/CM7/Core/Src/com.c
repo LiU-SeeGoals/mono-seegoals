@@ -133,7 +133,7 @@ void COM_RF_Receive(uint8_t pipe)
     // Timestamp of last received message
     last_rec_time = HAL_GetTick();
 
-    parse_controller_packet(payload + 1, len - 1);
+    parse_controller_packet(payload, len);
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
     NRF_SendCommand(NRF_CMD_FLUSH_RX);
@@ -264,7 +264,7 @@ uint8_t COM_Get_ID()
 
 static void parse_controller_packet(uint8_t* payload, uint8_t len)
 {
-    // Validate packet size (20 bytes for custom binary protocol)
+    // Validate packet size (32 bytes for custom binary protocol)
     if (len != ROBOT_COMMAND_SIZE) {
         LOG_DEBUG("Invalid packet size: %d (expected %d)\r\n", len, ROBOT_COMMAND_SIZE);
         return;
