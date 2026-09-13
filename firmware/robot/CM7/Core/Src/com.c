@@ -6,6 +6,7 @@
 #include "nav.h"
 #include <nrf24l01.h>
 #include <nrf_helper_defines.h>
+#include "robot_command.h"
 #include <robot_action.pb-c.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -263,16 +264,21 @@ uint8_t COM_Get_ID()
 
 static void parse_controller_packet(uint8_t* payload, uint8_t len)
 {
-    Command* cmd = NULL;
-    cmd = command__unpack(NULL, len, payload);
-
-    if (!cmd) {
-        LOG_DEBUG("Decoding PB failed\r\n");
-    } else {
-        NAV_HandleCommand(cmd);
+    // Validate packet size (20 bytes for custom binary protocol)
+    if (len != ROBOT_COMMAND_SIZE) {
+        LOG_DEBUG("Invalid packet size: %d (expected %d)\r\n", len, ROBOT_COMMAND_SIZE);
+        return;
     }
 
-    protobuf_c_message_free_unpacked((ProtobufCMessage*)cmd, NULL);
+    // Decode the custom binary command
+    RobotCommand cmd = {0};
+    if (!robot_command_decode(payload, &cmd)) {
+        LOG_DEBUG("Failed to decode robot command\r\n");
+        return;
+    }
+
+    // Process the command
+    NAV_HandleCommand(&cmd);
 }
 
 static char* ping_ack_to_string(uint8_t ack)

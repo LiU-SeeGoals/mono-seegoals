@@ -10,7 +10,6 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
-	"google.golang.org/protobuf/proto"
 )
 
 const MAX_SEND_SIZE = 32
@@ -108,8 +107,13 @@ func (b *BaseStationClient) sendCommands() {
 		b.queue = b.queue[1:]
 		b.queueMutex.Unlock()
 
-		serializedCmd, _ := proto.Marshal(cmd)
-		b.sendMessage(serializedCmd)
+		// Use custom binary encoder instead of protobuf
+		encoded, err := action.EncodeCommand(cmd)
+		if err != nil {
+			fmt.Printf("Failed to encode command for robot %d: %v\n", cmd.RobotId, err)
+			continue
+		}
+		b.sendMessage(encoded)
 	}
 }
 

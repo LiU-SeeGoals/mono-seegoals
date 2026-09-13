@@ -1,0 +1,97 @@
+/**
+ * @file robot_command.h
+ * @brief Custom binary protocol for robot command encoding/decoding
+ *
+ * Protocol: 22 bytes total (10 bytes under NRF24 32-byte limit)
+ *
+ * Byte Layout:
+ * [0]     : Action Type (uint8) - enum 0-5 (KICK, STOP, MOVE_TO, INIT, MOVE, ROTATE)
+ * [1]     : Robot ID (uint8) - 1-7
+ * [2-3]   : Kick Speed (int16, little-endian) - mm/s
+ * [4-5]   : Pos X (int16, little-endian) - mm
+ * [6-7]   : Pos Y (int16, little-endian) - mm
+ * [8-9]   : Dest X (int16, little-endian) - mm
+ * [10-11] : Dest Y (int16, little-endian) - mm
+ * [12-13] : Direction X (int16, little-endian) - normalized [-100, 100]
+ * [14-15] : Direction Y (int16, little-endian) - normalized [-100, 100]
+ * [16-17] : Angular Vel (int16, little-endian) - degrees/sec
+ * [18-19] : Orientation W (int16, little-endian) - [0, 3600) tenths of degrees
+ *
+ * Total: 20 bytes
+ */
+
+#ifndef ROBOT_COMMAND_H
+#define ROBOT_COMMAND_H
+
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Protocol constants
+#define ROBOT_COMMAND_SIZE 20
+#define ACTION_TYPE_KICK 0
+#define ACTION_TYPE_STOP 1
+#define ACTION_TYPE_MOVE_TO 2
+#define ACTION_TYPE_INIT 3
+#define ACTION_TYPE_MOVE 4
+#define ACTION_TYPE_ROTATE 5
+
+/**
+ * @struct RobotCommand
+ * @brief Decoded robot command structure
+ */
+typedef struct {
+    uint8_t action_type;    // 0-5
+    uint8_t robot_id;       // 1-7
+    int16_t kick_speed;     // mm/s
+    int16_t pos_x;          // mm
+    int16_t pos_y;          // mm
+    int16_t dest_x;         // mm
+    int16_t dest_y;         // mm
+    int16_t direction_x;    // [-100, 100]
+    int16_t direction_y;    // [-100, 100]
+    int16_t angular_vel;    // degrees/sec
+    int16_t orientation_w;  // [0, 3600) tenths of degrees
+} RobotCommand;
+
+/**
+ * @brief Encode a RobotCommand to 30-byte binary buffer
+ *
+ * @param cmd Pointer to RobotCommand struct to encode
+ * @param buf Output buffer (must be at least ROBOT_COMMAND_SIZE bytes)
+ * @return true if encoding succeeded, false on error
+ *
+ * @note Validates:
+ *       - action_type must be 0-5
+ *       - robot_id must be 1-7
+ *       - kick_speed must be 0-32767
+ */
+bool robot_command_encode(const RobotCommand* cmd, uint8_t* buf);
+
+/**
+ * @brief Decode a 30-byte binary buffer to RobotCommand
+ *
+ * @param buf Input buffer (must be exactly ROBOT_COMMAND_SIZE bytes)
+ * @param cmd Pointer to RobotCommand struct to populate
+ * @return true if decoding succeeded, false on error (e.g., invalid buffer size)
+ */
+bool robot_command_decode(const uint8_t* buf, RobotCommand* cmd);
+
+/**
+ * @brief Print RobotCommand for debugging
+ *
+ * @param cmd Command to print
+ *
+ * @note Requires logging infrastructure (LOG_DEBUG, LOG_INFO, etc.)
+ */
+void robot_command_print(const RobotCommand* cmd);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // ROBOT_COMMAND_H

@@ -275,7 +275,7 @@ void NAV_DisableMovement() { robot_cmd.movement_enabled = 0; }
 
 void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
-void NAV_HandleCommand(Command* cmd)
+void NAV_HandleCommand(RobotCommand* cmd)
 {
     KickerSpeed kickerSpeed = KICKER_SPEED_DEFAULT;
 
@@ -347,7 +347,7 @@ uint8_t check_bit(int32_t val, uint8_t n)
     return bit;
 }
 
-void NAV_SetMovement(Command* cmd, MovementType movementType)
+void NAV_SetMovement(RobotCommand* cmd, MovementType movementType)
 {
     NAV_EnableMovement();
     NAV_SetMovementType(movementType);
@@ -381,7 +381,7 @@ void NAV_SetMovement(Command* cmd, MovementType movementType)
     }
 }
 
-void NAV_GoToAction(Command* cmd)
+void NAV_GoToAction(RobotCommand* cmd)
 {
     // Only initialised on first run since static
     // Large values to always respect first vision data received
