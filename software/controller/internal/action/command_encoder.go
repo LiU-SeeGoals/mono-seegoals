@@ -74,20 +74,20 @@ func EncodeCommand(cmd *robot_action.Command) ([]byte, error) {
 
 	buf[offsetActionType] = uint8(cmd.CommandId)
 	buf[offsetRobotID] = uint8(cmd.RobotId)
-	binary.LittleEndian.PutInt16(buf[offsetKickSpeed:], int16(cmd.KickSpeed))
+	binary.LittleEndian.PutUint16(buf[offsetKickSpeed:], uint16(cmd.KickSpeed))
 
-	binary.LittleEndian.PutInt16(buf[offsetPosX:], posX)
-	binary.LittleEndian.PutInt16(buf[offsetPosY:], posY)
+	binary.LittleEndian.PutUint16(buf[offsetPosX:], uint16(posX))
+	binary.LittleEndian.PutUint16(buf[offsetPosY:], uint16(posY))
 
-	binary.LittleEndian.PutInt16(buf[offsetDestX:], destX)
-	binary.LittleEndian.PutInt16(buf[offsetDestY:], destY)
+	binary.LittleEndian.PutUint16(buf[offsetDestX:], uint16(destX))
+	binary.LittleEndian.PutUint16(buf[offsetDestY:], uint16(destY))
 
-	binary.LittleEndian.PutInt16(buf[offsetDirectionX:], dirX)
-	binary.LittleEndian.PutInt16(buf[offsetDirectionY:], dirY)
+	binary.LittleEndian.PutUint16(buf[offsetDirectionX:], uint16(dirX))
+	binary.LittleEndian.PutUint16(buf[offsetDirectionY:], uint16(dirY))
 
-	binary.LittleEndian.PutInt16(buf[offsetAngularVel:], int16(cmd.AngularVel))
+	binary.LittleEndian.PutUint16(buf[offsetAngularVel:], uint16(cmd.AngularVel))
 
-	binary.LittleEndian.PutInt16(buf[offsetAngle:], posW)
+	binary.LittleEndian.PutUint16(buf[offsetAngle:], uint16(posW))
 
 	return buf, nil
 }
@@ -99,24 +99,24 @@ func DecodeCommand(buf []byte) (*robot_action.Command, error) {
 	}
 
 	cmd := &robot_action.Command{
-		CommandId:  int32(buf[offsetActionType]),
+		CommandId:  robot_action.ActionType(buf[offsetActionType]),
 		RobotId:    int32(buf[offsetRobotID]),
-		KickSpeed:  int32(binary.LittleEndian.Int16(buf[offsetKickSpeed:])),
+		KickSpeed:  int32(int16(binary.LittleEndian.Uint16(buf[offsetKickSpeed:]))),
 		Pos: &robot_action.Vector3D{
-			X: int32(binary.LittleEndian.Int16(buf[offsetPosX:])),
-			Y: int32(binary.LittleEndian.Int16(buf[offsetPosY:])),
-			W: float32(int16(binary.LittleEndian.Int16(buf[offsetAngle:]))) / 1000.0,
+			X: int32(int16(binary.LittleEndian.Uint16(buf[offsetPosX:]))),
+			Y: int32(int16(binary.LittleEndian.Uint16(buf[offsetPosY:]))),
+			W: float32(int16(binary.LittleEndian.Uint16(buf[offsetAngle:]))) / 1000.0,
 		},
 		Dest: &robot_action.Vector3D{
-			X: int32(binary.LittleEndian.Int16(buf[offsetDestX:])),
-			Y: int32(binary.LittleEndian.Int16(buf[offsetDestY:])),
+			X: int32(int16(binary.LittleEndian.Uint16(buf[offsetDestX:]))),
+			Y: int32(int16(binary.LittleEndian.Uint16(buf[offsetDestY:]))),
 			W: 0,
 		},
 		Direction: &robot_action.Vector2D{
-			X: int32(binary.LittleEndian.Int16(buf[offsetDirectionX:])),
-			Y: int32(binary.LittleEndian.Int16(buf[offsetDirectionY:])),
+			X: int32(int16(binary.LittleEndian.Uint16(buf[offsetDirectionX:]))),
+			Y: int32(int16(binary.LittleEndian.Uint16(buf[offsetDirectionY:]))),
 		},
-		AngularVel: int32(binary.LittleEndian.Int16(buf[offsetAngularVel:])),
+		AngularVel: int32(int16(binary.LittleEndian.Uint16(buf[offsetAngularVel:]))),
 	}
 
 	return cmd, nil
