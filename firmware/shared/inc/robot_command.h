@@ -15,7 +15,7 @@
  * [12-13] : Direction X (int16, little-endian) - raw value
  * [14-15] : Direction Y (int16, little-endian) - raw value
  * [16-17] : Angular Vel (int16, little-endian) - degrees/sec
- * [18-19] : Orientation W (int16, little-endian) - radians * 1000 (milliradians)
+ * [18-19] : Angle (int16, little-endian) - radians * 1000 (milliradians)
  *
  * Total: 20 bytes of fields, 12 bytes reserved (zero-filled)
  */
@@ -54,7 +54,7 @@ typedef struct {
     int16_t direction_x;    // raw value
     int16_t direction_y;    // raw value
     int16_t angular_vel;    // degrees/sec
-    int16_t orientation_w;  // radians * 1000 (milliradians)
+    int16_t angle;          // radians * 1000 (milliradians)
 } RobotCommand;
 
 /**
