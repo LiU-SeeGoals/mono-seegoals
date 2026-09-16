@@ -67,7 +67,7 @@ static YAML::Node getOptional(const YAML::Node& node) {
 	return node.IsDefined() ? node : YAML::Node();
 }
 
-Resources::Resources(const std::string& configPath) : fieldReference(), configPath(configPath) {
+Resources::Resources(const std::string& configPath, const bool sharedClock) : fieldReference(), configPath(configPath) {
 	YAML::Node config = YAML::LoadFile(configPath);
 	struct stat st{};
 	if(stat(configPath.c_str(), &st) == 0)
@@ -110,7 +110,7 @@ Resources::Resources(const std::string& configPath) : fieldReference(), configPa
 
 	YAML::Node network = getOptional(config["network"]);
 	gcSocket = std::make_shared<GCSocket>(network["gc_ip"].as<std::string>("224.5.23.1"), network["gc_port"].as<int>(10003), YAML::LoadFile(config["bot_heights_file"].as<std::string>("robot-heights.yml")).as<std::map<std::string, double>>());
-	socket = std::make_shared<VisionSocket>(network["vision_ip"].as<std::string>("224.5.23.2"), network["vision_port"].as<int>(10006), camId, gcSocket->defaultBotHeight);
+	socket = std::make_shared<VisionSocket>(network["vision_ip"].as<std::string>("224.5.23.2"), network["vision_port"].as<int>(10006), camId, gcSocket->defaultBotHeight, !sharedClock);
 	perspective = std::make_shared<Perspective>(socket, camId, geometryTolerance);
 
 	YAML::Node stream = getOptional(config["stream"]);

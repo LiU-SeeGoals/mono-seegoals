@@ -24,7 +24,8 @@ def commands(root=ROOT):
         config = root / f"config-camera-{camera}.local.yml"
         if not config.is_file():
             config = root / f"config-camera-{camera}.yml"
-        jobs.append((f"camera {camera}", [str(root / "build/vision_processor"), config.name]))
+        # All three camera processes run on this PC and already share its clock.
+        jobs.append((f"camera {camera}", [str(root / "build/vision_processor"), "--shared-clock", config.name]))
     return jobs
 
 

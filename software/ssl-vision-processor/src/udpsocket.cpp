@@ -257,6 +257,9 @@ void VisionSocket::detectionTracking(const SSL_DetectionFrame &detection) {
 
 
 void VisionSocket::updateTime() {
+	if(!timeSyncEnabled)
+		return;
+
 	offsetMutex.lock();
 
 	double offset = 0.0;
@@ -282,6 +285,9 @@ void VisionSocket::updateTime() {
 }
 
 void VisionSocket::timeSynchronization(const SSL_DetectionFrame& detection) {
+	if(!timeSyncEnabled)
+		return;
+
 	const double localTime = getRealTime();
 	const unsigned int senderId = detection.camera_id();
 

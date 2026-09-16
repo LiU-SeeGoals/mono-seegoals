@@ -262,7 +262,23 @@ void sig_stop(int sig_num) {
 }
 
 int main(int argc, char* argv[]) {
-	Resources r(argc > 1 ? argv[1] : "config.yml");
+	bool sharedClock = false;
+	bool configProvided = false;
+	std::string configPath = "config.yml";
+	for(int i = 1; i < argc; i++) {
+		const std::string argument = argv[i];
+		if(argument == "--shared-clock") {
+			sharedClock = true;
+		} else if(argument.starts_with("--") || configProvided) {
+			FATAL("Usage: vision_processor [--shared-clock] [config.yml]");
+		} else {
+			configPath = argument;
+			configProvided = true;
+		}
+	}
+	if(sharedClock)
+		LOG("Using shared host clock; inter-camera time synchronization disabled");
+	Resources r(configPath, sharedClock);
 	cl::Kernel blobList = r.openCl->compile(kernel_blobList_cl);
 
 	uint32_t frameId = 0;

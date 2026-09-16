@@ -161,6 +161,26 @@ In `geometry[X].yml` set the corresponding flag under `optional_field_lines` to 
 
 H.264 RTSP streams can silently produce corrupted frames on slower or throttled machines. Switch the source to MJPEG, or run on a machine with a real OpenCL GPU.
 
+### Camera preview disappears after changing settings / backwards time jump warnings
+
+Camera setting changes can interrupt the input stream. Check the camera's own
+live view first. Once it is working, stop vision with `sg-kill`, start
+`python3 python/cam_viewer.py --cameras 3`, then restart with
+`sg-start --vision-processor`. Starting the viewer first lets it receive the
+debug stream's initial H.264 parameters. If the camera's own live view is also
+missing, restore the changed camera setting before restarting vision.
+
+`Large backwards time jump suppressed` is an inter-camera clock adjustment
+warning, not a UDP bind or receive error. The synchronizer retains peer timing
+offsets when a camera stops sending. The SeeGoals launcher passes
+`--shared-clock` to all three processors because they run on the same PC;
+this disables those adjustments and uses the shared host clock. Rebuild the
+processor after updating the launcher. For manual same-PC launches, use e.g.
+`./build/vision_processor --shared-clock config-camera-2.yml` for each camera.
+Network OpenCV inputs always use host timestamps rather than decoder frame
+positions. Separate-host deployments keep the existing synchronization behavior
+unless `--shared-clock` is explicitly supplied.
+
 ### If nothing else helps
 
 Activate `stream: raw_feed: true` in your `config[X].yml` and record the video livestream

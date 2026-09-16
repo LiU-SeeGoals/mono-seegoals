@@ -14,10 +14,14 @@
      limitations under the License.
  */
 #include "opencvdriver.h"
+#include "log.h"
 
 #include <cmath>
 
-OpenCVDriver::OpenCVDriver(const CameraConfig& config): capture(config.path, cv::CAP_ANY, {cv::CAP_PROP_HW_ACCELERATION, cv::VIDEO_ACCELERATION_ANY}), name(config.path) {
+OpenCVDriver::OpenCVDriver(const CameraConfig& config): capture(config.path, cv::CAP_ANY, {cv::CAP_PROP_HW_ACCELERATION, cv::VIDEO_ACCELERATION_ANY}), name(config.path), liveSource(config.path.find("://") != std::string::npos || config.path.starts_with("/dev/")) {
+	if(!capture.isOpened())
+		FATAL("Could not open OpenCV input. Check the camera URL, credentials and stream settings.");
+
 	std::replace(name.begin(), name.end(), '/', '_');
 
 	// Use compressed data stream to unlock the highest resolution - framerate combination on USB2 cameras
@@ -61,8 +65,11 @@ std::shared_ptr<RawImage> OpenCVDriver::readImage() {
 
 	CLMap<uint8_t> map = image->write<uint8_t>();
 	cv::Mat mat(cv::Size(image->width, image->height), CV_8UC3, (void*)*map);
-	if(!capture.read(mat))
+	if(!capture.read(mat)) {
+		if(liveSource)
+			WARN("Camera stream stopped or frame decoding failed. Restart vision after changing camera settings.");
 		return nullptr;
+	}
 
 	return image;
 }
@@ -82,6 +89,11 @@ double OpenCVDriver::expectedFrametime() {
 
 
 double OpenCVDriver::getTime() {
+	// HTTP/RTSP streams and live devices must stay on the host clock even if
+	// the decoder reports plausible frame counts after a settings change.
+	if(liveSource)
+		return getRealTime();
+
 	const double pos = capture.get(cv::CAP_PROP_POS_FRAMES);
 	const double fps = capture.get(cv::CAP_PROP_FPS);
 	const double frameCount = capture.get(cv::CAP_PROP_FRAME_COUNT);

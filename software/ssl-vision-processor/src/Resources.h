@@ -47,7 +47,7 @@ enum class StreamView {
 
 class Resources {
 public:
-	explicit Resources(const std::string& configPath);
+	explicit Resources(const std::string& configPath, bool sharedClock = false);
 
 	void reloadConfigIfChanged();
 

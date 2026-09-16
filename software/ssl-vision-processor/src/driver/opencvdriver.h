@@ -35,4 +35,5 @@ private:
 	cv::VideoCapture capture;
 	std::shared_ptr<RawImage> image = nullptr;
 	std::string name;
+	bool liveSource;
 };
