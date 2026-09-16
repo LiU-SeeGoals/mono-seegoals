@@ -12,6 +12,15 @@ The geometry publisher `geom_publisher.py` publishes the field geometry
 for all vision_processors, teams and the game controller.
 `cam_viewer.py` opens the `mpv` video player with the camera streams from the vision_processor instances.
 
+## SeeGoals lab startup
+
+After the one-time `./setup.sh` build (answer **n** to installing its generic
+systemd services), run `sg-start --vision-processor` or select option **8** in
+`sg-start`. This launches the SeeGoals geometry publisher, all three camera
+processors, and the lab Docker stack with AutoRef. Stop everything with
+`sg-kill`. See the [startup guide](../../scripts/README.md) for prerequisites,
+local camera overrides, logs, and camera previews.
+
 ## Wrapper
 
 A modular replacement for `geom_publisher.py` plus a browser UI:

@@ -1,6 +1,14 @@
 #!/bin/bash
 
-STOP=$(docker compose -p seegoals ps --format "{{.Names}}")
+# The new vision processor runs on the host so it can use the OpenCL driver.
+if command -v systemctl >/dev/null 2>&1 &&
+    systemctl --user show seegoals-vision-processor.service --property=LoadState --value 2>/dev/null | grep -qx loaded; then
+    echo "Stopping the new vision processor..."
+    systemctl --user stop seegoals-vision-processor.service || exit 1
+fi
+
+# Query by project label so this also works outside the repository directory.
+STOP=$(docker ps --filter label=com.docker.compose.project=seegoals --format "{{.Names}}")
 
 COUNT=$(echo "$STOP" | wc -l)
 
