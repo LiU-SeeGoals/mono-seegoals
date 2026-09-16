@@ -61,6 +61,7 @@ public:
 	double minCircularity;
 	double minScore;
 	double minCamEdgeDistance;
+	double minBotCamEdgeDistance;
 	int maxBlobs;
 	float minConfidence;
 	float resamplingFactor;
