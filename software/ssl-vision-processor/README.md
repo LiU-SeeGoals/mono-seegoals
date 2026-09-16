@@ -161,6 +161,30 @@ In `geometry[X].yml` set the corresponding flag under `optional_field_lines` to 
 
 H.264 RTSP streams can silently produce corrupted frames on slower or throttled machines. Switch the source to MJPEG, or run on a machine with a real OpenCL GPU.
 
+### Tune an Axis camera for robot tracking
+
+The Axis autotuner changes the camera's VAPIX exposure limits, listens to the
+raw SSL detections for that camera, and keeps the setting with the best robot
+detection coverage and confidence. Run it while the robots move through the
+camera's whole field of view. The default camera file is camera 2; use the
+local file so credentials are not added to a command line:
+
+    python3 python/axis_autotune.py --config config-camera-2.local.yml --probe
+
+Then run a trial. Supplying expected robot IDs makes the score measure recall
+for those robots instead of only measuring whether any robot was detected:
+
+    python3 python/axis_autotune.py --config config-camera-2.local.yml \
+      --expected-robots y0,y1,b0,b1 --duration 10 --settle 2
+
+The tuner tests `MaxExposureTime` and `MaxGain` values when the camera exposes
+them; on older Axis firmware it falls back to `ExposurePriority`. It applies
+the best combination and writes `axis-autotune-result.json`. Use `--no-apply` to
+restore the original camera settings after the trials, or `--dry-run` to print
+the candidate grid without changing the camera. Pressing Ctrl+C restores the
+original settings as well. The account must have operator or administrator
+rights for the Axis parameter API.
+
 ### Camera preview disappears after changing settings / backwards time jump warnings
 
 Camera setting changes can interrupt the input stream. Check the camera's own
