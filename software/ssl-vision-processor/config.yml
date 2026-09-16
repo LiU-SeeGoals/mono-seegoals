@@ -87,6 +87,10 @@ thresholds:
   # Min ball camera edge distance in mm
   #min_cam_edge_distance: 170.0
 
+  # Min robot camera edge distance in mm (0 disables filtering).
+  # Applies to image edges inside the field, for cameras with overlapping coverage.
+  #min_bot_cam_edge_distance: 0.0
+
   # Maximum allowed clipping of two objects in mm
   #clipping_tolerance: 10.0
 

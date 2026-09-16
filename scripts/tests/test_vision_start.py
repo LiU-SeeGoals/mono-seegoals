@@ -1,7 +1,8 @@
-"""Run with: python3 -m unittest discover -s scripts/tests -v."""
+"""Run with: python3 -B -m unittest discover -s scripts/tests -v."""
 
 import importlib.machinery
 import importlib.util
+import json
 import os
 from pathlib import Path
 import runpy
@@ -139,6 +140,37 @@ class StartupIntegrationTests(unittest.TestCase):
         self.assertFalse(any(command[0].endswith("sg-kill") for command in commands))
         self.assertFalse(any(command[:2] == ["docker", "rm"] for command in commands))
         system.assert_not_called()
+
+    def test_sg_kill_stops_service_and_containers_from_another_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            log = root / "commands.jsonl"
+            fake_command = (
+                f"#!{sys.executable}\n"
+                "import json, pathlib, sys\n"
+                "command = pathlib.Path(sys.argv[0]).name\n"
+                f"with open({str(log)!r}, 'a') as log:\n"
+                "    log.write(json.dumps([command, *sys.argv[1:]]) + '\\n')\n"
+                "if command == 'systemctl' and 'show' in sys.argv: print('loaded')\n"
+                "if command == 'docker' and sys.argv[1] == 'ps': print('test-ai')\n"
+            )
+            for name in ("systemctl", "docker"):
+                executable = root / name
+                executable.write_text(fake_command)
+                executable.chmod(0o755)
+            result = subprocess.run(
+                [str(ROOT / "scripts/bin/sg-kill")], cwd=root,
+                env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}"},
+                capture_output=True, text=True, timeout=5,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = [json.loads(line) for line in log.read_text().splitlines()]
+            stop = ["systemctl", "--user", "stop", "seegoals-vision-processor.service"]
+            self.assertLess(calls.index(stop), calls.index(["docker", "kill", "test-ai"]))
+            self.assertIn([
+                "docker", "ps", "--filter", "label=com.docker.compose.project=seegoals",
+                "--format", "{{.Names}}"
+            ], calls)
 
 
 if __name__ == "__main__":

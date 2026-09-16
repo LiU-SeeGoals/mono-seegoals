@@ -204,6 +204,7 @@ void Resources::applyTunables(const YAML::Node& config) {
 	minScore = thresholds["score"].as<double>(5.0);
 	minConfidence = thresholds["min_confidence"].as<float>(0.2f);
 	minCamEdgeDistance = thresholds["min_cam_edge_distance"].as<double>(170.0);
+	minBotCamEdgeDistance = thresholds["min_bot_cam_edge_distance"].as<double>(0.0);
 	resamplingFactor = thresholds["resampling_factor"].as<float>(1.0f);
 	clippingTolerance = thresholds["clipping_tolerance"].as<float>(10.0f);
 

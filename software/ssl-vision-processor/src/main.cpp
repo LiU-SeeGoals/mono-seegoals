@@ -13,6 +13,8 @@
      See the License for the specific language governing permissions and
      limitations under the License.
  */
+#include <algorithm>
+#include <cmath>
 #include <csignal>
 #include "log.h"
 #include <opencv2/bgsegm.hpp>
@@ -50,6 +52,9 @@ void generateAngleSortedBotHypotheses(const Resources& r, std::list<std::unique_
 
 		botBlobs.clear();
 		blobs.rangeSearch(botBlobs, blob.pos, r.perspective->field.max_robot_radius());
+		// The range search includes its center. A robot needs four distinct
+		// side markers in addition to that center marker.
+		botBlobs.erase(std::remove(botBlobs.begin(), botBlobs.end(), &blob), botBlobs.end());
 		if(botBlobs.size() < 4)
 			continue;
 
@@ -74,7 +79,8 @@ void generateAngleSortedBotHypotheses(const Resources& r, std::list<std::unique_
 			}
 		}
 
-		bots.push_back(std::move(bestBot));
+		if(bestBot != nullptr)
+			bots.push_back(std::move(bestBot));
 	}
 }
 
@@ -162,7 +168,7 @@ void filterStddevScore(std::list<std::unique_ptr<T>>& bots, float threshold) {
 	}
 }
 
-static inline bool closerThanCamEdgeDistance(const Resources& r, const Eigen::Vector2f& pos, const Eigen::Vector2f& border) {
+static inline bool closerThanCamEdgeDistance(const Resources& r, const Eigen::Vector2f& pos, const Eigen::Vector2f& border, const double minDistance) {
 	const SSL_GeometryFieldSize& field = r.perspective->field;
 	const float halfFieldLength = field.field_length()/2.0f + goalBoundaryWidth(field);
 	const float halfFieldWidth = field.field_width()/2.0f + field.boundary_width();
@@ -171,21 +177,28 @@ static inline bool closerThanCamEdgeDistance(const Resources& r, const Eigen::Ve
 
 	// Don't filter if border is outside field -> cannot be a partial robot
 	bool borderInsideField = borderPos.x() >= -halfFieldLength && borderPos.x() <= halfFieldLength && borderPos.y() >= -halfFieldWidth && borderPos.y() <= halfFieldWidth;
-	return borderInsideField && (borderPos - pos).squaredNorm() < r.minCamEdgeDistance*r.minCamEdgeDistance;
+	return borderInsideField && (borderPos - pos).squaredNorm() < minDistance*minDistance;
 }
 
-void filterBallsAtCamEdge(const Resources& r, std::list<std::unique_ptr<BallHypothesis>>& balls) {
-	for(auto it = balls.cbegin(); it != balls.cend(); ) {
+template<typename T>
+void filterObjectsAtCamEdge(const Resources& r, std::list<std::unique_ptr<T>>& objects, const double minDistance) {
+	if(minDistance <= 0.0)
+		return;
+
+	for(auto it = objects.cbegin(); it != objects.cend(); ) {
 		const Eigen::Vector2f& pos = (*it)->pos;
 		const Eigen::Vector2f imgPos = r.perspective->model.field2image({pos.x(), pos.y(), (float)r.gcSocket->maxBotHeight});
+		const auto& size = r.perspective->model.size;
 
 		if(
-				closerThanCamEdgeDistance(r, pos, Eigen::Vector2f(0.0f, imgPos.y())) ||
-				closerThanCamEdgeDistance(r, pos, Eigen::Vector2f(r.perspective->model.size.x()-1, imgPos.y())) ||
-				closerThanCamEdgeDistance(r, pos, Eigen::Vector2f(imgPos.x(), 0.0f)) ||
-				closerThanCamEdgeDistance(r, pos, Eigen::Vector2f(imgPos.x(), r.perspective->model.size.y()-1))
+				!std::isfinite(imgPos.x()) || !std::isfinite(imgPos.y()) ||
+				imgPos.x() < 0 || imgPos.x() > size.x()-1 || imgPos.y() < 0 || imgPos.y() > size.y()-1 ||
+				closerThanCamEdgeDistance(r, pos, Eigen::Vector2f(0.0f, imgPos.y()), minDistance) ||
+				closerThanCamEdgeDistance(r, pos, Eigen::Vector2f(size.x()-1, imgPos.y()), minDistance) ||
+				closerThanCamEdgeDistance(r, pos, Eigen::Vector2f(imgPos.x(), 0.0f), minDistance) ||
+				closerThanCamEdgeDistance(r, pos, Eigen::Vector2f(imgPos.x(), size.y()-1), minDistance)
 		) {
-			it = balls.erase(it);
+			it = objects.erase(it);
 		} else {
 			it++;
 		}
@@ -197,7 +210,7 @@ void filterClippingBotBotHypotheses(const Resources& r, std::list<std::unique_pt
 		const auto& bot1 = *it1;
 		bool remove = false;
 		for (auto it2 = bots.cbegin(); it2 != bots.cend(); it2++) {
-			const auto& bot2 = *it1;
+			const auto& bot2 = *it2;
 			if (bot2->score > bot1->score && bot1->isClipping(r, *bot2)) {
 				remove = true;
 				break;
@@ -327,6 +340,7 @@ int main(int argc, char* argv[]) {
 				generateRadiusSearchTrackedBotHypotheses(r, botHypotheses, matches, blobs, startTime);
 				generateAngleSortedBotHypotheses(r, botHypotheses, matches, blobs);
 				filterHypothesesScore(botHypotheses, r.minConfidence);
+				filterObjectsAtCamEdge(r, botHypotheses, r.minBotCamEdgeDistance);
 				filterClippingBotBotHypotheses(r, botHypotheses);
 				generateNonclippingBallHypotheses(r, botHypotheses, matches, ballHypotheses);
 			}
@@ -337,8 +351,10 @@ int main(int argc, char* argv[]) {
 			for (auto& ball : ballHypotheses)
 				ball->recalcPostColorCalib(r);
 
+			// Color updates can invalidate a previously accepted tracked robot.
+			filterHypothesesScore(botHypotheses, r.minConfidence);
 			filterHypothesesScore(ballHypotheses, r.minConfidence);
-			filterBallsAtCamEdge(r, ballHypotheses);
+			filterObjectsAtCamEdge(r, ballHypotheses, r.minCamEdgeDistance);
 			filterStddevScore(ballHypotheses, (float)r.minScore);
 
 			SSL_WrapperPacket wrapper;

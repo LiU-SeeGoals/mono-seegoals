@@ -134,6 +134,18 @@ adjust the reference colors under `color`.
 
 If bot detections are lost when multiple bots are in close distance (e.g. during collisions), increase `clipping_tolerance`.
 
+### Partial robots at an overlapping camera's image edge disturb tracking
+
+Set `thresholds.min_bot_cam_edge_distance` for the affected camera to reject
+robot candidates near image edges that lie inside the field. The distance is
+in field millimetres; `0` disables this filter. SeeGoals camera 2 starts with
+`170.0`, leaving those overlap regions to cameras 0/1. This value reloads live.
+If using `config-camera-2.local.yml`, add the setting to that file too.
+
+This margin does not fix exposure, focus, color classification, or calibration
+errors in the camera's central view. For those, inspect `img/2.raw.jpg`,
+`img/2.flat.jpg`, and `img/2.blob.jpg` with a robot in the affected region.
+
 ### Calibration is wrong on a field missing some standard lines
 
 If your physical field is missing one of the optional SSL markings (center-to-center line, halfway line, center circle, or penalty-area stretches), the calibration is fed lines that the camera cannot see and the reprojection does not match the field boundary.

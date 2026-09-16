@@ -26,6 +26,12 @@ geometry:
     - [1597, 167]
   refinement: true
 
+thresholds:
+  # Ignore partial robot patterns near image edges inside the field. Cameras
+  # 0/1 cover these overlap regions. Distance is in field millimetres and can
+  # be tuned live; 0 disables the margin.
+  min_bot_cam_edge_distance: 170.0
+
 network:
   gc_ip: "224.5.23.1"
   gc_port: 10003
