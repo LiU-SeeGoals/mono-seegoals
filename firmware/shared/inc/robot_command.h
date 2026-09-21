@@ -6,7 +6,7 @@
  *
  * Byte Layout:
  * [0]     : Action Type (uint8) - enum 0-5 (KICK, STOP, MOVE_TO, INIT, MOVE, ROTATE)
- * [1]     : Robot ID (uint8) - 1-7
+ * [1]     : Robot ID (uint8) - 0-15
  * [2-3]   : Kick Speed (int16, little-endian) - mm/s
  * [4-5]   : Pos X (int16, little-endian) - mm
  * [6-7]   : Pos Y (int16, little-endian) - mm
@@ -44,17 +44,17 @@ extern "C" {
  * @brief Decoded robot command structure
  */
 typedef struct {
-    uint8_t action_type;    // 0-5
-    uint8_t robot_id;       // 1-7
-    int16_t kick_speed;     // mm/s
-    int16_t pos_x;          // mm
-    int16_t pos_y;          // mm
-    int16_t dest_x;         // mm
-    int16_t dest_y;         // mm
-    int16_t direction_x;    // raw value
-    int16_t direction_y;    // raw value
-    int16_t angular_vel;    // degrees/sec
-    int16_t angle;          // radians * 1000 (milliradians)
+    uint8_t action_type;
+    uint8_t robot_id;
+    int16_t kick_speed;
+    int16_t pos_x;
+    int16_t pos_y;
+    int16_t dest_x;
+    int16_t dest_y;
+    int16_t direction_x;
+    int16_t direction_y;
+    int16_t angular_vel;
+    int16_t angle;
 } RobotCommand;
 
 /**
@@ -64,10 +64,6 @@ typedef struct {
  * @param buf Output buffer (must be at least ROBOT_COMMAND_SIZE bytes)
  * @return true if encoding succeeded, false on error
  *
- * @note Validates:
- *       - action_type must be 0-5
- *       - robot_id must be 1-7
- *       - kick_speed must be 0-32767
  */
 bool robot_command_encode(const RobotCommand* cmd, uint8_t* buf);
 
@@ -80,13 +76,6 @@ bool robot_command_encode(const RobotCommand* cmd, uint8_t* buf);
  */
 bool robot_command_decode(const uint8_t* buf, RobotCommand* cmd);
 
-/**
- * @brief Print RobotCommand for debugging
- *
- * @param cmd Command to print
- *
- * @note Requires logging infrastructure (LOG_DEBUG, LOG_INFO, etc.)
- */
 void robot_command_print(const RobotCommand* cmd);
 
 #ifdef __cplusplus
