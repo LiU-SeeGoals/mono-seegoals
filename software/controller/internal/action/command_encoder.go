@@ -3,6 +3,7 @@ package action
 import (
 	"encoding/binary"
 	"fmt"
+
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
 )
 
@@ -27,17 +28,18 @@ import (
 const (
 	CommandEncodedSize = 32
 
-	offsetActionType   = 0
-	offsetRobotID      = 1
-	offsetKickSpeed    = 2
-	offsetPosX         = 4
-	offsetPosY         = 6
-	offsetDestX        = 8
-	offsetDestY        = 10
-	offsetDirectionX   = 12
-	offsetDirectionY   = 14
-	offsetAngularVel   = 16
-	offsetAngle        = 18
+	offsetActionType = 0
+	offsetRobotID    = 1
+	offsetKickSpeed  = 2
+	offsetPosX       = 4
+	offsetPosY       = 6
+	offsetDestX      = 8
+	offsetDestY      = 10
+	offsetDirectionX = 12
+	offsetDirectionY = 14
+	offsetAngularVel = 16
+	offsetAngle      = 18
+	offsetDestW      = 20
 )
 
 // EncodeCommand converts a robot_action.Command to a 32-byte binary buffer
@@ -45,7 +47,6 @@ func EncodeCommand(cmd *robot_action.Command) ([]byte, error) {
 	if cmd == nil {
 		return nil, fmt.Errorf("command cannot be nil")
 	}
-
 
 	if cmd.CommandId < 0 || cmd.CommandId > 5 {
 		return nil, fmt.Errorf("invalid action type: %d", cmd.CommandId)
@@ -55,7 +56,7 @@ func EncodeCommand(cmd *robot_action.Command) ([]byte, error) {
 		return nil, fmt.Errorf("invalid robot id: %d", cmd.RobotId)
 	}
 
-	var posX, posY, posW, destX, destY, dirX, dirY int16
+	var posX, posY, posW, destX, destY, destW, dirX, dirY int16
 	if cmd.Pos != nil {
 		posX = int16(cmd.Pos.X)
 		posY = int16(cmd.Pos.Y)
@@ -64,6 +65,7 @@ func EncodeCommand(cmd *robot_action.Command) ([]byte, error) {
 	if cmd.Dest != nil {
 		destX = int16(cmd.Dest.X)
 		destY = int16(cmd.Dest.Y)
+		destW = int16(cmd.Dest.W * 1000.0)
 	}
 	if cmd.Direction != nil {
 		dirX = int16(cmd.Direction.X)
@@ -88,6 +90,7 @@ func EncodeCommand(cmd *robot_action.Command) ([]byte, error) {
 	binary.LittleEndian.PutUint16(buf[offsetAngularVel:], uint16(cmd.AngularVel))
 
 	binary.LittleEndian.PutUint16(buf[offsetAngle:], uint16(posW))
+	binary.LittleEndian.PutUint16(buf[offsetDestW:], uint16(destW))
 
 	return buf, nil
 }
@@ -99,9 +102,9 @@ func DecodeCommand(buf []byte) (*robot_action.Command, error) {
 	}
 
 	cmd := &robot_action.Command{
-		CommandId:  robot_action.ActionType(buf[offsetActionType]),
-		RobotId:    int32(buf[offsetRobotID]),
-		KickSpeed:  int32(int16(binary.LittleEndian.Uint16(buf[offsetKickSpeed:]))),
+		CommandId: robot_action.ActionType(buf[offsetActionType]),
+		RobotId:   int32(buf[offsetRobotID]),
+		KickSpeed: int32(int16(binary.LittleEndian.Uint16(buf[offsetKickSpeed:]))),
 		Pos: &robot_action.Vector3D{
 			X: int32(int16(binary.LittleEndian.Uint16(buf[offsetPosX:]))),
 			Y: int32(int16(binary.LittleEndian.Uint16(buf[offsetPosY:]))),
@@ -110,7 +113,7 @@ func DecodeCommand(buf []byte) (*robot_action.Command, error) {
 		Dest: &robot_action.Vector3D{
 			X: int32(int16(binary.LittleEndian.Uint16(buf[offsetDestX:]))),
 			Y: int32(int16(binary.LittleEndian.Uint16(buf[offsetDestY:]))),
-			W: 0,
+			W: float32(int16(binary.LittleEndian.Uint16(buf[offsetDestW:]))) / 1000.0,
 		},
 		Direction: &robot_action.Vector2D{
 			X: int32(int16(binary.LittleEndian.Uint16(buf[offsetDirectionX:]))),
