@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { SSLFieldUpdate } from '../../../types/SSLFieldUpdate';
 import './RobotTable.css';
-import LensIcon from '@mui/icons-material/Lens';
-import InfoIcon from '@mui/icons-material/Info';
 import { Action } from '../../../types/Action';
-import { actionToStr } from '../../../helper/defaultValues';
 
 interface RobotTableProps {
   robotActions: Action[];
@@ -12,33 +10,8 @@ interface RobotTableProps {
 }
 
 const RobotTable: React.FC<RobotTableProps> = ({
-  robotActions,
-  visibleRobots,
   sslFieldUpdate,
 }) => {
-  const [yellowRobots, setYellowRobots] = useState<Map<number, any>>(new Map());
-  const [blueRobots, setBlueRobots] = useState<Map<number, any>>(new Map());
-
-  useEffect(() => {
-    setYellowRobots(prev => {
-      const updated = new Map(prev);
-      sslFieldUpdate.robotsYellow.forEach(robot => {
-        updated.set(robot.robotId, robot);
-      });
-      return updated;
-    });
-
-    setBlueRobots(prev => {
-      const updated = new Map(prev);
-      sslFieldUpdate.robotsBlue.forEach(robot => {
-        updated.set(robot.robotId, robot);
-      });
-      return updated;
-    });
-  }, [sslFieldUpdate]);
-
-  const tip = 'This only shows if the SSL vision can currenty see the robot';
-
   return (
     <div>
       <h4>Robots</h4>
@@ -50,14 +23,14 @@ const RobotTable: React.FC<RobotTableProps> = ({
           <p>y</p>
           <p>Angle</p>
         </div>
-        {Array.from(yellowRobots.values())
-          .sort((a, b) => a.robotId - b.robotId)
+        {[...sslFieldUpdate.robotsYellow]
+          .sort((a, b) => (a.robotId ?? 0) - (b.robotId ?? 0))
           .map((robot, index) => (
         <div className="robotItem" key={index}>
           <p>{robot.robotId}</p>
           <p>{robot.x.toFixed(1)}</p>
           <p>{robot.y.toFixed(1)}</p>
-          <p>{robot.orientation.toFixed(5)}</p>
+          <p>{robot.orientation?.toFixed(5) ?? '—'}</p>
         </div>
         ))}
       </div>
@@ -70,14 +43,14 @@ const RobotTable: React.FC<RobotTableProps> = ({
           <p>y</p>
           <p>Angle</p>
         </div>
-        {Array.from(blueRobots.values())
-          .sort((a, b) => a.robotId - b.robotId)
+        {[...sslFieldUpdate.robotsBlue]
+          .sort((a, b) => (a.robotId ?? 0) - (b.robotId ?? 0))
           .map((robot, index) => (
         <div className="robotItem" key={index}>
           <p>{robot.robotId}</p>
           <p>{robot.x.toFixed(1)}</p>
           <p>{robot.y.toFixed(1)}</p>
-          <p>{robot.orientation.toFixed(5)}</p>
+          <p>{robot.orientation?.toFixed(5) ?? '—'}</p>
         </div>
         ))}
       </div>

@@ -22,3 +22,17 @@ The `./src/backend/sslVisionProxy.cjs` works in the same way.
 
 ## Speaking with AI controller
 Our own *AI* controller doesn't multicast, it creates a websocket on `VITE_AI_GAME_VIEWER_SOCKET_ADDR:VITE_AI_GAME_VIEWER_SOCKET_PORT` for us, so here we can simply connect to that. We do this in `./src/hooks/useAIController.ts`.
+
+## Vision source
+
+Choose **Tigers filter** (the default) or **Raw SSL Vision** in the sidebar.
+The choice is saved in this browser. Tigers requires a running auto-referee/tracker
+publishing to `SSL_TRACKER_ADDR:SSL_TRACKER_PORT` (default `224.5.23.2:10010`).
+The proxy still receives raw vision for field geometry. It does not fall back to
+raw detections when Tigers is unavailable. The vision status indicates fresh
+frames; robots and balls clear after one second without a frame or on disconnect.
+The robot table reflects the current frame instead of remembering old detections.
+Restart the Node vision proxy after updating it.
+
+Run tracker decoding regression tests with:
+`node --test src/backend/trackedVision.test.cjs`.
