@@ -1,0 +1,53 @@
+# SeeGoals overlapping centre-camera configuration for ssl-vision-processor.
+cam_id: 2
+bot_heights_file: robot-heights.yml
+
+camera:
+  driver: OPENCV
+  # This camera exposes the MJPEG feed through the Axis CGI endpoint. Keep
+  # credentials in an untracked config-camera-2.local.yml file.
+  path: "http://root:raswa151@192.168.1.12/axis-cgi/mjpg/video.cgi"
+  width: 1920
+  height: 1080
+  exposure: 0.0
+  gain: 0.0
+  gamma: 1.0
+  white_balance: OUTDOOR
+
+geometry:
+  # geometry.yml publishes the saved calibration for this non-uniform
+  # three-camera layout, so automatic camera-grid calibration is bypassed.
+  camera_amount: 3
+  camera_height: 2602.0
+  line_corners:
+    - [1539, 841]
+    - [339, 789]
+    - [324, 140]
+    - [1597, 167]
+  refinement: true
+
+thresholds:
+  # Ignore partial robot patterns near image edges inside the field. Cameras
+  # 0/1 cover these overlap regions. Distance is in field millimetres and can
+  # be tuned live; 0 disables the margin.
+  min_bot_cam_edge_distance: 170.0
+
+network:
+  gc_ip: "224.5.23.1"
+  gc_port: 10003
+  vision_ip: "224.5.23.2"
+  vision_port: 10006
+
+stream:
+  active: true
+  raw_feed: false
+  # Keep a fixed processed view to avoid restarting the H.264 stream.
+  view: reprojected
+  ip_base_prefix: "224.5.23."
+  ip_base_end: 100
+  port: 10100
+
+debug:
+  wait_for_geometry: true
+  debug_images: true
+  debug_stream_interval_ms: 2000

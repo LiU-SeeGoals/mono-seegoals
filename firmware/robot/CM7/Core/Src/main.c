@@ -146,18 +146,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         NAV_update_motor_state();
     }
 
-
-    if (htim->Instance == TIM12 && STATE_is_calibrated() == 1) {
-        IMU_AccelVec3 acc = IMU_read_accel_mps2();
-        IMU_GyroVec3 gyr = IMU_read_gyro_radps();
-
-        STATE_FusionEKFIntertialUpdate(acc, gyr);
-        float x = NAV_GetNavX();
-        float y = NAV_GetNavY();
-        float w = NAV_GetNavW();
-        DATA_log_imu_data(gyr.x,gyr.y,gyr.z);
-
-        POS_go_to_position_lqr(x,y,w);
+    if (htim->Instance == TIM12) {
+        NAV_MovementUpdate();
     }
 
     /* USER CODE BEGIN Callback 1 */
@@ -251,7 +241,7 @@ int main(void)
     UI_Init(&huart3);
     ITR_Init();
     LOG_INFO("Discharging kicker\r\n");
-    const int DISCHARGE_AMNT = 50;
+    const int DISCHARGE_AMNT = 10;
     COMMON_buzzer_warning_with_delay();
 
     for (int i = 0; i < DISCHARGE_AMNT; i++)
@@ -262,7 +252,7 @@ int main(void)
         }
 
         KICKER_KickSafe();
-        HAL_Delay(60);
+        HAL_Delay(40);
     }
 
     STATE_calibrate_imu_gyr();

@@ -19,6 +19,12 @@ typedef struct {
 
 typedef enum
 {
+    NAV_VELOCITY_MOVEMENT,
+    NAV_POSITION_MOVEMENT,
+} MovementType;
+
+typedef enum
+{
     UP,
     DOWN,
     LEFT,
@@ -64,6 +70,11 @@ void NAV_HandleCommand(Command* cmd);
  * Disables the pwm output to the motors.
  */
 void NAV_StopMovement();
+
+void NAV_MovementUpdate();
+
+void NAV_PositionMovementUpdate();
+void NAV_VelocityMovementUpdate();
 
 /**
  * Set robot speed to one unit forward
@@ -145,6 +156,10 @@ float NAV_GetNavX();
  * Get the goal y position
  */
 float NAV_GetNavY();
+
+void NAV_SetMovementType(MovementType type);
+
+void NAV_SetMovement(Command* cmd, MovementType movementType);
 
 /**
  * Get the goal w rotation

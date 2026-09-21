@@ -1,0 +1,47 @@
+# SeeGoals left-half camera configuration for ssl-vision-processor.
+cam_id: 0
+bot_heights_file: robot-heights.yml
+
+camera:
+  driver: OPENCV
+  # If the camera requires authentication, keep a local untracked copy named
+  # config-camera-0.local.yml and add USER:PASSWORD@ to this URL there.
+  path: "http://root:raswa151@192.168.1.10/mjpg/video.mjpg"
+  width: 1920
+  height: 1080
+  exposure: 0.0
+  gain: 0.0
+  gamma: 1.0
+  white_balance: OUTDOOR
+
+geometry:
+  # geometry.yml publishes the saved calibration for this non-uniform
+  # three-camera layout, so automatic camera-grid calibration is bypassed.
+  camera_amount: 3
+  camera_height: 2604.0
+  line_corners:
+    - [386, 282]
+    - [1653, 268]
+    - [1545, 1024]
+    - [532, 1056]
+  refinement: true
+
+network:
+  gc_ip: "224.5.23.1"
+  gc_port: 10003
+  vision_ip: "224.5.23.2"
+  vision_port: 10006
+
+stream:
+  active: true
+  raw_feed: false
+  # Keep a fixed processed view to avoid restarting the H.264 stream.
+  view: reprojected
+  ip_base_prefix: "224.5.23."
+  ip_base_end: 100
+  port: 10100
+
+debug:
+  wait_for_geometry: true
+  debug_images: true
+  debug_stream_interval_ms: 2000

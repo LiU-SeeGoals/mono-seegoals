@@ -62,8 +62,8 @@ void COM_RF_Init()
     uint8_t address[5] = ROBOT_ADDR(COM_Get_ID());
     NRF_WriteRegister(NRF_REG_RX_ADDR_P0, address, 5);
 
-    // Channel 2.525 GHz
-    NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7d);
+    // Channel 2.400 + 0.107 GHz
+    NRF_WriteRegisterByte(NRF_REG_RF_CH, 107);
 
     // No retransmissions
     NRF_WriteRegisterByte(NRF_REG_SETUP_RETR, 0x00);
@@ -72,7 +72,9 @@ void COM_RF_Init()
     NRF_WriteRegisterByte(NRF_REG_EN_AA, 0x00);
 
     // Channel rf 2525
-    NRF_WriteRegisterByte(NRF_REG_RF_CH, 0x7d);
+    // 125
+    // 2400 + 107
+    NRF_WriteRegisterByte(NRF_REG_RF_CH, 107);
 
     // Dynamic data length
     NRF_WriteRegisterByte(NRF_REG_DYNPD, 0x01);
@@ -221,40 +223,6 @@ uint8_t COM_Get_ID()
     uint32_t w1 = HAL_GetUIDw1();
     uint32_t w2 = HAL_GetUIDw2();
 
-    if (w0 == 2162755 && w1 == 875712788 && w2 == 926168633) {
-        return 3;
-    }
-    if (w0 == 3932237 && w1 == 892490001 && w2 == 842217265) {
-        return 1;
-    }
-    if (w0 == 2687023 && w1 == 858935561 && w2 == 808727605) {
-        return 1;
-    }
-    if (w0 == 3080253 && w1 == 892490001 && w2 == 842217265) {
-        return 2;
-    }
-    if (w0 == 1572912 && w1 == 892490001 && w2 == 842217265) {
-        return 3;
-    }
-    if (w0 == 2490418 && w1 == 858935561 && w2 == 808727605) {
-        return 3;
-    }
-    if (w0 == 4259883 && w1 == 892490001 && w2 == 842217265) {
-        return 4;
-    }
-    if (w0 == 4522020 && w1 == 892490001 && w2 == 842217265) {
-        return 5;
-    }
-    if (w0 == 4522048 && w1 == 892490001 && w2 == 842217265) {
-        return 6;
-    }
-    if (w0 == 2293800 && w1 == 858935561 && w2 == 808727605) {
-        return 8;
-    }
-    if (w0 == 2359363 && w1 == 842223884 && w2 == 859256630) {
-        return 3;
-    }
-
     // The following are the robots for the 2026 robocup competition
     if (w0 == 3080240 && w1 == 842223876 && w2 == 842544439) {
         return 1;
@@ -262,9 +230,29 @@ uint8_t COM_Get_ID()
     if (w0 == 3801132 && w1 == 892490001 && w2 == 842217265) {
         return 2;
     }
-    if (w0 == 4128804 && w1 == 842223876 && w2 == 842544439) {
+    if (w0 == 5177382 && w1 == 842223876 && w2 == 842544439)
+    {
         return 3;
     }
+    if (w0 == 4522020 && w1 == 892490001 && w2 == 842217265) {
+        return 4;
+    }
+    if (w0 == 3473474 && w1 == 842223884 && w2 == 859256630)
+    {
+        return 5;
+    }
+    if (w0 == 4259883 && w1 == 892490001 && w2 == 842217265) {
+        return 6;
+    }
+    if (w0 == 2228262  && w1 == 892555521 && w2 == 859059248) {
+        return 7;
+    }
+
+    if (w0 == 2555961 && w1 == 892555537 && w2 == 859059248)
+    {
+        return 7;
+    }
+
     LOG_ERROR("Failed ID lookup for robot ID: %d %d %d\r\n", w0, w1, w2);
     return 255;
 }
