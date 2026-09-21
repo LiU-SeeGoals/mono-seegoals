@@ -143,7 +143,6 @@ void NAV_wheelToBody(float* res)
 {
 
     // wheel to body psudeo inverse https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
-    // TODO: measure real wheel radius and chasis radius
     float r = 0.0275;
     float R = 0.09;
 
@@ -277,8 +276,6 @@ void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
 void NAV_HandleCommand(RobotCommand* cmd)
 {
-    // TODO: Make sure all handling of new cmd is correct.
-    // TODO: Currently some places reads the wrong angle etc
     KickerSpeed kickerSpeed = KICKER_SPEED_DEFAULT;
 
     switch (cmd->action_type) {
