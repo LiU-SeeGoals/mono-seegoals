@@ -15,6 +15,11 @@
  */
 #pragma once
 
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
 #include <opencv2/videoio.hpp>
 
 #include "cameradriver.h"
@@ -22,6 +27,7 @@
 class OpenCVDriver : public CameraDriver {
 public:
 	explicit OpenCVDriver(const CameraConfig& config);
+	~OpenCVDriver() override;
 
 	std::shared_ptr<RawImage> readImage() override;
 
@@ -32,8 +38,21 @@ public:
 	double getTime() override;
 
 private:
+	void captureLiveFrames();
+	std::shared_ptr<RawImage> readLatestImage();
+
 	cv::VideoCapture capture;
 	std::shared_ptr<RawImage> image = nullptr;
 	std::string name;
-	bool liveSource;
+	const bool liveSource;
+	double frameTime = 1.0 / 30.0;
+
+	// Only the capture thread accesses VideoCapture once live capture starts.
+	// The pending frame is replaced, never queued behind an older frame.
+	std::mutex frameMutex;
+	std::condition_variable frameReady;
+	cv::Mat latestFrame;
+	bool captureFinished = false; // Guarded by frameMutex.
+	std::atomic<bool> stopCapture{false};
+	std::thread captureThread;
 };

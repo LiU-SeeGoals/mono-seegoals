@@ -205,6 +205,27 @@ Network OpenCV inputs always use host timestamps rather than decoder frame
 positions. Separate-host deployments keep the existing synchronization behavior
 unless `--shared-clock` is explicitly supplied.
 
+### Live camera lag when processing falls behind
+
+Live OpenCV inputs (network streams and `/dev/` cameras) are read continuously
+by a capture thread. It keeps only the newest pending frame and replaces any
+older unprocessed frame. Detection takes that frame when ready and waits for a
+new one if it has already consumed it. Recorded video files still process every
+frame in order.
+
+This prevents slow detection or debug output from building up a queue of old
+frames in the processor. It does not remove latency already inside the camera,
+network, decoder, or preview player. `frame time overrun` can still appear when
+detection exceeds the camera's frame interval; intermediate frames are skipped
+instead of being processed later. No YAML setting is needed; rebuild the
+processor and restart `sg-start --vision-processor` to use this behavior.
+
+Network inputs request a three-second read timeout when opening the stream,
+using the [OpenCV FFmpeg/GStreamer timeout option](https://docs.opencv.org/4.x/d4/d15/group__videoio__flags__base.html).
+A failed or timed-out read ends capture and wakes the processing thread so the
+launcher can stop the other vision processes instead of waiting indefinitely
+for another frame.
+
 ### If nothing else helps
 
 Activate `stream: raw_feed: true` in your `config[X].yml` and record the video livestream
