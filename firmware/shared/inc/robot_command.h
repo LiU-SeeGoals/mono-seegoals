@@ -60,8 +60,6 @@ typedef struct {
 /**
  * @brief Encode a RobotCommand to 32-byte binary buffer
  *
- * @param cmd Pointer to RobotCommand struct to encode
- * @param buf Output buffer (must be at least ROBOT_COMMAND_SIZE bytes)
  * @return true if encoding succeeded, false on error
  *
  */
@@ -70,8 +68,6 @@ bool robot_command_encode(const RobotCommand* cmd, uint8_t* buf);
 /**
  * @brief Decode a 32-byte binary buffer to RobotCommand
  *
- * @param buf Input buffer (must be exactly ROBOT_COMMAND_SIZE bytes)
- * @param cmd Pointer to RobotCommand struct to populate
  * @return true if decoding succeeded, false on error (e.g., invalid buffer size)
  */
 bool robot_command_decode(const uint8_t* buf, RobotCommand* cmd);
