@@ -49,12 +49,13 @@ typedef struct {
     int16_t kick_speed;
     int16_t pos_x;
     int16_t pos_y;
+    int16_t pos_w;
     int16_t dest_x;
     int16_t dest_y;
+    int16_t dest_w;
     int16_t direction_x;
     int16_t direction_y;
     int16_t angular_vel;
-    int16_t angle;
 } RobotCommand;
 
 /**

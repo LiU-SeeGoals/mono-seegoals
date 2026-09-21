@@ -55,7 +55,8 @@ bool robot_command_encode(const RobotCommand* cmd, uint8_t* buf)
     write_int16_le(&buf[12], cmd->direction_x);
     write_int16_le(&buf[14], cmd->direction_y);
     write_int16_le(&buf[16], cmd->angular_vel);
-    write_int16_le(&buf[18], cmd->angle);
+    write_int16_le(&buf[18], cmd->pos_w);
+    write_int16_le(&buf[20], cmd->dest_w);
 
     return true;
 }
@@ -76,7 +77,8 @@ bool robot_command_decode(const uint8_t* buf, RobotCommand* cmd)
     cmd->direction_x = read_int16_le(&buf[12]);
     cmd->direction_y = read_int16_le(&buf[14]);
     cmd->angular_vel = read_int16_le(&buf[16]);
-    cmd->angle = read_int16_le(&buf[18]);
+    cmd->pos_w = read_int16_le(&buf[18]);
+    cmd->dest_w = read_int16_le(&buf[20]);
 
     return true;
 }

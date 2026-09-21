@@ -372,7 +372,7 @@ void NAV_SetMovement(RobotCommand* cmd, MovementType movementType)
         const int32_t speed = cmd->kick_speed;
         const int32_t vx = cmd->direction_x;
         const int32_t vy = cmd->direction_y;
-        const int32_t angle = cmd->angle;
+        const int32_t angle = cmd->dest_w;
 
         robot_cmd.x = vx * speed;
         robot_cmd.y = vy * speed;
@@ -390,11 +390,11 @@ void NAV_GoToAction(RobotCommand* cmd)
 
     const int32_t nav_x = cmd->dest_x;
     const int32_t nav_y = cmd->dest_y;
-    const int32_t nav_w = cmd->angle;
+    const int32_t nav_w = cmd->dest_w;
 
     const int32_t cam_x = cmd->pos_x;
     const int32_t cam_y = cmd->pos_y;
-    const int32_t cam_w = cmd->angle;
+    const int32_t cam_w = cmd->pos_w;
 
     // Within the robot we work in meters
     // Angle is scaled by 1000 before sent to robot.
