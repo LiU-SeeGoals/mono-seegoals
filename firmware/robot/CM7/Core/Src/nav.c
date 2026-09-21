@@ -143,7 +143,6 @@ void NAV_wheelToBody(float* res)
 {
 
     // wheel to body psudeo inverse https://tdpsearch.com/#/tdp/soccer_smallsize__2020__RoboTeam_Twente__0?ref=list
-    // TODO: measure real wheel radius and chasis radius
     float r = 0.0275;
     float R = 0.09;
 
@@ -275,15 +274,15 @@ void NAV_DisableMovement() { robot_cmd.movement_enabled = 0; }
 
 void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
-void NAV_HandleCommand(Command* cmd)
+void NAV_HandleCommand(RobotCommand* cmd)
 {
     KickerSpeed kickerSpeed = KICKER_SPEED_DEFAULT;
 
-    switch (cmd->command_id) {
-    case ACTION_TYPE__STOP_ACTION:
+    switch (cmd->action_type) {
+    case ACTION_TYPE_STOP:
         NAV_DisableMovement();
         break;
-    case ACTION_TYPE__MOVE_TO_ACTION: {
+    case ACTION_TYPE_MOVE_TO: {
 
         if(cmd->angular_vel == 1)
         {
@@ -297,14 +296,14 @@ void NAV_HandleCommand(Command* cmd)
         NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
     } break;
 
-    case ACTION_TYPE__MOVE_ACTION: {
+    case ACTION_TYPE_MOVE: {
 
         NAV_SetMovement(cmd, NAV_VELOCITY_MOVEMENT);
 
     } break;
-    case ACTION_TYPE__ROTATE_ACTION:
+    case ACTION_TYPE_ROTATE:
         break;
-    case ACTION_TYPE__KICK_ACTION:
+    case ACTION_TYPE_KICK:
 
         // First bit is set -> hard/soft kick
         // if second bit -> chip/straight kick mode
@@ -331,7 +330,7 @@ void NAV_HandleCommand(Command* cmd)
         NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
         break;
     default:
-        LOG_ERROR("Not known command: %i\r\n", cmd->command_id);
+        LOG_ERROR("Not known command: %i\r\n", cmd->action_type);
         break;
     }
 }
@@ -347,7 +346,7 @@ uint8_t check_bit(int32_t val, uint8_t n)
     return bit;
 }
 
-void NAV_SetMovement(Command* cmd, MovementType movementType)
+void NAV_SetMovement(RobotCommand* cmd, MovementType movementType)
 {
     NAV_EnableMovement();
     NAV_SetMovementType(movementType);
@@ -371,17 +370,17 @@ void NAV_SetMovement(Command* cmd, MovementType movementType)
         }
 
         const int32_t speed = cmd->kick_speed;
-        const int32_t x = cmd->dest->x - 1000;
-        const int32_t y = cmd->dest->y - 1000;
-        const int32_t angle = cmd->dest->w - 1000;
+        const int32_t vx = cmd->direction_x;
+        const int32_t vy = cmd->direction_y;
+        const int32_t angle = cmd->angle;
 
-        robot_cmd.x = x * speed;
-        robot_cmd.y = y * speed;
+        robot_cmd.x = vx * speed;
+        robot_cmd.y = vy * speed;
         robot_cmd.w = ((float)angle) / 1000.f;
     }
 }
 
-void NAV_GoToAction(Command* cmd)
+void NAV_GoToAction(RobotCommand* cmd)
 {
     // Only initialised on first run since static
     // Large values to always respect first vision data received
@@ -389,13 +388,13 @@ void NAV_GoToAction(Command* cmd)
     static int32_t prev_cam_y = 2147483647;
     static int32_t prev_cam_w = 2147483647;
 
-    const int32_t nav_x = cmd->dest->x;
-    const int32_t nav_y = cmd->dest->y;
-    const int32_t nav_w = cmd->dest->w;
+    const int32_t nav_x = cmd->dest_x;
+    const int32_t nav_y = cmd->dest_y;
+    const int32_t nav_w = cmd->angle;
 
-    const int32_t cam_x = cmd->pos->x;
-    const int32_t cam_y = cmd->pos->y;
-    const int32_t cam_w = cmd->pos->w;
+    const int32_t cam_x = cmd->pos_x;
+    const int32_t cam_y = cmd->pos_y;
+    const int32_t cam_w = cmd->angle;
 
     // Within the robot we work in meters
     // Angle is scaled by 1000 before sent to robot.

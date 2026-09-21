@@ -4,6 +4,7 @@
 #include <nrf24l01.h>
 #include <nrf_helper_defines.h>
 #include <parsed_vision.pb-c.h>
+#include "robot_command.h"
 #include <protobuf-c.h>
 #include <robot_action.pb-c.h>
 
@@ -202,28 +203,28 @@ UINT COM_ParsePacket(NX_PACKET* packet, PACKET_TYPE packet_type)
     case ROBOT_COMMAND: {
         int length = packet->nx_packet_append_ptr - packet->nx_packet_prepend_ptr;
 
-        if (length > 32) {
-            LOG_ERROR("Robot command packet over 32 bytes (%d bytes)\r\n", length);
+        if (length != ROBOT_COMMAND_SIZE) {
+            LOG_ERROR("Invalid robot command packet size: %d (expected %d)\r\n", 
+                      length, ROBOT_COMMAND_SIZE);
             ret = NX_INVALID_PACKET;
             return ret;
         }
 
-        Command* command = NULL;
-        command = command__unpack(NULL, length, packet->nx_packet_prepend_ptr);
-        if (command == NULL) {
-            LOG_ERROR("Invalid ethernet packet\r\n");
+        RobotCommand command = {0};
+        if (!robot_command_decode(packet->nx_packet_prepend_ptr, &command)) {
+            LOG_ERROR("Failed to decode robot command\r\n");
             return NX_INVALID_PACKET;
         }
 
-        const ProtobufCEnumValue* enum_value = protobuf_c_enum_descriptor_get_value(&action_type__descriptor, command->command_id);
+        if (command.robot_id > 15) {
+            LOG_ERROR("Invalid robot ID: %d\r\n", command.robot_id);
+            return NX_INVALID_PACKET;
+        }
 
-        uint8_t data[32];
-        data[0] = 1;
-        memcpy(data + 1, packet->nx_packet_prepend_ptr, length);
+        // The message fills the entire 32-byte NRF24 payload,
+        // so transmit the packet bytes as-is (no message type prefix).
+        COM_RF_Transmit(command.robot_id, packet->nx_packet_prepend_ptr, length);
 
-        COM_RF_Transmit(command->robot_id, data, length + 1);
-
-        protobuf_c_message_free_unpacked(&command->base, NULL);
     } break;
     default:
         LOG_INFO("Unknown packet type: %d\r\n", packet_type);

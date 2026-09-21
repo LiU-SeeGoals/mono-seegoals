@@ -149,37 +149,39 @@ func (mt *MoveTo) TranslateReal() *robot_action.Command {
 	if kickSpeedReal == 1 {
 		// fmt.Println("Kicking")
 		dribbleSpeedReal = 1
-		command_kick := &robot_action.Command{
+command_kick := &robot_action.Command{
 			CommandId: robot_action.ActionType_KICK_ACTION,
 			RobotId:   int32(mt.Id),
 			Pos: &robot_action.Vector3D{
-				X: int32(mt.Pos.X + 10000),
-				Y: int32(mt.Pos.Y + 10000),
-				W: float32(mt.Pos.Angle * 1000),
+				X: int32(mt.Pos.X),
+				Y: int32(mt.Pos.Y),
+				W: float32(mt.Pos.Angle),
 			},
 			Dest: &robot_action.Vector3D{
-				X: int32(mt.Dest.X + 10000),
-				Y: int32(mt.Dest.Y + 10000),
-				W: float32(mt.Dest.Angle * 1000),
+				X: int32(mt.Dest.X),
+				Y: int32(mt.Dest.Y),
+				W: float32(mt.Dest.Angle),
 			},
+			Direction: &robot_action.Vector2D{},
 			KickSpeed: int32(kickSpeedReal),
 		}
 		return command_kick
 	}
 
-	command_move := &robot_action.Command{
+command_move := &robot_action.Command{
 		CommandId: robot_action.ActionType_MOVE_TO_ACTION,
 		RobotId:   int32(mt.Id),
 		Pos: &robot_action.Vector3D{
-			X: int32(mt.Pos.X + 10000),
-			Y: int32(mt.Pos.Y + 10000),
-			W: float32(mt.Pos.Angle * 1000),
+			X: int32(mt.Pos.X),
+			Y: int32(mt.Pos.Y),
+			W: float32(mt.Pos.Angle),
 		},
 		Dest: &robot_action.Vector3D{
-			X: int32(mt.Dest.X + 10000),
-			Y: int32(mt.Dest.Y + 10000),
-			W: float32(mt.Dest.Angle * 1000),
+			X: int32(mt.Dest.X),
+			Y: int32(mt.Dest.Y),
+			W: float32(mt.Dest.Angle),
 		},
+		Direction:  &robot_action.Vector2D{},
 		AngularVel: int32(dribbleSpeedReal),
 	}
 
