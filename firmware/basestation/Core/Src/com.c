@@ -216,7 +216,7 @@ UINT COM_ParsePacket(NX_PACKET* packet, PACKET_TYPE packet_type)
             return NX_INVALID_PACKET;
         }
 
-        if (command.robot_id < 1 || command.robot_id > 7) {
+        if (command.robot_id < 1 || command.robot_id > 16) {
             LOG_ERROR("Invalid robot ID: %d\r\n", command.robot_id);
             return NX_INVALID_PACKET;
         }
