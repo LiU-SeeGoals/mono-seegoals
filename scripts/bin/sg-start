@@ -29,7 +29,6 @@ def read_env_ini():
                 env_vars[key.strip()] = value.strip().strip('"').strip("'")
     return env_vars
 
-<<<<<<< HEAD
 def ensure_sumatra_checkout():
     configured_dir = os.environ.get("SUMATRA_DIR")
     if configured_dir:
@@ -55,11 +54,8 @@ def ensure_sumatra_checkout():
         print("Could not clone Sumatra. Check your network connection or set SUMATRA_DIR manually.")
         sys.exit(1)
 
-# Enable x forwarding for docker containers
-os.system("xhost +")
 
-=======
->>>>>>> new-vison
+
 envs = read_env_ini()
 
 AI = envs.get("DOCKER_NAME_AI")
@@ -180,18 +176,12 @@ choices = [
         "container_to_enter": GW
     },
     {
-<<<<<<< HEAD
         "choice-text": "Run SeeGoals Blue vs TIGERs AI Yellow.",
-=======
-        "choice-text": "Fetdatorn configuration (new vision processor + autoref)",
-        "vision_processor": True,
->>>>>>> new-vison
         "pull_images": [],
         "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-<<<<<<< HEAD
             "-f", f"{docker_dir}/docker-compose.autostart_gameviewer.yml",
             "-f", f"{docker_dir}/docker-compose.vs-tigers-blue.yml",
             "-p", project_name, "up", "-d"
@@ -210,12 +200,19 @@ choices = [
             "-p", project_name, "up", "-d"
         ],
         "container_to_enter": None
-=======
+    },
+    {
+        "choice-text": "Fetdatorn configuration (new vision processor + autoref)",
+        "vision_processor": True,
+        "pull_images": [],
+        "pre_cmd": [],
+        "docker_cmd": [
+            "docker", "compose",
+            "-f", f"{docker_dir}/docker-compose.yml",
             "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
             "-p", project_name, "up", "-d"
         ],
         "container_to_enter": AI
->>>>>>> new-vison
     }
 ]
 
@@ -371,10 +368,8 @@ if __name__ == "__main__":
         print(f"Invalid choice {choice}...")
         sys.exit(1)
 
-<<<<<<< HEAD
     if choice in (8, 9):
         ensure_sumatra_checkout()
-=======
     # Check before sg-kill so missing dependencies leave the existing stack running.
     if choices[choice].get("vision_processor"):
         try:
@@ -385,7 +380,7 @@ if __name__ == "__main__":
 
     # Enable x forwarding for docker containers.
     os.system("xhost +")
->>>>>>> new-vison
+
 
     # Update submodules
     if check_submodule_status():
