@@ -100,8 +100,8 @@ func (rm *combinedRoleManager) applyAssignments(offenseIDs []info.ID, defenseIDs
 		switch role {
 		case roleOffense:
 			rm.assignOffense(id, now)
-		case roleDefense:
-			rm.assignDefense(id, now)
+			//		case roleDefense:
+			//			rm.assignDefense(id, now)
 		}
 	}
 }
@@ -547,9 +547,9 @@ func (m *CombinedPlan) run() {
 	mode := tacticalModeAttack
 	candidateMode := tacticalMode("")
 	candidateModeSince := time.Time{}
-	clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
+	//clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
 
-	var goalieID info.ID
+	//var goalieID info.ID
 	var goalieRole *roles.GoalieRole
 	var activeReceiver info.ID
 	var activeReceiverStart time.Time
@@ -560,22 +560,22 @@ func (m *CombinedPlan) run() {
 		gi = <-m.incomingGameInfo
 
 		activeRobots := m.activeRobots(&gi)
-		nextGoalieID, hasGoalie := m.chooseGoalie(&gi, activeRobots)
+		//nextGoalieID, hasGoalie := m.chooseGoalie(&gi, activeRobots)
 		fieldRobots := activeRobots
-		if hasGoalie {
-			fieldRobots = withoutRobot(activeRobots, nextGoalieID)
-			if goalieRole == nil || goalieID != nextGoalieID {
-				if goalieRole != nil {
-					m.ActivityHandler.ClearActivity(goalieID)
-				}
-				goalieID = nextGoalieID
-				goalieRole = roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
-				goalieRole.Init()
-			}
-		} else if goalieRole != nil {
-			m.ActivityHandler.ClearActivity(goalieID)
-			goalieRole = nil
-		}
+		//if hasGoalie {
+		//	fieldRobots = withoutRobot(activeRobots, nextGoalieID)
+		//	if goalieRole == nil || goalieID != nextGoalieID {
+		//		if goalieRole != nil {
+		//			m.ActivityHandler.ClearActivity(goalieID)
+		//		}
+		//		goalieID = nextGoalieID
+		//		goalieRole = roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
+		//		goalieRole.Init()
+		//	}
+		//} else if goalieRole != nil {
+		//	m.ActivityHandler.ClearActivity(goalieID)
+		//	goalieRole = nil
+		//}
 
 		desiredMode := m.desiredMode(&gi, mode)
 		mode = stableMode(mode, desiredMode, &candidateMode, &candidateModeSince, tickStart)

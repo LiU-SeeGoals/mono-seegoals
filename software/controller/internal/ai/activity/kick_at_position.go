@@ -105,7 +105,11 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	// If we get here, it means we are in possession of the ball and that the robot is facing the target.
 	// So we move forward and shoot
 	runUpDistance := unitVector.Scale(100)
+	robotPos, _ := robot.GetPosition()
+
 	destination := ballPos.Add(&runUpDistance)
+	// keep current angle
+	destination.Angle = robotPos.Angle
 	moveAction := action.MoveTo{
 		Id:   int(kp.id),
 		Dest: destination,
