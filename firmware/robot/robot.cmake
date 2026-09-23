@@ -63,6 +63,8 @@ file(GLOB ROBOT_DRIVERS_SOURCE
     ${DRIVERS_ROOT}/stm32h7xx_hal_uart_ex.c
     ${DRIVERS_ROOT}/stm32h7xx_hal_spi.c
     ${DRIVERS_ROOT}/stm32h7xx_hal_spi_ex.c
+    ${DRIVERS_ROOT}/stm32h7xx_hal_adc.c
+    ${DRIVERS_ROOT}/stm32h7xx_hal_adc_ex.c
     ${DSP_ROOT}/ControllerFunctions/arm_sin_cos_f32.c
     ${DSP_ROOT}/CommonTables/arm_common_tables.c
     ${DSP_ROOT}/MatrixFunctions/MatrixFunctions.c
