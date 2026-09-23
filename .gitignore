@@ -5,3 +5,24 @@ software/controller/internal/ui/joystick_controll.go
 software/GameController/config/**
 software/controller/internal/ui/test_controller.go
 software/controller/tests/**
+
+# Generated build output and caches
+**/build/
+**/cmake-build-*/
+**/Debug/
+**/Release/
+**/dist/
+**/node_modules/
+**/.pnpm-store/
+**/.vite/
+**/__pycache__/
+*.py[cod]
+*.prof
+
+# Runtime logs and camera debug snapshots
+*.log
+*.log.*
+**/logs/
+/software/controller/logs*/
+/software/temp-logs.txt
+/software/ssl-vision-processor/img/
