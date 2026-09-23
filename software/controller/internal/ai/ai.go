@@ -82,6 +82,9 @@ func NewAi(team info.Team, planner planner, executor executor) *Ai {
 
 // Decides on new actions for the robots
 func (ai *Ai) GetActions(gi *info.GameInfo) []action.Action {
+	if planner, ok := ai.planner.(interface{ ApplyPendingCommand() }); ok {
+		planner.ApplyPendingCommand()
+	}
 
 	// Send the game state copy to the plan so its aware of the environment
 	ai.gameInfoSenderSB <- *gi

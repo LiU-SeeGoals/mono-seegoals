@@ -129,6 +129,16 @@ Following are the most important environment variables:
 * `WEB_VISION_UI_PORT` - port on host machine for SSL vision UI when running docker
 * `WEB_GC_UI_PORT` - port on host machine for game controller UI when running docker
 
+### Vision timing diagnosis
+
+Start the controller process with `SEEGOALS_VISION_TIMING=1` in its environment
+to print one timing sample per second for each raw camera and the tracked stream.
+`age` is the time from the frame timestamp to controller receipt. For raw
+frames, `processor` is `t_sent - t_capture`; `after-send` is the remaining time
+up to controller receipt. These age values require synchronized host clocks.
+The camera's own exposure, network, and decoder delay before OpenCV returns a
+frame is not included in `processor` and needs a physical motion or flash test.
+
 <!-- ## Docker environment
 The docker environment should be used for local development. It uses sim to simulate the game.
 

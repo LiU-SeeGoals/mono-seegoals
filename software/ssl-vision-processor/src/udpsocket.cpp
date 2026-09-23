@@ -281,7 +281,7 @@ void VisionSocket::updateTime() {
 		return;
 	}
 
-	realTimeOffset += offset;
+	realTimeOffset.fetch_add(offset, std::memory_order_relaxed);
 }
 
 void VisionSocket::timeSynchronization(const SSL_DetectionFrame& detection) {

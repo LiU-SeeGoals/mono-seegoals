@@ -295,7 +295,7 @@ int main(int argc, char* argv[]) {
 		if(img == nullptr)
 			break;
 
-		double startTime = r.camera->getTime();
+		double startTime = r.camera->getCaptureTime();
 		double realStartTime = getRealTime(); // Just for realtime performance measurements
 
 		r.socket->geometryCheck();
@@ -393,7 +393,7 @@ int main(int argc, char* argv[]) {
 			double processingTime = getRealTime() - realStartTime;
 
 #if BENCHMARK
-			detection->set_t_sent(startTime + processingTime);
+			detection->set_t_sent(r.camera->getTime());
 			LOG("time " << processingTime * 1000.0 << " ms " << matches.size() << " blobs " << detection->balls().size() << " balls " << (detection->robots_yellow_size() + detection->robots_blue_size()) << " bots");
 			r.openCl->printRuntimes();
 #else

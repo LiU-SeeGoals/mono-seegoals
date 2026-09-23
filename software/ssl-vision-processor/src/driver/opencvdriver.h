@@ -36,6 +36,7 @@ public:
 	double expectedFrametime() override;
 
 	double getTime() override;
+	double getCaptureTime() override;
 
 private:
 	void captureLiveFrames();
@@ -52,6 +53,8 @@ private:
 	std::mutex frameMutex;
 	std::condition_variable frameReady;
 	cv::Mat latestFrame;
+	double latestFrameTime = 0.0; // Guarded by frameMutex.
+	double readFrameTime = 0.0; // Processing thread only.
 	bool captureFinished = false; // Guarded by frameMutex.
 	std::atomic<bool> stopCapture{false};
 	std::thread captureThread;

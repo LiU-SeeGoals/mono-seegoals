@@ -204,6 +204,10 @@ processor after updating the launcher. For manual same-PC launches, use e.g.
 Network OpenCV inputs always use host timestamps rather than decoder frame
 positions. Separate-host deployments keep the existing synchronization behavior
 unless `--shared-clock` is explicitly supplied.
+For live OpenCV inputs, `t_capture` is now stamped when `VideoCapture.read()`
+returns the decoded frame. The difference between `t_sent` and `t_capture`
+therefore includes processor waiting, transfer, and detection time. It cannot
+measure time spent inside the camera, network, or decoder before `read()` returns.
 
 ### Live camera lag when processing falls behind
 

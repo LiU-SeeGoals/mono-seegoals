@@ -15,11 +15,12 @@
  */
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <yaml-cpp/node/node.h>
 #include "opencl.h"
 
-extern double realTimeOffset;
+extern std::atomic<double> realTimeOffset;
 double getRealTime();
 
 
@@ -44,6 +45,9 @@ public:
 
 	// Bound to the driver for reproducibility during testing with files.
 	virtual double getTime();
+	// Time of the image returned by the last readImage call. Live drivers
+	// should capture this when they receive the frame, before any upload.
+	virtual double getCaptureTime();
 };
 
 

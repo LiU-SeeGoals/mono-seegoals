@@ -25,13 +25,17 @@
 
 #include <yaml-cpp/yaml.h>
 
-double realTimeOffset = 0.0;
+std::atomic<double> realTimeOffset{0.0};
 double getRealTime() {
-	return (double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count() / 1e6 + realTimeOffset;
+	return (double)std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count() / 1e6 + realTimeOffset.load(std::memory_order_relaxed);
 }
 
 double CameraDriver::getTime() {
 	return getRealTime();
+}
+
+double CameraDriver::getCaptureTime() {
+	return getTime();
 }
 
 

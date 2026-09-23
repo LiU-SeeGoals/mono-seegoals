@@ -92,6 +92,7 @@ void OpenCVDriver::captureLiveFrames() {
 					WARN("Camera stream stopped or frame decoding failed. Restart vision after changing camera settings.");
 				break;
 			}
+			const double frameTime = getRealTime();
 
 			{
 				std::lock_guard<std::mutex> lock(frameMutex);
@@ -100,6 +101,7 @@ void OpenCVDriver::captureLiveFrames() {
 				// Reuse the replaced buffer for the next read. A consumed frame
 				// has been moved out and cannot be overwritten by the worker.
 				std::swap(latestFrame, frame);
+				latestFrameTime = frameTime;
 			}
 			frameReady.notify_one();
 		}
@@ -123,6 +125,7 @@ std::shared_ptr<RawImage> OpenCVDriver::readLatestImage() {
 		if(latestFrame.empty())
 			return nullptr;
 		std::swap(frame, latestFrame);
+		readFrameTime = latestFrameTime;
 	}
 
 	if(frame.type() != CV_8UC3) {
@@ -185,4 +188,8 @@ double OpenCVDriver::getTime() {
 		return getRealTime();
 
 	return pos / fps;
+}
+
+double OpenCVDriver::getCaptureTime() {
+	return liveSource ? readFrameTime : getTime();
 }

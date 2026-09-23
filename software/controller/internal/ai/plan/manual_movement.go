@@ -1,9 +1,7 @@
 package ai
 
 import (
-	"fmt"
 	"sync"
-	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/client"
@@ -12,8 +10,6 @@ import (
 
 type plannerManualMovement struct {
 	plannerCore
-	start    time.Time
-	max_time time.Duration
 }
 
 func NewPlannerManualMovement(team info.Team) *plannerManualMovement {
@@ -34,32 +30,23 @@ func (m *plannerManualMovement) Init(
 	m.ActivityHandler.Activities = activities // store pointer directly
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
-	m.start = time.Now()
 	m.Active = true
-
-	go m.run()
 }
 
-func (m *plannerManualMovement) run() {
-
-	gameInfo := <-m.incomingGameInfo
-	fmt.Println(gameInfo.Status)
-
-	for m.Active {
-		<-m.incomingGameInfo // Only used for pacing
-		command := client.GetCommand(client.MOVE_ROBOT)
-		// fmt.Println(len(commands))
-
-		if command != nil {
-			fmt.Println("changing command")
-			pos := info.Position{X: float64(command.X), Y: float64(command.Y), Z: 0, Angle: 0}
-
-			m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(command.Id), pos))
-		}
+// ApplyPendingCommand is called before the executor receives this control
+// frame, so a click can change its activity in the same frame.
+func (m *plannerManualMovement) ApplyPendingCommand() {
+	if !m.Active {
+		return
 	}
+	command := client.GetCommand(client.MOVE_ROBOT)
+	if command == nil || command.Id < 0 || command.Id >= int(info.TEAM_SIZE) {
+		return
+	}
+	pos := info.Position{X: float64(command.X), Y: float64(command.Y)}
+	m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(command.Id), pos))
 }
 
 func (m *plannerManualMovement) Kill() {
-	fmt.Println("Exiting manual movement planner")
 	m.Active = false
 }

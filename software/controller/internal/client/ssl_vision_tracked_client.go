@@ -3,6 +3,7 @@ package client
 import (
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -62,8 +63,9 @@ func (r *SSLTrackedConnection) ReceiveTracked(packetChan chan *ssl_vision.Tracke
 }
 
 type SSLTrackedVisionClient struct {
-	ssl         *SSLTrackedConnection
-	ssl_channel chan *ssl_vision.TrackerWrapperPacket
+	ssl              *SSLTrackedConnection
+	ssl_channel      chan *ssl_vision.TrackerWrapperPacket
+	lastTimingReport time.Time
 }
 
 func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, play_time int64) {
@@ -186,6 +188,9 @@ func (receiver *SSLTrackedVisionClient) UpdateGameInfoTracked(gi *info.GameInfo,
 	select {
 	case packet, ok := <-receiver.ssl_channel:
 		receiver.handleTrackedPacket(packet, ok, gi, play_time)
+		if frame := packet.GetTrackedFrame(); frame != nil {
+			reportVisionTiming("tracked", frame.GetTimestamp(), 0, &receiver.lastTimingReport)
+		}
 	default:
 	}
 }

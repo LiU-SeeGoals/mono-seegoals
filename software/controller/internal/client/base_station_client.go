@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"sync"
-	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/config"
@@ -24,6 +23,7 @@ type BaseStationClient struct {
 	address       string
 	queueMutex    sync.Mutex
 	queue         []*robot_action.Command
+	wake          chan struct{}
 	hasBeenInited bool
 }
 
@@ -86,13 +86,19 @@ func NewBaseStationClient(address string) *BaseStationClient {
 		connections:   connections,
 		address:       "",
 		queue:         make([]*robot_action.Command, 0),
+		wake:          make(chan struct{}, 1),
 		hasBeenInited: false,
 	}
 }
 
 func (b *BaseStationClient) Init() {
-	go b.sendCommands()
+	b.queueMutex.Lock()
+	if b.wake == nil {
+		b.wake = make(chan struct{}, 1)
+	}
 	b.hasBeenInited = true
+	b.queueMutex.Unlock()
+	go b.sendCommands()
 }
 
 func (b *BaseStationClient) sendCommands() {
@@ -100,30 +106,32 @@ func (b *BaseStationClient) sendCommands() {
 		b.queueMutex.Lock()
 		if len(b.queue) == 0 {
 			b.queueMutex.Unlock()
-			time.Sleep(10 * time.Millisecond)
+			<-b.wake
 			continue
 		}
 		cmd := b.queue[0]
 		b.queue = b.queue[1:]
 		b.queueMutex.Unlock()
-
 		// Use custom binary encoder instead of protobuf
 		encoded, err := action.EncodeCommand(cmd)
 		if err != nil {
 			fmt.Printf("Failed to encode command for robot %d: %v\n", cmd.RobotId, err)
 			continue
 		}
-		b.sendMessage(encoded)
+		if err := b.sendMessage(encoded); err != nil {
+			fmt.Printf("Unable to send robot command: %v\n", err)
+		}
 	}
 }
 
 func (b *BaseStationClient) SendActions(actions []action.Action) {
+	b.queueMutex.Lock()
+	defer b.queueMutex.Unlock()
 	if !b.hasBeenInited {
 		fmt.Println("\033[0m Base station client has not been inited\033[33m")
 		return
 	}
 
-	b.queueMutex.Lock()
 	for _, robotAction := range actions {
 		command := robotAction.TranslateReal()
 		if command.GetCommandId() == robot_action.ActionType_STOP_ACTION {
@@ -136,10 +144,36 @@ func (b *BaseStationClient) SendActions(actions []action.Action) {
 				}
 			}
 			b.queue = queue
+		} else if isMotionCommand(command) {
+			// A later position or velocity update supersedes unsent motion for
+			// the same robot. Keep kicks, init, and stops in their original order.
+			queue := b.queue[:0]
+			for _, queuedCommand := range b.queue {
+				if queuedCommand.GetRobotId() != command.GetRobotId() || !isMotionCommand(queuedCommand) {
+					queue = append(queue, queuedCommand)
+				}
+			}
+			b.queue = queue
 		}
 		b.queue = append(b.queue, command)
 	}
-	b.queueMutex.Unlock()
+	if len(b.queue) > 0 && b.wake != nil {
+		select {
+		case b.wake <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func isMotionCommand(command *robot_action.Command) bool {
+	switch command.GetCommandId() {
+	case robot_action.ActionType_MOVE_TO_ACTION,
+		robot_action.ActionType_MOVE_ACTION,
+		robot_action.ActionType_ROTATE_ACTION:
+		return true
+	default:
+		return false
+	}
 }
 
 func (b *BaseStationClient) sendMessage(input []byte) error {
