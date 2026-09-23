@@ -242,7 +242,7 @@ func (rm *combinedRoleManager) setSlot(id info.ID, slot tacticalSlotKind, now ti
 		}
 	case tacticalSlotDefenderWall:
 		if defender, ok := rm.defenders[id]; ok {
-			defender.SetSlot(roles.DefenseSlot{Kind: roles.DefenseRoleWall})
+			defender.SetSlot(roles.DefenseSlot{Kind: roles.DefenseRoleCover})
 		}
 	case tacticalSlotDefenderHigh:
 		if defender, ok := rm.defenders[id]; ok {

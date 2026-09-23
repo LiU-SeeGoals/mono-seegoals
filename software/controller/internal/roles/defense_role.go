@@ -18,9 +18,13 @@ const (
 	backwardDefenderDepth     = 3200.0
 	highDefenderBallOffset    = 900.0
 	lowDefenderDepth          = 3600.0
+	defensePossessionDistance = 200.0
+	dangerousOpponentGoalDist = 2500
+	coverReceiverWeight       = 2.0 / 3.0
 )
 
 var neutralHoldPos = info.Position{X: 1000, Y: 0, Z: 0, Angle: 0}
+var coverParkingPos = info.Position{X: -4000, Y: -4000, Z: 0, Angle: 0}
 
 type DefenseRoleKind string
 
@@ -79,6 +83,8 @@ func (s *DefensePressState) Update() EventName {
 		target = s.ballGoalLineTarget(ballPos, middleDefenderBallOffset, s.slot.LateralOffset)
 	case DefenseRoleBackward:
 		target = s.backwardDefenderTarget(ballPos, s.slot.LateralOffset)
+	case DefenseRoleCover:
+		target = s.coverTarget(ballPos)
 	default:
 		target = info.Position{X: xSign * backwardDefenderDepth, Y: ballPos.Y, Z: 0, Angle: 0}
 		target = clampCoverTarget(target)
@@ -143,6 +149,118 @@ func clampCoverTarget(target info.Position) info.Position {
 	return target
 }
 
+func (s *DefensePressState) coverTarget(ballPos info.Position) info.Position {
+	ballPossessor, possessorPos, found := s.opponentWithBall(ballPos)
+	var excludedOpponent *info.Robot
+	if found {
+		excludedOpponent = ballPossessor
+		fmt.Printf("Opponent with ball: team=%s id=%d position=(%.0f, %.0f)\n",
+			ballPossessor.GetTeam(), ballPossessor.GetID(), possessorPos.X, possessorPos.Y)
+	}
+
+	dangerousOpponent, dangerousPos, goalDistance, found := s.closestOpponentToOwnGoalExcept(excludedOpponent)
+	if !found || goalDistance > dangerousOpponentGoalDist {
+		return coverParkingPos
+	}
+	fmt.Printf("Dangerous opponent closest to own goal: team=%s id=%d position=(%.0f, %.0f)\n",
+		dangerousOpponent.GetTeam(), dangerousOpponent.GetID(), dangerousPos.X, dangerousPos.Y)
+
+	target := info.Position{
+		X: ballPos.X + (dangerousPos.X-ballPos.X)*coverReceiverWeight,
+		Y: ballPos.Y + (dangerousPos.Y-ballPos.Y)*coverReceiverWeight,
+		Z: 0,
+	}
+	target.Angle = target.AngleToPosition(ballPos)
+	return target
+}
+
+func (s *DefensePressState) closestOpponentToOwnGoal() (*info.Robot, info.Position, bool) {
+	opponent, position, _, found := s.closestOpponentToOwnGoalExcept(nil)
+	return opponent, position, found
+}
+
+func (s *DefensePressState) closestOpponentToOwnGoalExcept(excluded *info.Robot) (*info.Robot, info.Position, float64, bool) {
+	if s.gi == nil || s.gi.State == nil {
+		return nil, info.Position{}, 0, false
+	}
+
+	halfFieldLength := 4500.0
+	if s.gi.HasField() {
+		fieldSize := s.gi.FieldSize()
+		if fieldSize.X > 0 {
+			halfFieldLength = fieldSize.X / 2
+		}
+	}
+	goalPos := info.Position{
+		X: s.gi.OwnHalfXSign(s.team) * halfFieldLength,
+		Y: 0,
+		Z: 0,
+	}
+
+	opponents := s.gi.State.GetOtherTeam(s.team)
+	var closestOpponent *info.Robot
+	var closestOpponentPos info.Position
+	closestDistance := math.Inf(1)
+
+	for _, opponent := range opponents {
+		if opponent == nil || !opponent.IsActive() {
+			continue
+		}
+		if excluded != nil && opponent.GetTeam() == excluded.GetTeam() && opponent.GetID() == excluded.GetID() {
+			continue
+		}
+
+		opponentPos, err := opponent.GetPosition()
+		if err != nil {
+			continue
+		}
+
+		distance := opponentPos.Dist2d(goalPos)
+		if distance < closestDistance {
+			closestOpponent = opponent
+			closestOpponentPos = opponentPos
+			closestDistance = distance
+		}
+	}
+
+	return closestOpponent, closestOpponentPos, closestDistance, closestOpponent != nil
+}
+
+func (s *DefensePressState) opponentWithBall(ballPos info.Position) (*info.Robot, info.Position, bool) {
+	if s.gi == nil || s.gi.State == nil {
+		return nil, info.Position{}, false
+	}
+
+	opponents := s.gi.State.GetOtherTeam(s.team)
+	var closestOpponent *info.Robot
+	var closestOpponentPos info.Position
+	closestDistance := math.Inf(1)
+
+	for _, opponent := range opponents {
+		if opponent == nil || !opponent.IsActive() {
+			continue
+		}
+
+		opponentPos, err := opponent.GetPosition()
+		if err != nil {
+			continue
+		}
+
+		distance := opponentPos.Dist2d(ballPos)
+		if distance < closestDistance {
+			closestOpponent = opponent
+			closestOpponentPos = opponentPos
+			closestDistance = distance
+		}
+	}
+
+	if closestOpponent == nil || closestDistance > defensePossessionDistance {
+		return nil, info.Position{}, false
+	}
+
+	return closestOpponent, closestOpponentPos, true
+}
+
 type DefenseWallState struct {
 	gi              *info.GameInfo
 	robotId         info.ID
@@ -186,7 +304,7 @@ func NewDefenseRole(robotID info.ID, activityHandler ai.ActivityHandler, gi *inf
 
 func (dr *DefenseRole) Init() {
 	pressName := StateName(fmt.Sprintf("DefensePress ID %d", dr.id))
-	wallName := StateName(fmt.Sprintf("DefenseWall ID %d", dr.id))
+	coverName := StateName(fmt.Sprintf("DefenseCover ID %d", dr.id))
 
 	pressState := &DefensePressState{
 		gi:              dr.gi,
@@ -196,19 +314,18 @@ func (dr *DefenseRole) Init() {
 		activityHandler: dr.activityHandler,
 		slot:            DefenseSlot{Kind: DefenseRoleCover},
 	}
-
-	wallState := &DefenseWallState{
+	coverState := &DefensePressState{
 		gi:              dr.gi,
 		robotId:         dr.id,
 		team:            dr.team,
-		name:            wallName,
+		name:            coverName,
 		activityHandler: dr.activityHandler,
-		wallPos:         &dr.wallPosition,
+		slot:            DefenseSlot{Kind: DefenseRoleCover},
 	}
 
 	sm := NewStateMachine(pressState)
-	sm.AddTransition(pressName, "ATTACKER_NEAR", wallState)
-	sm.AddTransition(wallName, "ATTACKER_FAR", pressState)
+	sm.AddTransition(pressName, "ATTACKER_NEAR", coverState)
+	sm.AddTransition(coverName, "ATTACKER_FAR", pressState)
 
 	dr.sm = sm
 	dr.pressState = pressState
