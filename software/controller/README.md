@@ -135,7 +135,10 @@ Start the controller process with `SEEGOALS_VISION_TIMING=1` in its environment
 to print one timing sample per second for each raw camera and the tracked stream.
 `age` is the time from the frame timestamp to controller receipt. For raw
 frames, `processor` is `t_sent - t_capture`; `after-send` is the remaining time
-up to controller receipt. These age values require synchronized host clocks.
+up to controller receipt. The values print to tenths of a millisecond, so
+`after-send=0.0ms` can mean a small nonzero delay. Tracked `age` is measured
+when the control loop consumes the packet; it includes tracker processing and
+any wait for a raw frame. These age values require synchronized host clocks.
 The camera's own exposure, network, and decoder delay before OpenCV returns a
 frame is not included in `processor` and needs a physical motion or flash test.
 

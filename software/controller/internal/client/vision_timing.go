@@ -21,9 +21,9 @@ func reportVisionTiming(source string, capture, sent float64, last *time.Time) {
 	*last = now
 	arrival := float64(now.UnixNano()) / 1e9
 	if sent >= capture {
-		fmt.Printf("[vision-timing] %s age=%.0fms processor=%.0fms after-send=%.0fms\n",
+		fmt.Printf("[vision-timing] %s age=%.1fms processor=%.1fms after-send=%.1fms\n",
 			source, (arrival-capture)*1000, (sent-capture)*1000, (arrival-sent)*1000)
 		return
 	}
-	fmt.Printf("[vision-timing] %s age=%.0fms\n", source, (arrival-capture)*1000)
+	fmt.Printf("[vision-timing] %s age=%.1fms\n", source, (arrival-capture)*1000)
 }

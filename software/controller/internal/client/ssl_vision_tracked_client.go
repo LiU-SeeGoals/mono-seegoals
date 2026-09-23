@@ -116,7 +116,7 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		}
 
 		gi.State.SetTrackedRobot(team, robotId.GetId(), p, v, p.Angle, vtheta, ts)
-		gi.State.SetRobotFromTracked(team, robotId.GetId(), p, play_time, replaceRobotTime)
+		gi.State.SetRobotFromTracked(team, robotId.GetId(), p, play_time, replaceRobotTime, ts)
 	}
 
 	balls := frame.GetBalls()
