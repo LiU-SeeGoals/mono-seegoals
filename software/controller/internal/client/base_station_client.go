@@ -10,7 +10,6 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
-	"google.golang.org/protobuf/proto"
 )
 
 const MAX_SEND_SIZE = 32
@@ -42,7 +41,7 @@ func NewBaseStationClient(address string) *BaseStationClient {
 		panic(err)
 	}
 
-	foundInterface := false;
+	foundInterface := false
 
 	var connections []Connection
 	for _, iface := range ifaces {
@@ -50,7 +49,7 @@ func NewBaseStationClient(address string) *BaseStationClient {
 			continue
 		}
 
-		foundInterface = true;
+		foundInterface = true
 
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagMulticast == 0 {
 			continue
@@ -106,10 +105,15 @@ func (b *BaseStationClient) sendCommands() {
 		}
 		cmd := b.queue[0]
 		b.queue = b.queue[1:]
-
-		serializedCmd, _ := proto.Marshal(cmd)
-		b.sendMessage(serializedCmd)
 		b.queueMutex.Unlock()
+
+		// Use custom binary encoder instead of protobuf
+		encoded, err := action.EncodeCommand(cmd)
+		if err != nil {
+			fmt.Printf("Failed to encode command for robot %d: %v\n", cmd.RobotId, err)
+			continue
+		}
+		b.sendMessage(encoded)
 	}
 }
 
