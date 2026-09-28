@@ -24,7 +24,7 @@ static const int PRESS_VALUE_KICKER;
 static const int PRESS_VALUE_DRIBBLER;
 static const int PRESS_VALUE_RANGE;
 
-ADC_HandleTypeDef hadc2;
+static ADC_HandleTypeDef *hadc2;
 
 static LOG_Module internal_log_mod;
 
@@ -39,6 +39,13 @@ void Button_Dribbler();
 /* Public functions implementations */
 
 
+void Button_Panel_INIT(ADC_HandleTypeDef* handle)
+{
+    hadc2 = handle;
+    LOG_InitModule(&internal_log_mod, "Button_Panel", LOG_LEVEL_UI, 0);
+}
+
+
 /**
   * @brief  Start the ADC of the button panel
   * @note   Interruptions enabled in this function: None.
@@ -46,20 +53,20 @@ void Button_Dribbler();
 void Button_Panel_ADC() 
 {
     HAL_StatusTypeDef status = HAL_ERROR;
-    status = HAL_ADC_Start(&hadc2);
+    status = HAL_ADC_Start(hadc2);
     if (status != HAL_OK) {
         LOG_ERROR("IR sensor ADC failed start.\r\n");
     }
 
     // Wait for conversion to complete, timeout 20ms
-    status = HAL_ADC_PollForConversion(&hadc2, 20);
+    status = HAL_ADC_PollForConversion(hadc2, 20);
     if (status != HAL_OK) {
         LOG_ERROR("ADC poll wait failed.\r\n");
     }
     
-    uint32_t raw = HAL_ADC_GetValue(&hadc2);
+    uint32_t raw = HAL_ADC_GetValue(hadc2);
     
-    status = HAL_ADC_Stop(&hadc2);
+    status = HAL_ADC_Stop(hadc2);
     
     if (status != HAL_OK) {
         LOG_ERROR("ADC stop failed.\r\n");
@@ -68,23 +75,23 @@ void Button_Panel_ADC()
 
     // Now that we have the raw ADC value we check it against the press_values to see which was pressed
 
-    if (PRESS_VALUE_AUX - PRESS_VALUE_RANGE < raw || raw < PRESS_VALUE_AUX + PRESS_VALUE_RANGE) 
+    if (PRESS_VALUE_AUX - PRESS_VALUE_RANGE < raw && raw < PRESS_VALUE_AUX + PRESS_VALUE_RANGE) 
     {
         Button_AUX();
     }
-    else if (PRESS_VALUE_MOTOR_OFF - PRESS_VALUE_RANGE < raw || raw < PRESS_VALUE_MOTOR_OFF + PRESS_VALUE_RANGE)
+    else if (PRESS_VALUE_MOTOR_OFF - PRESS_VALUE_RANGE < raw && raw < PRESS_VALUE_MOTOR_OFF + PRESS_VALUE_RANGE)
     {
         Button_Motor_Off();
     }
-    else if (PRESS_VALUE_CHIPPER - PRESS_VALUE_RANGE < raw || raw < PRESS_VALUE_MOTOR_OFF + PRESS_VALUE_RANGE)
+    else if (PRESS_VALUE_CHIPPER - PRESS_VALUE_RANGE < raw && raw < PRESS_VALUE_MOTOR_OFF + PRESS_VALUE_RANGE)
     {
         Button_Chipper();
     }
-    else if (PRESS_VALUE_KICKER - PRESS_VALUE_RANGE < raw || raw < PRESS_VALUE_KICKER + PRESS_VALUE_RANGE)
+    else if (PRESS_VALUE_KICKER - PRESS_VALUE_RANGE < raw && raw < PRESS_VALUE_KICKER + PRESS_VALUE_RANGE)
     {
         Button_Kicker();
     }
-    else if (PRESS_VALUE_DRIBBLER - PRESS_VALUE_RANGE < raw || raw < PRESS_VALUE_DRIBBLER + PRESS_VALUE_RANGE)
+    else if (PRESS_VALUE_DRIBBLER - PRESS_VALUE_RANGE < raw && raw < PRESS_VALUE_DRIBBLER + PRESS_VALUE_RANGE)
     {
         Button_Dribbler();
     }
@@ -96,3 +103,33 @@ void Button_Panel_ADC()
 
 
 /* Private functions implementations */
+
+void Button_AUX() 
+{
+    // AUX button. No use right now
+    return;
+}
+
+/**
+  * @brief  Toggle the motor
+  * @note   Ensure that there is an upper limit so that it can't run forever (maybe)
+  */
+void Button_Motor_Off() 
+{
+    return;
+}
+
+void Button_Chipper()
+{
+
+}
+
+void Button_Kicker()
+{
+
+}
+
+void Button_Dribbler()
+{
+    
+}

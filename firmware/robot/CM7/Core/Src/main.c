@@ -21,6 +21,7 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "button_panel.h"
 #include "com.h"
 #include "imu.h"
 #include "imu.pb.h"
@@ -248,6 +249,7 @@ int main(void)
     IMU_Init(&hi2c4);
     STATE_Init();
     UI_Init(&huart3);
+    Button_Panel_INIT(&hadc2);
     ITR_Init();
     LOG_INFO("Discharging kicker\r\n");
     const int DISCHARGE_AMNT = 10;
