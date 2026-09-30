@@ -37,6 +37,20 @@ else
                 echo -e "\e[92m »  NVIDIA graphics card selected\e[39m"
                 opencl_arch='opencl-nvidia nvidia-utils'
                 opencl_debian=nvidia-opencl-icd
+                if [[ -f /etc/debian_version && -z $(apt-cache madison nvidia-opencl-icd 2>/dev/null) ]]; then
+                    nvidia_compute=$(dpkg-query -W -f='${db:Status-Abbrev} ${Package}\n' 'libnvidia-compute-*' 2>/dev/null | awk '$1 == "ii" {print $2; exit}')
+                    if [[ -z $nvidia_compute && -r /sys/module/nvidia/version ]]; then
+                        nvidia_compute=libnvidia-compute-$(cut -d. -f1 /sys/module/nvidia/version)
+                    fi
+                    if [[ -n $nvidia_compute ]]; then
+                        opencl_debian=$nvidia_compute
+                    elif [[ -f /etc/OpenCL/vendors/nvidia.icd ]]; then
+                        opencl_debian=
+                    else
+                        echo -e "\e[91m »  Could not determine NVIDIA driver version, install libnvidia-compute-<version> matching your driver manually\e[39m" >&2
+                        opencl_debian=
+                    fi
+                fi
             elif [[ $vendor == 0x1002 ]]; then
                 echo -e "\e[92m »  AMD graphics card selected\e[39m"
                 opencl_arch='rocm-opencl-runtime mesa'

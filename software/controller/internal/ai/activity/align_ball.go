@@ -3,6 +3,7 @@ package ai
 import (
 	"fmt"
 	"math"
+	"time"
 
 	// "gonum.org/v1/plot"
 	// "gonum.org/v1/plot/plotter"
@@ -46,6 +47,7 @@ type AlignBall struct {
 	allowGoalArea     bool
 	allowOutsideField bool
 	allowBehindGoal   bool
+	latch             *AlignLatch
 }
 
 func (m *AlignBall) String() string {
@@ -62,6 +64,13 @@ func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) 
 		useRRT:            true,
 		avoidBall:         true,
 		allowOutsideField: true,
+		latch:             &AlignLatch{},
+	}
+}
+
+func (m *AlignBall) SetLatch(latch *AlignLatch) {
+	if latch != nil {
+		m.latch = latch
 	}
 }
 
@@ -160,8 +169,7 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	moveTo.AllowOutsideField(m.allowOutsideField)
 	moveTo.AllowBehindGoalLine(m.allowBehindGoal)
 	act := moveTo.GetMoveToAction(gi)
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-	if ok && ballVel.Norm2d() > 0.3 {
+	if m.ballRolling(gi) {
 		// Ball is moving face the ball to receive it
 		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 		myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
@@ -224,15 +232,29 @@ func (m *AlignBall) nearLyingBall(myPos info.Position, gi *info.GameInfo) bool {
 	if err != nil {
 		return false
 	}
-	dist := myPos.Dist2d(ballPos)
-	if dist <= nearBallOrbitRetainDist {
-		return true
+	enterDist := kickFarApproachDist
+	if m.ballRolling(gi) {
+		enterDist = nearBallOrbitRetainDist
 	}
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-	if ok && ballVel.Norm2d() > minRollingBallSpeed {
+	return m.latch.orbitBall(myPos.Dist2d(ballPos), enterDist, time.Now())
+}
+
+func (m *AlignBall) ballRolling(gi *info.GameInfo) bool {
+	now := time.Now()
+	ballVel, ok := gi.State.GetTrackedBall().GetFreshTrackedVelocity(now, alignTrackedBallMaxAge)
+	return m.latch.ballRolling(ballVel.Norm2d(), ok, now)
+}
+
+func (m *AlignBall) ballTrusted(gi *info.GameInfo) bool {
+	kind, holder := gi.State.GetBall().GetEstimateKind()
+	switch kind {
+	case info.BallObserved:
+		return true
+	case info.BallInDribbler:
+		return holder == gi.State.GetTeam(m.team)[m.id]
+	default:
 		return false
 	}
-	return dist <= kickFarApproachDist
 }
 
 // aroundBallAction walks around the ball onto the kick line, the standoff
@@ -323,6 +345,9 @@ func (m *AlignBall) passLineError(pos info.Position, gi *info.GameInfo) (float64
 	return lineErrorToTarget(pos, ballPos, m.to)
 }
 func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
+	if !m.ballTrusted(gi) {
+		return false
+	}
 
 	robotTargetPos := m.getTargetPos(gi)
 

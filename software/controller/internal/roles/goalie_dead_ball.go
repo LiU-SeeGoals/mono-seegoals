@@ -43,6 +43,7 @@ type GoalieSafeAlignState struct {
 	Name            StateName
 	ActivityHandler *coreai.ActivityHandler
 	Ctx             *GoalieSafeClearIntent
+	latch           *act.AlignLatch
 }
 
 type GoalieSafeKickState struct {
@@ -130,6 +131,7 @@ func (s *GoalieCollectDeadBallState) Update() EventName {
 }
 
 func (s *GoalieSafeAlignState) Initialize() {
+	s.latch = &act.AlignLatch{}
 	s.Ctx.FreezeTarget()
 }
 
@@ -149,6 +151,7 @@ func (s *GoalieSafeAlignState) Update() EventName {
 	}
 
 	activity := act.NewDirectAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
+	activity.SetLatch(s.latch)
 	activity.AllowGoalArea(true)
 	activity.AllowOutsideField(true)
 	activity.AllowBehindGoalLine(true)

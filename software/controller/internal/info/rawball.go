@@ -67,6 +67,8 @@ func (b *rawBall) GetVelocity() (Vec2, error){
 }
 
 func (b *rawBall) GetPositionTime() (Position, int64, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	if b.history.Len() == 0 {
 		return Position{}, 0, errors.New("No position in history for ball")
 	}

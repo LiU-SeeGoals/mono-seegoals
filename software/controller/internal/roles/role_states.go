@@ -15,6 +15,11 @@ const interceptNoGoWaitClearance = pathplanner.MotionRadius
 
 const alignTransitionConfirmTime = 0 * time.Millisecond
 
+const (
+	directAlignEnemyRadius   = 1000.0
+	directAlignReleaseRadius = 1200.0
+)
+
 type TargetContext interface {
 	GetTargetPosition() info.Position
 	GetFromPosition() info.Position
@@ -35,10 +40,12 @@ type AlignState struct {
 	alignedSince    time.Time
 	// Keep obstacle-aware staging for restarts even when a defender is nearby.
 	PlanApproach bool
+	latch        *act.AlignLatch
 }
 
 func (s *AlignState) Initialize() {
 	s.alignedSince = time.Time{}
+	s.latch = &act.AlignLatch{}
 	if ctx, ok := s.Ctx.(FreezableTargetContext); ok {
 		ctx.FreezeTarget()
 	}
@@ -68,14 +75,23 @@ func (s *AlignState) Update() sm.EventName {
 
 	targetPos := s.Ctx.GetTargetPosition()
 	fromPos := s.Ctx.GetFromPosition()
+	if s.latch == nil {
+		s.latch = &act.AlignLatch{}
+	}
 
-	var activity act.Activity
+	var activity *act.AlignBall
 
-	if !s.PlanApproach && enemyCloseToBall(s.Gi, s.Team, fromPos, 1000) {
+	direct := !s.PlanApproach && s.latch.DirectApproach(
+		enemyCloseToBall(s.Gi, s.Team, fromPos, directAlignEnemyRadius),
+		enemyCloseToBall(s.Gi, s.Team, fromPos, directAlignReleaseRadius),
+		time.Now(),
+	)
+	if direct {
 		activity = act.NewDirectAlign(s.Team, s.RobotId, targetPos, fromPos)
 	} else {
 		activity = act.NewAlign(s.Team, s.RobotId, targetPos, fromPos)
 	}
+	activity.SetLatch(s.latch)
 	//activity := act.NewAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
 	s.ActivityHandler.AddActivity(activity)
 	if updateAlignConfirmation(&s.alignedSince, activity.Achieved(s.Gi), time.Now()) {

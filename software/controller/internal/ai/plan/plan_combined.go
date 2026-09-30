@@ -20,6 +20,7 @@ import (
 type CombinedPlan struct {
 	plannerCore
 	ballTouchRestrictedRobot atomic.Uint32
+	tick                     func(GameInfo)
 }
 
 type tacticalMode string
@@ -328,18 +329,25 @@ func NewCombinedPlan(team Team) *CombinedPlan {
 }
 
 func (m *CombinedPlan) Init(
-	incoming <-chan GameInfo,
 	activities *[TEAM_SIZE]act.Activity,
 	lock *sync.Mutex,
 	team Team,
 ) {
-	m.incomingGameInfo = incoming
 	m.ActivityHandler.Activities = activities
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.Active = true
+	m.tick = nil
+}
 
-	go m.run()
+func (m *CombinedPlan) Tick(gi *GameInfo) {
+	if !m.Active {
+		return
+	}
+	if m.tick == nil {
+		m.tick = m.newTick()
+	}
+	m.tick(*gi)
 }
 
 func (m *CombinedPlan) getRobotClosestToPosition(
@@ -845,8 +853,8 @@ func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
 	goalieRole.Run()
 }
 
-func (m *CombinedPlan) run() {
-	gi := <-m.incomingGameInfo
+func (m *CombinedPlan) newTick() func(GameInfo) {
+	var gi GameInfo
 	roleManager := newCombinedRoleManager(&m.ActivityHandler, &gi, m.team)
 	possessionTracker := &ballPossessionTracker{}
 	actorTracker := &offenseBallActorTracker{}
@@ -862,9 +870,9 @@ func (m *CombinedPlan) run() {
 	var activeReceiverStart time.Time
 	hasActiveReceiver := false
 
-	for m.Active {
+	return func(frame GameInfo) {
 		tickStart := time.Now()
-		gi = <-m.incomingGameInfo
+		gi = frame
 		frameMonitor.Observe(gi.VisionFrame())
 		possession := possessionTracker.update(&gi, tickStart)
 		rawOwner := observedBallOwner(&gi)
@@ -933,7 +941,7 @@ func (m *CombinedPlan) run() {
 			hasActiveReceiver = false
 			actorTracker.switchTo(roleManager.attackers, noOffenseBallActor())
 			if referee.PrepareForUpcomingKickoff(&gi, m.team, activeRobots, &m.ActivityHandler) {
-				continue
+				return
 			}
 			for id, attacker := range roleManager.attackers {
 				attacker.TriggerEvent("BALL_LOST")
@@ -946,7 +954,7 @@ func (m *CombinedPlan) run() {
 				activeRobots,
 				&m.ActivityHandler,
 			)
-			continue
+			return
 		}
 
 		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()

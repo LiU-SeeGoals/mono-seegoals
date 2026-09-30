@@ -14,7 +14,8 @@ import (
 )
 
 type planner interface {
-	Init(incoming <-chan info.GameInfo, activities *[info.TEAM_SIZE]ai.Activity, lock *sync.Mutex, team info.Team)
+	Init(activities *[info.TEAM_SIZE]ai.Activity, lock *sync.Mutex, team info.Team)
+	Tick(gi *info.GameInfo)
 	Kill()
 }
 
@@ -31,9 +32,7 @@ type Ai struct {
 	team               info.Team
 	planner            planner
 	executor           executor
-	gameInfoSenderSB   chan<- info.GameInfo
 	gameInfoSenderFB   chan<- info.GameInfo
-	gameInfoRecieverSB <-chan info.GameInfo // Save game reciever to pass it to hotswapped ais
 	gameInfoRecieverFB <-chan info.GameInfo // Save game reciever to pass it to hotswapped ais
 	actionReceiver     chan []action.Action
 	activities         *[info.TEAM_SIZE]ai.Activity // Shared slice of Activity
@@ -46,7 +45,7 @@ func (m *Ai) HotswapPlanner(team info.Team, planner planner) {
 	defer m.activity_lock.Unlock()
 
 	m.planner.Kill()
-	planner.Init(m.gameInfoRecieverSB, m.activities, m.activity_lock, team)
+	planner.Init(m.activities, m.activity_lock, team)
 	m.planner = planner
 }
 
@@ -54,12 +53,11 @@ func NewAi(team info.Team, planner planner, executor executor) *Ai {
 	activities := &[info.TEAM_SIZE]ai.Activity{}
 	lock := &sync.Mutex{}
 
-	gameInfoSenderSB, gameInfoReceiverSB := helper.NB_KeepLatestChan[info.GameInfo]()
 	gameInfoSenderFB, gameInfoReceiverFB := helper.NB_KeepLatestChan[info.GameInfo]()
 	actionReceiver := make(chan []action.Action)
 
 	// Initialize plan and executor with the shared resources
-	planner.Init(gameInfoReceiverSB, activities, lock, team)
+	planner.Init(activities, lock, team)
 	executor.Init(gameInfoReceiverFB, activities, lock, actionReceiver, team)
 
 	ai.SetPathService(team, pathplanner.New())
@@ -70,9 +68,7 @@ func NewAi(team info.Team, planner planner, executor executor) *Ai {
 		planner:            planner,
 		executor:           executor,
 		activities:         activities,
-		gameInfoSenderSB:   gameInfoSenderSB,
 		gameInfoSenderFB:   gameInfoSenderFB,
-		gameInfoRecieverSB: gameInfoReceiverSB, // Save game reciever to pass it to hotswapped ais
 		gameInfoRecieverFB: gameInfoReceiverFB, // Save game reciever to pass it to hotswapped ais
 		activity_lock:      lock,
 		actionReceiver:     actionReceiver,
@@ -82,21 +78,14 @@ func NewAi(team info.Team, planner planner, executor executor) *Ai {
 
 // Decides on new actions for the robots
 func (ai *Ai) GetActions(gi *info.GameInfo) []action.Action {
-	if planner, ok := ai.planner.(interface{ ApplyPendingCommand() }); ok {
-		planner.ApplyPendingCommand()
-	}
-
-	// Send the game state copy to the plan so its aware of the environment
-	ai.gameInfoSenderSB <- *gi
+	// Planner and executor share state, so they must not run concurrently
+	ai.planner.Tick(gi)
 
 	// Send the game state to the executor so it can execute gamestate aware activities (e.g. avoid obstacles)
 	ai.gameInfoSenderFB <- *gi
 
 	// Get the actions from the executor, this will block until it has decided on actions
-	actions := <-ai.actionReceiver
-	if len(actions) > 0 {
-	}
-	return actions
+	return <-ai.actionReceiver
 }
 
 type ActivityHandler struct {
@@ -118,10 +107,18 @@ func (m *ActivityHandler) ClearActivity(id info.ID) {
 
 func (m *ActivityHandler) AddActivity(activity ai.Activity) {
 	m.Activity_lock.Lock()
-	defer m.Activity_lock.Unlock()
 	idx := activity.GetID()
-	Logger.Infof("Adding activity %v", activity)
+	previous := m.Activities[idx]
 	m.Activities[idx] = activity
+	m.Activity_lock.Unlock()
+
+	previousName, name := m.GetActionTypeName(previous), m.GetActionTypeName(activity)
+	if previousName != name {
+		if previousName == "" {
+			previousName = "none"
+		}
+		Logger.Infof("Robot %d activity %s -> %v", idx, previousName, activity)
+	}
 }
 
 func (m *ActivityHandler) GetActivity(id info.ID) ai.Activity {

@@ -97,7 +97,7 @@ The AI consists of a slow decision pipeline (slowBrain) and a fast decision pipe
 
 
 #### Communication
-The AI communicates using channels. The AI component sends the gamestate to the slowBrain and fastBrain via channels. The fastBrain acts on the current gameplan and sends actions to the client. The slowBrain sends a new gameplan to the fastBrain when a new strategy is decided. One can think of the slowBrain as interrupting the fastBrain when a new strategy is needed, but the fastBrain is responsible for real-time decisions based on the current gameplan and gamestate.
+Each control frame, the AI first runs the slowBrain (planner) on the control loop goroutine, then sends the gamestate to the fastBrain (activity executor) over a channel and waits for its actions. The planner and executor share the gamestate and activity objects, so they must never run at the same time; the planner therefore has no goroutine of its own. The planner updates the activities that the executor turns into actions in the same frame, and the executor is responsible for real-time decisions such as collision avoidance and referee safety limits.
 
 
 ### WebServer

@@ -105,14 +105,59 @@ func (gs *GameState) Update() {
 		// robot.Update()
 	}
 
-	latestBallPos, _ := gs.Ball.GetPosition()
 	newPossessor := gs.FindBallPossessor()
 	gs.Ball.SetPossessor(newPossessor)
 
-	// if gs.Ball.GetAge() < 50 { // Have a new ball measurement,  WARN: Magic number
-	// fmt.Println("New ball measurement")
-	gs.Ball.SetEstimatedPosition(latestBallPos)
-	// }
+	gs.updateBallEstimate(gs.MessageReceived)
+}
+
+func (gs *GameState) updateBallEstimate(now int64) {
+	lastSeen, seenAt, err := gs.Ball.GetPositionTime()
+	if err != nil {
+		return
+	}
+	if now-seenAt <= BallUnseenAfterMs {
+		gs.Ball.setEstimate(lastSeen, BallObserved, nil)
+		return
+	}
+
+	_, holder := gs.Ball.GetEstimateKind()
+	if holder == nil || !robotSeenSince(holder, now-holderUnseenAfterMs) {
+		holder = gs.hiddenBallHolder(lastSeen, now)
+	}
+	if holder == nil {
+		gs.Ball.setEstimate(lastSeen, BallUnseen, nil)
+		return
+	}
+	gs.Ball.setEstimate(holder.HeldBallPos(), BallInDribbler, holder)
+}
+
+func (gs *GameState) hiddenBallHolder(lastSeen Position, now int64) *Robot {
+	var holder *Robot
+	bestDist := math.Inf(1)
+	for _, team := range []*RobotTeam{gs.Blue_team, gs.Yellow_team} {
+		for _, robot := range team {
+			if !robotSeenSince(robot, now-holderUnseenAfterMs) {
+				continue
+			}
+			robotPos, _ := robot.GetPosition()
+			forward, lateral := BallLocalOffset(robotPos, lastSeen)
+			if forward <= 0 || forward > dribblerReachForward || math.Abs(lateral) > DribblerHalfWidth {
+				continue
+			}
+			heldPos := robot.HeldBallPos()
+			if dist := heldPos.Dist2d(lastSeen); dist < bestDist {
+				bestDist = dist
+				holder = robot
+			}
+		}
+	}
+	return holder
+}
+
+func robotSeenSince(robot *Robot, since int64) bool {
+	_, seenAt, err := robot.GetPositionTime()
+	return err == nil && seenAt >= since
 }
 
 func (gs *GameState) FindBallPossessor() *Robot {

@@ -10,7 +10,23 @@ type Ball struct {
 	rawBall
 	possessor         *Robot
 	estimatedPosition Position
+	estimateKind      BallEstimateKind
+	holder            *Robot
 }
+
+type BallEstimateKind int8
+
+const (
+	BallUnseen BallEstimateKind = iota
+	BallObserved
+	BallInDribbler
+)
+
+const (
+	BallUnseenAfterMs    = 100
+	dribblerReachForward = Center2DribblerDist + BallRadius + 20
+	holderUnseenAfterMs  = 250
+)
 
 func NewBall(historyCapacity int) *Ball {
 	return &Ball{
@@ -24,12 +40,28 @@ func NewBall(historyCapacity int) *Ball {
 
 // get position
 func (b *Ball) GetEstimatedPosition() (Position, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	return b.estimatedPosition, nil
 }
 
 // set position
 func (b *Ball) SetEstimatedPosition(pos Position) {
+	b.setEstimate(pos, BallObserved, nil)
+}
+
+func (b *Ball) setEstimate(pos Position, kind BallEstimateKind, holder *Robot) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.estimatedPosition = pos
+	b.estimateKind = kind
+	b.holder = holder
+}
+
+func (b *Ball) GetEstimateKind() (BallEstimateKind, *Robot) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.estimateKind, b.holder
 }
 
 func (b *Ball) SetPossessor(robot *Robot) {

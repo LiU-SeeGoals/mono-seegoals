@@ -21,21 +21,19 @@ func NewPlannerManualMovement(team info.Team) *plannerManualMovement {
 }
 
 func (m *plannerManualMovement) Init(
-	incoming <-chan info.GameInfo,
 	activities *[info.TEAM_SIZE]ai.Activity,
 	lock *sync.Mutex,
 	team info.Team,
 ) {
-	m.incomingGameInfo = incoming
 	m.ActivityHandler.Activities = activities // store pointer directly
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.Active = true
 }
 
-// ApplyPendingCommand is called before the executor receives this control
-// frame, so a click can change its activity in the same frame.
-func (m *plannerManualMovement) ApplyPendingCommand() {
+// Tick runs before the executor receives this control frame, so a click can
+// change its activity in the same frame.
+func (m *plannerManualMovement) Tick(_ *info.GameInfo) {
 	if !m.Active {
 		return
 	}
