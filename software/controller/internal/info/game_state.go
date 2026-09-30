@@ -34,10 +34,28 @@ type GameState struct {
 
 	KickedBall KickedBallInfo
 
-	MessageReceived     int64
-	Timestamp           float64
-	latestBlueCapture   [TEAM_SIZE]float64
-	latestYellowCapture [TEAM_SIZE]float64
+	MessageReceived int64
+	Timestamp       float64
+	rawCapture      captureOrder
+	trackedCapture  captureOrder
+}
+
+type captureOrder struct {
+	blue, yellow [TEAM_SIZE]float64
+}
+
+const maxCaptureRewindS = 1.0
+
+func (c *captureOrder) accept(team Team, robotId uint32, capture float64) bool {
+	latest := &c.blue[robotId]
+	if team == Yellow {
+		latest = &c.yellow[robotId]
+	}
+	if capture > 0 && *latest > capture && *latest-capture < maxCaptureRewindS {
+		return false
+	}
+	*latest = capture
+	return true
 }
 
 func NewGameState(capacity int) *GameState {
@@ -217,43 +235,32 @@ func (gs *GameState) SetBlueRobot(robotId uint32, x, y, angle float64, time int6
 // SetRobotFromVision keeps robot positions in observation-time order even when
 // camera packets from different sources arrive out of order.
 func (gs *GameState) SetRobotFromVision(team Team, robotId uint32, pos Position, time int64, capture float64) {
-	if robotId >= uint32(TEAM_SIZE) {
+	if robotId >= uint32(TEAM_SIZE) || (team != Yellow && team != Blue) {
+		return
+	}
+	if !gs.rawCapture.accept(team, robotId, capture) {
 		return
 	}
 	switch team {
 	case Yellow:
-		if capture > 0 && gs.latestYellowCapture[robotId] > capture {
-			return
-		}
 		gs.SetYellowRobot(robotId, pos.X, pos.Y, pos.Angle, time)
-		gs.latestYellowCapture[robotId] = capture
 	case Blue:
-		if capture > 0 && gs.latestBlueCapture[robotId] > capture {
-			return
-		}
 		gs.SetBlueRobot(robotId, pos.X, pos.Y, pos.Angle, time)
-		gs.latestBlueCapture[robotId] = capture
 	}
 }
 
 func (gs *GameState) SetRobotFromTracked(team Team, robotId uint32, pos Position, time int64, replaceTime int64, capture float64) {
-	if robotId >= uint32(TEAM_SIZE) {
+	if robotId >= uint32(TEAM_SIZE) || (team != Yellow && team != Blue) {
 		return
 	}
-
+	if !gs.trackedCapture.accept(team, robotId, capture) {
+		return
+	}
 	switch team {
 	case Yellow:
-		if capture > 0 && gs.latestYellowCapture[robotId] > capture {
-			return
-		}
 		gs.Yellow_team[robotId].SetOrReplacePositionTime(pos.X, pos.Y, pos.Angle, time, replaceTime)
-		gs.latestYellowCapture[robotId] = capture
 	case Blue:
-		if capture > 0 && gs.latestBlueCapture[robotId] > capture {
-			return
-		}
 		gs.Blue_team[robotId].SetOrReplacePositionTime(pos.X, pos.Y, pos.Angle, time, replaceTime)
-		gs.latestBlueCapture[robotId] = capture
 	}
 }
 

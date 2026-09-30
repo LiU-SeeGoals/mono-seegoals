@@ -2,20 +2,42 @@ package info
 
 import "testing"
 
-func TestTrackedRobotDoesNotReplaceNewerRawObservation(t *testing.T) {
+func TestTrackedRobotDoesNotReplaceNewerTrackedObservation(t *testing.T) {
 	gs := NewGameState(10)
-	gs.SetRobotFromVision(Blue, 1, Position{X: 200}, 1000, 100.020)
+	gs.SetRobotFromTracked(Blue, 1, Position{X: 200}, 1000, 0, 100.020)
 	gs.SetRobotFromTracked(Blue, 1, Position{X: 100}, 1001, 1000, 100.010)
 
 	pos, err := gs.GetRobot(1, Blue).GetPosition()
 	if err != nil || pos.X != 200 {
-		t.Fatalf("older tracked frame replaced raw observation: pos=%v err=%v", pos, err)
+		t.Fatalf("older tracked frame replaced newer tracked frame: pos=%v err=%v", pos, err)
 	}
 
 	gs.SetRobotFromTracked(Blue, 1, Position{X: 300}, 1002, 1000, 100.030)
 	pos, err = gs.GetRobot(1, Blue).GetPosition()
 	if err != nil || pos.X != 300 {
 		t.Fatalf("newer tracked frame was not used: pos=%v err=%v", pos, err)
+	}
+}
+
+func TestTrackerClockAheadDoesNotFreezeRawRobot(t *testing.T) {
+	gs := NewGameState(10)
+	gs.SetRobotFromTracked(Blue, 1, Position{X: 100}, 1000, 0, 100.500)
+	gs.SetRobotFromVision(Blue, 1, Position{X: 200}, 1001, 100.000)
+
+	pos, err := gs.GetRobot(1, Blue).GetPosition()
+	if err != nil || pos.X != 200 {
+		t.Fatalf("raw frame was dropped because the tracker clock is ahead: pos=%v err=%v", pos, err)
+	}
+}
+
+func TestRawRobotRecoversFromCameraClockReset(t *testing.T) {
+	gs := NewGameState(10)
+	gs.SetRobotFromVision(Yellow, 1, Position{X: 100}, 1000, 5000.0)
+	gs.SetRobotFromVision(Yellow, 1, Position{X: 200}, 1001, 100.0)
+
+	pos, err := gs.GetRobot(1, Yellow).GetPosition()
+	if err != nil || pos.X != 200 {
+		t.Fatalf("raw robot stayed frozen after a camera clock reset: pos=%v err=%v", pos, err)
 	}
 }
 
@@ -30,7 +52,7 @@ func TestTrackedRobotFillsMissingRawObservation(t *testing.T) {
 	}
 }
 
-func TestRawRobotDoesNotReplaceNewerTrackedOrRawObservation(t *testing.T) {
+func TestRawRobotDoesNotReplaceNewerRawObservation(t *testing.T) {
 	gs := NewGameState(10)
 	gs.SetRobotFromTracked(Blue, 1, Position{X: 300}, 1000, 0, 100.030)
 	gs.SetRobotFromVision(Blue, 1, Position{X: 200}, 1001, 100.020)
