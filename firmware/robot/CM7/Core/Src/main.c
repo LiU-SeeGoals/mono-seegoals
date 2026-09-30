@@ -157,6 +157,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         NAV_MovementUpdate();
     }
 
+    if (htim->Instance == TIM6) {
+        LOG_INFO("TIM6 interrupt came in: %u\r\n");
+        //Button_Panel_ADC();
+    }
+
     /* USER CODE BEGIN Callback 1 */
 
     /* USER CODE END Callback 1 */
@@ -282,32 +287,6 @@ int main(void)
     LOG_INFO("Data sample is %d bytes of max 255\r\n", sizeof(data_sample));
     LOG_INFO("Startup done\r\n");
     COMMON_buzzer_done();
-
-    // CATCH THE sg-fw serial startup in an infinite loop to test what ADC values the buttons give out
-    while(true) {
-      HAL_StatusTypeDef status = HAL_ERROR;
-      status = HAL_ADC_Start(&hadc2);
-      if (status != HAL_OK) {
-        LOG_ERROR("IR sensor ADC failed start.\r\n");
-      }
-
-      // Wait for conversion to complete, timeout 20ms
-      status = HAL_ADC_PollForConversion(&hadc2, 20);
-      if (status != HAL_OK) {
-        LOG_ERROR("ADC poll wait failed.\r\n");
-      }
-
-      uint32_t raw = HAL_ADC_GetValue(&hadc2);
-
-      status = HAL_ADC_Stop(&hadc2);
-      if (status != HAL_OK) {
-        LOG_ERROR("ADC stop failed.\r\n");
-      }
-
-      LOG_INFO("ADC2 VALUE IN: %u\r\n", raw);
-
-      HAL_Delay(1000);
-    }
   /* USER CODE END 2 */
 
   /* Infinite loop */
