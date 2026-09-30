@@ -116,10 +116,21 @@ def _generate_field_markings(
         arc.thickness = thickness
 
 
+NETWORK_KEYS = ("vision_ip", "vision_port")
+
+
+def load_network_config(path: Path) -> dict:
+    with path.open("r") as f:
+        config = yaml.safe_load(f)
+    return {key: config[key] for key in NETWORK_KEYS if key in config}
+
+
 def load_geometry(path: Path) -> SSL_WrapperPacket:
     with path.open("r") as f:
         config = yaml.safe_load(f)
 
+    for key in NETWORK_KEYS:
+        config.pop(key, None)
     optional_lines = config.pop("optional_field_lines")
     wrapper = SSL_WrapperPacket()
     ParseDict(config, wrapper.geometry)

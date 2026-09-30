@@ -18,7 +18,7 @@ from aiohttp import web
 
 from wrapper_backend import snapshot, websocket
 from wrapper_backend.bus import Bus
-from wrapper_backend.geometry import Geometry
+from wrapper_backend.geometry import Geometry, load_network_config
 from wrapper_backend.multicast import Multicast
 
 log = logging.getLogger("wrapper_backend")
@@ -39,14 +39,18 @@ async def _cors_middleware(
 async def _main() -> None:
     parser = argparse.ArgumentParser(prog="wrapper")
     parser.add_argument("geometry", type=Path, help="geometry.yml path")
-    parser.add_argument("--vision-ip", default="224.5.23.2")
-    parser.add_argument("--vision-port", type=int, default=10006)
+    parser.add_argument("--vision-ip")
+    parser.add_argument("--vision-port", type=int)
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
 
+    network = load_network_config(args.geometry)
+    vision_ip = args.vision_ip or network.get("vision_ip", "224.5.23.2")
+    vision_port = args.vision_port or int(network.get("vision_port", 10006))
+
     bus = Bus()
-    multicast = Multicast(bus, args.vision_ip, args.vision_port)
+    multicast = Multicast(bus, vision_ip, vision_port)
     geometry = Geometry(bus, args.geometry)
 
     http_app = web.Application(middlewares=[_cors_middleware])
