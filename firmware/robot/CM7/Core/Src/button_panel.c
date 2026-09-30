@@ -50,20 +50,21 @@ bool button_handled = false;
 // Kicker variables
 
 //Dribbler variables
-bool dribbling = false;
 
 
 /* Private functions declarations */
 void Button_AUX();
 void Button_Motor_Off();
 void Button_Chipper();
-void Button_Kicker(); // Lowest power possible
+void Button_Kicker(); 
 void Button_Dribbler();
 void Kick();
 
 /* Public functions implementations */
 
-
+/**
+  * @brief  Initialise the button panel system
+  */
 void Button_Panel_INIT(ADC_HandleTypeDef* handle)
 {
     hadc2 = handle;
@@ -75,6 +76,7 @@ void Button_Panel_INIT(ADC_HandleTypeDef* handle)
 /**
   * @brief  Start the ADC of the button panel
   * @note   Interruptions enabled in this function: None.
+  * @note   Reached via timer interrupt ???
   */
 void Button_Panel_ADC() 
 {
@@ -145,8 +147,7 @@ void Button_Panel_ADC()
 /* Private functions implementations */
 
 /**
-  * @brief  Toggle the motor
-  * @note   Ensure that there is an upper limit so that it can't run forever (maybe)
+  * @brief  Set the kicker to straight and straight pass
   */
 void Button_AUX() 
 {
@@ -156,121 +157,47 @@ void Button_AUX()
 }
 
 /**
-  * @brief  Toggle the motor
-  * @note   Ensure that there is an upper limit so that it can't run forever (maybe)
+  * @brief  Run the NAV_TEST_TireTest
   */
 void Button_Motor_Off() 
 {
-    /*
-    } else if (current_state == state_motors) {
-        static int dribble_cur = 0;
-
-        switch (key) {
-        case 'S': // Steer
-            current_state = state_motors_steer;
-            print_help();
-            break;
-        case 'T': // Toggle movement
-            LOG_INFO("Movement toggled\r\n");
-            if (moving) {
-                NAV_DisableMovement();
-                moving = 0;
-            } else {
-                NAV_EnableMovement();
-                moving = 1;
-            }
-            break;
-        case 'G': // Go tire test
-            STATE_disable_calibration();
-            NAV_TEST_TireTest();
-            break;
-        
-    */
-
     // If NAV is by default enabled then all we should need is to run the tire test
 
     STATE_disable_calibration();
     NAV_TEST_TireTest();
 
+    // STATE_enable_calibration
+
 
     return;
 }
 
+/**
+  * @brief  Set the kicker to chipper and chip pass
+  */
 void Button_Chipper()
 {
     KICKER_SetKickerMode(KICKER_CHIPPER);
     KICKER_ChargeStart(KICKER_SPEED_CHIP_PASS);
-
-    // When to discharge?
-    
-    /*
-    LOG_UI("Discharging\r\n");
-            KICKER_KickStart();
-
-    case 'C':
-            LOG_UI("Chipper kicking\r\n");
-            KICKER_SetKickerMode(KICKER_CHIPPER);
-            KICKER_ChargeStart(KICKER_SPEED_CHIP_PASS);
-            break;
-    */
-
-    
-
     return;
 }
 
+
+/**
+  * @brief  Set the kicker to chipper and straight shoot
+  */
 void Button_Kicker()
 {
-    /*
-    else if (current_state == state_kicker) {
-        switch (key) {
-        case 'D':
-            LOG_UI("Discharging\r\n");
-            KICKER_KickStart();
-            break;
-        case 'S':
-            LOG_UI("Straight kicking\r\n");
-            KICKER_SetKickerMode(KICKER_STRAIGHT);
-            KICKER_ChargeStart(KICKER_SPEED_DEFAULT);
-            break;
-        
-        case 'P': // Print vars
-        {
-            KICKER_Settings* set = KICKER_GetSettings();
-            LOG_UI("Max charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us);
-        } break;
-        case 'E': // Edit vars
-            current_state = state_kicker_edit;
-            print_help();
-            break;
-        }
-    */
-
     KICKER_SetKickerMode(KICKER_STRAIGHT);
     KICKER_ChargeStart(KICKER_SPEED_STRAIGHT_GOAL);
+    return;
 }
 
 /**
-  * @brief  Toggle the dribbler
-  * @note   Ensure that there is an upper limit so that it can't run forever (maybe)
+  * @brief  Start dribbler test
   */
 void Button_Dribbler()
 {
-    if (dribbling)
-    {
-        NAV_StopDribbler();
-        dribbling = false;
-    }
-    else 
-    {
-        NAV_RunDribbler();
-        dribbling = true;
-    }
-
+    NAV_TestDribbler();
     return;
-}
-
-void Kick() 
-{
-
 }
