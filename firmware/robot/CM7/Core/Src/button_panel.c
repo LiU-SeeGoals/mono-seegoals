@@ -148,6 +148,7 @@ void Button_Panel_ADC()
 
 /**
   * @brief  Set the kicker to straight and straight pass
+  * @note assumes that ChargeStart will automatically kick on timer interrupt.
   */
 void Button_AUX() 
 {
@@ -174,6 +175,7 @@ void Button_Motor_Off()
 
 /**
   * @brief  Set the kicker to chipper and chip pass
+  * @note assumes that ChargeStart will automatically kick on timer interrupt.
   */
 void Button_Chipper()
 {
@@ -185,6 +187,7 @@ void Button_Chipper()
 
 /**
   * @brief  Set the kicker to chipper and straight shoot
+  * @note assumes that ChargeStart will automatically kick on timer interrupt.
   */
 void Button_Kicker()
 {
