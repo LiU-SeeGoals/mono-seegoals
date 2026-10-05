@@ -1,6 +1,5 @@
 #include "pos_follow.h"
 #include "log.h"
-#include "data_logging.h"
 #include "math.h"
 #include "nav.h"
 #include "state_estimator.h"
@@ -60,10 +59,6 @@ float standard_error(float current, float desired) { return desired - current; }
 
 void POS_go_to_position_lqr(float dest_x, float dest_y, float dest_w)
 {
-    ControlSignal sigx;
-    ControlSignal sigy;
-    ControlSignal sigw;
-
     static float i_prev_y = 0;
     static float i_prev_x = 0;
     // Get current state from EKF
