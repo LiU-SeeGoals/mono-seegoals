@@ -17,22 +17,25 @@
 /* Private enums/structs */
 
 /* Private variables */
-static const int NOISE_FILTER = 1200;
+static const int NOISE_FILTER = 1280;
 
 static const int AUX_LOWER = 2600;
 static const int AUX_UPPER = 2800;
 
-static const int MOTOR_OFF_LOWER = 1900;
-static const int MOTOR_OFF_UPPER = 2100;
+static const int MOTOR_OFF_LOWER = 1800;
+static const int MOTOR_OFF_UPPER = 2120;
 
+// Chipper has reached 1533 during testing
 static const int CHIPPER_LOWER = 1630;
 static const int CHIPPER_UPPER = 1780;
 
+// The poor kicker has a very small window as such but the speed of ADC makes it a non issue
 static const int KICKER_LOWER = 1530;
-static const int KICKER_UPPER = 1600;
+static const int KICKER_UPPER = 1532;
 
+// Dribbler has reached 1531 once during testing. 
 static const int DRIBBLER_LOWER = 1300;
-static const int DRIBBLER_UPPER = 1490;
+static const int DRIBBLER_UPPER = 1450;
 
 static const int PRESS_VALUE_RANGE = 40;
 
@@ -58,7 +61,6 @@ void Button_Motor_Off();
 void Button_Chipper();
 void Button_Kicker(); 
 void Button_Dribbler();
-void Kick();
 
 /* Public functions implementations */
 
@@ -99,7 +101,6 @@ void Button_Panel_ADC()
     if (status != HAL_OK) {
         LOG_ERROR("ADC stop failed.\r\n");
     }
-    LOG_INFO("ADC2 VALUE IN: %u\r\n", raw);
 
     // Now that we have the raw ADC value we check it against the press_values to see which was pressed
 
@@ -109,33 +110,39 @@ void Button_Panel_ADC()
         return;
     }
 
+    // Check within which bound the button press falls within
     if (button_handled)
     {
         return;
     }
     else if (AUX_LOWER < raw && raw < AUX_UPPER) 
     {
-        Button_AUX();
+        LOG_INFO("ADC2 VALUE: %u DETERMINED TO BE AUX BUTTON \r\n", raw);
+        // Button_AUX();
     }
     else if (MOTOR_OFF_LOWER < raw && raw < MOTOR_OFF_UPPER)
     {
-        Button_Motor_Off();
+        LOG_INFO("ADC2 VALUE: %u DETERMINED TO BE MOTOR_OFF BUTTON \r\n", raw);
+        // Button_Motor_Off();
     }
     else if (CHIPPER_LOWER < raw && raw < CHIPPER_UPPER)
     {
-        Button_Chipper();
+        LOG_INFO("ADC2 VALUE: %u DETERMINED TO BE CHIPPER BUTTON \r\n", raw);
+        // Button_Chipper();
     }
     else if (KICKER_LOWER < raw && raw < KICKER_UPPER)
     {
-        Button_Kicker();
+        LOG_INFO("ADC2 VALUE: %u DETERMINED TO BE KICKER BUTTON \r\n", raw);
+        
+        // Button_Kicker();
     }
     else if (DRIBBLER_LOWER < raw && raw < DRIBBLER_UPPER)
     {
-        Button_Dribbler();
+        LOG_INFO("ADC2 VALUE: %u DETERMINED TO BE DRIBBLER BUTTON \r\n", raw);
+        // Button_Dribbler();
     }
     else
     {
-        LOG_ERROR("The button pressed could not be determined: %u\r\n", raw);
         button_handled = false;
         return;
     }
@@ -167,9 +174,7 @@ void Button_Motor_Off()
     STATE_disable_calibration();
     NAV_TEST_TireTest();
 
-    // STATE_enable_calibration
-
-
+    // STATE_enable_calibration();
     return;
 }
 

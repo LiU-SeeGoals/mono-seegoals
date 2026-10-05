@@ -35,6 +35,7 @@
 #include "state_estimator.h"
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_gpio.h"
+#include "stm32h7xx_hal_tim.h"
 #include "stm32h7xx_it.h"
 #include "ui.h"
 /* USER CODE END Includes */
@@ -144,22 +145,25 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     if (htim->Instance == TIM5) {
         KICKER_ChargeStop();
         KICKER_KickStart();
+        return;
     }
 
     if (htim->Instance == TIM3) {
         KICKER_KickStop();
+        return;
     }
     if (htim->Instance == TIM7) {
         NAV_update_motor_state();
+        return;
     }
 
     if (htim->Instance == TIM12) {
         NAV_MovementUpdate();
+        return;
     }
 
     if (htim->Instance == TIM6) {
-        LOG_INFO("TIM6 interrupt came in: %u\r\n");
-        //Button_Panel_ADC();
+        Button_Panel_ADC();
     }
 
     /* USER CODE BEGIN Callback 1 */
@@ -257,6 +261,7 @@ int main(void)
     STATE_Init();
     UI_Init(&huart3);
     Button_Panel_INIT(&hadc2);
+    HAL_TIM_Base_Start_IT(&htim6);
     ITR_Init();
     LOG_INFO("Discharging kicker\r\n");
     const int DISCHARGE_AMNT = 10;
@@ -871,8 +876,8 @@ static void MX_TIM6_Init(void)
   htim6.Instance = TIM6;
   htim6.Init.Prescaler = 9999;
   htim6.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim6.Init.Period = 199;
-  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  htim6.Init.Period = 19;
+  htim6.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim6) != HAL_OK)
   {
     Error_Handler();
@@ -884,6 +889,8 @@ static void MX_TIM6_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN TIM6_Init 2 */
+
+  LOG_INFO("TIM6 Init is done \r\n");
 
   /* USER CODE END TIM6_Init 2 */
 
