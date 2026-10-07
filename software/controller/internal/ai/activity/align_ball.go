@@ -102,8 +102,7 @@ func (m *AlignBall) getStagingPos(gi *info.GameInfo) info.Position {
 }
 
 func (m *AlignBall) getTargetPosWithClearance(gi *info.GameInfo, clearance float64) info.Position {
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	alignBallPos := ballPos
+	alignBallPos := m.ballPos(gi)
 
 	ballV2 := info.Vec2{X: alignBallPos.X, Y: alignBallPos.Y}
 	goalPos := info.Vec2{X: m.to.X, Y: m.to.Y}
@@ -171,7 +170,7 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	act := moveTo.GetMoveToAction(gi)
 	if m.ballRolling(gi) {
 		// Ball is moving face the ball to receive it
-		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+		ballPos := m.ballPos(gi)
 		myPos, err := gi.State.GetTeam(m.team)[m.id].GetPosition()
 		if err == nil {
 			act.Dest.Angle = myPos.AngleToPosition(ballPos)
@@ -193,7 +192,7 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 		}
 	}
 
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	ballPos := m.ballPos(gi)
 	robot := gi.State.GetTeam(m.team)[m.id]
 	finalHeadingErr := math.Abs(info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myPos.Angle))
 	captureReady := capturePoseReady(myPos, ballPos, m.to, finalHeadingErr)
@@ -228,15 +227,35 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 // nearLyingBall reports whether the ball is lying still with the robot close
 // enough that the clearance/staging targets would point away from the ball.
 func (m *AlignBall) nearLyingBall(myPos info.Position, gi *info.GameInfo) bool {
-	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
-	if err != nil {
-		return false
-	}
+	ballPos := m.ballPos(gi)
 	enterDist := kickFarApproachDist
 	if m.ballRolling(gi) {
 		enterDist = nearBallOrbitRetainDist
 	}
 	return m.latch.orbitBall(myPos.Dist2d(ballPos), enterDist, time.Now())
+}
+
+func (m *AlignBall) ballPos(gi *info.GameInfo) info.Position {
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	if m.ballRolling(gi) {
+		m.latch.releaseBall()
+		return ballPos
+	}
+	return m.latch.holdBall(ballPos, time.Now())
+}
+
+func (m *AlignBall) onKickLine(gi *info.GameInfo, robot *info.Robot, myPos, ballPos info.Position, headingErr float64) bool {
+	along, sideErr, ok := lineErrorToTarget(myPos, ballPos, m.to)
+	if !ok {
+		return false
+	}
+	now := time.Now()
+	vel, fresh := gi.State.GetTrackedRobot(m.team, uint32(m.id)).GetFreshTrackedVelocity(now, alignTrackedBallMaxAge)
+	if !fresh {
+		vel = robot.GetVelocity()
+	}
+	sideSpeed := sideSpeedToLine(vel, ballPos, m.to)
+	return m.latch.onKickLine(along, sideErr, sideSpeed, headingErr, now)
 }
 
 func (m *AlignBall) ballRolling(gi *info.GameInfo) bool {
@@ -261,7 +280,7 @@ func (m *AlignBall) ballTrusted(gi *info.GameInfo) bool {
 // margin closing as the heading aligns, so the robot keeps the ball at its
 // kicker instead of backing off to the clearance points.
 func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) action.Action {
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	ballPos := m.ballPos(gi)
 	robot := gi.State.GetTeam(m.team)[m.id]
 
 	finalOrientation := ballPos.AngleToPosition(m.to)
@@ -269,7 +288,7 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 	headingErr := math.Abs(info.NormalizeAngleDelta(finalOrientation, myPos.Angle))
 	dribblerPos := robot.DribblerPos()
 	ballCentered := m.contactPointCentered(robot, ballPos)
-	approachReady := captureApproachReady(myPos, ballPos, m.to, headingErr)
+	approachReady := m.onKickLine(gi, robot, myPos, ballPos, headingErr)
 	captureReady := capturePoseReady(myPos, ballPos, m.to, headingErr)
 
 	keepWide := !behindBallHalfPlane(ballPos, myPos, m.to) || !ballCentered
@@ -337,12 +356,7 @@ func (m *AlignBall) contactPointCentered(robot *info.Robot, ballPos info.Positio
 }
 
 func (m *AlignBall) passLineError(pos info.Position, gi *info.GameInfo) (float64, float64, bool) {
-	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
-	if err != nil {
-		fmt.Println(err)
-		return 0, 0, false
-	}
-	return lineErrorToTarget(pos, ballPos, m.to)
+	return lineErrorToTarget(pos, m.ballPos(gi), m.to)
 }
 func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	if !m.ballTrusted(gi) {
@@ -363,11 +377,12 @@ func (m *AlignBall) Achieved(gi *info.GameInfo) bool {
 	// transition corridor. This remains less strict than the kick-center
 	// diagnostic while preventing a handoff at the edge of dribbler reach.
 	if m.nearLyingBall(myRobotPos, gi) {
-		ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-		headingErr := info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle)
-		_, lateral, ballOffsetOK := gi.State.GetTeam(m.team)[m.id].BallLocalOffset(ballPos)
+		ballPos := m.ballPos(gi)
+		robot := gi.State.GetTeam(m.team)[m.id]
+		headingErr := math.Abs(info.NormalizeAngleDelta(ballPos.AngleToPosition(m.to), myRobotPos.Angle))
+		_, lateral, ballOffsetOK := robot.BallLocalOffset(ballPos)
 		return myRobotPos.Dist2d(ballPos) < kickerStandoffDist(maxMarginToBall) &&
-			captureApproachReady(myRobotPos, ballPos, m.to, math.Abs(headingErr)) &&
+			m.onKickLine(gi, robot, myRobotPos, ballPos, headingErr) &&
 			ballOffsetOK &&
 			math.Abs(lateral) <= alignTransitionLateralTolerance
 	}

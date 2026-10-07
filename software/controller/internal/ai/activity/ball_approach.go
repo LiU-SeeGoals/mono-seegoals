@@ -17,11 +17,8 @@ const (
 	alignTransitionLateralTolerance = 30.0
 	capturePoseTolerance            = 35.0
 	nearBallOrbitRetainDist         = 300.0
-	// The real robot's position follower scales velocity with destination
-	// distance. Keep close orbit corrections large enough to avoid crawling.
-	minAroundBallMoveDist    = 50.0
-	minAroundBallMoveTrigger = 1.0
-	aroundBallMinLinearSpeed = 0.5
+	minAroundBallMoveTrigger        = 1.0
+	aroundBallMinLinearSpeed        = 0.5
 	// Keep the orbit carrot far enough ahead that the position controller
 	// commands useful tangential speed while the robot has substantial
 	// rotation remaining. Small final corrections are still limited by the
@@ -84,6 +81,16 @@ func lineErrorToTarget(pos, ballPos, target info.Position) (float64, float64, bo
 	alongLine := posFromBall.X*targetDir.X + posFromBall.Y*targetDir.Y
 	sideError := math.Abs(posFromBall.X*targetDir.Y - posFromBall.Y*targetDir.X)
 	return alongLine, sideError, true
+}
+
+func sideSpeedToLine(vel, ballPos, target info.Position) float64 {
+	dx := target.X - ballPos.X
+	dy := target.Y - ballPos.Y
+	norm := math.Hypot(dx, dy)
+	if norm < 1 {
+		return 0
+	}
+	return (vel.Y*dx - vel.X*dy) / norm
 }
 
 func captureApproachReady(robotPos, ballPos, target info.Position, headingErr float64) bool {
@@ -150,21 +157,6 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 	}
 
 	shiftMag := math.Min(math.Abs(remaining), aroundBallShiftAngle)
-	botRadius := ballPos.Dist2d(botPos)
-	if distance > 1 && botRadius > 1 {
-		orbitArc := shiftMag * distance
-		moveDist := math.Sqrt(botRadius*botRadius + distance*distance -
-			2*botRadius*distance*math.Cos(shiftMag))
-		if orbitArc > minAroundBallMoveTrigger && moveDist < minAroundBallMoveDist {
-			// Solve the chord equation for the angular shift that places the
-			// carrot far enough away while keeping it on the intended orbit.
-			cosShift := (botRadius*botRadius + distance*distance -
-				minAroundBallMoveDist*minAroundBallMoveDist) / (2 * botRadius * distance)
-			cosShift = math.Max(-1, math.Min(1, cosShift))
-			minShift := math.Acos(cosShift)
-			shiftMag = math.Min(aroundBallShiftAngle, math.Max(shiftMag, minShift))
-		}
-	}
 	shift := -math.Copysign(shiftMag, remaining)
 	bearing := ball2BotAngle + shift
 	return info.Position{
