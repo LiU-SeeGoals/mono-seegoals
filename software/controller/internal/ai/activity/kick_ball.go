@@ -3,6 +3,7 @@ package ai
 import (
 	"fmt"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
@@ -22,6 +23,8 @@ type KickBall struct {
 	kickSpeed         int
 	simKickSpeed      float32
 	kickAngle         float32
+	holdMu            sync.Mutex
+	hold              ballHold
 }
 
 type KickConfig struct {
@@ -41,6 +44,7 @@ const (
 	kickAssumedFinalSpeed     = 0.65
 	kickMinFirmwareLeadDist   = 50.0
 	kickMaxFirmwareLeadDist   = 220.0
+	kickRailLookahead         = 40.0
 )
 
 func GetKickConfig() KickConfig {
@@ -95,10 +99,25 @@ func (m *KickBall) SetKickAngle(angle float32) {
 	m.kickAngle = angle
 }
 
+func (m *KickBall) ballMoving(gi *info.GameInfo) bool {
+	vel, ok := gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), alignTrackedBallMaxAge)
+	return ok && vel.Norm2d() > alignRollingEnterSpeed
+}
+
+func (m *KickBall) ballPos(gi *info.GameInfo) info.Position {
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+	m.holdMu.Lock()
+	defer m.holdMu.Unlock()
+	if m.ballMoving(gi) {
+		m.hold.held = false
+		return ballPos
+	}
+	return m.hold.update(ballPos, time.Now())
+}
+
 func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 
-	ball := gi.State.GetBall()
-	ballPos, _ := ball.GetEstimatedPosition()
+	ballPos := m.ballPos(gi)
 	// fmt.Println("new pos", ballPos, m.orignalBallPos, ballPos.Norm2d(m.orignalBallPos))
 	ballV2 := info.Vec2{X: ballPos.X, Y: ballPos.Y}
 
@@ -130,7 +149,9 @@ func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
 		return behindBallDest(ballPos, m.to, captureMarginToBall)
 	}
 
-	robotXY := info.Add(ballV2, ballToTarget.Mult(GetKickConfig().driveThrough))
+	along, _, _ := lineErrorToTarget(robotPos, ballPos, m.to)
+	railAlong := math.Min(along+kickRailLookahead, GetKickConfig().driveThrough)
+	robotXY := info.Add(ballV2, ballToTarget.Mult(railAlong))
 	robotTargetPos := info.Position{X: robotXY.X, Y: robotXY.Y, Z: 0, Angle: kickAngle}
 	return robotTargetPos
 }
@@ -147,17 +168,8 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 	// Use the same filtered ball position as AlignBall and GetTargetPos. Mixing
 	// raw and estimated positions can invalidate the alignment gate immediately
 	// after the state transition.
-	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
-
-	if err != nil {
-		fmt.Println(err)
-	}
-	ball := gi.State.GetTrackedBall()
-	//ballPos, err := ball.GetTrackedPosition()
-	ballVel, _ := ball.GetTrackedVelocity()
-
-	speed := ballVel.Norm2d()
-	if speed > 0.05 {
+	ballPos := m.ballPos(gi)
+	if m.ballMoving(gi) {
 		robotTargetPos = robotPos
 	}
 
