@@ -2,9 +2,11 @@ package roles
 
 import (
 	"math"
+	"sync"
 	"testing"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
+	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -21,7 +23,7 @@ func TestClosestOpponentToOwnGoal(t *testing.T) {
 	opponents[3].SetActive(false)
 
 	state := &DefensePressState{gi: gi, team: info.Blue}
-	opponent, position, found := state.closestOpponentToOwnGoal()
+	opponent, position, _, found := state.closestOpponentToOwnGoal()
 
 	if !found {
 		t.Fatal("expected to find an active opponent")
@@ -37,54 +39,8 @@ func TestClosestOpponentToOwnGoal(t *testing.T) {
 func TestClosestOpponentToOwnGoalReturnsFalseWithoutGameState(t *testing.T) {
 	state := &DefensePressState{}
 
-	if _, _, found := state.closestOpponentToOwnGoal(); found {
+	if _, _, _, found := state.closestOpponentToOwnGoal(); found {
 		t.Fatal("found an opponent without game state")
-	}
-}
-
-func TestOpponentWithBallReturnsClosestOpponentWithinDistance(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
-	opponents := gi.State.GetOtherTeam(info.Blue)
-	opponents[4].SetPositionTime(1200, -350, 0, 1)
-	opponents[5].SetPositionTime(1125, -350, 0, 1)
-	ballPos := info.Position{X: 1100, Y: -350}
-
-	state := &DefensePressState{gi: gi, team: info.Blue}
-	possessor, position, found := state.opponentWithBall(ballPos)
-
-	if !found {
-		t.Fatal("expected to find the opponent with the ball")
-	}
-	if got, want := possessor.GetTeam(), info.Yellow; got != want {
-		t.Fatalf("possessor team = %s, want %s", got, want)
-	}
-	if got, want := possessor.GetID(), info.ID(5); got != want {
-		t.Fatalf("possessor ID = %d, want %d", got, want)
-	}
-	if got, want := position, (info.Position{X: 1125, Y: -350}); got != want {
-		t.Fatalf("possessor position = %+v, want %+v", got, want)
-	}
-}
-
-func TestOpponentWithBallIgnoresNearbyTeammate(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
-	teammate := gi.State.GetTeam(info.Blue)[2]
-	teammate.SetPositionTime(50, 0, 0, 1)
-
-	state := &DefensePressState{gi: gi, team: info.Blue}
-	if _, _, found := state.opponentWithBall(info.Position{}); found {
-		t.Fatal("reported a teammate as the opponent with the ball")
-	}
-}
-
-func TestOpponentWithBallRejectsOpponentBeyondDistance(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
-	opponent := gi.State.GetOtherTeam(info.Blue)[4]
-	opponent.SetPositionTime(defensePossessionDistance+1, 0, 0, 1)
-
-	state := &DefensePressState{gi: gi, team: info.Blue}
-	if _, _, found := state.opponentWithBall(info.Position{}); found {
-		t.Fatal("reported an opponent farther than the possession distance")
 	}
 }
 
@@ -128,17 +84,138 @@ func TestCoverTargetParksWhenReceiverIsNotDangerous(t *testing.T) {
 	opponents[1].SetPositionTime(-1000, 0, 0, 1)
 
 	state := &DefensePressState{gi: gi, team: info.Blue, robotId: 7}
-	if got := state.coverTarget(ballPos); got != coverParkingPos {
-		t.Fatalf("cover target = %+v, want parking position %+v", got, coverParkingPos)
+	want := state.coverParkingPos(ballPos)
+	if got := state.coverTarget(ballPos); got != want {
+		t.Fatalf("cover target = %+v, want parking position %+v", got, want)
 	}
 }
 
 func TestCoverTargetParksWithoutOpponentNearBall(t *testing.T) {
 	gi := info.NewGameInfo(int(info.TEAM_SIZE))
 	state := &DefensePressState{gi: gi, team: info.Blue, robotId: 7}
+	ballPos := info.Position{X: -500, Y: 725}
 
-	if got := state.coverTarget(info.Position{}); got != coverParkingPos {
-		t.Fatalf("cover target = %+v, want parking position %+v", got, coverParkingPos)
+	want := state.coverParkingPos(ballPos)
+	if got := state.coverTarget(ballPos); got != want {
+		t.Fatalf("cover target = %+v, want parking position %+v", got, want)
+	}
+	if got := want.X; got != -3000 {
+		t.Fatalf("Blue parking X = %.0f, want -3000", got)
+	}
+	if got := want.Y; got != ballPos.Y {
+		t.Fatalf("parking Y = %.0f, want ball Y %.0f", got, ballPos.Y)
+	}
+}
+
+func TestCoverParkingPositionUsesTeamHalf(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	ballPos := info.Position{X: 250, Y: -640}
+	blueState := &DefensePressState{gi: gi, team: info.Blue}
+	yellowState := &DefensePressState{gi: gi, team: info.Yellow}
+
+	if got := blueState.coverParkingPos(ballPos); got.X != -3000 || got.Y != ballPos.Y {
+		t.Fatalf("Blue parking position = %+v, want X=-3000 and Y=%.0f", got, ballPos.Y)
+	}
+	if got := yellowState.coverParkingPos(ballPos); got.X != 3000 || got.Y != ballPos.Y {
+		t.Fatalf("Yellow parking position = %+v, want X=3000 and Y=%.0f", got, ballPos.Y)
+	}
+}
+
+func TestLowDefenderTargetsProjectedBallPath(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.State.SetBall(0, 0, 0, 1000)
+	gi.State.SetBall(-1000, 200, 0, 1020)
+	ballPos := info.Position{X: -1000, Y: 200}
+
+	state := &DefensePressState{gi: gi, team: info.Blue}
+	target := LowDefenderTarget(state.gi, state.team, ballPos, 0)
+	if target.X != -3000 || target.Y != 600 {
+		t.Fatalf("Blue Low Def target = %+v, want X=-3000 Y=600", target)
+	}
+}
+
+func TestLowDefenderUsesPositiveHalfForYellow(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.State.SetBall(0, 0, 0, 1000)
+	gi.State.SetBall(1000, 200, 0, 1020)
+	ballPos := info.Position{X: 1000, Y: 200}
+
+	state := &DefensePressState{gi: gi, team: info.Yellow}
+	target := LowDefenderTarget(state.gi, state.team, ballPos, 0)
+	if target.X != 3000 || target.Y != 600 {
+		t.Fatalf("Yellow Low Def target = %+v, want X=3000 Y=600", target)
+	}
+}
+
+func TestLowDefenderRetreatsPastMinimumDepth(t *testing.T) {
+	tests := []struct {
+		name  string
+		team  info.Team
+		ballX float64
+		wantX float64
+	}{
+		{name: "blue", team: info.Blue, ballX: -3600, wantX: -3600},
+		{name: "yellow", team: info.Yellow, ballX: 3800, wantX: 3800},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			gi := info.NewGameInfo(int(info.TEAM_SIZE))
+			ballPos := info.Position{X: test.ballX, Y: 250}
+			gi.State.GetBall().SetEstimatedPosition(ballPos)
+
+			target := LowDefenderTarget(gi, test.team, ballPos, 0)
+			if target.X != test.wantX {
+				t.Fatalf("Low Def target X = %.0f, want %.0f", target.X, test.wantX)
+			}
+		})
+	}
+}
+
+func TestLowDefenderClampsProjectedBallPath(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.State.SetBall(0, 0, 0, 1000)
+	gi.State.SetBall(-1000, 1000, 0, 1020)
+	ballPos := info.Position{X: -1000, Y: 1000}
+
+	state := &DefensePressState{gi: gi, team: info.Blue}
+	target := LowDefenderTarget(state.gi, state.team, ballPos, 0)
+	if target.X != -3000 || target.Y != coverYClamp {
+		t.Fatalf("clamped Low Def target = %+v, want X=-3000 Y=%.0f", target, coverYClamp)
+	}
+}
+
+func TestLowDefenderPredictsWhereStationaryShooterAims(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	opponent := gi.State.GetOtherTeam(info.Blue)[2]
+	opponentPos := info.Position{X: 500, Y: 200}
+	wantedHit := info.Position{X: -3000, Y: 900}
+	opponentPos.Angle = opponentPos.AngleToPosition(wantedHit)
+	opponent.SetPositionTime(opponentPos.X, opponentPos.Y, opponentPos.Angle, 1)
+
+	// Put the stationary ball at the opponent's dribbler. There is deliberately
+	// no ball movement history, so the target must come from the shooter's aim.
+	ballPos := opponent.DribblerPos()
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+
+	state := &DefensePressState{gi: gi, team: info.Blue}
+	target := LowDefenderTarget(state.gi, state.team, ballPos, 0)
+	if math.Abs(target.X-wantedHit.X) > 1e-9 || math.Abs(target.Y-wantedHit.Y) > 1e-9 {
+		t.Fatalf("Low Def target from shooter aim = %+v, want %+v", target, wantedHit)
+	}
+}
+
+func TestLowDefenderIgnoresShooterAimingAwayFromDefenseLine(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	opponent := gi.State.GetOtherTeam(info.Blue)[2]
+	opponent.SetPositionTime(0, 200, 0, 1)
+	ballPos := opponent.DribblerPos()
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+
+	state := &DefensePressState{gi: gi, team: info.Blue}
+	target := LowDefenderTarget(state.gi, state.team, ballPos, 0)
+	if target.X != -3000 || target.Y != ballPos.Y {
+		t.Fatalf("Low Def fallback target = %+v, want X=-3000 Y=%.3f", target, ballPos.Y)
 	}
 }
 
@@ -165,6 +242,173 @@ func TestCoverTargetBlocksDangerousOpponentWithoutBallPossessor(t *testing.T) {
 	}
 	if math.Abs(info.NormalizeAngleDelta(target.Angle, want.Angle)) > 1e-9 {
 		t.Fatalf("cover angle without possessor = %.6f, want %.6f", target.Angle, want.Angle)
+	}
+}
+
+func TestCoverTargetUsesAssignedOpponentInsteadOfClosestToGoal(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	opponents := gi.State.GetOtherTeam(info.Blue)
+	ballPos := info.Position{X: 0, Y: 0}
+	opponents[1].SetPositionTime(-3900, -900, 0, 1)
+	assignedPos := info.Position{X: -3400, Y: 900}
+	opponents[2].SetPositionTime(assignedPos.X, assignedPos.Y, 0, 1)
+
+	state := &DefensePressState{
+		gi:   gi,
+		team: info.Blue,
+		coverOpponent: &coverOpponentSelection{
+			id:       2,
+			assigned: true,
+			managed:  true,
+		},
+	}
+	target := state.coverTarget(ballPos)
+	want := info.Position{
+		X: ballPos.X + (assignedPos.X-ballPos.X)*coverReceiverWeight,
+		Y: ballPos.Y + (assignedPos.Y-ballPos.Y)*coverReceiverWeight,
+	}
+	want.Angle = want.AngleToPosition(ballPos)
+
+	if math.Abs(target.X-want.X) > 1e-9 || math.Abs(target.Y-want.Y) > 1e-9 {
+		t.Fatalf("assigned cover target = %+v, want %+v", target, want)
+	}
+}
+
+func TestCoverTargetParksWhenDangerousOpponentIsNearBall(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	opponents := gi.State.GetOtherTeam(info.Blue)
+	ballPos := info.Position{X: -3500, Y: 0}
+
+	opponents[1].SetPositionTime(
+		ballPos.X+CoverDangerousBallDistance,
+		ballPos.Y,
+		0,
+		1,
+	)
+
+	state := &DefensePressState{gi: gi, team: info.Blue, robotId: 7}
+	want := state.coverParkingPos(ballPos)
+	if got := state.coverTarget(ballPos); got != want {
+		t.Fatalf("cover target = %+v, want parking position %+v", got, want)
+	}
+}
+
+func TestCoverRoleCanKickNearbySlowBall(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.State.SetBlueRobot(3, 0, 0, 0, 1)
+	ballPos := info.Position{X: defenseKickBallDistance - 1, Y: 0}
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+	gi.State.SetTrackedBall(ballPos, info.Position{X: defenseKickMaxBallSpeed}, 1)
+
+	dr := NewDefenseRole(3, ai.ActivityHandler{}, gi, info.Blue)
+	dr.Init()
+	dr.SetRoleKind(DefenseRoleCover)
+	dr.SetMayPlayBall(true)
+
+	if !dr.defenderBallReadyToKick() {
+		t.Fatal("expected Cover to prepare a kick for a nearby slow ball")
+	}
+	if got := dr.kickIntent.GetTargetPosition(); got != defenseKickTarget {
+		t.Fatalf("kick target = %+v, want %+v", got, defenseKickTarget)
+	}
+}
+
+func TestCoverRoleStartsAligningBeforeKick(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.State.SetBlueRobot(3, 0, 0, 0, 1)
+	ballPos := info.Position{X: defenseKickBallDistance - 1}
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)
+
+	activities := [info.TEAM_SIZE]act.Activity{}
+	handler := ai.ActivityHandler{
+		Activities:    &activities,
+		Activity_lock: &sync.Mutex{},
+	}
+	dr := NewDefenseRole(3, handler, gi, info.Blue)
+	dr.Init()
+	dr.SetRoleKind(DefenseRoleCover)
+	dr.SetMayPlayBall(true)
+	dr.Run()
+
+	if got, want := string(dr.sm.CurrentStateName()), "DefenseAlignKick ID 3"; got != want {
+		t.Fatalf("Cover state = %q, want %q", got, want)
+	}
+	if _, ok := activities[3].(*act.AlignBall); !ok {
+		t.Fatalf("Cover activity = %T, want *activity.AlignBall", activities[3])
+	}
+}
+
+func TestLowDefenseStartsAligningBeforeKick(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.State.SetBlueRobot(5, 0, 0, 0, 1)
+	ballPos := info.Position{X: defenseKickBallDistance - 1}
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)
+
+	activities := [info.TEAM_SIZE]act.Activity{}
+	handler := ai.ActivityHandler{
+		Activities:    &activities,
+		Activity_lock: &sync.Mutex{},
+	}
+	dr := NewDefenseRole(5, handler, gi, info.Blue)
+	dr.Init()
+	dr.SetRoleKind(DefenseRoleLow)
+	dr.SetMayPlayBall(true)
+	dr.Run()
+
+	if got, want := string(dr.sm.CurrentStateName()), "DefenseAlignKick ID 5"; got != want {
+		t.Fatalf("Low Def state = %q, want %q", got, want)
+	}
+	if _, ok := activities[5].(*act.AlignBall); !ok {
+		t.Fatalf("Low Def activity = %T, want *activity.AlignBall", activities[5])
+	}
+}
+
+func TestCoverRoleDoesNotKickFarOrFastBall(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.State.SetBlueRobot(3, 0, 0, 0, 1)
+	dr := NewDefenseRole(3, ai.ActivityHandler{}, gi, info.Blue)
+	dr.Init()
+	dr.SetRoleKind(DefenseRoleCover)
+	dr.SetMayPlayBall(true)
+
+	farBall := info.Position{X: defenseKickBallDistance + 1}
+	gi.State.GetBall().SetEstimatedPosition(farBall)
+	gi.State.SetTrackedBall(farBall, info.Position{}, 1)
+	if dr.defenderBallReadyToKick() {
+		t.Fatal("Cover prepared a kick while the ball was too far away")
+	}
+
+	nearBall := info.Position{X: defenseKickBallDistance - 1}
+	gi.State.GetBall().SetEstimatedPosition(nearBall)
+	gi.State.SetTrackedBall(nearBall, info.Position{X: defenseKickMaxBallSpeed + 0.01}, 2)
+	if dr.defenderBallReadyToKick() {
+		t.Fatal("Cover prepared a kick while the ball was moving too quickly")
+	}
+}
+
+func TestCoverRoleCannotKickWithoutBallAssignment(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.State.SetBlueRobot(3, 0, 0, 0, 1)
+	ballPos := info.Position{X: defenseKickBallDistance - 1}
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+	gi.State.SetTrackedBall(ballPos, info.Position{}, 1)
+
+	dr := NewDefenseRole(3, ai.ActivityHandler{}, gi, info.Blue)
+	dr.Init()
+	dr.SetRoleKind(DefenseRoleCover)
+
+	if !dr.CanKickBall() {
+		t.Fatal("expected Cover to be physically able to kick the ball")
+	}
+	if dr.defenderBallReadyToKick() {
+		t.Fatal("Cover prepared a kick without being selected as ball actor")
+	}
+
+	dr.SetMayPlayBall(true)
+	if !dr.defenderBallReadyToKick() {
+		t.Fatal("selected Cover did not prepare a kick")
 	}
 }
 

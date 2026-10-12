@@ -229,7 +229,7 @@ type gameTeamController struct {
 }
 
 func newGameTeamController(team info.Team) *gameTeamController {
-	slowBrain := plan.NewCombinedPlanWithRef(team)
+	slowBrain := plan.NewStaticPlanWithRef(team) // Change to NewCombinedPlanWithRef for dynamic roles
 	manualMovement := plan.NewPlannerManualMovement(team)
 	teamAI := ai.NewAi(team, slowBrain, ai.NewActivityExecutor())
 
