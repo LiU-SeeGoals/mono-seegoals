@@ -2,7 +2,15 @@
 #define __MOTOR_H
 
 #include "stm32h7xx_hal.h"
-#include "data_logging.h"
+
+typedef struct
+{
+    float u;
+    float r;
+    float y;
+    float e;
+} ControlSignal;
+
 // Tick buffer of 100 with 5000hz update is 0.05 second filter on motor
 #define MOTOR_TICK_BUF_SIZE 1
 typedef struct {

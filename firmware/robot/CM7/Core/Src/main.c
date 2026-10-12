@@ -23,8 +23,6 @@
 /* USER CODE BEGIN Includes */
 #include "com.h"
 #include "imu.h"
-#include "imu.pb.h"
-#include "data_logging.h"
 #include "kicker.h"
 #include "log.h"
 #include "motor.h"
@@ -234,7 +232,6 @@ int main(void)
     NAV_Init(&htim7, &htim1, &htim15);
     HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1);
-    DATA_Init(&hspi6);
     KICKER_Init(&htim5, &htim3);
     IMU_Init(&hi2c4);
     STATE_Init();
@@ -266,7 +263,6 @@ int main(void)
 
     HAL_GPIO_WritePin(LED_YELLOW_GPIO_Port, LED_YELLOW_Pin, GPIO_PIN_RESET);
 
-    LOG_INFO("Data sample is %d bytes of max 255\r\n", sizeof(data_sample));
     LOG_INFO("Startup done\r\n");
     COMMON_buzzer_done();
   /* USER CODE END 2 */
@@ -280,13 +276,6 @@ int main(void)
     NAV_StopDribbler();
     float out[3];
     while (1) {
-
-        DATA_log_state(STATE_get_posx(), STATE_get_posy(), STATE_get_robot_angle());
-        if (HAL_GPIO_ReadPin(DATA_NSS_GPIO_Port, DATA_NSS_Pin) == GPIO_PIN_SET)
-        {
-            // When NSS goes high spi transfer ready for another data dump
-            DATA_spi_send();
-        }
 
     /* USER CODE END WHILE */
 

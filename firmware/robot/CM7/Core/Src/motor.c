@@ -1,7 +1,6 @@
 #include "motor.h"
 
 /* Private includes */
-#include "data_logging.h"
 #include "log.h"
 
 /* Private variables */

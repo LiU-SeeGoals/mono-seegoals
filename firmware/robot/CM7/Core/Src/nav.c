@@ -1,7 +1,6 @@
 #include "nav.h"
 #include "common.h"
 #include "kicker.h"
-#include "data_logging.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
 
@@ -135,7 +134,6 @@ void NAV_update_motor_state()
             sigs[i] = MOTOR_SetSpeed(&motors[i], 0, &I_prevs[i]);
         }
     }
-    DATA_log_motor(sigs[0], sigs[1], sigs[2], sigs[3]);
 }
 
 // res is a 3x1 vector
@@ -190,7 +188,6 @@ void NAV_wheelToBody(float* res)
     float v = wrf * m21 + wrb * m22 + wlb * m23 + wlf * m24;
     float w = wrf * m31 + wrb * m32 + wlb * m33 + wlf * m34;
 
-    DATA_log_odometry(u, v, w);
     res[0] = u;
     res[1] = v;
     res[2] = w;
@@ -545,7 +542,6 @@ void NAV_PositionMovementUpdate()
     float x = NAV_GetNavX();
     float y = NAV_GetNavY();
     float w = NAV_GetNavW();
-    DATA_log_imu_data(gyr.x,gyr.y,gyr.z);
 
     POS_go_to_position_lqr(x,y,w);
 }
