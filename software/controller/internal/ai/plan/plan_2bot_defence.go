@@ -102,6 +102,7 @@ func (m *TwoBotDefence) calcWallPositions(attackerPos Position) (Position, Posit
 func (m *TwoBotDefence) run() {
 	activeRobots := []info.ID{5, 6, 7}
 	defenders := make(map[info.ID]*roles.DefenseRole)
+	coverMarking := coverMarkingTracker{}
 
 	gi := <-m.incomingGameInfo
 
@@ -113,6 +114,22 @@ func (m *TwoBotDefence) run() {
 
 	for {
 		gi = <-m.incomingGameInfo
+		coverAssignments := coverMarking.update(&gi, m.team, activeRobots)
+		for id, defender := range defenders {
+			opponentID, assigned := coverAssignments[id]
+			defender.SetCoverOpponent(opponentID, assigned)
+		}
+		setDefenderBallActor(defenders, 0, false)
+		owner := observedBallOwner(&gi)
+		if owner.valid && owner.team == m.team {
+			if _, ok := defenders[owner.id]; ok {
+				setDefenderBallActor(defenders, owner.id, true)
+			}
+		} else if !owner.valid {
+			if defenderID, ok := closestReadyDefenderToBall(&gi, m.team, defenders); ok {
+				setDefenderBallActor(defenders, defenderID, true)
+			}
+		}
 
 		attackerPos, found := m.getAttackerPosition(&gi)
 

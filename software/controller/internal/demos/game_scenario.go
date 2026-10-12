@@ -26,9 +26,6 @@ const (
 	mmToM                              = 1.0 / 1000.0
 )
 
-// Temporary simulator override: place every teleported ball at field center.
-var temporaryBallTeleportTarget = info.Position{X: 0, Y: 0}
-
 func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimControl) {
 
 	ball := gameInfo.State.GetBall()
@@ -48,7 +45,6 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	case info.STATE_HALTED:
 	case info.STATE_STOPPED:
 		if target, ok := refereePlacementTarget(ge, ballPos); ok {
-			target = temporaryBallTeleportTarget
 			// fmt.Printf("teleported ball (%f, %f) (referee placement)\n", target.X, target.Y)
 
 			teleportBallMillimeters(simController, target)
@@ -57,7 +53,6 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 			// Some GameController versions expose the placement position only in
 			// their state store, not in the SSL referee packet. In that case wait
 			// for STOP and use the same field geometry as a compatibility fallback.
-			target = temporaryBallTeleportTarget
 			// fmt.Printf("teleported ball (%f, %f) (derived referee placement)\n", target.X, target.Y)
 			teleportBallMillimeters(simController, target)
 			placementHandled = true
@@ -72,12 +67,10 @@ func handleSimulatedBall(gameInfo *info.GameInfo, simController *simulator.SimCo
 	case info.STATE_PLAYING:
 	case info.STATE_BALL_PLACEMENT:
 		if target, ok := refereePlacementTarget(ge, ballPos); ok {
-			target = temporaryBallTeleportTarget
 			fmt.Printf("teleported ball (%f, %f) (ball placement %s)\n", target.X, target.Y, ge.GetTeamWithPossession())
 			teleportBallMillimeters(simController, target)
 			placementHandled = true
 		} else if target, ok := outsideFieldPlacement(gameInfo, ballPos); ok {
-			target = temporaryBallTeleportTarget
 			fmt.Printf("teleported ball (%f, %f) (derived ball placement)\n", target.X, target.Y)
 			teleportBallMillimeters(simController, target)
 			placementHandled = true
@@ -214,7 +207,6 @@ func penaltyMarkPosition(gameInfo *info.GameInfo, attackingTeam info.Team) (info
 }
 
 func teleportBallMillimeters(simController *simulator.SimControl, pos info.Position) {
-	pos = temporaryBallTeleportTarget
 	simController.TeleportBall(float32(pos.X*mmToM), float32(pos.Y*mmToM))
 }
 
@@ -227,7 +219,7 @@ type gameTeamController struct {
 }
 
 func newGameTeamController(team info.Team) *gameTeamController {
-	slowBrain := plan.NewCombinedPlanWithRef(team)
+	slowBrain := plan.NewStaticPlanWithRef(team) // Change to NewCombinedPlanWithRef for dynamic roles
 	manualMovement := plan.NewPlannerManualMovement(team)
 	teamAI := ai.NewAi(team, slowBrain, ai.NewActivityExecutor())
 

@@ -12,7 +12,6 @@ const (
 	goalieForwardPenaltyAreaFraction = 0.5
 	goalieWaypointGain               = 3.0
 	goalieWaypointMaxDistance        = 1000.0
-	BALL_JITTER_DISTANCE             = 1.0
 	SHOT_THREAT_DISTANCE             = 350.0
 )
 
@@ -222,8 +221,8 @@ func (m *Goalie) GetID() info.ID {
 	return m.id
 }
 
-//Predict the opponent while oppponent is close enough to the ball
-//Returns the opponent that should be treated as the ball possessor
+// threateningOpponent returns the opponent that should be treated as the ball
+// possessor when it is close enough to the ball.
 func threateningOpponent(gi *info.GameInfo, team info.Team, ballPos info.Position) *info.Robot {
 	ball := gi.State.GetBall()
 	if poss := ball.GetPossessor(); poss != nil && poss.GetTeam() != team {
@@ -279,38 +278,12 @@ func predictShotY(opponent info.Position, goalieX float64, goalSize float64, fal
 // It ignores tiny displacements to avoid reacting to jitter, and only returns true
 // when the current ball path intersects the goal mouth.
 func predictBallPathY(ball *info.Ball, goalieX float64, goalSize float64) (float64, bool) {
-	currentPos, currentTime, previousPos, previousTime, err := ball.GetLatestTwoPositionsTime()
-	if err != nil {
+	hit, ok := ball.ProjectTrajectoryToX(goalieX)
+	if !ok {
 		return 0, false
 	}
 
-	dt := float64(currentTime - previousTime)
-	if dt <= 0 {
-		return 0, false
-	}
-
-	dx := currentPos.X - previousPos.X
-	dy := currentPos.Y - previousPos.Y
-	displacement := math.Hypot(dx, dy)
-	if displacement < BALL_JITTER_DISTANCE {
-		return 0, false
-	}
-
-	if math.Abs(dx) < 1e-6 {
-		return 0, false
-	}
-
-	velocityX := dx / dt
-	if math.Abs(velocityX) < 1e-6 {
-		return 0, false
-	}
-
-	t := (goalieX - currentPos.X) / dx
-	if t < 0 {
-		return 0, false
-	}
-
-	yHit := currentPos.Y + t*dy
+	yHit := hit.Y
 	if yHit < -goalSize || yHit > goalSize {
 		return 0, false
 	}

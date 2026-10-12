@@ -2,8 +2,12 @@ package info
 
 import (
 	"container/list"
-	// "fmt"
+	"math"
+)
 
+const (
+	BallTrajectoryMinDisplacement = 1.0
+	BallTrajectoryMaxSampleMillis = int64(250)
 )
 
 type Ball struct {
@@ -69,7 +73,7 @@ func (b *Ball) GetVelocity() Position {
 	return sum_deltas.Scale(1 / float64(count))
 }
 
-func (b *Ball) GetVelocity2() (Vec2, error){
+func (b *Ball) GetVelocity2() (Vec2, error) {
 
 	return b.rawBall.GetVelocity()
 	// if b.history.Len() < 2 {
@@ -94,6 +98,39 @@ func (b *Ball) GetVelocity2() (Vec2, error){
 func (b *Ball) GetLatestTwoPositionsTime() (Position, int64, Position, int64, error) {
 	return b.rawBall.GetLatestTwoPositionsTime()
 }
+
+// ProjectTrajectoryToX treats the two newest ball observations as a ray and
+// returns where that ray crosses targetX. It only projects forward along the
+// measured direction and rejects stale or near-stationary observations.
+func (b *Ball) ProjectTrajectoryToX(targetX float64) (Position, bool) {
+	current, currentTime, previous, previousTime, err := b.GetLatestTwoPositionsTime()
+	if err != nil {
+		return Position{}, false
+	}
+
+	dt := currentTime - previousTime
+	if dt <= 0 || dt > BallTrajectoryMaxSampleMillis {
+		return Position{}, false
+	}
+
+	dx := current.X - previous.X
+	dy := current.Y - previous.Y
+	if math.Hypot(dx, dy) < BallTrajectoryMinDisplacement || math.Abs(dx) < 1e-6 {
+		return Position{}, false
+	}
+
+	t := (targetX - current.X) / dx
+	if t < 0 {
+		return Position{}, false
+	}
+
+	return Position{
+		X: targetX,
+		Y: current.Y + t*dy,
+		Z: current.Z,
+	}, true
+}
+
 type BallDTO struct {
 	PosX float64
 	PosY float64

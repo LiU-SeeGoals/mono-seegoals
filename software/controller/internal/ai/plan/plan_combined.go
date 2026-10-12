@@ -20,6 +20,7 @@ import (
 type CombinedPlan struct {
 	plannerCore
 	ballTouchRestrictedRobot atomic.Uint32
+	staticSlots              map[info.ID]tacticalSlotKind
 }
 
 type tacticalMode string
@@ -38,7 +39,6 @@ const (
 	goalWallYClamp           = 1200.0
 	goalWallSpacing          = 240.0
 	highDefenderBallOffset   = 900.0
-	lowDefenderDepth         = 3600.0
 )
 
 type roleKind string
@@ -102,6 +102,7 @@ type combinedRoleManager struct {
 	roleByRobot     map[info.ID]roleKind
 	slotByRobot     map[info.ID]tacticalSlotKind
 	lastChanged     map[info.ID]time.Time
+	coverMarking    coverMarkingTracker
 }
 
 func newCombinedRoleManager(activityHandler *coreai.ActivityHandler, gi *GameInfo, team Team) *combinedRoleManager {
@@ -321,6 +322,65 @@ func (rm *combinedRoleManager) configureOffenseReceivers(receiverIDs []info.ID) 
 	}
 }
 
+func setDefenderBallActor(defenders map[info.ID]*roles.DefenseRole, actorID info.ID, hasActor bool) {
+	for id, defender := range defenders {
+		defender.SetMayPlayBall(hasActor && id == actorID)
+	}
+}
+
+func closestReadyDefenderToBall(
+	gi *GameInfo,
+	team Team,
+	defenders map[info.ID]*roles.DefenseRole,
+) (info.ID, bool) {
+	if gi == nil || gi.State == nil {
+		return 0, false
+	}
+	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
+	if err != nil {
+		return 0, false
+	}
+
+	closestID := info.ID(0)
+	closestDistance := math.Inf(1)
+	found := false
+	for id, defender := range defenders {
+		if !defender.CanKickBall() {
+			continue
+		}
+		robotPos, err := gi.State.GetRobotPosition(team, id)
+		if err != nil {
+			continue
+		}
+		distance := robotPos.Dist2d(ballPos)
+		if !found || distance < closestDistance || (distance == closestDistance && id < closestID) {
+			closestID = id
+			closestDistance = distance
+			found = true
+		}
+	}
+	return closestID, found
+}
+
+func robotIsCloserToBall(gi *GameInfo, team Team, candidateID, currentID info.ID) bool {
+	if gi == nil || gi.State == nil {
+		return false
+	}
+	ballPos, err := gi.State.GetBall().GetEstimatedPosition()
+	if err != nil {
+		return false
+	}
+	candidatePos, err := gi.State.GetRobotPosition(team, candidateID)
+	if err != nil {
+		return false
+	}
+	currentPos, err := gi.State.GetRobotPosition(team, currentID)
+	if err != nil {
+		return true
+	}
+	return candidatePos.Dist2d(ballPos) < currentPos.Dist2d(ballPos)
+}
+
 func NewCombinedPlan(team Team) *CombinedPlan {
 	return &CombinedPlan{
 		plannerCore: plannerCore{team: team},
@@ -452,6 +512,13 @@ func withoutRobot(robots []info.ID, excluded info.ID) []info.ID {
 }
 
 func (m *CombinedPlan) chooseGoalie(gi *GameInfo, activeRobots []info.ID) (info.ID, bool) {
+	if m.staticSlots != nil {
+		if containsRobot(activeRobots, preferredGoalieID) {
+			return preferredGoalieID, true
+		}
+		return 0, false
+	}
+
 	if gi != nil && gi.Status != nil {
 		teamInfo := gi.Status.GetTeamInfo(m.team == info.Yellow)
 		if teamInfo != nil {
@@ -645,16 +712,6 @@ func (m *CombinedPlan) highDefenderTarget(gi *GameInfo, ballPos Position) Positi
 	return target
 }
 
-func (m *CombinedPlan) lowDefenderTarget(gi *GameInfo, ballPos Position) Position {
-	target := Position{
-		X: m.defenseXSign(gi) * lowDefenderDepth,
-		Y: clampFloat(ballPos.Y, -goalWallYClamp, goalWallYClamp),
-		Z: 0,
-	}
-	target.Angle = target.AngleToPosition(ballPos)
-	return target
-}
-
 func (m *CombinedPlan) targetForTacticalSlot(gi *GameInfo, slot tacticalSlotKind) Position {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 
@@ -667,7 +724,7 @@ func (m *CombinedPlan) targetForTacticalSlot(gi *GameInfo, slot tacticalSlotKind
 	case tacticalSlotDefenderHigh:
 		return m.highDefenderTarget(gi, ballPos)
 	case tacticalSlotDefenderLow:
-		return m.lowDefenderTarget(gi, ballPos)
+		return roles.LowDefenderTarget(gi, m.team, ballPos, 0)
 	}
 
 	return ballPos
@@ -710,6 +767,16 @@ func (m *CombinedPlan) assignTacticalSlots(
 		available = withoutRobot(available, id)
 	}
 
+	return assignments
+}
+
+func (m *CombinedPlan) configuredStaticSlots(robots []info.ID) map[info.ID]tacticalSlotKind {
+	assignments := make(map[info.ID]tacticalSlotKind)
+	for _, id := range robots {
+		if slot, configured := m.staticSlots[id]; configured {
+			assignments[id] = slot
+		}
+	}
 	return assignments
 }
 
@@ -807,9 +874,12 @@ func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
 	}
 
 	wallRobots := roleManager.idsForSlot(tacticalSlotDefenderWall)
+	coverAssignments := roleManager.coverMarking.update(gi, m.team, wallRobots)
 	wallPositions := m.calcGoalWallPositionsForRobots(gi, threatPos, len(wallRobots))
 	for i, id := range wallRobots {
 		if defender, ok := roleManager.defenders[id]; ok {
+			opponentID, assigned := coverAssignments[id]
+			defender.SetCoverOpponent(opponentID, assigned)
 			defender.SetWallPosition(wallPositions[i])
 			defender.TriggerEvent("ATTACKER_NEAR")
 		}
@@ -894,16 +964,24 @@ func (m *CombinedPlan) run() {
 			mode = stableMode(mode, desiredMode, &candidateMode, &candidateModeSince, tickStart)
 		}
 
-		assignment := roleAssignmentForMode(len(fieldRobots), mode)
-		slotAssignments := m.assignTacticalSlots(
-			&gi,
-			fieldRobots,
-			assignment,
-			possession.owner,
-			restrictedRobot,
-			hasRestrictedRobot,
-		)
+		var slotAssignments map[info.ID]tacticalSlotKind
+		if m.staticSlots != nil {
+			slotAssignments = m.configuredStaticSlots(fieldRobots)
+		} else {
+			assignment := roleAssignmentForMode(len(fieldRobots), mode)
+			slotAssignments = m.assignTacticalSlots(
+				&gi,
+				fieldRobots,
+				assignment,
+				possession.owner,
+				restrictedRobot,
+				hasRestrictedRobot,
+			)
+		}
 		roleManager.applySlotAssignments(slotAssignments, tickStart)
+		// Ball access is opt-in on every frame. It is granted below to at most
+		// one defender, after possession and the Chaser have been considered.
+		setDefenderBallActor(roleManager.defenders, 0, false)
 		if hasRestrictedRobot {
 			if restrictedAttacker, ok := roleManager.attackers[restrictedRobot]; ok {
 				restrictedAttacker.TriggerEvent("BALL_LOST")
@@ -957,6 +1035,36 @@ func (m *CombinedPlan) run() {
 			(!rawOwner.valid || rawOwner.team != m.team) &&
 			(ballMoving || !ownerRetained)
 		ownerMayPlayBall := !hasRestrictedRobot || possession.owner.id != restrictedRobot
+		handledByNonOffense := false
+		if !passInFlight && possession.owner.valid && possession.owner.team == m.team && ownerMayPlayBall {
+			ownerID := possession.owner.id
+			if _, ok := roleManager.defenders[ownerID]; ok {
+				setDefenderBallActor(roleManager.defenders, ownerID, true)
+				handledByNonOffense = true
+				hasActiveReceiver = false
+				actorTracker.switchTo(roleManager.attackers, noOffenseBallActor())
+			} else if goalieRole != nil && ownerID == goalieID {
+				handledByNonOffense = true
+				hasActiveReceiver = false
+				actorTracker.switchTo(roleManager.attackers, noOffenseBallActor())
+			}
+		}
+
+		// For a genuinely loose ball, a nearby Cover/Low defender may take over
+		// only when it is closer than the Chaser. An observed owner must never be
+		// mistaken for a loose ball during the possession debounce.
+		ballIsLoose := !possession.owner.valid && !rawOwner.valid
+		if !handledByNonOffense && !passInFlight && ballIsLoose {
+			if defenderID, ok := closestReadyDefenderToBall(&gi, m.team, roleManager.defenders); ok {
+				defenderShouldTakeBall := !hasChaser || robotIsCloserToBall(&gi, m.team, defenderID, chaserID)
+				if defenderShouldTakeBall {
+					setDefenderBallActor(roleManager.defenders, defenderID, true)
+					handledByNonOffense = true
+					actorTracker.switchTo(roleManager.attackers, noOffenseBallActor())
+				}
+			}
+		}
+
 		if !passInFlight && possession.owner.valid && possession.owner.team == m.team && ownerMayPlayBall {
 			ownerID := possession.owner.id
 			owner, ok := roleManager.attackers[ownerID]
@@ -979,7 +1087,7 @@ func (m *CombinedPlan) run() {
 			}
 		}
 
-		if !handledByOffense {
+		if !handledByOffense && !handledByNonOffense {
 			if passInFlight {
 				actorTracker.switchTo(roleManager.attackers, newOffenseBallActor(activeReceiver, offenseBallActorReceiver))
 			} else {
