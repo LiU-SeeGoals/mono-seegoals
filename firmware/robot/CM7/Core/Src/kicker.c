@@ -3,7 +3,9 @@
 /* Private includes */
 #include "common.h"
 #include "log.h"
+#include "stm32h7xx_hal_spi.h"
 #include <stdbool.h>
+#include <stdint.h>
 
 /* Private defines */
 // ...
@@ -21,6 +23,7 @@ static volatile bool charging = false;
 static volatile bool kicking = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
 static TIM_HandleTypeDef* htim_kicker_kick;
+static SPI_HandleTypeDef* hspi5_kicker;
 static volatile KickerMode kickerMode;
 
 /*
@@ -32,11 +35,12 @@ int get_charge_us(KickerSpeed kickSpeed);
 /*
  * Public functions implementations
  */
-void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick)
+void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, SPI_HandleTypeDef* hspi5)
 {
     LOG_InitModule(&internal_log_mod, "KICKER", LOG_LEVEL_INFO, 0);
     htim_kicker_charge = htim_charge;
     htim_kicker_kick = htim_kick;
+    hspi5_kicker = hspi5;
 
     htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
     htim_kicker_charge->Instance->EGR = TIM_EGR_UG;
@@ -138,6 +142,38 @@ void KICKER_KickSafe()
 }
 
 KICKER_Settings* KICKER_GetSettings() { return &settings; }
+
+int KICKER_Get_Voltage_Charge(void)
+{
+
+    LOG_Printf(&internal_log_mod, LOG_LEVEL_DEBUG, "Start getter of voltage charge %d\r\n");
+
+    uint8_t tx[2] = {0x00, 0x00};
+    uint8_t rx[2] = {0};
+
+    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port,
+                      KICKER_CS_Pin,
+                      GPIO_PIN_RESET);
+
+    HAL_SPI_TransmitReceive(hspi5_kicker,
+                            tx,
+                            rx,
+                            2,
+                            HAL_MAX_DELAY);
+
+    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port,
+                      KICKER_CS_Pin,
+                      GPIO_PIN_SET);
+
+    uint16_t adc = ((uint16_t)rx[0] << 8) | rx[1];
+
+    adc &= 0x0FFF;
+
+    LOG_Printf(&internal_log_mod, LOG_LEVEL_DEBUG, "ADC value from kicker_board: %d\r\n", adc);
+
+    return 0;
+}
+
 
 /*
    Private function implementation

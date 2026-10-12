@@ -32,6 +32,7 @@
 #include "pos_follow.h"
 #include "common.h"
 #include "state_estimator.h"
+#include "stm32h755xx.h"
 #include "stm32h7xx_hal_gpio.h"
 #include "stm32h7xx_it.h"
 #include "ui.h"
@@ -238,7 +239,7 @@ int main(void)
     HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1);
     DATA_Init(&hspi6);
-    KICKER_Init(&htim5, &htim3);
+    KICKER_Init(&htim5, &htim3, &hspi5);
     IMU_Init(&hi2c4);
     STATE_Init();
     UI_Init(&huart3);

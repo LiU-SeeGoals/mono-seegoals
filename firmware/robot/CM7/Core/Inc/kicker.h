@@ -29,7 +29,7 @@ typedef enum
  * Initalize the kicker subsystem.
  * Curently initializes the log module
  */
-void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick);
+void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, SPI_HandleTypeDef* hspi5);
 
 /**
  *
@@ -59,5 +59,11 @@ void KICKER_SetKickerMode(KickerMode mode);
  * Returns a reference to the current kicker settings.
  */
 KICKER_Settings* KICKER_GetSettings();
+
+/**
+ * @brief Sends on SPI to get ADC convert value of charge and converts into volts
+ * @return The charge in volts
+ */
+int KICKER_Get_Voltage_Charge();
 
 #endif /* KICKER_H */
