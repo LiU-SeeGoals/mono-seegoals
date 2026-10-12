@@ -147,7 +147,7 @@ KICKER_Settings* KICKER_GetSettings() { return &settings; }
 
 int KICKER_Get_Voltage_Charge(void)
 {
-    uint8_t tx[2] = {0x00, 0x00};
+    uint8_t tx[2] = {0x08, 0x00};
     uint8_t rx[2] = {0};
 
     HAL_GPIO_WritePin(KICKER_CS_GPIO_Port,
@@ -166,17 +166,16 @@ int KICKER_Get_Voltage_Charge(void)
 
     uint16_t adc = ((uint16_t)rx[0] << 8) | rx[1];
 
-    adc &= 0x0FFF;
-
-    LOG_Printf(&internal_log_mod, LOG_LEVEL_DEBUG, "ADC value from kicker_board: %d\r\n", adc);
+    LOG_Printf(&internal_log_mod, LOG_LEVEL_INFO, "ADC: %d\r\n", adc);
 
     float adc_voltage_complex = KICKER_ADC_To_Voltage_Complex(adc);
     float adc_voltage_simple = KICKER_ADC_To_Voltage_Simple(adc);
 
+    /*
     LOG_Printf(&internal_log_mod,
-         LOG_LEVEL_DEBUG,
+         LOG_LEVEL_INFO,
           "Comparison of the SIMPLE and COMPLEX ADC to Volt functions: %d \t %d \r\n", adc_voltage_simple, adc_voltage_complex);
-
+    */
     return 0;
 }
 
