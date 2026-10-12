@@ -31,6 +31,8 @@ static volatile KickerMode kickerMode;
  */
 
 int get_charge_us(KickerSpeed kickSpeed);
+float KICKER_ADC_To_Voltage_Complex(uint16_t adc);
+float KICKER_ADC_To_Voltage_Simple(uint16_t adc);
 
 /*
  * Public functions implementations
@@ -145,9 +147,6 @@ KICKER_Settings* KICKER_GetSettings() { return &settings; }
 
 int KICKER_Get_Voltage_Charge(void)
 {
-
-    LOG_Printf(&internal_log_mod, LOG_LEVEL_DEBUG, "Start getter of voltage charge %d\r\n");
-
     uint8_t tx[2] = {0x00, 0x00};
     uint8_t rx[2] = {0};
 
@@ -171,9 +170,27 @@ int KICKER_Get_Voltage_Charge(void)
 
     LOG_Printf(&internal_log_mod, LOG_LEVEL_DEBUG, "ADC value from kicker_board: %d\r\n", adc);
 
+    float adc_voltage_complex = KICKER_ADC_To_Voltage_Complex(adc);
+    float adc_voltage_simple = KICKER_ADC_To_Voltage_Simple(adc);
+
+    LOG_Printf(&internal_log_mod,
+         LOG_LEVEL_DEBUG,
+          "Comparison of the SIMPLE and COMPLEX ADC to Volt functions: %d \t %d \r\n", adc_voltage_simple, adc_voltage_complex);
+
     return 0;
 }
 
+float KICKER_ADC_To_Voltage_Complex(uint16_t adc)
+{
+    float adc_voltage = ((float)adc * 3.3f) / 4095.0f;
+
+    return adc_voltage * ((10000000.0f + 133000.0f) / 133000.0f);
+}
+
+float KICKER_ADC_To_Voltage_Simple(uint16_t adc)
+{
+    return ((float)adc * 251.0f) / 4095.0f;
+}
 
 /*
    Private function implementation
