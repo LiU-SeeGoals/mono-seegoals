@@ -64,6 +64,6 @@ KICKER_Settings* KICKER_GetSettings();
  * @brief Sends on SPI to get ADC convert value of charge and converts into volts
  * @return The charge in volts
  */
-int KICKER_Get_Voltage_Charge();
+int KICKER_Get_ADC_Charge();
 
 #endif /* KICKER_H */

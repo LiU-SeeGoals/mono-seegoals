@@ -14,6 +14,8 @@
 #define KICK_STRAIGHT_GOAL_US 450000
 #define KICK_CHIP_PASS_US 650000
 
+#define KICKER_BOARD_ADC_CODE 0x80
+
 /* Private variables */
 // Kicker tuning Chip discharge: 650000. Kicker tuning straight discharge: 650000
 // Kicker tuning straight goal kick: 350000. kicker straight pass: 250000
@@ -145,51 +147,23 @@ void KICKER_KickSafe()
 
 KICKER_Settings* KICKER_GetSettings() { return &settings; }
 
-int KICKER_Get_Voltage_Charge(void)
+int KICKER_Get_ADC_Charge(void)
 {
-    uint8_t tx[2] = {0x08, 0x00};
+    // One byte at a time. Total amount to send is 2 bytes over SPI.
+    uint8_t tx[2] = {KICKER_BOARD_ADC_CODE, 0x00};
     uint8_t rx[2] = {0};
 
-    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port,
-                      KICKER_CS_Pin,
-                      GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_RESET);
 
-    HAL_SPI_TransmitReceive(hspi5_kicker,
-                            tx,
-                            rx,
-                            2,
-                            HAL_MAX_DELAY);
+    HAL_SPI_TransmitReceive(hspi5_kicker, tx, rx, 2, HAL_MAX_DELAY);
 
-    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port,
-                      KICKER_CS_Pin,
-                      GPIO_PIN_SET);
+    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_SET);
 
     uint16_t adc = ((uint16_t)rx[0] << 8) | rx[1];
 
-    LOG_Printf(&internal_log_mod, LOG_LEVEL_INFO, "ADC: %d\r\n", adc);
-
-    float adc_voltage_complex = KICKER_ADC_To_Voltage_Complex(adc);
-    float adc_voltage_simple = KICKER_ADC_To_Voltage_Simple(adc);
-
-    /*
-    LOG_Printf(&internal_log_mod,
-         LOG_LEVEL_INFO,
-          "Comparison of the SIMPLE and COMPLEX ADC to Volt functions: %d \t %d \r\n", adc_voltage_simple, adc_voltage_complex);
-    */
     return 0;
 }
 
-float KICKER_ADC_To_Voltage_Complex(uint16_t adc)
-{
-    float adc_voltage = ((float)adc * 3.3f) / 4095.0f;
-
-    return adc_voltage * ((10000000.0f + 133000.0f) / 133000.0f);
-}
-
-float KICKER_ADC_To_Voltage_Simple(uint16_t adc)
-{
-    return ((float)adc * 251.0f) / 4095.0f;
-}
 
 /*
    Private function implementation
@@ -214,3 +188,14 @@ int get_charge_us(KickerSpeed kickSpeed)
     return charge_us;
 }
 
+float KICKER_ADC_To_Voltage_Complex(uint16_t adc)
+{
+    float adc_voltage = ((float) adc * 3.3f) / 4095.0f;
+
+    return adc_voltage * ((10000000.0f + 133000.0f) / 133000.0f);
+}
+
+float KICKER_ADC_To_Voltage_Simple(uint16_t adc)
+{
+    return ((float) adc * 251.0f) / 4095.0f;
+}

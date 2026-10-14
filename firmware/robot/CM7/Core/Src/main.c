@@ -157,7 +157,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     }
 
     if (htim->Instance == TIM6) {
-        KICKER_Get_Voltage_Charge();
+        KICKER_Get_ADC_Charge();
     }
 
     /* USER CODE BEGIN Callback 1 */
