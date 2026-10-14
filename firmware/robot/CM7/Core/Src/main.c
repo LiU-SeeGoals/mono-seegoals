@@ -135,8 +135,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 
     /* USER CODE END Callback 0 */
     if (htim->Instance == TIM5) {
-        KICKER_ChargeStop();
-        KICKER_KickStart();
+        KICKER_ChargeComplete();
     }
 
     if (htim->Instance == TIM3) {
@@ -254,6 +253,9 @@ int main(void)
         KICKER_KickSafe();
         HAL_Delay(40);
     }
+
+    // Keep the kicker charged so kicks can be fired on request.
+    KICKER_ChargeStart();
 
     STATE_calibrate_imu_gyr();
     HAL_TIM_Base_Start_IT(&htim12);

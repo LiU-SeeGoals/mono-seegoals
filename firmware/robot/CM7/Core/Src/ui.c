@@ -330,24 +330,25 @@ void parse_key()
         }
     } else if (current_state == state_kicker) {
         switch (key) {
-        case 'D':
+        case 'D': {
             LOG_UI("Discharging\r\n");
-            KICKER_KickStart();
+            KICKER_SetKickConfig(KICKER_STRAIGHT, KICKER_SPEED_DEFAULT, false);
+            KICKER_Status status = KICKER_KickStart();
+            LOG_UI("Status: %i\r\n", status);
             break;
+        }
         case 'S':
             LOG_UI("Straight kicking\r\n");
-            KICKER_SetKickerMode(KICKER_STRAIGHT);
-            KICKER_ChargeStart(KICKER_SPEED_DEFAULT);
+            KICKER_SetKickConfig(KICKER_STRAIGHT, KICKER_SPEED_STRAIGHT_GOAL, false);
             break;
         case 'C':
             LOG_UI("Chipper kicking\r\n");
-            KICKER_SetKickerMode(KICKER_CHIPPER);
-            KICKER_ChargeStart(KICKER_SPEED_CHIP_PASS);
+            KICKER_SetKickConfig(KICKER_CHIPPER, KICKER_SPEED_CHIP_PASS, false);
             break;
         case 'P': // Print vars
         {
             KICKER_Settings* set = KICKER_GetSettings();
-            LOG_UI("Max charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us);
+            LOG_UI("Max charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\nStatus: %i\r\nCharged: %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us, KICKER_GetStatus(), KICKER_IsCharged());
         } break;
         case 'E': // Edit vars
             current_state = state_kicker_edit;

@@ -276,8 +276,6 @@ void NAV_EnableMovement() { robot_cmd.movement_enabled = 1; }
 
 void NAV_HandleCommand(RobotCommand* cmd)
 {
-    KickerSpeed kickerSpeed = KICKER_SPEED_DEFAULT;
-
     switch (cmd->action_type) {
     case ACTION_TYPE_STOP:
         NAV_DisableMovement();
@@ -303,32 +301,32 @@ void NAV_HandleCommand(RobotCommand* cmd)
     } break;
     case ACTION_TYPE_ROTATE:
         break;
-    case ACTION_TYPE_KICK:
+    case ACTION_TYPE_KICK: {
+        KickerSpeed kickerSpeed = KICKER_SPEED_STRAIGHT_GOAL;
+        KickerMode mode = KICKER_STRAIGHT;
 
-        // First bit is set -> hard/soft kick
-        // if second bit -> chip/straight kick mode
-        if(check_bit(cmd->kick_speed, 0u))
-        {
-            kickerSpeed = KICKER_SPEED_STRAIGHT_PASS;
-        }
-        else
-        {
-            kickerSpeed = KICKER_SPEED_STRAIGHT_GOAL;
-        }
-
-        if(check_bit(cmd->kick_speed, 1u))
-        {
-            KICKER_SetKickerMode(KICKER_CHIPPER);
+        // 2nd bit -> chip/straight kick mode
+        if (check_bit(cmd->kick_speed, 1u)) {
+            mode = KICKER_CHIPPER;
             kickerSpeed = KICKER_SPEED_CHIP_PASS;
-        }
-        else
-        {
-            KICKER_SetKickerMode(KICKER_STRAIGHT);
+        } else {
+            // 1st bit set -> soft pass, else hard goal kick
+            if (check_bit(cmd->kick_speed, 0u)) {
+                kickerSpeed = KICKER_SPEED_STRAIGHT_PASS;
+            } else {
+                kickerSpeed = KICKER_SPEED_STRAIGHT_GOAL;
+            }
         }
 
-        KICKER_ChargeStart(kickerSpeed);
+        KICKER_SetKickConfig(mode, kickerSpeed, false);
+
+        KICKER_Status status = KICKER_KickStart();
+        if (status != KICKER_STATUS_OK) {
+            LOG_WARNING("Kick rejected (mode=%i speed=%i status=%i)\r\n", mode, kickerSpeed, status);
+        }
+
         NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
-        break;
+    } break;
     default:
         LOG_ERROR("Not known command: %i\r\n", cmd->action_type);
         break;
