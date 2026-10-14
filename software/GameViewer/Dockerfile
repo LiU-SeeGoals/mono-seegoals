@@ -8,7 +8,7 @@ WORKDIR /var/GameViewer
 RUN apt-get update && apt-get install -y git
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9
 
 COPY .bash_history /root/.bash_history
 # Copy package.json and pnpm-lock.yaml to the working directory

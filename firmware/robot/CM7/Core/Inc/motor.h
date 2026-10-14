@@ -4,7 +4,7 @@
 #include "stm32h7xx_hal.h"
 #include "data_logging.h"
 // Tick buffer of 100 with 5000hz update is 0.05 second filter on motor
-#define MOTOR_TICK_BUF_SIZE 50
+#define MOTOR_TICK_BUF_SIZE 1
 typedef struct {
     TIM_HandleTypeDef* pwm_htim;
     uint32_t channel;

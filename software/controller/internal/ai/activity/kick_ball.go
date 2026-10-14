@@ -234,7 +234,7 @@ func kickBallImpactReady(forward, lateral, headingErr, leadDist float64) bool {
 func kickFirmwareLeadDist(robot *info.Robot) float64 {
 	if robot == nil {
 		return kickFirmwareLeadDistForSpeed(kickAssumedFinalSpeed)
-	}
+	}	
 	robotPos, err := robot.GetPosition()
 	if err != nil {
 		return kickFirmwareLeadDistForSpeed(kickAssumedFinalSpeed)

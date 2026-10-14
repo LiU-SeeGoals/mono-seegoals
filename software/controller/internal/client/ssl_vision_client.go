@@ -94,7 +94,7 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 		angle := float64(robot.GetOrientation())
 		//fmt.Println("Robot", robot.GetRobotId(), "x:", x, "y:", y, "angle:", angle)
 
-		gi.State.SetBlueRobot(robot.GetRobotId(), x, y, angle, play_time)
+		gi.State.SetRobotFromVision(info.Blue, robot.GetRobotId(), info.Position{X: x, Y: y, Angle: angle}, play_time, detect.GetTCapture())
 	}
 
 	for _, robot := range detect.GetRobotsYellow() {
@@ -102,7 +102,7 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 		x := float64(robot.GetX())
 		y := float64(robot.GetY())
 		angle := float64(robot.GetOrientation())
-		gi.State.SetYellowRobot(robot.GetRobotId(), x, y, angle, play_time)
+		gi.State.SetRobotFromVision(info.Yellow, robot.GetRobotId(), info.Position{X: x, Y: y, Angle: angle}, play_time, detect.GetTCapture())
 
 	}
 

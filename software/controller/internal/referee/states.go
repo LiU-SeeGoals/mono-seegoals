@@ -8,6 +8,7 @@ import (
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
 	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/roles"
@@ -41,7 +42,7 @@ const (
 	kickoffFieldMarginMM           = 300.0
 	kickoffKickTargetDistanceMM    = 1000.0
 	kickoffPrepareDistanceMM       = 500.0
-	freeKickPrepareDistanceMM      = 550.0
+	freeKickPrepareDistanceMM      = pathplanner.StopBallKeepoutRadius + 50.0
 	freeKickWallDistanceMM         = 700.0
 	freeKickWallSpacingMM          = 300.0
 	freeKickWallRobotCount         = 3
@@ -386,7 +387,7 @@ func (s *FreeKick) Initialize() {
 		kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kickerID))
 		kickName := StateName(fmt.Sprintf("Kick ID %d", kickerID))
 		freeKick := FreeKickIntent{gi: s.gi, team: s.team, id: kickerID}
-		prepareKick := &roles.AlignState{Ctx: &freeKick, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
+		prepareKick := &roles.AlignState{Ctx: &freeKick, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickPrepareName, ActivityHandler: s.activityHandler, PlanApproach: true}
 		kick := &roles.KickState{Ctx: &freeKick, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickName, ActivityHandler: s.activityHandler}
 
 		s.freeKick = NewStateMachine(prepareKick)
@@ -615,6 +616,9 @@ type RefereeHandler struct {
 	stateInfos                    []*RefereeInfo
 	activityHandler               *ai.ActivityHandler
 	kickoffTouchRestriction       kickoffTouchRestriction
+	lastCommand                   info.RefCommand
+	lastCommandTimestamp          uint64
+	commandSeen                   bool
 }
 
 func KickoffMaxTime(division info.Division) time.Duration {
@@ -1385,7 +1389,7 @@ func selectFreeKickKicker(
 }
 
 func freeKickPreparationBallPosition(gi *info.GameInfo, gameEvent *info.GameEvent) info.Position {
-	if gameEvent != nil && gameEvent.CurrentState == info.STATE_BALL_PLACEMENT {
+	if gameEvent.IsPlacementStop() {
 		if designatedPosition := gameEvent.GetDesignatedPosition(); designatedPosition != nil && designatedPosition.Len() >= 2 {
 			return info.Position{X: designatedPosition.AtVec(0), Y: designatedPosition.AtVec(1)}
 		}
@@ -1912,6 +1916,20 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	refereeSM.AddTransition(uninitialized.GetName(), FREE_KICK, freeKick)
 	refereeSM.AddTransition(uninitialized.GetName(), BALL_PLACEMENT, ballPlacement)
 
+	// A multicast receiver can miss an intermediate STOP. Honor explicit new
+	// commands from every state; HandleReferee deduplicates repeated packets.
+	for _, from := range []StateName{"UNINITIALIZED", "HALT", "STOP", "TIMEOUT", "BALLPLACEMENT",
+		"PREPAREKICKOFF", "PREPAREPENALTY", "KICKOFF", "PENALTY", "FREEKICK", "RUNNING"} {
+		refereeSM.AddTransition(from, STOP, stop)
+		refereeSM.AddTransition(from, HALT, halt)
+		refereeSM.AddTransition(from, TIMEOUT, timeout)
+		refereeSM.AddTransition(from, FORCE_START, running)
+		refereeSM.AddTransition(from, FREE_KICK, freeKick)
+		refereeSM.AddTransition(from, BALL_PLACEMENT, ballPlacement)
+		refereeSM.AddTransition(from, PREPARE_KICKOFF, prepareKickoff)
+		refereeSM.AddTransition(from, PREPARE_PENALTY, preparePenalty)
+	}
+
 	return &RefereeHandler{
 		gi:              gi,
 		refereeSM:       refereeSM,
@@ -1972,8 +1990,14 @@ func (s *RefereeHandler) HandleReferee() bool {
 	// Appendix B: Game States https://robocup-ssl.github.io/ssl-rules/sslrules.html
 
 	gameEvent := s.gi.Status.GetGameEvent()
-	refEvent := s.refEventForGameEvent(gameEvent)
-	s.refereeSM.TriggerEvent(EventName(refEvent))
+	if !s.commandSeen || s.lastCommand != gameEvent.RefCommand ||
+		s.lastCommandTimestamp != gameEvent.CommandTimestamp {
+		refEvent := s.refEventForGameEvent(gameEvent)
+		s.refereeSM.TriggerEvent(EventName(refEvent))
+		s.lastCommand = gameEvent.RefCommand
+		s.lastCommandTimestamp = gameEvent.CommandTimestamp
+		s.commandSeen = true
+	}
 
 	stateBeforeUpdate := s.refereeSM.CurrentStateName()
 	if stateBeforeUpdate != "RUNNING" && stateBeforeUpdate != "KICKOFF" {

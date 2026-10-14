@@ -5,7 +5,7 @@ import GameViewer from './components/gameViewer/GameViewer';
 import { useSSLVision } from './hooks/useSSLVision';
 import { useAIController } from './hooks/useAIController';
 import { useGameController } from './hooks/useGameController.ts';
-import { SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
+
 import { parseProto } from './helper/ParseProto';
 import { parseJson } from './helper/ParseJson';
 
@@ -18,12 +18,16 @@ import {
   getDefaultLog,
   getDefaultVisibleRobots,
 } from './helper/defaultValues';
+import { SSLGeometryFieldSize as SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
 
 function fotballFieldClick(event){
 
 }
 
 function App() {
+  const [visionSource, setVisionSource] = useState<'raw' | 'tigers'>(() =>
+    localStorage.getItem('visionSource') === 'raw' ? 'raw' : 'tigers');
+  useEffect(() => { localStorage.setItem('visionSource', visionSource); }, [visionSource]);
   const [sslFieldUpdate, setSSLFieldUpdate] = useState(getDefaultSSLFieldUpdate());
   const [aiRobotUpdate, setAIUpdate] = useState(getDefaultAIRobotUpdate());
   const [robotActions, setRobotActions] = useState(getDefaultActions());
@@ -40,7 +44,8 @@ function App() {
   const { isConnected: isConnectedToVision } = useSSLVision(
     setSSLFieldUpdate,
     setErrorOverlay,
-    setFieldGeometry
+    setFieldGeometry,
+    visionSource
   );
 
   const { isConnected: isConnectedToAI, controllerSend } = useAIController(setRobotActions, setRobotRoles);
@@ -53,6 +58,8 @@ function App() {
   return (
     <div className="app-container">
       <Sidebar
+        visionSource={visionSource}
+        setVisionSource={setVisionSource}
         vectorSettingBlue={vectorSettingBlue}
         setVectorSettingBlue={setVectorSettingBlue}
         vectorSettingYellow={vectorSettingYellow}

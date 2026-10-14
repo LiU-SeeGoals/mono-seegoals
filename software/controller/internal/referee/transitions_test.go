@@ -55,3 +55,35 @@ func TestPenaltyTimeoutReturnsToStop(t *testing.T) {
 		t.Fatal("expired penalty did not return both referee representations to STOP")
 	}
 }
+
+func TestFreeKickStartsWithoutStopAndRepeatedPacketDoesNotRestartIt(t *testing.T) {
+	gi := info.NewGameInfo(10)
+	gi.State.SetBall(0, 0, 0, 1)
+	var activities [info.TEAM_SIZE]activity.Activity
+	handler := &coreai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
+	ref := NewRefereeHandler(gi, nil, info.Blue, handler)
+	ge := gi.Status.GetGameEvent()
+	ge.UpdateFromRefCommand(info.FORCE_START, 100, 0, 0, info.UNINITIALIZED, 0, false)
+	ref.HandleReferee()
+	ge.UpdateFromRefCommand(info.DIRECT_FREE_BLUE, 200, 0, 0, info.UNINITIALIZED, 10_000_000, true)
+	ref.HandleReferee()
+	if ref.refereeSM.CurrentStateName() != "FREEKICK" {
+		t.Fatal("free kick ignored after RUNNING without an intermediate STOP")
+	}
+	started := ref.freeKick.freeKickStart
+	ref.HandleReferee()
+	if ref.freeKick.freeKickStart != started {
+		t.Fatal("repeat command reset free-kick initialization")
+	}
+	ge.SetBallMoved()
+	ref.refereeSM.TriggerEvent(GAME_RUNNING_DETECTED)
+	ref.HandleReferee()
+	if ref.refereeSM.CurrentStateName() != "RUNNING" {
+		t.Fatal("old free-kick command restarted a completed restart")
+	}
+	ge.UpdateFromRefCommand(info.DIRECT_FREE_BLUE, 300, 0, 0, info.UNINITIALIZED, 10_000_000, true)
+	ref.HandleReferee()
+	if ref.refereeSM.CurrentStateName() != "FREEKICK" {
+		t.Fatal("new command of the same type was ignored")
+	}
+}

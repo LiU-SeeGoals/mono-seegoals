@@ -71,6 +71,15 @@ func (r *Robot) DribblerPos() Position {
 	return robotPos
 }
 
+func (r *Robot) HeldBallPos() Position {
+	robotPos, _ := r.GetPosition()
+	reach := Center2DribblerDist + BallRadius
+	return Position{
+		X: robotPos.X + reach*math.Cos(robotPos.Angle),
+		Y: robotPos.Y + reach*math.Sin(robotPos.Angle),
+	}
+}
+
 func BallLocalOffset(robotPos Position, ballPos Position) (forward float64, lateral float64) {
 	dx := ballPos.X - robotPos.X
 	dy := ballPos.Y - robotPos.Y

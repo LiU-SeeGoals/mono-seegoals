@@ -281,77 +281,82 @@ func (ge *GameEvent) UpdateFromRefCommandWithDesignatedPosition(
 
 	ge.PreviousState = ge.CurrentState
 
-	switch refCommand {
-	case HALT:
-		ge.CurrentState = STATE_HALTED
-		// TeamWithPossession will remain as is
-		ge.BallInPlay = false
+	if newCommand {
+		switch refCommand {
+		case HALT:
+			ge.CurrentState = STATE_HALTED
+			// TeamWithPossession will remain as is
+			ge.BallInPlay = false
 
-	case STOP:
-		ge.CurrentState = STATE_STOPPED
-		// Keep the previous team possession when going to STOP
-		ge.BallInPlay = false
+		case STOP:
+			ge.CurrentState = STATE_STOPPED
+			// Keep the previous team possession when going to STOP
+			ge.BallInPlay = false
 
-	case NORMAL_START:
-		// Keep the prepared restart state. The ball only enters play after it
-		// moved 50mm or the action timer expires.
+		case NORMAL_START:
+			// Keep the prepared restart state. The ball only enters play after it
+			// moved 50mm or the action timer expires.
 
-	case FORCE_START:
-		ge.CurrentState = STATE_PLAYING
-		// TeamWithPossession will be ignored in PLAYING state
-		ge.BallInPlay = true
+		case FORCE_START:
+			ge.CurrentState = STATE_PLAYING
+			// TeamWithPossession will be ignored in PLAYING state
+			ge.BallInPlay = true
 
-	case PREPARE_KICKOFF_YELLOW:
-		ge.CurrentState = STATE_KICKOFF_PREPARATION
-		ge.TeamWithPossession = Yellow
-		ge.BallInPlay = false
-
-	case PREPARE_KICKOFF_BLUE:
-		ge.CurrentState = STATE_KICKOFF_PREPARATION
-		ge.TeamWithPossession = Blue
-		ge.BallInPlay = false
-
-	case PREPARE_PENALTY_YELLOW:
-		ge.CurrentState = STATE_PENALTY_PREPARATION
-		ge.TeamWithPossession = Yellow
-		ge.BallInPlay = false
-
-	case PREPARE_PENALTY_BLUE:
-		ge.CurrentState = STATE_PENALTY_PREPARATION
-		ge.TeamWithPossession = Blue
-		ge.BallInPlay = false
-
-	case DIRECT_FREE_YELLOW, INDIRECT_FREE_YELLOW:
-		ge.CurrentState = STATE_FREE_KICK
-		ge.TeamWithPossession = Yellow
-		ge.BallInPlay = false
-
-	case DIRECT_FREE_BLUE, INDIRECT_FREE_BLUE:
-		ge.CurrentState = STATE_FREE_KICK
-		ge.TeamWithPossession = Blue
-		ge.BallInPlay = false
-
-	case TIMEOUT_YELLOW, TIMEOUT_BLUE:
-		ge.CurrentState = STATE_TIMEOUT
-		if refCommand == TIMEOUT_YELLOW {
+		case PREPARE_KICKOFF_YELLOW:
+			ge.CurrentState = STATE_KICKOFF_PREPARATION
 			ge.TeamWithPossession = Yellow
-		} else {
+			ge.BallInPlay = false
+
+		case PREPARE_KICKOFF_BLUE:
+			ge.CurrentState = STATE_KICKOFF_PREPARATION
 			ge.TeamWithPossession = Blue
+			ge.BallInPlay = false
+
+		case PREPARE_PENALTY_YELLOW:
+			ge.CurrentState = STATE_PENALTY_PREPARATION
+			ge.TeamWithPossession = Yellow
+			ge.BallInPlay = false
+
+		case PREPARE_PENALTY_BLUE:
+			ge.CurrentState = STATE_PENALTY_PREPARATION
+			ge.TeamWithPossession = Blue
+			ge.BallInPlay = false
+
+		case DIRECT_FREE_YELLOW, INDIRECT_FREE_YELLOW:
+			ge.CurrentState = STATE_FREE_KICK
+			ge.TeamWithPossession = Yellow
+			ge.BallInPlay = false
+
+		case DIRECT_FREE_BLUE, INDIRECT_FREE_BLUE:
+			ge.CurrentState = STATE_FREE_KICK
+			ge.TeamWithPossession = Blue
+			ge.BallInPlay = false
+
+		case TIMEOUT_YELLOW, TIMEOUT_BLUE:
+			ge.CurrentState = STATE_TIMEOUT
+			if refCommand == TIMEOUT_YELLOW {
+				ge.TeamWithPossession = Yellow
+			} else {
+				ge.TeamWithPossession = Blue
+			}
+			ge.BallInPlay = false
+
+		case BALL_PLACEMENT_YELLOW:
+			ge.CurrentState = STATE_BALL_PLACEMENT
+			ge.TeamWithPossession = Yellow
+			ge.BallInPlay = false
+
+		case BALL_PLACEMENT_BLUE:
+			ge.CurrentState = STATE_BALL_PLACEMENT
+			ge.TeamWithPossession = Blue
+			ge.BallInPlay = false
 		}
-		ge.BallInPlay = false
-
-	case BALL_PLACEMENT_YELLOW:
-		ge.CurrentState = STATE_BALL_PLACEMENT
-		ge.TeamWithPossession = Yellow
-		ge.BallInPlay = false
-
-	case BALL_PLACEMENT_BLUE:
-		ge.CurrentState = STATE_BALL_PLACEMENT
-		ge.TeamWithPossession = Blue
-		ge.BallInPlay = false
 	}
 
-	if ge.CurrentActionTimedOut() {
+	// Preparation timers are not permission to kick. Only an issued start or
+	// free-kick command can time out into open play.
+	_, freeKickCommand := refCommand.FreeKickTeam()
+	if ge.CurrentActionTimedOut() && (freeKickCommand || refCommand == NORMAL_START) {
 		ge.SetBallMoved()
 	}
 
@@ -365,6 +370,11 @@ func isBallPlacementRefCommand(command RefCommand) bool {
 func (ge *GameEvent) GetCurrentState() RefState {
 	// Check for timeouts and update state if needed
 	return ge.CurrentState
+}
+
+// IsPlacementStop applies to both teams while a restart is being prepared.
+func (ge *GameEvent) IsPlacementStop() bool {
+	return ge != nil && (ge.CurrentState == STATE_STOPPED || ge.CurrentState == STATE_BALL_PLACEMENT)
 }
 
 func (ge *GameEvent) GetPreviousState() RefState {

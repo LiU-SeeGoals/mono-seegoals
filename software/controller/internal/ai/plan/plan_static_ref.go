@@ -14,7 +14,6 @@ import (
 type StaticPlanWithRef struct {
 	plannerCore
 	normalPlan      *StaticPlan
-	normalIncoming  chan info.GameInfo
 	refereeHandler  *referee.RefereeHandler
 	currentGameInfo info.GameInfo
 }
@@ -27,30 +26,26 @@ func NewStaticPlanWithRef(team info.Team) *StaticPlanWithRef {
 }
 
 func (m *StaticPlanWithRef) Init(
-	incoming <-chan info.GameInfo,
 	activities *[info.TEAM_SIZE]act.Activity,
 	lock *sync.Mutex,
 	team info.Team,
 ) {
-	m.incomingGameInfo = incoming
 	m.ActivityHandler.Activities = activities
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.Active = true
-	m.normalIncoming = make(chan info.GameInfo)
 	if m.normalPlan == nil {
 		m.normalPlan = NewStaticPlan(team)
 	}
 
-	m.normalPlan.Init(m.normalIncoming, activities, lock, team)
-	go m.run()
+	m.normalPlan.Init(activities, lock, team)
 }
 
-func (m *StaticPlanWithRef) run() {
-	for m.Active {
-		gi := <-m.incomingGameInfo
-		m.routeFrame(gi)
+func (m *StaticPlanWithRef) Tick(gi *info.GameInfo) {
+	if !m.Active || gi == nil {
+		return
 	}
+	m.routeFrame(*gi)
 }
 
 func (m *StaticPlanWithRef) routeFrame(gi info.GameInfo) bool {
@@ -60,7 +55,7 @@ func (m *StaticPlanWithRef) routeFrame(gi info.GameInfo) bool {
 		return false
 	}
 
-	m.normalIncoming <- m.currentGameInfo
+	m.normalPlan.Tick(&m.currentGameInfo)
 	return true
 }
 

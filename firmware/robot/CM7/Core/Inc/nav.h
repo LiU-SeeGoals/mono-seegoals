@@ -5,6 +5,7 @@
  * Public includes
  */
 #include "main.h"
+#include "robot_command.h"
 #include <robot_action.pb-c.h>
 
 // Which positions robot should go to, sent by AI dudes
@@ -16,6 +17,12 @@ typedef struct {
     uint8_t movement_enabled;
     uint8_t panic;
 } robot_nav_command;
+
+typedef enum
+{
+    NAV_VELOCITY_MOVEMENT,
+    NAV_POSITION_MOVEMENT,
+} MovementType;
 
 typedef enum
 {
@@ -58,12 +65,17 @@ void NAV_Stop();
  *
  * @param cmd Command to be executed
  */
-void NAV_HandleCommand(Command* cmd);
+void NAV_HandleCommand(RobotCommand* cmd);
 
 /**
  * Disables the pwm output to the motors.
  */
 void NAV_StopMovement();
+
+void NAV_MovementUpdate();
+
+void NAV_PositionMovementUpdate();
+void NAV_VelocityMovementUpdate();
 
 /**
  * Set robot speed to one unit forward
@@ -111,7 +123,7 @@ void NAV_wheelToBody(float* res);
 /**
  * Sets the robot_cmd to move to the desired position
  */
-void NAV_GoToAction(Command* command);
+void NAV_GoToAction(RobotCommand* command);
 
 /**
  * Returns flag for nav panic, 1 if paniced 0 if not.
@@ -145,6 +157,10 @@ float NAV_GetNavX();
  * Get the goal y position
  */
 float NAV_GetNavY();
+
+void NAV_SetMovementType(MovementType type);
+
+void NAV_SetMovement(RobotCommand* cmd, MovementType movementType);
 
 /**
  * Get the goal w rotation

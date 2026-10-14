@@ -7,6 +7,8 @@ import RobotTable from './robotTable/RobotTable';
 import { Action } from '../../types/Action';
 
 interface SidebarProps {
+  visionSource: 'raw' | 'tigers';
+  setVisionSource: (source: 'raw' | 'tigers') => void;
   vectorSettingBlue: boolean[];
   setVectorSettingBlue: React.Dispatch<React.SetStateAction<boolean[]>>;
   vectorSettingYellow: boolean[];
@@ -24,6 +26,8 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
+  visionSource,
+  setVisionSource,
   vectorSettingBlue,
   setVectorSettingBlue,
   vectorSettingYellow,
@@ -65,6 +69,15 @@ const Sidebar: React.FC<SidebarProps> = ({
             <hr />
 
             <div style={{ padding: '10px 15px' }}>
+              <label style={{ display: 'block', marginBottom: 12 }}>
+                Vision source
+                <select aria-label="Vision source" value={visionSource}
+                  onChange={(event) => setVisionSource(event.target.value as 'raw' | 'tigers')}
+                  style={{ display: 'block', width: '100%', marginTop: 6 }}>
+                  <option value="tigers">Tigers filter</option>
+                  <option value="raw">Raw SSL Vision</option>
+                </select>
+              </label>
               <div style={{ marginBottom: "10px" }}>Connection status</div>
 
               <div style={{
@@ -80,7 +93,7 @@ const Sidebar: React.FC<SidebarProps> = ({
                   backgroundColor: isConnectedToVision ? '#4CAF50' : '#f44336',
                   boxShadow: isConnectedToVision ? '0 0 8px #4CAF50' : 'none'
                 }} />
-                <span style={{ fontSize: '14px' }}>SSL Vision</span>
+                <span style={{ fontSize: '14px' }}>{visionSource === 'tigers' ? 'Tigers filter' : 'SSL Vision'}</span>
               </div>
 
               <div style={{

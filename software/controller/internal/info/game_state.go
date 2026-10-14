@@ -36,6 +36,26 @@ type GameState struct {
 
 	MessageReceived int64
 	Timestamp       float64
+	rawCapture      captureOrder
+	trackedCapture  captureOrder
+}
+
+type captureOrder struct {
+	blue, yellow [TEAM_SIZE]float64
+}
+
+const maxCaptureRewindS = 1.0
+
+func (c *captureOrder) accept(team Team, robotId uint32, capture float64) bool {
+	latest := &c.blue[robotId]
+	if team == Yellow {
+		latest = &c.yellow[robotId]
+	}
+	if capture > 0 && *latest > capture && *latest-capture < maxCaptureRewindS {
+		return false
+	}
+	*latest = capture
+	return true
 }
 
 func NewGameState(capacity int) *GameState {
@@ -103,14 +123,59 @@ func (gs *GameState) Update() {
 		// robot.Update()
 	}
 
-	latestBallPos, _ := gs.Ball.GetPosition()
 	newPossessor := gs.FindBallPossessor()
 	gs.Ball.SetPossessor(newPossessor)
 
-	// if gs.Ball.GetAge() < 50 { // Have a new ball measurement,  WARN: Magic number
-	// fmt.Println("New ball measurement")
-	gs.Ball.SetEstimatedPosition(latestBallPos)
-	// }
+	gs.updateBallEstimate(gs.MessageReceived)
+}
+
+func (gs *GameState) updateBallEstimate(now int64) {
+	lastSeen, seenAt, err := gs.Ball.GetPositionTime()
+	if err != nil {
+		return
+	}
+	if now-seenAt <= BallUnseenAfterMs {
+		gs.Ball.setEstimate(lastSeen, BallObserved, nil)
+		return
+	}
+
+	_, holder := gs.Ball.GetEstimateKind()
+	if holder == nil || !robotSeenSince(holder, now-holderUnseenAfterMs) {
+		holder = gs.hiddenBallHolder(lastSeen, now)
+	}
+	if holder == nil {
+		gs.Ball.setEstimate(lastSeen, BallUnseen, nil)
+		return
+	}
+	gs.Ball.setEstimate(holder.HeldBallPos(), BallInDribbler, holder)
+}
+
+func (gs *GameState) hiddenBallHolder(lastSeen Position, now int64) *Robot {
+	var holder *Robot
+	bestDist := math.Inf(1)
+	for _, team := range []*RobotTeam{gs.Blue_team, gs.Yellow_team} {
+		for _, robot := range team {
+			if !robotSeenSince(robot, now-holderUnseenAfterMs) {
+				continue
+			}
+			robotPos, _ := robot.GetPosition()
+			forward, lateral := BallLocalOffset(robotPos, lastSeen)
+			if forward <= 0 || forward > dribblerReachForward || math.Abs(lateral) > DribblerHalfWidth {
+				continue
+			}
+			heldPos := robot.HeldBallPos()
+			if dist := heldPos.Dist2d(lastSeen); dist < bestDist {
+				bestDist = dist
+				holder = robot
+			}
+		}
+	}
+	return holder
+}
+
+func robotSeenSince(robot *Robot, since int64) bool {
+	_, seenAt, err := robot.GetPositionTime()
+	return err == nil && seenAt >= since
 }
 
 func (gs *GameState) FindBallPossessor() *Robot {
@@ -167,11 +232,30 @@ func (gs *GameState) SetBlueRobot(robotId uint32, x, y, angle float64, time int6
 	gs.Blue_team[robotId].SetPositionTime(x, y, angle, time)
 }
 
-func (gs *GameState) SetRobotFromTracked(team Team, robotId uint32, pos Position, time int64, replaceTime int64) {
-	if robotId >= uint32(TEAM_SIZE) {
+// SetRobotFromVision keeps robot positions in observation-time order even when
+// camera packets from different sources arrive out of order.
+func (gs *GameState) SetRobotFromVision(team Team, robotId uint32, pos Position, time int64, capture float64) {
+	if robotId >= uint32(TEAM_SIZE) || (team != Yellow && team != Blue) {
 		return
 	}
+	if !gs.rawCapture.accept(team, robotId, capture) {
+		return
+	}
+	switch team {
+	case Yellow:
+		gs.SetYellowRobot(robotId, pos.X, pos.Y, pos.Angle, time)
+	case Blue:
+		gs.SetBlueRobot(robotId, pos.X, pos.Y, pos.Angle, time)
+	}
+}
 
+func (gs *GameState) SetRobotFromTracked(team Team, robotId uint32, pos Position, time int64, replaceTime int64, capture float64) {
+	if robotId >= uint32(TEAM_SIZE) || (team != Yellow && team != Blue) {
+		return
+	}
+	if !gs.trackedCapture.accept(team, robotId, capture) {
+		return
+	}
 	switch team {
 	case Yellow:
 		gs.Yellow_team[robotId].SetOrReplacePositionTime(pos.X, pos.Y, pos.Angle, time, replaceTime)

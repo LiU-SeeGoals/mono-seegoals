@@ -12,7 +12,6 @@ import (
 type CombinedPlanWithRef struct {
 	plannerCore
 	normalPlan      *CombinedPlan
-	normalIncoming  chan info.GameInfo
 	refereeHandler  *referee.RefereeHandler
 	currentGameInfo info.GameInfo
 }
@@ -25,30 +24,26 @@ func NewCombinedPlanWithRef(team info.Team) *CombinedPlanWithRef {
 }
 
 func (m *CombinedPlanWithRef) Init(
-	incoming <-chan info.GameInfo,
 	activities *[info.TEAM_SIZE]act.Activity,
 	lock *sync.Mutex,
 	team info.Team,
 ) {
-	m.incomingGameInfo = incoming
 	m.ActivityHandler.Activities = activities
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
 	m.Active = true
-	m.normalIncoming = make(chan info.GameInfo)
 	if m.normalPlan == nil {
 		m.normalPlan = NewCombinedPlan(team)
 	}
 
-	m.normalPlan.Init(m.normalIncoming, activities, lock, team)
-	go m.run()
+	m.normalPlan.Init(activities, lock, team)
 }
 
-func (m *CombinedPlanWithRef) run() {
-	for m.Active {
-		gi := <-m.incomingGameInfo
-		m.routeFrame(gi)
+func (m *CombinedPlanWithRef) Tick(gi *info.GameInfo) {
+	if !m.Active {
+		return
 	}
+	m.routeFrame(*gi)
 }
 
 func (m *CombinedPlanWithRef) routeFrame(gi info.GameInfo) bool {
@@ -58,7 +53,7 @@ func (m *CombinedPlanWithRef) routeFrame(gi info.GameInfo) bool {
 		return false
 	}
 
-	m.normalIncoming <- m.currentGameInfo
+	m.normalPlan.Tick(&m.currentGameInfo)
 	return true
 }
 

@@ -1,56 +1,70 @@
 import { useEffect, useState } from 'react';
-import { parseProto } from '../helper/ParseProto';
 import { SSLFieldUpdate } from '../types/SSLFieldUpdate';
-import { SSL_GeometryFieldSize } from '../proto/ssl_vision_geometry';
+import { SSLGeometryFieldSize } from '../proto/ssl_vision_geometry';
+import { SSLWrapperPacket } from '../proto/ssl_wrapper';
 
 export const useSSLVision = (
   setSSLFieldUpdate: React.Dispatch<React.SetStateAction<SSLFieldUpdate>>,
   setErrorOverlay: React.Dispatch<React.SetStateAction<string | undefined>>,
-  setFieldGeometry: React.Dispatch<React.SetStateAction<SSL_GeometryFieldSize | null>>
+  setFieldGeometry: React.Dispatch<React.SetStateAction<SSLGeometryFieldSize | null>>,
+  source: 'raw' | 'tigers' = 'tigers'
 ) => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    const vision_ws_addr = import.meta.env.VITE_SSL_VISION_WS_ADDR;
-    const vision_ws_port = import.meta.env.VITE_SSL_VISION_WS_PORT;
-    console.log(`[useSSLVision.ts] connecting to ws://${vision_ws_addr}:${vision_ws_port}`);
-
-    const ws = new WebSocket(`ws://${vision_ws_addr}:${vision_ws_port}/`);
-    ws.binaryType = 'arraybuffer';
-
-    ws.onopen = () => {
+    let disposed = false;
+    let socket: WebSocket;
+    let retry: ReturnType<typeof setTimeout>;
+    let expiry: ReturnType<typeof setTimeout>;
+    const clearDetections = () => {
+      setSSLFieldUpdate({ balls: [], robotsBlue: [], robotsYellow: [] });
+      setIsConnected(false);
+    };
+    const acceptFrame = (update: SSLFieldUpdate) => {
+      clearTimeout(expiry);
+      setSSLFieldUpdate(update);
       setIsConnected(true);
-      console.log(`[useSSLVision.ts] connected on ${ws.url}`);
-
+      setErrorOverlay(undefined);
+      expiry = setTimeout(clearDetections, 1000);
     };
-
-    ws.onerror = (err) => {
-      setIsConnected(false);
-      console.error(`[useSSLVision.ts] error: ${err}`)
-    };
-
-    ws.onclose = () => {
-      setIsConnected(false);
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        if (!event.data) return;
-        const buffer = new Uint8Array(event.data);
-        if (!buffer) {
-          console.error('Expected ArrayBuffer, got', typeof event.data);
-          return;
+    clearDetections();
+    const connect = () => {
+      const addr = import.meta.env.VITE_SSL_VISION_WS_ADDR || window.location.hostname;
+      const port = import.meta.env.VITE_SSL_VISION_WS_PORT || 3000;
+      socket = new WebSocket(`ws://${addr}:${port}/?source=${source}`);
+      socket.binaryType = 'arraybuffer';
+      socket.onmessage = (event) => {
+        if (disposed) return;
+        try {
+          if (typeof event.data === 'string') {
+            const message = JSON.parse(event.data);
+            if (source === 'tigers' && message.type === 'tracked') acceptFrame(message.update);
+          } else {
+            const packet = SSLWrapperPacket.decode(new Uint8Array(event.data));
+            if (packet.geometry?.field) setFieldGeometry(packet.geometry.field);
+            if (source === 'raw' && packet.detection) acceptFrame(packet.detection);
+          }
+        } catch (error) {
+          setErrorOverlay('Error parsing vision data');
+          console.error(error);
         }
-        parseProto(buffer, setSSLFieldUpdate, setErrorOverlay, setFieldGeometry);
-      } catch (e) {
-        console.error('Error parsing message JSON', e);
-      }
+      };
+      socket.onerror = () => socket.close();
+      socket.onclose = () => {
+        if (disposed) return;
+        clearTimeout(expiry);
+        clearDetections();
+        retry = setTimeout(connect, 1000);
+      };
     };
-
+    connect();
     return () => {
-      ws.close();
+      disposed = true;
+      clearTimeout(retry);
+      clearTimeout(expiry);
+      socket.close();
     };
-  }, [setSSLFieldUpdate, setErrorOverlay, setFieldGeometry]);
+  }, [setSSLFieldUpdate, setErrorOverlay, setFieldGeometry, source]);
 
   return { isConnected };
 };

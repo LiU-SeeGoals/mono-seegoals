@@ -132,3 +132,23 @@ func TestStopReplacesQueuedCommandsForItsRobot(t *testing.T) {
 		t.Fatalf("STOP did not replace stale commands: %v", client.queue)
 	}
 }
+
+func TestNewMotionDropsOnlyOlderUnsentMotionForSameRobot(t *testing.T) {
+	client := &BaseStationClient{hasBeenInited: true}
+	client.SendActions([]action.Action{
+		&action.MoveTo{Id: 1, Dest: info.Position{X: 100}},
+		&action.MoveTo{Id: 2, Dest: info.Position{X: 200}},
+		&action.Kick{Id: 1, KickSpeed: 3},
+	})
+	client.SendActions([]action.Action{&action.MoveTo{Id: 1, Dest: info.Position{X: 300}}})
+
+	if len(client.queue) != 3 {
+		t.Fatalf("expected other robot motion, kick, and latest motion; got %v", client.queue)
+	}
+	if client.queue[0].GetRobotId() != 2 ||
+		client.queue[1].GetCommandId() != robot_action.ActionType_KICK_ACTION ||
+		client.queue[2].GetRobotId() != 1 ||
+		client.queue[2].GetDest().GetX() != 300 {
+		t.Fatalf("unexpected command order or latest destination: %v", client.queue)
+	}
+}

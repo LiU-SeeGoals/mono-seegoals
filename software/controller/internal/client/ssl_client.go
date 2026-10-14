@@ -1,15 +1,18 @@
 package client
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	"time"
 )
 
 type SSLClient struct {
-	vision        *SSLVisionClient
-	referee       *SSLRefereeClient
-	lastDetection time.Time
+	vision           *SSLVisionClient
+	referee          *SSLRefereeClient
+	lastDetection    time.Time
+	lastTimingReport [16]time.Time
 }
 
 const visionTimeout = 250 * time.Millisecond
@@ -50,6 +53,11 @@ func (client *SSLClient) WaitForVision(gi *info.GameInfo) bool {
 			client.vision.handlePacket(packet, ok, gi, time.Now().UnixMilli())
 			if packet.GetDetection() != nil {
 				client.lastDetection = time.Now()
+				detection := packet.GetDetection()
+				cameraID := detection.GetCameraId()
+				if cameraID < uint32(len(client.lastTimingReport)) {
+					reportVisionTiming(fmt.Sprintf("raw camera %d", cameraID), detection.GetTCapture(), detection.GetTSent(), &client.lastTimingReport[cameraID])
+				}
 			}
 		} else {
 			client.vision.ssl_channel = nil

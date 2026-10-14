@@ -423,7 +423,7 @@ func requiredBallKeepoutRadius(team info.Team, gi *info.GameInfo) (float64, bool
 	}
 
 	switch gameEvent.CurrentState {
-	case info.STATE_STOPPED:
+	case info.STATE_STOPPED, info.STATE_BALL_PLACEMENT:
 		return StopBallKeepoutRadius, true
 	case info.STATE_FREE_KICK, info.STATE_KICKOFF_PREPARATION:
 		return RestartBallKeepoutRadius, gameEvent.TeamWithPossession != team
@@ -865,6 +865,13 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoalline
 	if ballRadius, ok := ballObstacleRadius(team, avoidBall, gi); ok {
 		ballPos, _ := gi.State.Ball.GetPosition()
 		obstacles = append(obstacles, Obstacle{Position: ballPos, Size: ballRadius})
+		if ge := gi.Status.GetGameEvent(); ge.IsPlacementStop() && ge.GetDesignatedPosition() != nil {
+			pos := ge.GetDesignatedPosition()
+			target := info.Position{X: pos.AtVec(0), Y: pos.AtVec(1)}
+			if target.Dist2d(ballPos) > 1 {
+				obstacles = append(obstacles, Obstacle{Position: target, Size: ballRadius})
+			}
+		}
 	}
 
 	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Blue), team, id)

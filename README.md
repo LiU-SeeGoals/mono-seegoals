@@ -50,7 +50,7 @@ export PATH="$PATH:PATH_TO_MONO_SEEGOALS_REPOSITORY"
 
 If you're not using bash, then update the corresponding *rc* file for your shell (if you're unsure what you're using, you're using bash).
 
-3. Then restart your shell and you should have all commands available needed to continue, test by writing `sg-start --help` from your home folder, you should see the text `as if...` printed in your terminal.
+3. Then restart your shell and you should have all commands available needed to continue. Test by writing `sg-start --help` from your home folder; it should list the available configurations.
 
 ### Running the project (simulation)
 The command `sg-start` is used to start different environments for developing, you can see all available setups by simply running `sg-start` from anywhere.
@@ -73,6 +73,11 @@ If you want to try out the project on the field in the lab, then:
 1. Make sure the basestation is powered up and connected to the switch that fetdatorn is connected to.
 2. From fetdatorn, run the fetdatorn configuration available on `sg-start`, press up arrow and run the controller program.
 3. Go to our [GameViewer](http://localhost:5173) from fetdatorn to see that everything seems to work.
+
+To use the new `ssl-vision-processor`, follow the one-time build instructions in
+the [scripts startup guide](scripts/README.md), then run
+`sg-start --vision-processor` (menu option 8). `sg-kill` stops both the processor
+service and the containers.
 
 Debugging:
 - Check that the `BASESTATION_ADDR` within `./environment.ini` is the same as the address the basesation reports `sg-fw serial /dev/serial/by-id/BASESATION_ID`.

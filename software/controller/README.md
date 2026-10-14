@@ -97,7 +97,7 @@ The AI consists of a slow decision pipeline (slowBrain) and a fast decision pipe
 
 
 #### Communication
-The AI communicates using channels. The AI component sends the gamestate to the slowBrain and fastBrain via channels. The fastBrain acts on the current gameplan and sends actions to the client. The slowBrain sends a new gameplan to the fastBrain when a new strategy is decided. One can think of the slowBrain as interrupting the fastBrain when a new strategy is needed, but the fastBrain is responsible for real-time decisions based on the current gameplan and gamestate.
+Each control frame, the AI first runs the slowBrain (planner) on the control loop goroutine, then sends the gamestate to the fastBrain (activity executor) over a channel and waits for its actions. The planner and executor share the gamestate and activity objects, so they must never run at the same time; the planner therefore has no goroutine of its own. The planner updates the activities that the executor turns into actions in the same frame, and the executor is responsible for real-time decisions such as collision avoidance and referee safety limits.
 
 
 ### WebServer
@@ -128,6 +128,19 @@ Following are the most important environment variables:
 * `GC_PUBLISH_PORT` - publish port used by game controller
 * `WEB_VISION_UI_PORT` - port on host machine for SSL vision UI when running docker
 * `WEB_GC_UI_PORT` - port on host machine for game controller UI when running docker
+
+### Vision timing diagnosis
+
+Start the controller process with `SEEGOALS_VISION_TIMING=1` in its environment
+to print one timing sample per second for each raw camera and the tracked stream.
+`age` is the time from the frame timestamp to controller receipt. For raw
+frames, `processor` is `t_sent - t_capture`; `after-send` is the remaining time
+up to controller receipt. The values print to tenths of a millisecond, so
+`after-send=0.0ms` can mean a small nonzero delay. Tracked `age` is measured
+when the control loop consumes the packet; it includes tracker processing and
+any wait for a raw frame. These age values require synchronized host clocks.
+The camera's own exposure, network, and decoder delay before OpenCV returns a
+frame is not included in `processor` and needs a physical motion or flash test.
 
 <!-- ## Docker environment
 The docker environment should be used for local development. It uses sim to simulate the game.

@@ -18,6 +18,8 @@ services:
     ports:
       - "${VITE_AI_GAME_VIEWER_SOCKET_PORT}:${VITE_AI_GAME_VIEWER_SOCKET_PORT}"
     command: tail -f /dev/null
+    devices:
+      - /dev/input:/dev/input
 
   game-viewer:
     platform: linux/amd64

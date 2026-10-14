@@ -2,6 +2,30 @@ package info
 
 import "testing"
 
+func TestRepeatedFreeKickPacketPreservesBallInPlay(t *testing.T) {
+	ge := NewGameEvent()
+	ge.UpdateFromRefCommand(DIRECT_FREE_BLUE, 100, 0, 0, UNINITIALIZED, 10_000_000, true)
+	ge.SetBallMoved()
+	ge.UpdateFromRefCommand(DIRECT_FREE_BLUE, 100, 0, 0, UNINITIALIZED, 9_000_000, true)
+	if !ge.BallInPlay || ge.CurrentState != STATE_PLAYING {
+		t.Fatal("repeat packet reset a completed restart")
+	}
+	ge.UpdateFromRefCommand(DIRECT_FREE_BLUE, 200, 0, 0, UNINITIALIZED, 10_000_000, true)
+	if ge.BallInPlay || ge.CurrentState != STATE_FREE_KICK {
+		t.Fatal("new free kick did not start a fresh restart")
+	}
+}
+
+func TestPreparationTimeoutDoesNotStartPlay(t *testing.T) {
+	for _, command := range []RefCommand{PREPARE_KICKOFF_BLUE, PREPARE_PENALTY_YELLOW} {
+		ge := NewGameEvent()
+		ge.UpdateFromRefCommand(command, 100, 0, 0, UNINITIALIZED, 0, true)
+		if ge.BallInPlay || ge.CurrentState == STATE_PLAYING {
+			t.Fatalf("%v timer incorrectly started play", command)
+		}
+	}
+}
+
 func TestNewGameEventHasNoAnnouncedNextCommand(t *testing.T) {
 	if got := NewGameEvent().NextCommand; got != UNINITIALIZED {
 		t.Fatalf("new game event next command = %s, want uninitialized", got)
