@@ -14,7 +14,8 @@
 #define KICK_STRAIGHT_GOAL_US 450000
 #define KICK_CHIP_PASS_US 650000
 
-#define KICKER_BOARD_ADC_CODE 0x80
+#define KICKER_BOARD_ADC_CODE 0x08
+#define KICKER_BOARD_SPI_SIZE 2
 
 /* Private variables */
 // Kicker tuning Chip discharge: 650000. Kicker tuning straight discharge: 650000
@@ -27,6 +28,15 @@ static TIM_HandleTypeDef* htim_kicker_charge;
 static TIM_HandleTypeDef* htim_kicker_kick;
 static SPI_HandleTypeDef* hspi5_kicker;
 static volatile KickerMode kickerMode;
+
+static uint8_t kicker_spi_tx[KICKER_BOARD_SPI_SIZE] = {KICKER_BOARD_ADC_CODE, 0x00};
+static uint8_t kicker_spi_rx[KICKER_BOARD_SPI_SIZE];
+
+static volatile bool kicker_spi_busy = false;
+static volatile bool kicker_adc_ready = false;
+
+static volatile uint16_t kicker_adc_value = 0;
+static volatile float kicker_voltage = 0.0f;
 
 /*
  * Private function declaration
@@ -45,6 +55,14 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
     htim_kicker_charge = htim_charge;
     htim_kicker_kick = htim_kick;
     hspi5_kicker = hspi5;
+
+    kicker_spi_busy = false;
+    kicker_adc_ready = false;
+    kicker_adc_value = 0;
+    kicker_voltage = 0.0f;
+
+    // CS actie low start at high
+    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_SET);
 
     htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
     htim_kicker_charge->Instance->EGR = TIM_EGR_UG;
@@ -147,23 +165,105 @@ void KICKER_KickSafe()
 
 KICKER_Settings* KICKER_GetSettings() { return &settings; }
 
-int KICKER_Get_ADC_Charge(void)
+int KICKER_StartVoltageMeasurement(void)
 {
-    // One byte at a time. Total amount to send is 2 bytes over SPI.
-    uint8_t tx[2] = {KICKER_BOARD_ADC_CODE, 0x00};
-    uint8_t rx[2] = {0};
+    if (kicker_spi_busy)
+    {
+        return 1;
+    }
 
+    // If the SPI5 is busy then don't try to use it
+    if (HAL_SPI_GetState(hspi5_kicker) != HAL_SPI_STATE_READY)
+    {
+        return 1;
+    }
+
+    kicker_spi_busy = true;
+
+    // The message needs to be reset as well since it has gotten whatever the adc is
+    kicker_spi_tx[0] = KICKER_BOARD_ADC_CODE;
+    kicker_spi_tx[1] = 0x00;
+
+    // Activate the chip by putting the pin low
     HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_RESET);
 
-    HAL_SPI_TransmitReceive(hspi5_kicker, tx, rx, 2, HAL_MAX_DELAY);
+    // Start the SPI transfer non blocking
+    HAL_StatusTypeDef status = HAL_SPI_TransmitReceive_IT(hspi5_kicker, kicker_spi_tx, kicker_spi_rx, KICKER_BOARD_SPI_SIZE);
 
-    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_SET);
+    if (status != HAL_OK)
+    {
+        // Transfer didn't start. Put pin back high
+        HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_SET);
 
-    uint16_t adc = ((uint16_t)rx[0] << 8) | rx[1];
+        kicker_spi_busy = false;
+
+        if (status == HAL_BUSY)
+        {
+            return 1;
+        }
+
+        return -1;
+    }
 
     return 0;
 }
 
+void KICKER_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    if (hspi != hspi5_kicker)
+    {
+        return;
+    }
+
+    // SPI done release the pin
+    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_SET);
+
+    uint16_t raw_adc = ((uint16_t)kicker_spi_rx[0] << 8) | (uint16_t)kicker_spi_rx[1];
+
+    raw_adc &= 0x0FFF;
+
+    kicker_adc_value = raw_adc;
+    kicker_adc_ready = true;
+    kicker_spi_busy = false;
+}
+
+void KICKER_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+    if (hspi != hspi5_kicker)
+    {
+        return;
+    }
+
+    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_SET);
+    kicker_spi_busy = false;
+}
+
+bool KICKER_TryGetADC(uint16_t *adc)
+{
+    if (adc == NULL)
+    {
+        return false;
+    }
+
+    if (!kicker_adc_ready)
+    {
+        return false;
+    }
+
+    // Getting the adc value has to be atomic (No chaging the value while we try to get it)
+    uint32_t primask = __get_PRIMASK();
+    __disable_irq();
+
+    *adc = kicker_adc_value;
+    kicker_adc_ready = false;
+
+    if (primask == 0U)
+    {
+        __enable_irq();
+    }
+
+    return true;
+}
 
 /*
    Private function implementation

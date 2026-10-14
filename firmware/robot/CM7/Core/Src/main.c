@@ -157,7 +157,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     }
 
     if (htim->Instance == TIM6) {
-        KICKER_Get_ADC_Charge();
+        KICKER_StartVoltageMeasurement();
     }
 
     /* USER CODE BEGIN Callback 1 */
@@ -166,6 +166,23 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef* huart) { UI_RxCallback(); }
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    if (hspi->Instance == SPI5)
+    {
+        KICKER_SPI_TxRxCpltCallback(hspi);
+    }
+}
+
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+    if (hspi->Instance == SPI5)
+    {
+        KICKER_SPI_ErrorCallback(hspi);
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
