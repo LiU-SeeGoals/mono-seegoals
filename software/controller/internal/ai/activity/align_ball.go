@@ -168,6 +168,7 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 	moveTo.AllowOutsideField(m.allowOutsideField)
 	moveTo.AllowBehindGoalLine(m.allowBehindGoal)
 	act := moveTo.GetMoveToAction(gi)
+	act.Dest = avoidRobotsOnApproach(m.team, m.id, myPos, act.Dest, gi)
 	if m.ballRolling(gi) {
 		// Ball is moving face the ball to receive it
 		ballPos := m.ballPos(gi)
@@ -296,6 +297,7 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 
 	lineup := behindBallDest(ballPos, m.to, minMargin)
 	carrot := aroundBallDest(ballPos, myPos, lineup, minMargin)
+	carrot = avoidRobotsOnApproach(m.team, m.id, myPos, carrot, gi)
 	carrot.Angle = steppedOrientation(myPos, ballPos, finalOrientation)
 
 	forward, lateral, ok := robot.BallLocalOffset(ballPos)
