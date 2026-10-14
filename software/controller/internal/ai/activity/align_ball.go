@@ -331,7 +331,7 @@ func (m *AlignBall) aroundBallAction(myPos info.Position, gi *info.GameInfo) act
 		AllowOutsideField:   m.allowOutsideField,
 		AllowBehindGoalLine: m.allowBehindGoal,
 		AllowGoalArea:       m.allowGoalArea,
-		MinLinearSpeed:      aroundBallLinearSpeed(myPos, carrot),
+		MinLinearSpeed:      aroundBallLinearSpeed(myPos, carrot, ballPos, m.to),
 		Dribble:             dribble,
 	}
 }

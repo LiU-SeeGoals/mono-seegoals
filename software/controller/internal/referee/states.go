@@ -272,6 +272,7 @@ func (s *Penalty) initializeKick() {
 	// drives directly at a point behind the ball, where it can stall.
 	s.penaltyKick = NewStateMachine(prepareKick)
 	s.penaltyKick.AddTransition(kickPrepareName, "ALIGNED", kick)
+	s.penaltyKick.AddTransition(kickName, "MISALIGNED", prepareKick)
 }
 
 func (s *Penalty) Update() EventName {
@@ -392,6 +393,7 @@ func (s *FreeKick) Initialize() {
 
 		s.freeKick = NewStateMachine(prepareKick)
 		s.freeKick.AddTransition(kickPrepareName, "ALIGNED", kick)
+		s.freeKick.AddTransition(kickName, "MISALIGNED", prepareKick)
 	}
 
 	originalBallPos, ok := s.gi.State.GetTrackedBall().GetTrackedPosition()
@@ -514,6 +516,7 @@ func (s *Kickoff) Initialize() {
 
 	s.kickOff = NewStateMachine(prepareKick)
 	s.kickOff.AddTransition(kickPrepareName, "ALIGNED", kick)
+	s.kickOff.AddTransition(kickName, "MISALIGNED", prepareKick)
 
 	// If we dont have possession we take good defense position
 }

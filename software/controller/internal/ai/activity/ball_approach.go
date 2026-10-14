@@ -29,6 +29,12 @@ const (
 	ballLookaheadSec         = 0.2
 	minRollingBallSpeed      = 0.3
 
+	alignLineFloorSideSpeed = 0.5 * alignLineMaxSideSpeed
+
+	aroundBallBodyRadius       = 90.0
+	aroundBallChordClearance   = aroundBallBodyRadius + info.BallRadius + 30.0
+	aroundBallInsideShiftAngle = 0.7
+
 	aroundBallRobotClearance = 180.0
 	aroundBallDetourMargin   = 30.0
 	aroundBallRobotMaxAgeMs  = 200
@@ -161,6 +167,7 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 	}
 
 	shiftMag := math.Min(math.Abs(remaining), aroundBallShiftAngle)
+	shiftMag = chordSafeShift(ballPos.Dist2d(botPos), distance, shiftMag)
 	shift := -math.Copysign(shiftMag, remaining)
 	bearing := ball2BotAngle + shift
 	return info.Position{
@@ -170,8 +177,48 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 	}
 }
 
-func aroundBallLinearSpeed(botPos, dest info.Position) float64 {
-	if botPos.Dist2d(dest) < minAroundBallMoveTrigger {
+func chordClearance(r1, r2, angle float64) float64 {
+	chord := math.Sqrt(math.Max(0, r1*r1+r2*r2-2*r1*r2*math.Cos(angle)))
+	if chord < 1e-9 {
+		return math.Min(r1, r2)
+	}
+	foot := (r1*r1 - r1*r2*math.Cos(angle)) / chord
+	if foot <= 0 || foot >= chord {
+		return math.Min(r1, r2)
+	}
+	return r1 * r2 * math.Sin(angle) / chord
+}
+
+func chordSafeShift(botRadius, carrotRadius, shift float64) float64 {
+	if chordClearance(botRadius, carrotRadius, shift) >= aroundBallChordClearance {
+		return shift
+	}
+	if math.Min(botRadius, carrotRadius) <= aroundBallChordClearance {
+		return math.Min(shift, aroundBallInsideShiftAngle)
+	}
+	lo, hi := 0.0, shift
+	for i := 0; i < 30; i++ {
+		mid := (lo + hi) / 2
+		if chordClearance(botRadius, carrotRadius, mid) >= aroundBallChordClearance {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	return lo
+}
+
+func aroundBallLinearSpeed(botPos, dest, ballPos, target info.Position) float64 {
+	moveDist := botPos.Dist2d(dest)
+	if moveDist < minAroundBallMoveTrigger {
+		return 0
+	}
+	_, sideErr, ok := lineErrorToTarget(botPos, ballPos, target)
+	if !ok || sideErr > alignLineExitTolerance || !behindBallHalfPlane(ballPos, botPos, target) {
+		return aroundBallMinLinearSpeed
+	}
+	sideMove := math.Abs(sideSpeedToLine(info.Position{X: dest.X - botPos.X, Y: dest.Y - botPos.Y}, ballPos, target))
+	if sideMove*aroundBallMinLinearSpeed > alignLineFloorSideSpeed*moveDist {
 		return 0
 	}
 	return aroundBallMinLinearSpeed

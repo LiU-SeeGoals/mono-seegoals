@@ -190,6 +190,9 @@ func (s *GoalieSafeKickState) Update() EventName {
 		s.Ctx.ResetTarget()
 		return "KICKED"
 	}
+	if s.KickAct.NeedsRealign(s.Gi) {
+		return "MISALIGNED"
+	}
 	return "NONE"
 }
 
