@@ -86,6 +86,7 @@ void KICKER_SPI_ErrorCallback(SPI_HandleTypeDef *hspi);
 /**
  * @brief Atomically tries to access the adc convert value.
  * @note After getting the adc value the function cannot be called again until a new value is transferred
+ * @note since the value isn't available until the SPI is done using while(TryADC){} is needed immmediately after calling the start function
  * @param adc reference to where the adc value should get placed
  * @return true if an adc value was gotten. false if not
  */
