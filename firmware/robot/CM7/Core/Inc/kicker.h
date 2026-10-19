@@ -33,14 +33,22 @@ typedef enum
 void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, SPI_HandleTypeDef* hspi5);
 
 /**
- *
+ * @brief Starts charging the capacitors. 
  */
 void KICKER_ChargeStart(KickerSpeed kickSpeed);
 
 /**
- *
+ * @brief Checks if the ADC value from the KickerBoard SPI connection is high enough and if so stop the charging.
+ * @note Called in main on TIM5 interrupts. TIM5 is started by ChargeStart.
  */
 void KICKER_ChargeStop();
+
+/**
+ * @brief Stops the charging of the capacitors no matter what. Used within ChargeStop incase of error
+ * @param status is for debugging help mostly so that it is easier to see what went wrong.
+ */
+void KICKER_ChargeStopForced(int status);
+
 
 /**
  *

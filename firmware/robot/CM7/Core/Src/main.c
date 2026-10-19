@@ -140,7 +140,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     /* USER CODE END Callback 0 */
     if (htim->Instance == TIM5) {
         KICKER_ChargeStop();
-        KICKER_KickStart();
+        
+        
+        //KICKER_KickStart();
     }
 
     if (htim->Instance == TIM3) {
@@ -258,7 +260,6 @@ int main(void)
     MOTOR_Init(&htim1);
     DATA_Init(&hspi6);
     KICKER_Init(&htim5, &htim3, &hspi5);
-    HAL_TIM_Base_Start_IT(&htim6);
     IMU_Init(&hi2c4);
     STATE_Init();
     UI_Init(&huart3);
@@ -797,7 +798,7 @@ static void MX_TIM5_Init(void)
   htim5.Instance = TIM5;
   htim5.Init.Prescaler = 399;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim5.Init.Period = 4294967295;
+  htim5.Init.Period = 49;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim5.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim5) != HAL_OK)
