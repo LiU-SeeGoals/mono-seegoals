@@ -30,9 +30,10 @@ const (
 	tacticalModeAttack tacticalMode = "attack"
 	tacticalModeDefend tacticalMode = "defend"
 
-	roleSwitchMinDuration    = 750 * time.Millisecond
-	tacticalModeSwitchDelay  = 500 * time.Millisecond
-	activeRobotTimeoutMillis = int64(1000)
+	roleSwitchMinDuration   = 750 * time.Millisecond
+	tacticalModeSwitchDelay = 500 * time.Millisecond
+	ballInterceptLookahead  = 500 * time.Millisecond
+	ballInterceptMinSpeed   = 0.3
 
 	preferredGoalieID = info.ID(6)
 
@@ -439,17 +440,7 @@ func (m *CombinedPlan) getRobotClosestToPosition(
 }
 
 func (m *CombinedPlan) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID) info.ID {
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-
-	targetPos := ballPos
-
-	if ok && ballVel.Norm2d() > 0.3 {
-		lookaheadSeconds := 0.5
-
-		targetPos.X = ballPos.X + ballVel.X*1000*lookaheadSeconds
-		targetPos.Y = ballPos.Y + ballVel.Y*1000*lookaheadSeconds
-	}
+	targetPos, _ := gi.State.BallPositionAfter(ballInterceptLookahead, ballInterceptMinSpeed)
 
 	return m.getRobotClosestToPosition(gi, activeRobots, targetPos)
 }
@@ -472,32 +463,10 @@ func (m *CombinedPlan) ballTouchRestriction() (info.ID, bool) {
 }
 
 func (m *CombinedPlan) activeRobots(gi *GameInfo) []info.ID {
-	team := gi.State.GetTeam(m.team)
-	nowMillis := time.Now().UnixMilli()
-	recent := []info.ID{}
-	seen := []info.ID{}
-
-	for id, robot := range team {
-		if robot == nil || !robot.IsActive() {
-			continue
-		}
-
-		_, robotTime, err := robot.GetPositionTime()
-		if err != nil {
-			continue
-		}
-
-		robotID := info.ID(id)
-		seen = append(seen, robotID)
-		if nowMillis-robotTime <= activeRobotTimeoutMillis {
-			recent = append(recent, robotID)
-		}
+	if gi == nil || gi.State == nil {
+		return nil
 	}
-
-	if len(recent) > 0 {
-		return recent
-	}
-	return seen
+	return gi.State.ActiveRobotIDs(m.team, time.Now())
 }
 
 func containsRobot(robots []info.ID, target info.ID) bool {
@@ -1035,8 +1004,8 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 			return
 		}
 
-		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
-		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
+		ballVel, ballVelOK := gi.State.GetTrackedBall().GetFreshTrackedVelocity(tickStart, info.TrackedBallFreshness)
+		ballMoving := ballVelOK && ballVel.Norm2d() > ballInterceptMinSpeed
 		ownerRetained := possession.owner.valid && ownerStillRetained(&gi, possession.owner)
 
 		handledByOffense := false

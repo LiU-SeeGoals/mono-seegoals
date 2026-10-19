@@ -73,33 +73,43 @@ func (g *GameScenario) getRobotClosestToPosition(
 }
 
 func (g *GameScenario) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID) info.ID {
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-
-	targetPos := ballPos
-
-	if ok && ballVel.Norm2d() > 0.3 {
-		lookaheadSeconds := 0.5
-
-		targetPos.X = ballPos.X + ballVel.X*1000*lookaheadSeconds
-		targetPos.Y = ballPos.Y + ballVel.Y*1000*lookaheadSeconds
-	}
+	targetPos, _ := gi.State.BallPositionAfter(ballInterceptLookahead, ballInterceptMinSpeed)
 
 	return g.getRobotClosestToPosition(gi, activeRobots, targetPos)
 }
 
-func (g *GameScenario) run() {
-
-	activeRobots := []info.ID{1, 2, 3, 4, 5, 6}
-	kickers := make(map[info.ID]*roles.OffenseRole)
-
-	gi := <-g.incomingGameInfo
-	// refereeHandler := referee.NewRefereeHandler(&gi, activeRobots, g.team, &g.ActivityHandler)
+func (g *GameScenario) syncKickers(
+	gi *info.GameInfo,
+	activeRobots []info.ID,
+	kickers map[info.ID]*roles.OffenseRole,
+) {
+	active := make(map[info.ID]bool, len(activeRobots))
 	for _, id := range activeRobots {
-		kicker := roles.NewOffenseRole(id, g.ActivityHandler, &gi, g.team)
+		active[id] = true
+		if _, exists := kickers[id]; exists {
+			continue
+		}
+		kicker := roles.NewOffenseRole(id, g.ActivityHandler, gi, g.team)
 		kicker.Init()
 		kickers[id] = kicker
 	}
+
+	for id := range kickers {
+		if active[id] {
+			continue
+		}
+		g.ActivityHandler.ClearActivity(id)
+		delete(kickers, id)
+	}
+}
+
+func (g *GameScenario) run() {
+	kickers := make(map[info.ID]*roles.OffenseRole)
+
+	gi := <-g.incomingGameInfo
+	activeRobots := gi.State.ActiveRobotIDs(g.team, time.Now())
+	g.syncKickers(&gi, activeRobots, kickers)
+	// refereeHandler := referee.NewRefereeHandler(&gi, activeRobots, g.team, &g.ActivityHandler)
 
 	fmt.Println(gi.Status)
 
@@ -115,13 +125,15 @@ func (g *GameScenario) run() {
 
 		gi = <-g.incomingGameInfo
 		frameMonitor.Observe(gi.VisionFrame())
+		activeRobots = gi.State.ActiveRobotIDs(g.team, tickStart)
+		g.syncKickers(&gi, activeRobots, kickers)
 		possession := possessionTracker.update(&gi, tickStart)
 		rawOwner := observedBallOwner(&gi)
 		// handleRef := refereeHandler.HandleReferee()
 		// Only coordinate robot roles, trigger ball events
 
-		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
-		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
+		ballVel, ballVelOK := gi.State.GetTrackedBall().GetFreshTrackedVelocity(tickStart, info.TrackedBallFreshness)
+		ballMoving := ballVelOK && ballVel.Norm2d() > ballInterceptMinSpeed
 		ownerRetained := possession.owner.valid && ownerStillRetained(&gi, possession.owner)
 
 		passInFlight := hasActiveReceiver &&
@@ -152,12 +164,15 @@ func (g *GameScenario) run() {
 		} else {
 			if passInFlight {
 				actorTracker.switchTo(kickers, newOffenseBallActor(activeReceiver, offenseBallActorReceiver))
-			} else {
+			} else if len(activeRobots) > 0 {
 				hasActiveReceiver = false
 				interceptorID := g.getRobotForBall(&gi, activeRobots)
 
 				actorTracker.switchTo(kickers, newOffenseBallActor(interceptorID, offenseBallActorChaser))
 				kickers[interceptorID].TriggerEvent("BALL_APPROACHING")
+			} else {
+				hasActiveReceiver = false
+				actorTracker.switchTo(kickers, noOffenseBallActor())
 			}
 		}
 
