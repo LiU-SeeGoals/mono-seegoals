@@ -14,6 +14,7 @@ typedef struct {
 
 typedef enum
 {
+    NONE,
     KICKER_STRAIGHT,
     KICKER_CHIPPER,
 } KickerMode;

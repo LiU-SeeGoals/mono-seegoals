@@ -8,7 +8,6 @@
 #include "nav.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
-#include <cstddef>
 #include <stdlib.h>
 #include <string.h>
 
@@ -60,7 +59,8 @@ typedef enum
 //!@{
 CommandInfo default_commands[4] = {{'R', "F"}, {'K', "icker"}, {'L', "ogs"}, {'M', "otors"}};
 
-CommandInfo kicker_commands[5] = {
+CommandInfo kicker_commands[6] = {
+    {'T', "oggle charge on"},
     {'S', "traigt kick"},
     {'C', "hipper kick"},
     {'D', "ischarge"},
@@ -337,8 +337,8 @@ void parse_key()
             break;
         case 'D':
             LOG_UI("Discharging\r\n");
-            KICKER_SetKickerMode(NULL);
-            KICKER_KickStart(NULL);
+            KICKER_SetKickerMode(NONE);
+            KICKER_KickStart(KICKER_SPEED_DEFAULT);
             break;
         case 'S':
             LOG_UI("Straight kicking\r\n");

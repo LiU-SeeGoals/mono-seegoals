@@ -33,7 +33,7 @@ static volatile bool kicking = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
 static TIM_HandleTypeDef* htim_kicker_kick;     // One shot timer
 static SPI_HandleTypeDef* hspi5_kicker;
-static volatile KickerMode kickerMode;
+static volatile KickerMode kickerMode = NONE;
 
 static uint8_t kicker_spi_tx[KICKER_BOARD_SPI_SIZE] = {KICKER_BOARD_ADC_CODE, 0x00};
 static uint8_t kicker_spi_rx[KICKER_BOARD_SPI_SIZE];
@@ -74,11 +74,6 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
 
     htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
     htim_kicker_charge->Instance->EGR = TIM_EGR_UG;
-
-    __HAL_TIM_SET_AUTORELOAD(htim_kicker_charge, settings.charge_wait_us);
-    __HAL_TIM_SET_COUNTER(htim_kicker_charge, 0);
-    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us);
-    __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
 }
 
 void KICKER_ChargeStart()
@@ -99,25 +94,28 @@ void KICKER_ChargeStart()
         return;
     }
 
-    LOG_DEBUG("Charging start\r\n");
+    LOG_INFO("Charging start\r\n");
 
     // int charge_us = get_charge_us(kickSpeed);
 
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_SET);
     charging = true;
     HAL_TIM_Base_Start_IT(htim_kicker_charge);
-
+    
     settings.charges_since_last_kick++;
+    KICKER_StartVoltageMeasurement(); // Start getting ADC values
 }
 
 void KICKER_ChargeStop()
 {
     if (!charging)
     {
+        LOG_DEBUG("Not charging\r\n");
         return;
     }
     if (!KICKER_TryGetADC(&kicker_current_charge_adc))
     {
+        LOG_DEBUG("Could not get adc\r\n");
         return;
     }
 
@@ -134,10 +132,10 @@ void KICKER_ChargeStop()
     // Literally identical to what we want
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
     settings.charges_since_last_kick++;
-    LOG_DEBUG("Charging stopped, charged %d times...\r\n", settings.charges_since_last_kick);
     HAL_TIM_Base_Stop_IT(htim_kicker_charge);
     charging = false;
     charged = true;
+    LOG_INFO("Charging stopped, charged to %d or %fV\r\n", kicker_current_charge_adc, KICKER_ADC_To_Voltage_Simple(kicker_current_charge_adc));
 }
 
 void KICKER_ChargeStopForced(int status)
@@ -169,7 +167,7 @@ void KICKER_KickStart(KickerSpeed kickspeed)
     }
     kicking = true;
 
-    LOG_DEBUG("Kicking start\r\n");
+    LOG_INFO("Kicking start\r\n");
 
     // Kicks on low
     if (kickerMode == KICKER_STRAIGHT)
@@ -267,6 +265,7 @@ void KICKER_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
     {
         return;
     }
+    LOG_DEBUG("Got an ADC\r\n");
 
     // SPI done release the pin
     HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_SET);
@@ -286,6 +285,8 @@ void KICKER_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
     {
         return;
     }
+    LOG_ERROR("FUCK\r\n");
+
 
     HAL_GPIO_WritePin(KICKER_CS_GPIO_Port, KICKER_CS_Pin, GPIO_PIN_SET);
     kicker_spi_busy = false;
@@ -295,11 +296,13 @@ bool KICKER_TryGetADC(uint16_t *adc)
 {
     if (adc == NULL)
     {
+        LOG_DEBUG("adc is null\r\n");
         return false;
     }
 
     if (!kicker_adc_ready)
     {
+        LOG_DEBUG("adc is not ready\r\n");
         return false;
     }
 
