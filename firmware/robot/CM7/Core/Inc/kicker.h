@@ -35,7 +35,7 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
 /**
  * @brief Starts charging the capacitors. 
  */
-void KICKER_ChargeStart(KickerSpeed kickSpeed);
+void KICKER_ChargeStart();
 
 /**
  * @brief Checks if the ADC value from the KickerBoard SPI connection is high enough and if so stop the charging.
@@ -51,9 +51,9 @@ void KICKER_ChargeStopForced(int status);
 
 
 /**
- *
+ * @brief Kicks at the selected power instantly 
  */
-void KICKER_KickStart();
+void KICKER_KickStart(KickerSpeed kickspeed);
 
 /**
  *

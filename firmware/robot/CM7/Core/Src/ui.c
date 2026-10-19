@@ -8,6 +8,7 @@
 #include "nav.h"
 #include "pos_follow.h"
 #include "state_estimator.h"
+#include <cstddef>
 #include <stdlib.h>
 #include <string.h>
 
@@ -330,19 +331,24 @@ void parse_key()
         }
     } else if (current_state == state_kicker) {
         switch (key) {
+        case 'T':
+            LOG_UI("Charging\r\n");
+            KICKER_ChargeStart();
+            break;
         case 'D':
             LOG_UI("Discharging\r\n");
-            KICKER_KickStart();
+            KICKER_SetKickerMode(NULL);
+            KICKER_KickStart(NULL);
             break;
         case 'S':
             LOG_UI("Straight kicking\r\n");
             KICKER_SetKickerMode(KICKER_STRAIGHT);
-            KICKER_ChargeStart(KICKER_SPEED_DEFAULT);
+            KICKER_KickStart(KICKER_SPEED_DEFAULT);
             break;
         case 'C':
             LOG_UI("Chipper kicking\r\n");
             KICKER_SetKickerMode(KICKER_CHIPPER);
-            KICKER_ChargeStart(KICKER_SPEED_CHIP_PASS);
+            KICKER_KickStart(KICKER_SPEED_CHIP_PASS);
             break;
         case 'P': // Print vars
         {

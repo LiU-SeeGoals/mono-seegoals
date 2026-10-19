@@ -14,6 +14,10 @@
 #define KICK_STRAIGHT_GOAL_US 450000
 #define KICK_CHIP_PASS_US 650000
 
+#define DISCHARGE_STRAIGHT_PASS_US 65
+#define DISCHARGE_STRAIGHT_GOAL_US 65
+#define DISCHARGE_CHIP_PASS_US 90
+
 #define KICKER_ADC_CHARGE_VALUE 1200 // Random value for now. The ADC is 12 bit long so this is like one quarter charge
 #define KICKER_BOARD_ADC_CODE 0x08
 #define KICKER_BOARD_SPI_SIZE 2
@@ -22,7 +26,7 @@
 // Kicker tuning Chip discharge: 650000. Kicker tuning straight discharge: 650000
 // Kicker tuning straight goal kick: 350000. kicker straight pass: 250000
 static LOG_Module internal_log_mod;
-static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=15, .charge_wait_us = 350000, .discharge_wait_us = 300, .charges_since_last_kick = 0};
+static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=25, .charge_wait_us = 350000, .discharge_wait_us = 300, .charges_since_last_kick = 0};
 static volatile bool charging = false;
 static volatile bool charged = false;
 static volatile bool kicking = false;
@@ -46,6 +50,7 @@ static volatile float kicker_voltage = 0.0f;
  */
 
 int get_charge_us(KickerSpeed kickSpeed);
+int get_discharge_us(KickerSpeed kickSpeed);
 float KICKER_ADC_To_Voltage_Complex(uint16_t adc);
 float KICKER_ADC_To_Voltage_Simple(uint16_t adc);
 
@@ -76,7 +81,7 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
     __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
 }
 
-void KICKER_ChargeStart(KickerSpeed kickSpeed)
+void KICKER_ChargeStart()
 {
     /*
     if (settings.charges_since_last_kick >= settings.max_charges_per_kick) {
@@ -84,6 +89,11 @@ void KICKER_ChargeStart(KickerSpeed kickSpeed)
         return;
     }
     */
+    if (kicking)
+    {
+        LOG_DEBUG("Currently kicking");
+        return;
+    }
     if (charging) {
         LOG_DEBUG("Already charging\r\n");
         return;
@@ -130,7 +140,7 @@ void KICKER_ChargeStop()
     charged = true;
 }
 
-void KICKER_CHargeStopForced(int status)
+void KICKER_ChargeStopForced(int status)
 {
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
     settings.charges_since_last_kick++;
@@ -139,9 +149,21 @@ void KICKER_CHargeStopForced(int status)
     charging = false;
 }
 
-void KICKER_KickStart()
+void KICKER_KickStart(KickerSpeed kickspeed)
 {
-    if (kicking) {
+    if (!charged)
+    {
+        LOG_DEBUG("Not yet fully charged");
+        return;
+    }
+
+    if (charging)
+    {
+        LOG_DEBUG("Currently charging");
+    }
+
+    if (kicking)
+    {
         LOG_DEBUG("Already kicking\r\n");
         return;
     }
@@ -159,7 +181,9 @@ void KICKER_KickStart()
         HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_RESET);
     }
 
-    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us);
+    int discharge_length = get_discharge_us(kickspeed);
+
+    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, discharge_length);
     __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
     htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
     __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
@@ -315,6 +339,26 @@ int get_charge_us(KickerSpeed kickSpeed)
     }
 
     return charge_us;
+}
+
+int get_discharge_us(KickerSpeed kickSpeed)
+{
+    int discharge_us = settings.discharge_wait_us;
+
+    if (kickSpeed == KICKER_SPEED_STRAIGHT_GOAL)
+    {
+        discharge_us = DISCHARGE_STRAIGHT_GOAL_US;
+    }
+    else if (kickSpeed == KICKER_SPEED_STRAIGHT_PASS)
+    {
+        discharge_us = DISCHARGE_STRAIGHT_PASS_US;
+    }
+    else if (kickSpeed == KICKER_SPEED_CHIP_PASS)
+    {
+        discharge_us = DISCHARGE_CHIP_PASS_US;
+    }
+
+    return discharge_us;
 }
 
 float KICKER_ADC_To_Voltage_Complex(uint16_t adc)
