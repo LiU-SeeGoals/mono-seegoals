@@ -3,11 +3,14 @@ package info
 import (
 	"encoding/json"
 	"math"
+	"time"
 
 	. "github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 const TEAM_SIZE ID = 16
+
+const RobotObservationFreshness = time.Second
 
 type KickedBallInfo struct {
 	StartX    float64
@@ -310,6 +313,79 @@ func (gs *GameState) GetTrackedRobot(team Team, id uint32) *TrackedRobot {
 
 func (gs *GameState) GetTrackedBall() *TrackedBall {
 	return gs.TrackedBall
+}
+
+// ActiveRobotIDs returns robot IDs observed for team. Fresh observations are
+// preferred; if every observation is old, seen robots are returned as a
+// compatibility fallback for recorded data and simulations with another clock.
+func (gs *GameState) ActiveRobotIDs(team Team, now time.Time) []ID {
+	if gs == nil {
+		return nil
+	}
+
+	robots := gs.GetTeam(team)
+	nowMillis := now.UnixMilli()
+	recent := make([]ID, 0, TEAM_SIZE)
+	seen := make([]ID, 0, TEAM_SIZE)
+	for id, robot := range robots {
+		if robot == nil || !robot.IsActive() {
+			continue
+		}
+
+		_, observedAt, err := robot.GetPositionTime()
+		if err != nil {
+			continue
+		}
+
+		robotID := ID(id)
+		seen = append(seen, robotID)
+		if nowMillis-observedAt <= RobotObservationFreshness.Milliseconds() {
+			recent = append(recent, robotID)
+		}
+	}
+
+	if len(recent) > 0 {
+		return recent
+	}
+	return seen
+}
+
+// BallPositionAfter predicts from fresh SSL-Vision tracked data. When tracked
+// data is unavailable or too slow, it returns the current estimated position.
+func (gs *GameState) BallPositionAfter(after time.Duration, minSpeedMetersPerSecond float64) (Position, bool) {
+	if gs == nil {
+		return Position{}, false
+	}
+	if gs.TrackedBall != nil {
+		if predicted, ok := gs.TrackedBall.PredictPosition(after, minSpeedMetersPerSecond); ok {
+			return predicted, true
+		}
+	}
+	if gs.Ball == nil {
+		return Position{}, false
+	}
+	if _, err := gs.Ball.GetPosition(); err != nil {
+		return Position{}, false
+	}
+	current, err := gs.Ball.GetEstimatedPosition()
+	return current, err == nil
+}
+
+// ProjectBallTrajectoryToX prefers the velocity supplied by SSL-Vision's
+// tracker and falls back to the two newest raw vision ball observations.
+func (gs *GameState) ProjectBallTrajectoryToX(targetX float64) (Position, bool) {
+	if gs == nil {
+		return Position{}, false
+	}
+	if gs.TrackedBall != nil {
+		if hit, ok := gs.TrackedBall.ProjectTrajectoryToX(targetX); ok {
+			return hit, true
+		}
+	}
+	if gs.Ball == nil {
+		return Position{}, false
+	}
+	return gs.Ball.ProjectTrajectoryToX(targetX)
 }
 
 func (gs *GameState) SetKickedBall(startX, startY, startTS, stopX, stopY, stopTS float64, team Team, id uint32) {

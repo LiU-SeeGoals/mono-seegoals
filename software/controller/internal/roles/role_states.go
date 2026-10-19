@@ -207,7 +207,7 @@ func (s *InterceptBallState) Update() sm.EventName {
 		}
 	}
 
-	ballVel, ok := s.gi.State.GetTrackedBall().GetTrackedVelocity()
+	ballVel, ok := s.gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), info.TrackedBallFreshness)
 	if ok && ballVel.Norm2d() > 0.3 {
 		activity := act.NewMoveToBall(s.team, s.robotId)
 		s.activityHandler.AddActivity(activity)

@@ -1,6 +1,9 @@
 package info
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestTrackedRobotDoesNotReplaceNewerTrackedObservation(t *testing.T) {
 	gs := NewGameState(10)
@@ -62,5 +65,30 @@ func TestRawRobotDoesNotReplaceNewerRawObservation(t *testing.T) {
 	pos, err := gs.GetRobot(1, Blue).GetPosition()
 	if err != nil || pos.X != 400 {
 		t.Fatalf("out-of-order raw frame replaced newer observation: pos=%v err=%v", pos, err)
+	}
+}
+
+func TestActiveRobotIDsComeFromObservedTeam(t *testing.T) {
+	state := NewGameState(4)
+	now := time.Now()
+	state.SetRobotFromVision(Blue, 2, Position{X: 200}, now.UnixMilli(), 1)
+	state.SetRobotFromVision(Blue, 7, Position{X: 700}, now.UnixMilli(), 1)
+	state.SetRobotFromVision(Yellow, 4, Position{X: 400}, now.UnixMilli(), 1)
+
+	ids := state.ActiveRobotIDs(Blue, now)
+	if len(ids) != 2 || ids[0] != 2 || ids[1] != 7 {
+		t.Fatalf("active blue IDs = %v, want [2 7]", ids)
+	}
+}
+
+func TestActiveRobotIDsIgnoreStaleRobotWhenFreshRobotExists(t *testing.T) {
+	state := NewGameState(4)
+	now := time.Now()
+	state.SetRobotFromVision(Blue, 2, Position{}, now.Add(-RobotObservationFreshness-time.Millisecond).UnixMilli(), 1)
+	state.SetRobotFromVision(Blue, 7, Position{}, now.UnixMilli(), 1)
+
+	ids := state.ActiveRobotIDs(Blue, now)
+	if len(ids) != 1 || ids[0] != 7 {
+		t.Fatalf("active blue IDs = %v, want [7]", ids)
 	}
 }

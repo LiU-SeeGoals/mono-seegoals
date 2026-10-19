@@ -153,8 +153,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 		fmt.Println(err)
 	}
 	ball := gi.State.GetTrackedBall()
-	//ballPos, err := ball.GetTrackedPosition()
-	ballVel, _ := ball.GetTrackedVelocity()
+	ballVel, _ := ball.GetFreshTrackedVelocity(time.Now(), info.TrackedBallFreshness)
 
 	speed := ballVel.Norm2d()
 	if speed > 0.05 {
@@ -234,7 +233,7 @@ func kickBallImpactReady(forward, lateral, headingErr, leadDist float64) bool {
 func kickFirmwareLeadDist(robot *info.Robot) float64 {
 	if robot == nil {
 		return kickFirmwareLeadDistForSpeed(kickAssumedFinalSpeed)
-	}	
+	}
 	robotPos, err := robot.GetPosition()
 	if err != nil {
 		return kickFirmwareLeadDistForSpeed(kickAssumedFinalSpeed)

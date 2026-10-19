@@ -73,7 +73,7 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 				goalTargetY = yHit
 			}
 		}
-	} else if yHit, ok := predictBallPathY(ball, bounds.goalLineX, bounds.goalHalfWidth); ok {
+	} else if yHit, ok := predictBallPathY(gi.State, bounds.goalLineX, bounds.goalHalfWidth); ok {
 		// Otherwise, predict the ball trajectory when it is already moving toward our goal.
 		goalTargetY = yHit
 	}
@@ -245,8 +245,8 @@ func predictShotY(opponent info.Position, goalieX float64, goalSize float64, fal
 // predictBallPathY estimates where the moving ball crosses the goalie's X line.
 // It ignores tiny displacements to avoid reacting to jitter, and only returns true
 // when the current ball path intersects the goal mouth.
-func predictBallPathY(ball *info.Ball, goalieX float64, goalSize float64) (float64, bool) {
-	hit, ok := ball.ProjectTrajectoryToX(goalieX)
+func predictBallPathY(state *info.GameState, goalieX float64, goalSize float64) (float64, bool) {
+	hit, ok := state.ProjectBallTrajectoryToX(goalieX)
 	if !ok {
 		return 0, false
 	}

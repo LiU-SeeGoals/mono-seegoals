@@ -2,6 +2,7 @@ package ai
 
 import (
 	"math"
+	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
@@ -34,14 +35,11 @@ const (
 )
 
 func predictedBallPos(gi *info.GameInfo, lookaheadSec float64) info.Position {
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-	if !ok || ballVel.Norm2d() < minRollingBallSpeed {
+	lookahead := time.Duration(lookaheadSec * float64(time.Second))
+	if ballPos, ok := gi.State.BallPositionAfter(lookahead, minRollingBallSpeed); ok {
 		return ballPos
 	}
-	ballPos.X += ballVel.X * 1000 * lookaheadSec
-	ballPos.Y += ballVel.Y * 1000 * lookaheadSec
-	return ballPos
+	return info.Position{}
 }
 
 func kickerStandoffDist(margin float64) float64 {

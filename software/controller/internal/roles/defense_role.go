@@ -3,6 +3,7 @@ package roles
 import (
 	"fmt"
 	"math"
+	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
@@ -153,7 +154,7 @@ func LowDefenderTarget(gi *info.GameInfo, team info.Team, ballPos info.Position,
 	if aimedY, ok := state.opponentAimYAtX(ballPos, targetX); ok {
 		targetY = aimedY
 	} else if gi != nil && gi.State != nil {
-		if projected, ok := gi.State.GetBall().ProjectTrajectoryToX(targetX); ok {
+		if projected, ok := gi.State.ProjectBallTrajectoryToX(targetX); ok {
 			targetY = projected.Y
 		}
 	}
@@ -557,7 +558,7 @@ func (dr *DefenseRole) CanKickBall() bool {
 	if err != nil || robotPos.Dist2d(ballPos) > defenseKickBallDistance {
 		return false
 	}
-	ballVelocity, ok := dr.gi.State.GetTrackedBall().GetTrackedVelocity()
+	ballVelocity, ok := dr.gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), info.TrackedBallFreshness)
 	return ok && ballVelocity.Norm2d() <= defenseKickMaxBallSpeed
 }
 
