@@ -69,11 +69,9 @@ CommandInfo kicker_commands[7] = {
     {'E', "dit vars"},
 };
 
-CommandInfo kicker_edit_commands[4] = {
-    {'M', "ax charges per kick"},
-    {'C', "harge wait (us)"},
+CommandInfo kicker_edit_commands[2] = {
     {'D', "ischarge wait (us)"},
-    {'V', "alue of ADC target"}
+    {'C', "harge target in ADC"}
 };
 
 CommandInfo log_commands[4] = {
@@ -359,7 +357,7 @@ void parse_key()
         case 'P': // Print vars
         {
             KICKER_Settings* set = KICKER_GetSettings();
-            LOG_UI("Max charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\nCharge_amount_in_ADC: %d\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us);
+            LOG_UI("Discharge wait (us): %i\r\nCharge_amount_in_ADC: %d\r\n", set->discharge_wait_us, set->charge_target_ADC);
         } break;
         case 'E': // Edit vars
             current_state = state_kicker_edit;
@@ -368,13 +366,11 @@ void parse_key()
         }
     } else if (current_state == state_kicker_edit) {
         switch (key) {
-        case 'M': // Max charges per kick
-        case 'C': // Charge wait
         case 'D': // Discharge wait
-        case 'V': // Charge_amount_in_ADC
+        case 'C': // Charge_amount_in_ADC
         {
             KICKER_Settings* set = KICKER_GetSettings();
-            LOG_UI("\r\n---\r\nMax charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\nCharge_amount_in_ADC: %d\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us);
+            LOG_UI("Discharge wait (us): %i\r\nCharge_amount_in_ADC: %d\r\n", set->discharge_wait_us, set->charge_target_ADC);
             start_reading_to_buffer();
         } break;
         }
@@ -533,19 +529,13 @@ void finished_reading_to_buffer()
     if (current_state == state_kicker_edit) {
         KICKER_Settings* set = KICKER_GetSettings();
         switch (current_command) {
-        case 'M':
-            set->max_charges_per_kick = atoi(rx_buffer);
-            break;
-        case 'C':
-            set->charge_wait_us = atoi(rx_buffer);
-            break;
         case 'D':
             set->discharge_wait_us = atoi(rx_buffer);
             break;
-        case 'V':
-            set->charge_amount_in_ADC = atoi(rx_buffer);
+        case 'C':
+            set->charge_target_ADC = atoi(rx_buffer);
         }
-        LOG_UI("\r\n---\r\nMax charges per kick: %i\r\nCharge wait (us): %i\r\nDischarge wait (us): %i\r\n", set->max_charges_per_kick, set->charge_wait_us, set->discharge_wait_us);
+        LOG_UI("\r\n---\r\nDischarge wait (us): %i\r\nCharge_target_in_ADC", set->discharge_wait_us, set->charge_target_ADC);
     } else if (current_state == state_logs) {
         switch (current_command) {
         case 'M':

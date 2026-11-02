@@ -8,15 +8,10 @@
 #include <stdint.h>
 
 /* Private defines */
-// ...
 
-#define KICK_STRAIGHT_PASS_US 250000
-#define KICK_STRAIGHT_GOAL_US 450000
-#define KICK_CHIP_PASS_US 650000
-
-#define DISCHARGE_STRAIGHT_PASS_US 65
-#define DISCHARGE_STRAIGHT_GOAL_US 65
-#define DISCHARGE_CHIP_PASS_US 90
+#define DISCHARGE_STRAIGHT_PASS_US 88
+#define DISCHARGE_STRAIGHT_GOAL_US 120
+#define DISCHARGE_CHIP_PASS_US 150
 
 #define KICKER_ADC_CHARGE_VALUE 2600 // On very large discharge wait times won't straight shoot past 6.50 m/s (No dribbler)
 #define KICKER_BOARD_ADC_CODE 0x08
@@ -26,11 +21,11 @@
 // Kicker tuning Chip discharge: 650000. Kicker tuning straight discharge: 650000
 // Kicker tuning straight goal kick: 350000. kicker straight pass: 250000
 static LOG_Module internal_log_mod;
-static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=25, .charge_wait_us = 350000, .discharge_wait_us = 65, .charges_since_last_kick = 0, .charge_amount_in_ADC = KICKER_ADC_CHARGE_VALUE};
+static KICKER_Settings settings = {.safe_discharge_wait_us=25, .discharge_wait_us = 65, .charge_target_ADC = KICKER_ADC_CHARGE_VALUE};
 static volatile bool charging = false;
 static volatile bool charged = false;
 static volatile bool kicking = false;
-static volatile bool recharge_automatically = false;
+static volatile bool recharge_automatically = true;
 static TIM_HandleTypeDef* htim_kicker_charge;
 static TIM_HandleTypeDef* htim_kicker_kick;     // One shot timer
 static SPI_HandleTypeDef* hspi5_kicker;
@@ -49,8 +44,6 @@ static volatile float kicker_voltage = 0.0f;
 /*
  * Private function declaration
  */
-
-int get_charge_us(KickerSpeed kickSpeed);
 int get_discharge_us(KickerSpeed kickSpeed);
 float KICKER_ADC_To_Voltage_Complex(uint16_t adc);
 float KICKER_ADC_To_Voltage_Simple(uint16_t adc);
@@ -112,7 +105,7 @@ void KICKER_ChargeStop()
         return;
     }
 
-    if (kicker_current_charge_adc < settings.charge_amount_in_ADC)
+    if (kicker_current_charge_adc < settings.charge_target_ADC)
     {
         int status = KICKER_StartVoltageMeasurement();
 
@@ -124,7 +117,6 @@ void KICKER_ChargeStop()
     }
     // Literally identical to what we want
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
-    settings.charges_since_last_kick++;
     HAL_TIM_Base_Stop_IT(htim_kicker_charge);
     charging = false;
     charged = true;
@@ -134,7 +126,6 @@ void KICKER_ChargeStop()
 void KICKER_ChargeStopForced(int status)
 {
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
-    settings.charges_since_last_kick++;
     LOG_ERROR("Something with starting the SPI transfer went wrong and I don't know what %d \r\n", status);
     HAL_TIM_Base_Stop_IT(htim_kicker_charge);
     charging = false;
@@ -207,7 +198,6 @@ void KICKER_KickSafe()
     HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
     COMMON_Wait(settings.safe_discharge_wait_us);
     HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_SET);
-    settings.charges_since_last_kick = 0;
 }
 
 KICKER_Settings* KICKER_GetSettings() { return &settings; }
@@ -317,29 +307,19 @@ bool KICKER_TryGetADC(uint16_t *adc)
     return true;
 }
 
+void KICKER_set_recharge_automatically(bool value)
+{
+    recharge_automatically = value;
+}
+
+bool KICKER_get_recharge_automatically()
+{
+    return recharge_automatically;
+}
+
 /*
    Private function implementation
 */
-int get_charge_us(KickerSpeed kickSpeed)
-{
-    int charge_us = settings.charge_wait_us;
-
-    if (kickSpeed == KICKER_SPEED_STRAIGHT_GOAL)
-    {
-        charge_us = KICK_STRAIGHT_PASS_US;
-    }
-    else if (kickSpeed == KICKER_SPEED_STRAIGHT_PASS)
-    {
-        charge_us = KICK_STRAIGHT_GOAL_US;
-    }
-    else if (kickSpeed == KICKER_SPEED_CHIP_PASS)
-    {
-        charge_us = KICK_CHIP_PASS_US;
-    }
-
-    return charge_us;
-}
-
 int get_discharge_us(KickerSpeed kickSpeed)
 {
     int discharge_us = settings.discharge_wait_us;
@@ -358,16 +338,6 @@ int get_discharge_us(KickerSpeed kickSpeed)
     }
 
     return discharge_us;
-}
-
-void KICKER_set_recharge_automatically(bool value)
-{
-    recharge_automatically = value;
-}
-
-bool KICKER_get_recharge_automatically()
-{
-    return recharge_automatically;
 }
 
 float KICKER_ADC_To_Voltage_Complex(uint16_t adc)

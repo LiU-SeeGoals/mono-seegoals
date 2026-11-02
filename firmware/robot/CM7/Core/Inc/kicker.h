@@ -5,12 +5,9 @@
 #include <stdbool.h>
 
 typedef struct {
-    int max_charges_per_kick;
-    int charge_wait_us;
     int discharge_wait_us;
     int safe_discharge_wait_us;
-    int charges_since_last_kick;
-    int charge_amount_in_ADC;
+    int charge_target_ADC; // Minimum 25 
 } KICKER_Settings;
 
 typedef enum
