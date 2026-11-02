@@ -18,7 +18,7 @@
 #define DISCHARGE_STRAIGHT_GOAL_US 65
 #define DISCHARGE_CHIP_PASS_US 90
 
-#define KICKER_ADC_CHARGE_VALUE 1200 // Random value for now. The ADC is 12 bit long so this is like one quarter charge
+#define KICKER_ADC_CHARGE_VALUE 2600 // On very large discharge wait times won't straight shoot past 6.50 m/s (No dribbler)
 #define KICKER_BOARD_ADC_CODE 0x08
 #define KICKER_BOARD_SPI_SIZE 2
 
@@ -26,7 +26,7 @@
 // Kicker tuning Chip discharge: 650000. Kicker tuning straight discharge: 650000
 // Kicker tuning straight goal kick: 350000. kicker straight pass: 250000
 static LOG_Module internal_log_mod;
-static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=25, .charge_wait_us = 350000, .discharge_wait_us = 300, .charges_since_last_kick = 0};
+static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wait_us=25, .charge_wait_us = 350000, .discharge_wait_us = 65, .charges_since_last_kick = 0, .charge_amount_in_ADC = KICKER_ADC_CHARGE_VALUE};
 static volatile bool charging = false;
 static volatile bool charged = false;
 static volatile bool kicking = false;
@@ -112,7 +112,7 @@ void KICKER_ChargeStop()
         return;
     }
 
-    if (kicker_current_charge_adc < KICKER_ADC_CHARGE_VALUE)
+    if (kicker_current_charge_adc < settings.charge_amount_in_ADC)
     {
         int status = KICKER_StartVoltageMeasurement();
 
@@ -190,6 +190,10 @@ void KICKER_KickStop()
     LOG_DEBUG("Kicking stop\r\n");
     HAL_TIM_Base_Stop_IT(htim_kicker_kick);
     kicking = false;
+    if (recharge_automatically)
+    {
+        KICKER_ChargeStart();
+    }
 }
 
 void KICKER_SetKickerMode(KickerMode mode)

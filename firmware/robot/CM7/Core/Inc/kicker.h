@@ -10,6 +10,7 @@ typedef struct {
     int discharge_wait_us;
     int safe_discharge_wait_us;
     int charges_since_last_kick;
+    int charge_amount_in_ADC;
 } KICKER_Settings;
 
 typedef enum
