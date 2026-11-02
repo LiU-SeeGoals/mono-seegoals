@@ -30,6 +30,7 @@ static KICKER_Settings settings = {.max_charges_per_kick = 6, .safe_discharge_wa
 static volatile bool charging = false;
 static volatile bool charged = false;
 static volatile bool kicking = false;
+static volatile bool recharge_automatically = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
 static TIM_HandleTypeDef* htim_kicker_kick;     // One shot timer
 static SPI_HandleTypeDef* hspi5_kicker;
@@ -78,12 +79,6 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
 
 void KICKER_ChargeStart()
 {
-    /*
-    if (settings.charges_since_last_kick >= settings.max_charges_per_kick) {
-        LOG_DEBUG("Max charges per kick reached.\r\n");
-        return;
-    }
-    */
     if (kicking)
     {
         LOG_DEBUG("Currently kicking");
@@ -96,13 +91,10 @@ void KICKER_ChargeStart()
 
     LOG_INFO("Charging start\r\n");
 
-    // int charge_us = get_charge_us(kickSpeed);
-
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_SET);
     charging = true;
     HAL_TIM_Base_Start_IT(htim_kicker_charge);
     
-    settings.charges_since_last_kick++;
     KICKER_StartVoltageMeasurement(); // Start getting ADC values
 }
 
@@ -115,6 +107,7 @@ void KICKER_ChargeStop()
     }
     if (!KICKER_TryGetADC(&kicker_current_charge_adc))
     {
+        KICKER_StartVoltageMeasurement();
         LOG_DEBUG("Could not get adc\r\n");
         return;
     }
@@ -168,7 +161,8 @@ void KICKER_KickStart(KickerSpeed kickspeed)
     kicking = true;
 
     LOG_INFO("Kicking start\r\n");
-
+    int discharge_length = get_discharge_us(kickspeed);
+    
     // Kicks on low
     if (kickerMode == KICKER_STRAIGHT)
     {
@@ -179,7 +173,6 @@ void KICKER_KickStart(KickerSpeed kickspeed)
         HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_RESET);
     }
 
-    int discharge_length = get_discharge_us(kickspeed);
 
     __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, discharge_length);
     __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
@@ -194,7 +187,6 @@ void KICKER_KickStop()
     // Stop kick on high, both chipper and straight
     HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_SET);
-    settings.charges_since_last_kick = 0;
     LOG_DEBUG("Kicking stop\r\n");
     HAL_TIM_Base_Stop_IT(htim_kicker_kick);
     kicking = false;
@@ -362,6 +354,16 @@ int get_discharge_us(KickerSpeed kickSpeed)
     }
 
     return discharge_us;
+}
+
+void KICKER_set_recharge_automatically(bool value)
+{
+    recharge_automatically = value;
+}
+
+bool KICKER_get_recharge_automatically()
+{
+    return recharge_automatically;
 }
 
 float KICKER_ADC_To_Voltage_Complex(uint16_t adc)

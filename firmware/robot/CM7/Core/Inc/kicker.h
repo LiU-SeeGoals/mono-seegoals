@@ -101,4 +101,7 @@ void KICKER_SPI_ErrorCallback(SPI_HandleTypeDef *hspi);
  */
 bool KICKER_TryGetADC(uint16_t *adc);
 
+bool KICKER_get_recharge_automatically();
+void KICKER_set_recharge_automatically(bool value);
+
 #endif /* KICKER_H */

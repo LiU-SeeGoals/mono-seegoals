@@ -59,8 +59,9 @@ typedef enum
 //!@{
 CommandInfo default_commands[4] = {{'R', "F"}, {'K', "icker"}, {'L', "ogs"}, {'M', "otors"}};
 
-CommandInfo kicker_commands[6] = {
-    {'T', "oggle charge on"},
+CommandInfo kicker_commands[7] = {
+    {'T', "oggle automatic charging"},
+    {'M', "anual charge up"},
     {'S', "traigt kick"},
     {'C', "hipper kick"},
     {'D', "ischarge"},
@@ -332,6 +333,10 @@ void parse_key()
     } else if (current_state == state_kicker) {
         switch (key) {
         case 'T':
+            bool value = !KICKER_get_recharge_automatically();
+            LOG_UI("Toggling automatic recharge to %d", value);
+            KICKER_set_recharge_automatically(value);
+        case 'M':
             LOG_UI("Charging\r\n");
             KICKER_ChargeStart();
             break;
