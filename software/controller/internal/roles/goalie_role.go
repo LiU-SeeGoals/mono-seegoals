@@ -123,6 +123,7 @@ func (gr *GoalieRole) Init() {
 	sm.AddTransition(alignName, "ALIGNED", kick)
 	sm.AddTransition(alignName, "BALL_LOST", defend)
 	sm.AddTransition(kickName, "KICKED", defend)
+	sm.AddTransition(kickName, "MISALIGNED", align)
 	sm.AddTransition(kickName, "BALL_LOST", defend)
 
 	gr.sm = sm

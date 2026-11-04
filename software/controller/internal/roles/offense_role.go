@@ -752,6 +752,7 @@ func (kr *OffenseRole) Init() {
 	sm.AddTransition(kickPrepareName, "ALIGNED", kick)
 	sm.AddTransition(kickPrepareName, "BALL_LOST", awaitBall)
 	sm.AddTransition(kickName, "KICKED", prepareKick)
+	sm.AddTransition(kickName, "MISALIGNED", prepareKick)
 	sm.AddTransition(kickName, "BALL_LOST", awaitBall)
 	sm.AddTransition(receiveName, "BALL_OWNER", prepareKick)
 	sm.AddTransition(receiveName, "BALL_RECEIVED", prepareKick)

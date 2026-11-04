@@ -1,5 +1,7 @@
 package info
 
+import "time"
+
 type TrackedRobot struct {
 	Id        uint32
 	Team      Team
@@ -9,6 +11,7 @@ type TrackedRobot struct {
 	VelAngular float64
 	Timestamp  float64
 	Valid      bool
+	updatedAt  int64
 }
 
 func NewTrackedRobot(id uint32, team Team) *TrackedRobot {
@@ -25,6 +28,7 @@ func (tr *TrackedRobot) SetTracked(pos Position, vel Position, orientation float
 	tr.VelAngular = velAngular
 	tr.Timestamp = ts
 	tr.Valid = true
+	tr.updatedAt = time.Now().UnixMilli()
 }
 
 func (tr *TrackedRobot) GetTrackedPosition() (Position, bool) {
@@ -41,3 +45,10 @@ func (tr *TrackedRobot) GetTrackedVelocity() (Position, bool) {
 	return tr.Vel, true
 }
 
+
+func (tr *TrackedRobot) GetFreshTrackedVelocity(now time.Time, maxAge time.Duration) (Position, bool) {
+	if !tr.Valid || now.UnixMilli()-tr.updatedAt > maxAge.Milliseconds() {
+		return Position{}, false
+	}
+	return tr.Vel, true
+}

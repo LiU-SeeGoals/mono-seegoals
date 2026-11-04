@@ -115,16 +115,24 @@ func (r *Robot) GetVelocity() Position {
 	robot := element.Value.(*rawRobotPos)
 
 	sum_deltas := Position{}
+	count := 0
 
 	for e := r.history.Front().Next(); e != nil; e = e.Next() {
 		robot2 := e.Value.(*rawRobotPos)
-		dPos := robot2.pos.Sub(&robot.pos)
 		dt := float64(robot2.time - robot.time)
+		if dt == 0 {
+			continue
+		}
+		dPos := robot2.pos.Sub(&robot.pos)
 		// TODO: lets add exponential decay so that the most recent deltas have more weight
 		scaled := dPos.Scale(1 / dt)
 		sum_deltas = sum_deltas.Add(&scaled)
+		count++
 	}
-	return sum_deltas.Scale(1 / float64(r.history.Len()-1))
+	if count == 0 {
+		return Position{0, 0, 0, 0}
+	}
+	return sum_deltas.Scale(1 / float64(count))
 }
 
 func (r *Robot) GetAcceleration() float64 {

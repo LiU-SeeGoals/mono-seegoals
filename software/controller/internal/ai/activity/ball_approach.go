@@ -17,11 +17,8 @@ const (
 	alignTransitionLateralTolerance = 30.0
 	capturePoseTolerance            = 35.0
 	nearBallOrbitRetainDist         = 300.0
-	// The real robot's position follower scales velocity with destination
-	// distance. Keep close orbit corrections large enough to avoid crawling.
-	minAroundBallMoveDist    = 50.0
-	minAroundBallMoveTrigger = 1.0
-	aroundBallMinLinearSpeed = 0.5
+	minAroundBallMoveTrigger        = 1.0
+	aroundBallMinLinearSpeed        = 0.5
 	// Keep the orbit carrot far enough ahead that the position controller
 	// commands useful tangential speed while the robot has substantial
 	// rotation remaining. Small final corrections are still limited by the
@@ -31,6 +28,16 @@ const (
 	roughAngleTolerance      = 0.05
 	ballLookaheadSec         = 0.2
 	minRollingBallSpeed      = 0.3
+
+	alignLineFloorSideSpeed = 0.5 * alignLineMaxSideSpeed
+
+	aroundBallBodyRadius       = 90.0
+	aroundBallChordClearance   = aroundBallBodyRadius + info.BallRadius + 30.0
+	aroundBallInsideShiftAngle = 0.7
+
+	aroundBallRobotClearance = 180.0
+	aroundBallDetourMargin   = 30.0
+	aroundBallRobotMaxAgeMs  = 200
 )
 
 func predictedBallPos(gi *info.GameInfo, lookaheadSec float64) info.Position {
@@ -84,6 +91,16 @@ func lineErrorToTarget(pos, ballPos, target info.Position) (float64, float64, bo
 	alongLine := posFromBall.X*targetDir.X + posFromBall.Y*targetDir.Y
 	sideError := math.Abs(posFromBall.X*targetDir.Y - posFromBall.Y*targetDir.X)
 	return alongLine, sideError, true
+}
+
+func sideSpeedToLine(vel, ballPos, target info.Position) float64 {
+	dx := target.X - ballPos.X
+	dy := target.Y - ballPos.Y
+	norm := math.Hypot(dx, dy)
+	if norm < 1 {
+		return 0
+	}
+	return (vel.Y*dx - vel.X*dy) / norm
 }
 
 func captureApproachReady(robotPos, ballPos, target info.Position, headingErr float64) bool {
@@ -150,21 +167,7 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 	}
 
 	shiftMag := math.Min(math.Abs(remaining), aroundBallShiftAngle)
-	botRadius := ballPos.Dist2d(botPos)
-	if distance > 1 && botRadius > 1 {
-		orbitArc := shiftMag * distance
-		moveDist := math.Sqrt(botRadius*botRadius + distance*distance -
-			2*botRadius*distance*math.Cos(shiftMag))
-		if orbitArc > minAroundBallMoveTrigger && moveDist < minAroundBallMoveDist {
-			// Solve the chord equation for the angular shift that places the
-			// carrot far enough away while keeping it on the intended orbit.
-			cosShift := (botRadius*botRadius + distance*distance -
-				minAroundBallMoveDist*minAroundBallMoveDist) / (2 * botRadius * distance)
-			cosShift = math.Max(-1, math.Min(1, cosShift))
-			minShift := math.Acos(cosShift)
-			shiftMag = math.Min(aroundBallShiftAngle, math.Max(shiftMag, minShift))
-		}
-	}
+	shiftMag = chordSafeShift(ballPos.Dist2d(botPos), distance, shiftMag)
 	shift := -math.Copysign(shiftMag, remaining)
 	bearing := ball2BotAngle + shift
 	return info.Position{
@@ -174,8 +177,48 @@ func aroundBallDest(ballPos, botPos, dest info.Position, minMargin float64) info
 	}
 }
 
-func aroundBallLinearSpeed(botPos, dest info.Position) float64 {
-	if botPos.Dist2d(dest) < minAroundBallMoveTrigger {
+func chordClearance(r1, r2, angle float64) float64 {
+	chord := math.Sqrt(math.Max(0, r1*r1+r2*r2-2*r1*r2*math.Cos(angle)))
+	if chord < 1e-9 {
+		return math.Min(r1, r2)
+	}
+	foot := (r1*r1 - r1*r2*math.Cos(angle)) / chord
+	if foot <= 0 || foot >= chord {
+		return math.Min(r1, r2)
+	}
+	return r1 * r2 * math.Sin(angle) / chord
+}
+
+func chordSafeShift(botRadius, carrotRadius, shift float64) float64 {
+	if chordClearance(botRadius, carrotRadius, shift) >= aroundBallChordClearance {
+		return shift
+	}
+	if math.Min(botRadius, carrotRadius) <= aroundBallChordClearance {
+		return math.Min(shift, aroundBallInsideShiftAngle)
+	}
+	lo, hi := 0.0, shift
+	for i := 0; i < 30; i++ {
+		mid := (lo + hi) / 2
+		if chordClearance(botRadius, carrotRadius, mid) >= aroundBallChordClearance {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	return lo
+}
+
+func aroundBallLinearSpeed(botPos, dest, ballPos, target info.Position) float64 {
+	moveDist := botPos.Dist2d(dest)
+	if moveDist < minAroundBallMoveTrigger {
+		return 0
+	}
+	_, sideErr, ok := lineErrorToTarget(botPos, ballPos, target)
+	if !ok || sideErr > alignLineExitTolerance || !behindBallHalfPlane(ballPos, botPos, target) {
+		return aroundBallMinLinearSpeed
+	}
+	sideMove := math.Abs(sideSpeedToLine(info.Position{X: dest.X - botPos.X, Y: dest.Y - botPos.Y}, ballPos, target))
+	if sideMove*aroundBallMinLinearSpeed > alignLineFloorSideSpeed*moveDist {
 		return 0
 	}
 	return aroundBallMinLinearSpeed
@@ -189,4 +232,118 @@ func steppedOrientation(botPos, ballPos info.Position, finalOrientation float64)
 func limitedOrientationStep(currentOrientation, finalOrientation, maxStep float64) float64 {
 	diff := info.NormalizeAngleDelta(finalOrientation, currentOrientation)
 	return currentOrientation + math.Copysign(math.Min(maxStep, math.Abs(diff)), diff)
+}
+
+func nearbyRobotPositions(team info.Team, id info.ID, gi *info.GameInfo) []info.Position {
+	now := gi.State.GetMessageReceivedTime()
+	positions := make([]info.Position, 0, 2*int(info.TEAM_SIZE))
+	for _, t := range []info.Team{info.Blue, info.Yellow} {
+		robots := gi.State.GetTeam(t)
+		if robots == nil {
+			continue
+		}
+		for _, robot := range robots {
+			if robot == nil || (t == team && robot.GetID() == id) {
+				continue
+			}
+			pos, seenAt, err := robot.GetPositionTime()
+			if err != nil || now-seenAt > aroundBallRobotMaxAgeMs {
+				continue
+			}
+			positions = append(positions, pos)
+		}
+	}
+	return positions
+}
+
+func avoidRobotsOnApproach(team info.Team, id info.ID, myPos, dest info.Position, gi *info.GameInfo) info.Position {
+	return deflectAroundRobots(myPos, dest, nearbyRobotPositions(team, id, gi))
+}
+
+func deflectAroundRobots(myPos, dest info.Position, robots []info.Position) info.Position {
+	for _, robot := range robots {
+		if dest.Dist2d(robot) < aroundBallRobotClearance {
+			dest = pushOutOfRobot(dest, myPos, robot)
+		}
+	}
+
+	blocker, blocked := firstBlockingRobot(myPos, dest, robots)
+	if !blocked {
+		return dest
+	}
+
+	toBlockerX := blocker.X - myPos.X
+	toBlockerY := blocker.Y - myPos.Y
+	dist := math.Hypot(toBlockerX, toBlockerY)
+	if dist < 1e-9 {
+		return dest
+	}
+	dirX, dirY := toBlockerX/dist, toBlockerY/dist
+	perpX, perpY := -dirY, dirX
+	if (dest.X-myPos.X)*perpX+(dest.Y-myPos.Y)*perpY < 0 {
+		perpX, perpY = -perpX, -perpY
+	}
+	radius := aroundBallRobotClearance + aroundBallDetourMargin
+	if dist <= radius {
+		return info.Position{
+			X:     myPos.X + perpX*radius,
+			Y:     myPos.Y + perpY*radius,
+			Angle: dest.Angle,
+		}
+	}
+	sinA := radius / dist
+	cosA := math.Sqrt(1 - sinA*sinA)
+	tangentLen := dist * cosA
+	return info.Position{
+		X:     myPos.X + (dirX*cosA+perpX*sinA)*tangentLen,
+		Y:     myPos.Y + (dirY*cosA+perpY*sinA)*tangentLen,
+		Angle: dest.Angle,
+	}
+}
+
+func pushOutOfRobot(dest, myPos, robot info.Position) info.Position {
+	dx := dest.X - robot.X
+	dy := dest.Y - robot.Y
+	norm := math.Hypot(dx, dy)
+	if norm < 1e-9 {
+		dx = myPos.X - robot.X
+		dy = myPos.Y - robot.Y
+		norm = math.Hypot(dx, dy)
+		if norm < 1e-9 {
+			return dest
+		}
+	}
+	dest.X = robot.X + dx/norm*aroundBallRobotClearance
+	dest.Y = robot.Y + dy/norm*aroundBallRobotClearance
+	return dest
+}
+
+func firstBlockingRobot(myPos, dest info.Position, robots []info.Position) (info.Position, bool) {
+	abX := dest.X - myPos.X
+	abY := dest.Y - myPos.Y
+	lenSq := abX*abX + abY*abY
+	if lenSq < 1e-9 {
+		return info.Position{}, false
+	}
+
+	best := info.Position{}
+	bestT := math.Inf(1)
+	for _, robot := range robots {
+		acX := robot.X - myPos.X
+		acY := robot.Y - myPos.Y
+		t := (acX*abX + acY*abY) / lenSq
+		if t <= 0 {
+			continue
+		}
+		closestT := math.Min(t, 1)
+		dx := robot.X - (myPos.X + closestT*abX)
+		dy := robot.Y - (myPos.Y + closestT*abY)
+		if dx*dx+dy*dy >= aroundBallRobotClearance*aroundBallRobotClearance {
+			continue
+		}
+		if t < bestT {
+			best, bestT = robot, t
+		}
+	}
+	return best, !math.IsInf(bestT, 1)
 }

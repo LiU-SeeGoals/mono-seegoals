@@ -169,7 +169,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 		Pos:               robotPos,
 		Dest:              carrot,
 		AllowOutsideField: true,
-		MinLinearSpeed:    aroundBallLinearSpeed(robotPos, carrot),
+		MinLinearSpeed:    aroundBallLinearSpeed(robotPos, carrot, ballPred, kp.targetPosition),
 		Dribble:           dribble,
 	}
 }
