@@ -20,6 +20,8 @@ Here follows a short description of the systems:
 ## Quickstart Guide
 Follow these steps to get started developing!
 
+On Windows, read the [Windows setup guide](WINDOWS.md) first.
+
 ### Dependencies
 1. Make sure you have git installed by running `git -v` in your terminal. You'll see something similar to `git version 2.52.0`.
 
