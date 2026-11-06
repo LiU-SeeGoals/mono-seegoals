@@ -8,7 +8,6 @@
 #include "stm32h755xx.h"
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_adc.h"
-#include "stm32h7xx_hal_adc_ex.h"
 #include "stm32h7xx_hal_def.h"
 #include "stm32h7xx_hal_gpio.h"
 #include "stm32h7xx_hal_spi.h"
@@ -21,7 +20,15 @@
 /* Private variables */
 static LOG_Module internal_log_mod;
 static KICKER_Settings settings = {
-    .max_charges_per_kick = 6, .safe_discharge_wait_us = 15, .charge_wait_us = 100000, .discharge_wait_us_kicker = 300, .discharge_wait_us_chipper = 10, .charges_since_last_kick = 0};
+    .max_charges_per_kick = 6,
+    .safe_discharge_wait_us = 15,
+    .charge_wait_us = 350000,
+    .discharge_wait_us_kicker = 300,
+    .discharge_wait_us_chipper = 10,
+    .charges_since_last_kick = 0,
+    .ir_poll_intervall_us = 20000,
+};
+
 static volatile bool charging = false;
 static volatile bool kicking = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
@@ -30,13 +37,9 @@ static TIM_HandleTypeDef* htim_kicker_kick;
 static SPI_HandleTypeDef* kicker_hspi;
 static ADC_HandleTypeDef* ir_adc;
 
-// Containter for the ir sensor readout, this value is updated via DMA
-// so it should be considered read only.
-uint32_t ir_adc_value;
-
 // Threshold value for the ir sensor, if the reading is bellow this value we
-// consider the sensor ocluded. TODO: Experimentaly establish this value.
-const uint32_t ir_threshold = 0;
+// consider the sensor ocluded.
+const uint32_t ir_threshold = 2000;
 
 /*
  * Private functions:
@@ -60,30 +63,74 @@ void spi_enable(bool enabled)
 
 int16_t readADC()
 {
-    uint8_t buffer[2] = {0x08, // Control register, read from ch. 2
-                         0x00};
+    uint8_t tx[2] = {0x08, 0x00};
+    uint8_t rx[2] = {0};
 
     spi_enable(true);
-    HAL_SPI_Receive(kicker_hspi, &buffer[0], 2, 1000);
-    spi_enable(false);
 
-    uint16_t measurement = (uint16_t)buffer[0] | ((uint16_t)buffer[1] << 8);
+    HAL_SPI_TransmitReceive(kicker_hspi,
+                            tx,
+                            rx,
+                            2,
+                            HAL_MAX_DELAY);
 
-    return measurement;
+    HAL_GPIO_WritePin(KICKER_CS_GPIO_Port,
+                      KICKER_CS_Pin,
+                      GPIO_PIN_SET);
+
+    uint16_t adc = ((uint16_t)rx[0] << 8) | rx[1];
+
+    LOG_Printf(&internal_log_mod, LOG_LEVEL_INFO, "ADC: %d\r\n", adc);
+    return 0;
 }
 
 bool ir_sensor_ocluded()
 {
+    // CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    // DWT->CYCCNT = 0;
+    // DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+    // uint32_t start = DWT->CYCCNT;
+
+    HAL_StatusTypeDef status = HAL_ERROR;
+    status = HAL_ADC_Start(ir_adc);
+    if (status != HAL_OK) {
+        LOG_ERROR("IR sensor ADC failed start.\r\n");
+    }
+
+    // Wait for conversion to complete, timeout 20ms
+    status = HAL_ADC_PollForConversion(ir_adc, 20);
+    if (status != HAL_OK) {
+        LOG_ERROR("ADC poll wait failed.\r\n");
+    }
+
+    uint32_t raw = HAL_ADC_GetValue(ir_adc);
+
+    status = HAL_ADC_Stop(ir_adc);
+    if (status != HAL_OK) {
+        LOG_ERROR("ADC stop failed.\r\n");
+    }
+    // LOG_INFO("IR measurement: %u\r\n", raw);
+
     /*
      * false => adc reading above threshold, the light is reaching the sensor
      * true  => adc reading bellow threshold, less light is reaching the sensor
      *          so it is probablly ocluded, possibly by ball
      */
-    if (ir_adc_value > ir_threshold) {
-        return false;
+    bool ball_status;
+    if (raw > ir_threshold) {
+        ball_status = false;
+        // LOG_INFO("Ball?: No\r\n");
     } else {
-        return true;
+        ball_status = true;
+        // LOG_INFO("Ball?: Yes!\r\n");
     }
+    // uint32_t end = DWT->CYCCNT;
+    // uint32_t cycles = end - start;
+
+    // LOG_INFO("IR sensor read clk cycles: %u \r\n", cycles);
+
+    return ball_status;
 }
 
 /*
@@ -109,7 +156,7 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
     HAL_StatusTypeDef status = HAL_ERROR;
     // status = HAL_ADCEx_Calibration_Start(ir_adc, ADC_CALIB_OFFSET, ADC_SINGLE_ENDED);
     // if (status != HAL_OK) {
-        // LOG_ERROR("IR sensor ADC failed calibration.\r\n");
+    // LOG_ERROR("IR sensor ADC failed calibration.\r\n");
     // }
 
     // Disable the spi connection as default
@@ -117,27 +164,7 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
 
     // Testing, reading from the ADC
     while (true) {
-        // uint16_t meas = readADC();
-        status = HAL_ADC_Start(ir_adc);
-        if (status != HAL_OK) {
-            LOG_ERROR("IR sensor ADC failed start.\r\n");
-        }
-
-        // Wait for conversion to complete, timeout 20ms
-        status = HAL_ADC_PollForConversion(ir_adc, 20);
-        if (status != HAL_OK) {
-            LOG_ERROR("ADC poll wait failed.\r\n");
-        }
-
-        uint32_t raw = HAL_ADC_GetValue(ir_adc);
-
-        status = HAL_ADC_Stop(ir_adc);
-        if (status != HAL_OK) {
-            LOG_ERROR("ADC stop failed.\r\n");
-        }
-
-        LOG_INFO("IR measurement: %u\r\n", raw);
-
+        bool ball_status = ir_sensor_ocluded();
         HAL_Delay(500);
     }
 }
@@ -177,9 +204,111 @@ void KICKER_ChargeStop()
     charging = false;
 }
 
+typedef struct {
+    // Indicates that a kick process is in progress, this might be kicking or
+    // waiting for the IR sensor.
+    bool in_progress;
+    // The amout of polls to wait before the kick times out.
+    uint32_t timeout;
+    // The solenoid we are using, kicker or chipper
+    KICKER_type type;
+    // If a kick has started
+    bool kick_started;
+} KICKER_InternalState;
+
+static KICKER_InternalState internal_state = {
+    .in_progress = false,
+    .timeout = 0,
+    .type = KICKER,
+    .kick_started = false,
+};
+
+void KICKER_KickStartWithIR(KICKER_type type, uint32_t timeout)
+{
+    // Check if the other kicker function has already been called.
+    if (kicking) {
+        LOG_DEBUG("Already kicking\r\n");
+        return;
+    }
+
+    // Check if this kick function has been run before
+    if (internal_state.in_progress) {
+        LOG_DEBUG("Already kicking\r\n");
+        return;
+    }
+
+    internal_state.in_progress = true;
+    internal_state.type = type;
+    internal_state.timeout = timeout;
+
+    // If the timeout is zero we want to kick imediately
+    if (timeout == 0) {
+        KICKER_KickPoll();
+
+        return;
+    }
+
+    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.ir_poll_intervall_us);
+    __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
+    htim_kicker_charge->Instance->EGR = TIM_EGR_UG;
+    __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
+
+    HAL_TIM_Base_Start_IT(htim_kicker_kick);
+}
+
+void KICKER_KickPoll()
+{
+
+    // If we have started a kick we want to stop
+    if (internal_state.kick_started) {
+        KICKER_KickStop();
+
+        // Reset internal state
+        internal_state.in_progress = false;
+        internal_state.kick_started = false;
+
+        return;
+    }
+
+    // If the IR sensor is occluded we want to kick the ball and if the timeout
+    // is 0 we also want to kick
+    if (internal_state.timeout == 0 || ir_sensor_ocluded()) {
+        internal_state.kick_started = true;
+
+        LOG_DEBUG("Kicking start\r\n");
+
+        if (internal_state.type == KICKER) {
+            // Kicker
+            // Kicks on low
+            HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
+            __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us_kicker);
+        } else {
+            // Chipper
+            // Kicks on low
+            HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_RESET);
+            __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, settings.discharge_wait_us_chipper);
+        }
+
+        __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
+        htim_kicker_charge->Instance->EGR = TIM_EGR_UG;
+        __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
+
+        return;
+    }
+
+    // decrease the timeout counter.
+    internal_state.timeout -= 1;
+}
+
 void KICKER_KickStart(KICKER_type type)
 {
     if (kicking) {
+        LOG_DEBUG("Already kicking\r\n");
+        return;
+    }
+
+    // Check if the ir sensor kick function is in progress
+    if (internal_state.in_progress) {
         LOG_DEBUG("Already kicking\r\n");
         return;
     }

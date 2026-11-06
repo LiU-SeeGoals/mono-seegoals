@@ -5,13 +5,16 @@
 #include "stm32h7xx_hal_adc.h"
 #include "stm32h7xx_hal_spi.h"
 
+#include <stdint.h>
+
 typedef struct {
-    int max_charges_per_kick;
-    int charge_wait_us;
-    int discharge_wait_us_kicker;
-    int discharge_wait_us_chipper;
-    int safe_discharge_wait_us;
-    int charges_since_last_kick;
+    uint32_t max_charges_per_kick;
+    uint32_t charge_wait_us;
+    uint32_t discharge_wait_us_kicker;
+    uint32_t discharge_wait_us_chipper;
+    uint32_t safe_discharge_wait_us;
+    uint32_t charges_since_last_kick;
+    uint32_t ir_poll_intervall_us;
 } KICKER_Settings;
 
 typedef enum {
@@ -42,6 +45,10 @@ void KICKER_ChargeStop();
  *
  */
 void KICKER_KickStart(KICKER_type type);
+
+void KICKER_KickStartWithIR(KICKER_type type, uint32_t timeout);
+
+void KICKER_KickPoll();
 
 /**
  *

@@ -32,6 +32,7 @@
 #include "pos_follow.h"
 #include "common.h"
 #include "state_estimator.h"
+#include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_gpio.h"
 #include "stm32h7xx_it.h"
 #include "ui.h"
@@ -141,11 +142,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     /* USER CODE END Callback 0 */
     if (htim->Instance == TIM5) {
         KICKER_ChargeStop();
-        KICKER_KickStart(CHIPPER);
+        // Start a kick, very high timeout while testing.
+        // KICKER_KickStartWithIR(KICKER, 1000000);
+        KICKER_KickStart(KICKER);
+
     }
 
     if (htim->Instance == TIM3) {
-        KICKER_KickStop();
+        KICKER_KickPoll();
     }
     if (htim->Instance == TIM7) {
         NAV_update_motor_state();
