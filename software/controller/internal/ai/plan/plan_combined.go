@@ -960,14 +960,6 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
 		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
 		ownerRetained := possession.owner.valid && ownerStillRetained(&gi, possession.owner)
-		// halt game
-		if true {
-			for id, attacker := range roleManager.attackers {
-				attacker.TriggerEvent("BALL_LOST")
-				m.ActivityHandler.AddActivity(act.NewRefStop(m.team, id))
-			}
-			return
-		}
 
 		handledByOffense := false
 		passInFlight := hasActiveReceiver &&
