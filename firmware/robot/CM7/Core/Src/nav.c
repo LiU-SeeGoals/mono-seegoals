@@ -12,6 +12,7 @@
 #include "stm32h7xx_it.h"
 #include "log.h"
 #include "motor.h"
+#include <stdint.h>
 #include <stdlib.h>
 
 /*
@@ -44,48 +45,52 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     HAL_TIM_Base_Start(pwm15_htim);
 
     motors[0].pwm_htim = pwm_htim;
-    motors[0].ticks = 0;
+    // motors[0].ticks = 0;
     motors[0].speed = 0.f;
-    motors[0].prev_tick = 0;
+    // motors[0].prev_tick = 0;
     motors[0].channel = TIM_CHANNEL_1;
     motors[0].breakPinPort = MOTOR1_BREAK_GPIO_Port;
     motors[0].breakPin = MOTOR1_BREAK_Pin;
     motors[0].reversePinPort = MOTOR1_REVERSE_GPIO_Port;
     motors[0].reversePin = MOTOR1_REVERSE_Pin;
     motors[0].dir = 1;
+    motors[0].enc_speed = 0;
 
     motors[1].pwm_htim = pwm_htim;
-    motors[1].ticks = 0;
+    // motors[1].ticks = 0;
     motors[1].speed = 0.f;
-    motors[1].prev_tick = 0;
+    // motors[1].prev_tick = 0;
     motors[1].channel = TIM_CHANNEL_2;
     motors[1].breakPinPort = MOTOR2_BREAK_GPIO_Port;
     motors[1].breakPin = MOTOR2_BREAK_Pin;
     motors[1].reversePinPort = MOTOR2_REVERSE_GPIO_Port;
     motors[1].reversePin = MOTOR2_REVERSE_Pin;
     motors[1].dir = 1;
+    motors[1].enc_speed = 0;
 
     motors[2].pwm_htim = pwm_htim;
-    motors[2].ticks = 0;
+    // motors[2].ticks = 0;
     motors[2].speed = 0.f;
-    motors[2].prev_tick = 0;
+    // motors[2].prev_tick = 0;
     motors[2].channel = TIM_CHANNEL_3;
     motors[2].breakPinPort = MOTOR3_BREAK_GPIO_Port;
     motors[2].breakPin = MOTOR3_BREAK_Pin;
     motors[2].reversePinPort = MOTOR3_REVERSE_GPIO_Port;
     motors[2].reversePin = MOTOR3_REVERSE_Pin;
     motors[2].dir = 1;
+    motors[2].enc_speed = 0;
 
     motors[3].pwm_htim = pwm_htim;
-    motors[3].ticks = 0;
-    motors[3].speed = 0.f;
-    motors[3].prev_tick = 0;
+    // motors[3].ticks = 0;
+    // motors[3].speed = 0.f;
+    // motors[3].prev_tick = 0;
     motors[3].channel = TIM_CHANNEL_4;
     motors[3].breakPinPort = MOTOR4_BREAK_GPIO_Port;
     motors[3].breakPin = MOTOR4_BREAK_Pin;
     motors[3].reversePinPort = MOTOR4_REVERSE_GPIO_Port;
     motors[3].reversePin = MOTOR4_REVERSE_Pin;
     motors[3].dir = 1;
+    motors[3].enc_speed = 0;
 
     MOTOR_PWMStart(&motors[0]);
     MOTOR_PWMStart(&motors[1]);
@@ -93,14 +98,14 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
     MOTOR_PWMStart(&motors[3]);
 
     // memset did not work, idc
-    for (int i = 0; i < 4; i++) {
-        motors[i].cur_tick_idx = 0;
-        motors[i].cur_tick_idx = 0;
-        I_prevs[i] = 0.0f;
-        for (int j = 0; j < MOTOR_TICK_BUF_SIZE; j++) {
-            motors[i].motor_ticks[j] = 0;
-        }
-    }
+    // for (int i = 0; i < 4; i++) {
+    //     motors[i].cur_tick_idx = 0;
+    //     motors[i].cur_tick_idx = 0;
+    //     I_prevs[i] = 0.0f;
+    //     for (int j = 0; j < MOTOR_TICK_BUF_SIZE; j++) {
+    //         motors[i].motor_ticks[j] = 0;
+    //     }
+    // }
 
     robot_cmd.x = 0;
     robot_cmd.y = 0;
@@ -115,15 +120,21 @@ void NAV_Init(TIM_HandleTypeDef* motor_tick_itr,
 
 void NAV_update_motor_state()
 {
+    // TODO: Remove commented code when we don't need it anymore
+    // int* motor_ticks = ITR_GetMotorTicks();
 
-    int* motor_ticks = ITR_GetMotorTicks();
+    // for (int i = 0; i < 4; i++) {
+    //     int ticks_before = motors[i].prev_tick;
+    //     int new_ticks = motor_ticks[i];
+    //     MOTOR_update_motor_ticks(&motors[i], new_ticks - ticks_before);
+    //     motors[i].ticks = new_ticks - ticks_before;
+    //     motors[i].prev_tick = new_ticks;
+    // }
 
-    for (int i = 0; i < 4; i++) {
-        int ticks_before = motors[i].prev_tick;
-        int new_ticks = motor_ticks[i];
-        MOTOR_update_motor_ticks(&motors[i], new_ticks - ticks_before);
-        motors[i].ticks = new_ticks - ticks_before;
-        motors[i].prev_tick = new_ticks;
+    if (MOTOR_GetEncoderSpeeds(motors) != HAL_OK) {
+        // TODO: If we don't get data from the encoders we might want to do someting
+        // to make shure that the I component of the PID loops does'nt go wild.
+        LOG_INFO("Problem reading encoders encountered the speed has thus not been updated!\r\n");
     }
 
     // Dont move this into the other for loop, we want motors to run simultanious!!
@@ -149,10 +160,15 @@ void NAV_wheelToBody(float* res)
     float psi = PI * 31.f / 180.0f;
     float theta = PI * 45.f / 180.0f;
 
-    float wrf = MOTOR_GetMotorSign(&motors[0]) * MOTOR_ReadTicksPerSecond(&motors[0]) / 48.f * 2.0f * PI;
-    float wlf = MOTOR_GetMotorSign(&motors[1]) * MOTOR_ReadTicksPerSecond(&motors[1]) / 48.f * 2.0f * PI;
-    float wlb = MOTOR_GetMotorSign(&motors[2]) * MOTOR_ReadTicksPerSecond(&motors[2]) / 48.f * 2.0f * PI;
-    float wrb = MOTOR_GetMotorSign(&motors[3]) * MOTOR_ReadTicksPerSecond(&motors[3]) / 48.f * 2.0f * PI;
+    // TODO: Remove commented code when we don't need it anymore
+    // float wrf = MOTOR_GetMotorSign(&motors[0]) * MOTOR_ReadTicksPerSecond(&motors[0]) / 48.f * 2.0f * PI;
+    // float wlf = MOTOR_GetMotorSign(&motors[1]) * MOTOR_ReadTicksPerSecond(&motors[1]) / 48.f * 2.0f * PI;
+    // float wlb = MOTOR_GetMotorSign(&motors[2]) * MOTOR_ReadTicksPerSecond(&motors[2]) / 48.f * 2.0f * PI;
+    // float wrb = MOTOR_GetMotorSign(&motors[3]) * MOTOR_ReadTicksPerSecond(&motors[3]) / 48.f * 2.0f * PI;
+    float wrf = MOTOR_GetMotorSign(&motors[0]) * MOTOR_ReadMotorRPM(&motors[0]) / 2.0f * PI;
+    float wlf = MOTOR_GetMotorSign(&motors[1]) * MOTOR_ReadMotorRPM(&motors[1]) / 2.0f * PI;
+    float wlb = MOTOR_GetMotorSign(&motors[2]) * MOTOR_ReadMotorRPM(&motors[2]) / 2.0f * PI;
+    float wrb = MOTOR_GetMotorSign(&motors[3]) * MOTOR_ReadMotorRPM(&motors[3]) / 2.0f * PI;
 
     // motors[0].speed = wrf;
     // motors[1].speed = wlf;

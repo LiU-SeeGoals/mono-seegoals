@@ -36,6 +36,7 @@
 #include "stm32h7xx_hal_gpio.h"
 #include "stm32h7xx_it.h"
 #include "ui.h"
+#include <stdint.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -65,7 +66,6 @@ SPI_HandleTypeDef hspi6;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim3;
-TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
 TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim12;
@@ -100,7 +100,6 @@ static void MX_SPI1_Init(void);
 static void MX_TIM12_Init(void);
 static void MX_TIM15_Init(void);
 static void MX_I2C4_Init(void);
-static void MX_TIM4_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_TIM7_Init(void);
@@ -218,7 +217,6 @@ int main(void)
   MX_TIM12_Init();
   MX_TIM15_Init();
   MX_I2C4_Init();
-  MX_TIM4_Init();
   MX_TIM5_Init();
   MX_TIM3_Init();
   MX_TIM7_Init();
@@ -236,7 +234,6 @@ int main(void)
     }
     POS_Init();
     NAV_Init(&htim7, &htim1, &htim15);
-    HAL_TIM_Base_Start_IT(&htim4);
     MOTOR_Init(&htim1, &hi2c3);
     DATA_Init(&hspi6);
     KICKER_Init(&htim5, &htim3);
@@ -259,9 +256,11 @@ int main(void)
         HAL_Delay(40);
     }
 
+    int32_t speeds[4] = { 0 };
     while (true) {
         LOG_INFO("test\r\n");
-        MOTOR_get_encoder_rpms();
+        // MOTOR_GetEncoderSpeeds(speeds);
+        LOG_INFO("speed0: %d, speed1: %d, speed2: %d, speed3: %d\r\n", speeds[0], speeds[1], speeds[2], speeds[3]);
         HAL_Delay(1000);
     }
 
@@ -708,58 +707,6 @@ static void MX_TIM3_Init(void)
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
-
-}
-
-/**
-  * @brief TIM4 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM4_Init(void)
-{
-
-  /* USER CODE BEGIN TIM4_Init 0 */
-
-  /* USER CODE END TIM4_Init 0 */
-
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-
-  /* USER CODE BEGIN TIM4_Init 1 */
-
-  /* USER CODE END TIM4_Init 1 */
-  htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 0;
-  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 999;
-  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_DISABLE;
-  sSlaveConfig.InputTrigger = TIM_TS_ITR1;
-  if (HAL_TIM_SlaveConfigSynchro(&htim4, &sSlaveConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM4_Init 2 */
-
-  /* USER CODE END TIM4_Init 2 */
 
 }
 

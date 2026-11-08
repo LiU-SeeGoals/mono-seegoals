@@ -47,10 +47,10 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN PV */
-static int motor_ticks[4];
-static int motor_ticks_prev[4];
-static int motor_ticks_delta[4];
-static int cur_buf_idx = 0;
+// static int motor_ticks[4];
+// static int motor_ticks_prev[4];
+// static int motor_ticks_delta[4];
+// static int cur_buf_idx = 0;
 static LOG_Module internal_log_mod;
 
 /* USER CODE END PV */
@@ -68,7 +68,6 @@ static LOG_Module internal_log_mod;
 /* External variables --------------------------------------------------------*/
 extern SPI_HandleTypeDef hspi6;
 extern TIM_HandleTypeDef htim3;
-extern TIM_HandleTypeDef htim4;
 extern TIM_HandleTypeDef htim5;
 extern TIM_HandleTypeDef htim7;
 extern TIM_HandleTypeDef htim12;
@@ -230,54 +229,6 @@ void TIM3_IRQHandler(void)
 }
 
 /**
-  * @brief This function handles TIM4 global interrupt.
-  */
-void TIM4_IRQHandler(void)
-{
-  /* USER CODE BEGIN TIM4_IRQn 0 */
-
-  static GPIO_PinState motor_prev[4];
-  static GPIO_PinState motor_cur[4];
-  static uint8_t init = 0;
-
-  if (!init)
-  {
-      for (int i = 0; i < 4; i ++)
-      {
-          motor_ticks[i] = 0;
-          motor_ticks_prev[i] = 0;
-          motor_ticks_delta[i] = 0;
-          motor_cur[i] = 0;
-          motor_prev[i] = 0;
-      }
-      init = 1;
-  }
-  /* USER CODE END TIM4_IRQn 0 */
-  HAL_TIM_IRQHandler(&htim4);
-  /* USER CODE BEGIN TIM4_IRQn 1 */
-
-  // Motor 1 to 4
-  motor_cur[0] = (int)HAL_GPIO_ReadPin(MOTOR1_ENCODER_GPIO_Port, MOTOR1_ENCODER_Pin);
-  motor_cur[1] = (int)HAL_GPIO_ReadPin(MOTOR2_ENCODER_GPIO_Port, MOTOR2_ENCODER_Pin);
-  motor_cur[2] = (int)HAL_GPIO_ReadPin(MOTOR3_ENCODER_GPIO_Port, MOTOR3_ENCODER_Pin);
-  motor_cur[3] = (int)HAL_GPIO_ReadPin(MOTOR4_ENCODER_GPIO_Port, MOTOR4_ENCODER_Pin);
-
-
-  for (int i = 0; i < 4; i++)
-  {
-      if(motor_prev[i] != motor_cur[i])
-      {
-          motor_prev[i] = motor_cur[i];
-          motor_ticks[i] += 1;
-      }
-  }
-  /* USER CODE END TIM3_IRQn 1 */
-  /* USER CODE BEGIN TIM4_IRQn 1 */
-
-  /* USER CODE END TIM4_IRQn 1 */
-}
-
-/**
   * @brief This function handles USART3 global interrupt.
   */
 void USART3_IRQHandler(void)
@@ -363,11 +314,10 @@ void SPI6_IRQHandler(void)
 }
 
 /* USER CODE BEGIN 1 */
-int* ITR_GetMotorTicks(void)
-{
-
-    return motor_ticks;
-}
+// int* ITR_GetMotorTicks(void)
+// {
+//     return motor_ticks;
+// }
 
 void ITR_Init(void)
 {

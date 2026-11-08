@@ -54,7 +54,6 @@ int32_t deserialize_int32(uint8_t* buffer, uint32_t start_index)
  **/
 HAL_StatusTypeDef deserialize_speeds(int32_t* speeds, uint32_t speeds_offset, uint8_t* buffer)
 {
-    // TODO: Handle errors
     // STX Check
     if (buffer[0] != 0x02) {
         LOG_ERROR("Message does not start with STX\r\n");
@@ -83,31 +82,32 @@ HAL_StatusTypeDef deserialize_speeds(int32_t* speeds, uint32_t speeds_offset, ui
 /*
  Averages motor speed ticks
 */
-void MOTOR_update_motor_ticks(MotorPWM* motor, float val)
-{
-    motor->cur_tick_idx = (1 + motor->cur_tick_idx) % (MOTOR_TICK_BUF_SIZE);
-    motor->motor_ticks[motor->cur_tick_idx] = val;
-}
+// void MOTOR_update_motor_ticks(MotorPWM* motor, float val)
+// {
+//     motor->cur_tick_idx = (1 + motor->cur_tick_idx) % (MOTOR_TICK_BUF_SIZE);
+//     motor->motor_ticks[motor->cur_tick_idx] = val;
+// }
 
 /*
  Get motor speed
 */
-float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor)
-{
-    // Can be made faster keeping a moving average and removing the last adding the new?
-    float cur = 0;
-    for (int i = 0; i < MOTOR_TICK_BUF_SIZE; i++) {
-        cur += motor->motor_ticks[i];
-    }
-    return cur / ((float)MOTOR_TICK_BUF_SIZE);
-}
+// float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor)
+// {
+//     // Can be made faster keeping a moving average and removing the last adding the new?
+//     float cur = 0;
+//     for (int i = 0; i < MOTOR_TICK_BUF_SIZE; i++) {
+//         cur += motor->motor_ticks[i];
+//     }
+//     return cur / ((float)MOTOR_TICK_BUF_SIZE);
+// }
 
-HAL_StatusTypeDef MOTOR_get_encoder_rpms()
+HAL_StatusTypeDef MOTOR_GetEncoderSpeeds(MotorPWM motors[4])
 {
     // The device adress has to be left shifted by one as the 7 bit adress is in
     // bits 1..7 not 0..6
     uint8_t devaddr_0 = 0x5;
     uint8_t devaddr_1 = 0x6;
+
     int32_t speeds[4] = { 0 };
 
     // uint8_t message[10] = {0x03, 0x01};
@@ -124,15 +124,18 @@ HAL_StatusTypeDef MOTOR_get_encoder_rpms()
         return HAL_ERROR;
     }
 
-    uint32_t i;
-    for (i = 0; i < 11; i++) {
-        LOG_INFO("%u: %u\r\n", i, counter_0_buf[i]);
-    }
+    // uint32_t i;
+    // for (i = 0; i < 11; i++) {
+    //     LOG_INFO("%u: %u\r\n", i, counter_0_buf[i]);
+    // }
 
     uint8_t crc = calc_crc(counter_0_buf, 1, 10);
-    LOG_INFO("crc: %u\r\n", crc);
+    // LOG_INFO("crc: %u\r\n", crc);
 
-    deserialize_speeds(speeds, 0, counter_0_buf);
+    if (deserialize_speeds(speeds, 0, counter_0_buf) != HAL_OK) {
+        LOG_ERROR("Deserialization of encoder counter 0 data failed\r\n");
+        return HAL_ERROR;
+    }
 
     uint8_t counter_1_buf[11] = {0};
     rx_status = HAL_I2C_Master_Receive(enc_i2c_handle, (devaddr_1 << 1), counter_1_buf, 0x11, 1000);
@@ -141,17 +144,28 @@ HAL_StatusTypeDef MOTOR_get_encoder_rpms()
         return HAL_ERROR;
     }
 
-    for (i = 0; i < 11; i++) {
-        LOG_INFO("%u: %u\r\n", i, counter_1_buf[i]);
-    }
+    // for (i = 0; i < 11; i++) {
+    //     LOG_INFO("%u: %u\r\n", i, counter_1_buf[i]);
+    // }
 
     crc = calc_crc(counter_1_buf, 1, 10);
-    LOG_INFO("crc: %u\r\n", crc);
+    // LOG_INFO("crc: %u\r\n", crc);
 
-    deserialize_speeds(speeds, 2, counter_1_buf);
+    if (deserialize_speeds(speeds, 2, counter_1_buf) != HAL_OK) {
+        LOG_ERROR("Deserialization of encoder counter 1 data failed\r\n");
+        return HAL_ERROR;
+    }
 
-    LOG_INFO("speed0: %d, speed1: %d, speed2: %d, speed3: %d\r\n", speeds[0], speeds[1], speeds[2], speeds[3]);
+    for (int i = 0; i < 4; i++) {
+        motors[i].enc_speed = speeds[i];
+    }
+
     return HAL_OK;
+}
+
+float_t MOTOR_ReadMotorRPM(MotorPWM* motor) {
+    // (tics/s * 60s) / (subtics * ticks/rotation)
+    return ((float_t)(motor->enc_speed) * 60.0) / (64.0 * 4000.0);
 }
 
 void MOTOR_Init(TIM_HandleTypeDef* pwm_htim, I2C_HandleTypeDef* enc_i2c)
@@ -229,7 +243,10 @@ ControlSignal MOTOR_SetSpeed(MotorPWM* motor, float speed, float* I_prev)
     float Ts = 1.f / CONTROL_FREQ;
     float Ti = 0.02;
     float K = 0.00015;
-    float current_speed = (float)MOTOR_ReadTicksPerSecond(motor);
+    // TODO: I chose to multiply the rpm value by 48 as the old system gets
+    // 48 clicks per rotation. This sould be updated by tuning around RPM as it's
+    // a more sensible unit but this probably works in the meantime.
+    float current_speed = MOTOR_ReadMotorRPM(motor) * 48.0;
     float error = speed - current_speed;
     float I;
     float v;
@@ -292,11 +309,11 @@ void MOTOR_SendPWM(MotorPWM* motor, float pulse_width)
     __HAL_TIM_SET_COMPARE(motor->pwm_htim, motor->channel, pwm_speed);
 }
 
-float MOTOR_ReadTicksPerSecond(MotorPWM* motor)
-{
-    // When I write this control freq should be 2000, each iteration is a
-    // time-step of 1/2000 so this gives the speed in ticks per second.
-    float speed_s = MOTOR_get_motor_ticks_per_iteration(motor) * CONTROL_FREQ;
+// float MOTOR_ReadTicksPerSecond(MotorPWM* motor)
+// {
+//     // When I write this control freq should be 2000, each iteration is a
+//     // time-step of 1/2000 so this gives the speed in ticks per second.
+//     float speed_s = MOTOR_get_motor_ticks_per_iteration(motor) * CONTROL_FREQ;
 
-    return speed_s;
-}
+//     return speed_s;
+// }

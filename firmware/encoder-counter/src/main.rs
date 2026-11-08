@@ -114,6 +114,8 @@ fn main() -> ! {
     led_pin.set_high().unwrap();
 
     loop {
+        let point_1 = timer.get_counter();
+
         enc0.update();
         enc1.update();
 
@@ -123,14 +125,14 @@ fn main() -> ! {
                 // The controller has requested data so we should send the
                 // speeds
                 Event::TransferRead => {
-                    info!("Transfer Read");
+                    // info!("Transfer Read");
                     let speed0 = enc0.get_raw_encoder_state().get_speed();
                     let speed1 = enc1.get_raw_encoder_state().get_speed();
-                    info!("Speed0: {}, Speed1: {}", speed0, speed1);
+                    // info!("Speed0: {}, Speed1: {}", speed0, speed1);
                     i2c.write(&compose_message(speed0, speed1));
                 }
                 Event::TransferWrite => {
-                    info!("Transfer write");
+                    // info!("Transfer write");
                     let mut buf = [0; 32];
                     i2c.read(&mut buf);
                     // info!("{:?}", buf);
@@ -148,8 +150,11 @@ fn main() -> ! {
         //     enc.get_rotation(),
         //     enc.get_steps()
         // );
+        let point_2 = timer.get_counter();
+        let dur = point_2.checked_duration_since(point_1).unwrap().to_micros();
 
-        delay.delay_ms(20);
+        info!("Loop duration: {}µs", dur);
+        delay.delay_ms(500);
     }
 }
 

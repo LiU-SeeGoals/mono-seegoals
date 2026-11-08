@@ -6,21 +6,23 @@
 
 #include "stm32h7xx_hal_def.h"
 #include "stm32h7xx_hal_i2c.h"
+#include <stdint.h>
 // Tick buffer of 100 with 5000hz update is 0.05 second filter on motor
 #define MOTOR_TICK_BUF_SIZE 1
 typedef struct {
     TIM_HandleTypeDef* pwm_htim;
     uint32_t channel;
-    int ticks;
-    float speed;
-    int prev_tick;
+    // int ticks;
+    float speed; // Motor speed setpoint
+    // int prev_tick;
     GPIO_TypeDef* breakPinPort;
     uint16_t breakPin;
     GPIO_TypeDef* reversePinPort;
     uint16_t reversePin;
     uint16_t dir;
-    float motor_ticks[MOTOR_TICK_BUF_SIZE];
-    int cur_tick_idx;
+    // float motor_ticks[MOTOR_TICK_BUF_SIZE];
+    // int cur_tick_idx;
+    int32_t enc_speed; // encoder speed in 64x subdivided encoder steps per second
 } MotorPWM;
 
 /**
@@ -38,13 +40,13 @@ int MOTOR_GetMotorSign(MotorPWM* motor);
 /**
  * Returns the average motor ticks per iteration
  */
-float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor);
+// float MOTOR_get_motor_ticks_per_iteration(MotorPWM* motor);
 
 /**
  * Update motor tick buffer
  * @param val float of motor ticks for this iteration.
  */
-void MOTOR_update_motor_ticks(MotorPWM* motor, float val);
+// void MOTOR_update_motor_ticks(MotorPWM* motor, float val);
 
 /**
  * Enables the PWM signal
@@ -91,8 +93,27 @@ int setDirection(MotorPWM* motor, float speed);
  *
  * @returns float of speed
  */
-float MOTOR_ReadTicksPerSecond(MotorPWM* motor);
+// float MOTOR_ReadTicksPerSecond(MotorPWM* motor);
 
-HAL_StatusTypeDef MOTOR_get_encoder_rpms();
+/**
+ * Communicates with the encoder counter pcb to get the current speeds of the
+ * four connected encoders and updates the speed values of the motors.
+ *
+ * The speeds will **only** be updated if the function returns HAL_OK otherwise
+ * communication with the encoder counters has encountered a fault.
+ *
+ * The units that the speeds are returned in are encoder steps subdivided by 64
+ * per second.
+ *
+ * @param array of motors
+ *
+ * @returns Error value HAL_OK if success
+ */
+HAL_StatusTypeDef MOTOR_GetEncoderSpeeds(MotorPWM motors[4]);
+
+/**
+ * Gives the current speed of the passed motor in RPM
+ */
+float_t MOTOR_ReadMotorRPM(MotorPWM* motor);
 
 #endif
