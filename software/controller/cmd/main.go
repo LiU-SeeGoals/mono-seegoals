@@ -13,6 +13,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/demos"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/scripts"
 )
 
 // Use RUN_PROFILER to trace program execution time and memory usage
@@ -70,6 +71,8 @@ func main() {
 		demos.GameScenarioRealBlue()
 	case "real-yellow", "yellow":
 		demos.GameScenarioRealYellow()
+	case "script":
+		demos.RunScript(info.Blue, scripts.FreeKick)
 	default:
 		demos.GameScenario()
 	}
