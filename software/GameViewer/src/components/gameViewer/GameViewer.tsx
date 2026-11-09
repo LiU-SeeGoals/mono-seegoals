@@ -2,9 +2,11 @@ import './GameViewer.css';
 import { SSL_GeometryFieldSize } from '../../proto/ssl_vision_geometry';
 import useResizeSidebar from '../../hooks/useResizeSidebar';
 import FootballField from './footballField/FootballField';
+import { VisionMask } from '../../types/VisionMask';
 
 interface gameViewerProps {
   sslFieldUpdate: SSLFieldUpdate;
+  visionMask: VisionMask | null;
   aiRobotUpdate: AIRobotUpdate;
   robotActions: Action[];
   robotRoles: Record<string, string>;
@@ -17,6 +19,7 @@ interface gameViewerProps {
 
 const GameViewer: React.FC<gameViewerProps> = ({
   sslFieldUpdate,
+  visionMask,
   aiRobotUpdate,
   robotActions,
   robotRoles,
@@ -42,6 +45,7 @@ const GameViewer: React.FC<gameViewerProps> = ({
         height={footballFieldHeight}
         width={width}
         sslFieldUpdate={sslFieldUpdate}
+        visionMask={visionMask}
         aiRobotUpdate={aiRobotUpdate}
         robotActions={robotActions}
         robotRoles={robotRoles}

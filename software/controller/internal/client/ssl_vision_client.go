@@ -87,6 +87,7 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 	detect := packet.GetDetection()
 	gi.AdvanceVisionFrame()
 	gi.State.SetMessageReceivedTime(play_time)
+	rememberVisionMask(gi)
 
 	for _, robot := range detect.GetRobotsBlue() {
 		x := float64(robot.GetX())

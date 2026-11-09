@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, type Dispatch, type SetStateAction } from 'react';
 import { Action } from '../types/Action';
+import { VisionMask } from '../types/VisionMask';
 
 type RobotRoleDTO = {
   Team: number;
@@ -10,11 +11,13 @@ type RobotRoleDTO = {
 type AIControllerPacket = {
   Actions?: Action[];
   RobotRoles?: RobotRoleDTO[];
+  VisionMask?: VisionMask;
 };
 
 export const useAIController = (
   setRobotActions: Dispatch<SetStateAction<Action[]>>,
-  setRobotRoles?: Dispatch<SetStateAction<Record<string, string>>>
+  setRobotRoles?: Dispatch<SetStateAction<Record<string, string>>>,
+  setVisionMask?: Dispatch<SetStateAction<VisionMask | null>>
 ) => {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -63,6 +66,7 @@ export const useAIController = (
         if (!isMounted || wsRef.current !== ws) return;
         clearTimeout(connectTimeout);
         setIsConnected(false);
+        setVisionMask?.(null);
         console.log(`[useAIController.ts] closed ${ws.url}, retrying in ${retryDelayMs} ms...`);
 
         if (!retryTimeout) {
@@ -85,6 +89,9 @@ export const useAIController = (
               ? parsedData.Actions
               : [];
           if (actions.length === 0 && Array.isArray(parsedData)) return;
+          if (setVisionMask && !Array.isArray(parsedData)) {
+            setVisionMask(parsedData.VisionMask ?? null);
+          }
 
           const roleUpdates: Record<string, string> = {};
           if (!Array.isArray(parsedData) && Array.isArray(parsedData.RobotRoles)) {
@@ -121,7 +128,7 @@ export const useAIController = (
       wsRef.current?.close();
       if (retryTimeout) clearTimeout(retryTimeout);
     };
-  }, [setRobotActions, setRobotRoles]);
+  }, [setRobotActions, setRobotRoles, setVisionMask]);
 
   const controllerSend = (data: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

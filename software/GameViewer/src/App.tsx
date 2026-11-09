@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import './App.css';
 import Sidebar from './components/sidebar/Sidebar';
 import GameViewer from './components/gameViewer/GameViewer';
@@ -8,6 +8,8 @@ import { useGameController } from './hooks/useGameController.ts';
 
 import { parseProto } from './helper/ParseProto';
 import { parseJson } from './helper/ParseJson';
+import { applyVisionMask } from './helper/visionMask';
+import { VisionMask } from './types/VisionMask';
 
 import {
   getDefaultSSLFieldUpdate,
@@ -40,6 +42,7 @@ function App() {
   const [errorOverlay, setErrorOverlay] = useState<string | undefined>();
   const [sidebarWidth, setSidebarWidth] = useState(320);
   const [fieldGeometry, setFieldGeometry] = useState<SSL_GeometryFieldSize | null>(null);
+  const [visionMask, setVisionMask] = useState<VisionMask | null>(null);
 
   const { isConnected: isConnectedToVision } = useSSLVision(
     setSSLFieldUpdate,
@@ -48,7 +51,11 @@ function App() {
     visionSource
   );
 
-  const { isConnected: isConnectedToAI, controllerSend } = useAIController(setRobotActions, setRobotRoles);
+  const { isConnected: isConnectedToAI, controllerSend } = useAIController(setRobotActions, setRobotRoles, setVisionMask);
+  const maskedFieldUpdate = useMemo(
+    () => applyVisionMask(sslFieldUpdate, visionMask),
+    [sslFieldUpdate, visionMask]
+  );
 
   const { isConnected: isConnectedToGameController } = useGameController();
   useEffect(() => {
@@ -71,13 +78,14 @@ function App() {
         isConnectedToVision={isConnectedToVision}
         isConnectedToAI={isConnectedToAI}
         isConnectedToGameController={isConnectedToGameController}
-        sslFieldUpdate={sslFieldUpdate}
+        sslFieldUpdate={maskedFieldUpdate}
         sidebarWidth={sidebarWidth}
         setSidebarWidth={setSidebarWidth}
         controllerSend={controllerSend}
       />
       <GameViewer
-        sslFieldUpdate={sslFieldUpdate}
+        sslFieldUpdate={maskedFieldUpdate}
+        visionMask={visionMask}
         aiRobotUpdate={aiRobotUpdate}
         robotActions={robotActions}
         robotRoles={robotRoles}

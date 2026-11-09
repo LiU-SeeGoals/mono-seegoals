@@ -74,6 +74,7 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		return
 	}
 
+	rememberVisionMask(gi)
 	ts := frame.GetTimestamp()
 	replaceRobotTime := gi.State.GetMessageReceivedTime()
 	gi.State.SetTimestamp(ts)

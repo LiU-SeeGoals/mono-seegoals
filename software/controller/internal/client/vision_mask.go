@@ -2,6 +2,7 @@ package client
 
 import (
 	"strings"
+	"sync/atomic"
 
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -13,6 +14,13 @@ const visionMaskMarginMM = 250.0
 
 var visionMaskTeam = info.UNKNOWN
 
+var visionMaskSign atomic.Int32
+
+type VisionMaskDTO struct {
+	MaskedSign int     `json:"MaskedSign"`
+	MarginMM   float64 `json:"MarginMM"`
+}
+
 func loadVisionMask() {
 	setting := strings.TrimSpace(config.RestrictToOpponentHalfTeam())
 	visionMaskTeam = info.UNKNOWN
@@ -22,6 +30,22 @@ func loadVisionMask() {
 			Logger.Warnf("Ignoring vision detections on the %v half", team)
 		}
 	}
+}
+
+func rememberVisionMask(gi *info.GameInfo) {
+	if visionMaskTeam == info.UNKNOWN || gi == nil {
+		visionMaskSign.Store(0)
+		return
+	}
+	visionMaskSign.Store(int32(gi.OwnHalfXSign(visionMaskTeam)))
+}
+
+func currentVisionMask() *VisionMaskDTO {
+	sign := visionMaskSign.Load()
+	if sign == 0 {
+		return nil
+	}
+	return &VisionMaskDTO{MaskedSign: int(sign), MarginMM: visionMaskMarginMM}
 }
 
 func visionMasked(gi *info.GameInfo, x float64) bool {

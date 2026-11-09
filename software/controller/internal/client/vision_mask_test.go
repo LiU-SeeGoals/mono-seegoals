@@ -46,6 +46,25 @@ func TestVisionMaskedHidesRestrictedTeamsOwnHalf(t *testing.T) {
 	}
 }
 
+func TestCurrentVisionMaskFollowsRefereeSide(t *testing.T) {
+	t.Cleanup(func() { visionMaskSign.Store(0) })
+
+	withVisionMask(t, info.UNKNOWN)
+	rememberVisionMask(info.NewGameInfo(1))
+	if mask := currentVisionMask(); mask != nil {
+		t.Fatalf("mask = %+v, want nil when the restriction is off", mask)
+	}
+
+	withVisionMask(t, info.Blue)
+	gi := info.NewGameInfo(1)
+	gi.Status.SetGameStatus(0, 0, 0, 0, 0, true, "")
+	rememberVisionMask(gi)
+	mask := currentVisionMask()
+	if mask == nil || mask.MaskedSign != 1 || mask.MarginMM != visionMaskMarginMM {
+		t.Fatalf("mask = %+v, want positive half masked with %v mm margin", mask, visionMaskMarginMM)
+	}
+}
+
 func TestUnmaskedBallsDropsBallsOnMaskedHalf(t *testing.T) {
 	withVisionMask(t, info.Yellow)
 	gi := info.NewGameInfo(1)

@@ -3,6 +3,7 @@ import './FootballField.css';
 import { AIRobot } from '../../../types/AIRobot';
 import { actionToStr } from '../../../helper/defaultValues';
 import { SSL_GeometryFieldSize } from '../../../proto/ssl_vision_geometry';
+import { VisionMask } from '../../../types/VisionMask';
 
 const TEAM_IDS = Object.freeze({
   YELLOW: 1,
@@ -90,6 +91,7 @@ interface FootBallFieldProps {
   height: number;
   width: number;
   sslFieldUpdate: SSLFieldUpdate;
+  visionMask: VisionMask | null;
   aiRobotUpdate: AIRobotUpdate;
   robotActions: Action[];
   robotRoles: Record<string, string>;
@@ -103,6 +105,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
   height,
   width,
   sslFieldUpdate,
+  visionMask,
   aiRobotUpdate,
   robotActions,
   robotRoles,
@@ -177,6 +180,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
     if (fieldGeometry) {
       drawField(context, fieldGeometry);
     }
+    drawVisionMask(context);
 
     drawAllRobots(context);
     drawBall(context);
@@ -184,6 +188,23 @@ const FootballField: React.FC<FootBallFieldProps> = ({
 
     context.restore();
   }
+
+  const drawVisionMask = (context: CanvasRenderingContext2D) => {
+    if (!visionMask) return;
+
+    const { canvasX: edgeX } = getCanvasCoordinates(visionMask.MaskedSign * visionMask.MarginMM, 0, context);
+    const left = visionMask.MaskedSign > 0 ? edgeX : 0;
+    const right = visionMask.MaskedSign > 0 ? context.canvas.width : edgeX;
+
+    context.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    context.fillRect(left, 0, right - left, context.canvas.height);
+
+    context.font = `bold ${Math.max(12, FONT_SIZE * 1.5 * getScaler(context.canvas.width, context.canvas.height))}px Arial`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    context.fillText('Vision masked', (left + right) / 2, context.canvas.height / 2);
+  };
 
   const drawBall = (context: CanvasRenderingContext2D) => {
     try {
@@ -426,7 +447,7 @@ const FootballField: React.FC<FootBallFieldProps> = ({
       canvas.height = height;
       draw(canvas);
     }
-  }, [sslFieldUpdate, robotActions, robotRoles, width, height, zoomLevel, fieldGeometry]);
+  }, [sslFieldUpdate, visionMask, robotActions, robotRoles, width, height, zoomLevel, fieldGeometry]);
 
   useEffect(() => {
     const handleWheel = (event: WheelEvent) => {
