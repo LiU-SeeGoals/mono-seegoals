@@ -231,6 +231,23 @@ func (s *Script) PlaceBall(pos info.Position) {
 	)
 }
 
+func (s *Script) TeleportRobot(id info.ID, pos info.Position) {
+	s.Stop(id)
+	if s.sim == nil {
+		fmt.Printf("Move robot %d to (%.0f, %.0f)\n", id, pos.X, pos.Y)
+		return
+	}
+	s.sim.TeleportRobot(float32(pos.X), float32(pos.Y), uint32(id), s.team)
+}
+
+func (s *Script) TeleportBall(pos info.Position) {
+	if s.sim == nil {
+		fmt.Printf("Move ball to (%.0f, %.0f)\n", pos.X, pos.Y)
+		return
+	}
+	s.sim.TeleportBall(float32(pos.X/1000), float32(pos.Y/1000))
+}
+
 func (s *Script) waitPlaced(name string, target info.Position, teleport func(), current func() (info.Position, bool)) {
 	if s.sim == nil {
 		fmt.Printf("Place %s at (%.0f, %.0f)\n", name, target.X, target.Y)

@@ -72,7 +72,7 @@ func main() {
 	case "real-yellow", "yellow":
 		demos.GameScenarioRealYellow()
 	case "script":
-		demos.RunScript(info.Blue, scripts.FreeKick)
+		demos.RunScript(info.Blue, scripts.DriveSquare)
 	default:
 		demos.GameScenario()
 	}
