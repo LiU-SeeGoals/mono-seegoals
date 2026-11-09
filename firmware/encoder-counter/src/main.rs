@@ -114,7 +114,7 @@ fn main() -> ! {
     led_pin.set_high().unwrap();
 
     loop {
-        let point_1 = timer.get_counter();
+        // let point_1 = timer.get_counter(); // time measurement start
 
         enc0.update();
         enc1.update();
@@ -144,17 +144,21 @@ fn main() -> ! {
             }
         }
 
-        // info!(
-        //     "Speed: {}, Rotation: {}, Steps: {}",
-        //     enc.get_speed(),
-        //     enc.get_rotation(),
-        //     enc.get_steps()
-        // );
-        let point_2 = timer.get_counter();
-        let dur = point_2.checked_duration_since(point_1).unwrap().to_micros();
+        // Time measurement stop and calculation
+        // let point_2 = timer.get_counter();
+        // let dur = point_2.checked_duration_since(point_1).unwrap().to_micros();
+        // info!("Loop duration: {}µs", dur);
 
-        info!("Loop duration: {}µs", dur);
-        delay.delay_ms(500);
+        // Uncomment to get speed measurements in rpm, you should probably also
+        // increase the delay period.
+        // info!(
+        //     "Speed [rpm] 0: {}, 1: {}",
+        //     enc0.get_speed(),
+        //     enc1.get_speed()
+        // );
+
+        // Run at ~5000 Hz
+        delay.delay_us(200);
     }
 }
 
