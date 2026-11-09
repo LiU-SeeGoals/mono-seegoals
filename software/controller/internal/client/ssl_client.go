@@ -24,6 +24,7 @@ type SSLTrackedClient struct {
 }
 
 func NewSSLClient(visionAddress string) *SSLClient {
+	loadVisionMask()
 	return &SSLClient{
 		vision:  NewSSLVisionClient(visionAddress),
 		referee: NewSSLRefereeClient(config.GetGCClientAddress()),
@@ -31,6 +32,7 @@ func NewSSLClient(visionAddress string) *SSLClient {
 }
 
 func NewSSLTrackedClient(visionAddress string) *SSLTrackedClient {
+	loadVisionMask()
 	return &SSLTrackedClient{
 		vision:  NewSSLTrackedVisionClient(visionAddress),
 		referee: NewSSLRefereeClient(config.GetGCClientAddress()),

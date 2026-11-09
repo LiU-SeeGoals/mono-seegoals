@@ -93,6 +93,9 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 		y := float64(robot.GetY())
 		angle := float64(robot.GetOrientation())
 		//fmt.Println("Robot", robot.GetRobotId(), "x:", x, "y:", y, "angle:", angle)
+		if visionMasked(gi, x) {
+			continue
+		}
 
 		gi.State.SetRobotFromVision(info.Blue, robot.GetRobotId(), info.Position{X: x, Y: y, Angle: angle}, play_time, detect.GetTCapture())
 	}
@@ -102,11 +105,14 @@ func unpack(packet *ssl_vision.SSL_WrapperPacket, gi *info.GameInfo, play_time i
 		x := float64(robot.GetX())
 		y := float64(robot.GetY())
 		angle := float64(robot.GetOrientation())
+		if visionMasked(gi, x) {
+			continue
+		}
 		gi.State.SetRobotFromVision(info.Yellow, robot.GetRobotId(), info.Position{X: x, Y: y, Angle: angle}, play_time, detect.GetTCapture())
 
 	}
 
-	if ball := bf.Filter(detect.GetBalls(), play_time); ball != nil {
+	if ball := bf.Filter(unmaskedBalls(gi, detect.GetBalls()), play_time); ball != nil {
 		x := float64(ball.GetX())
 		y := float64(ball.GetY())
 		z := float64(ball.GetZ())
