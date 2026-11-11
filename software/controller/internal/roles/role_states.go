@@ -198,7 +198,19 @@ func (s *InterceptBallState) GetName() sm.StateName {
 }
 
 func (s *InterceptBallState) Update() sm.EventName {
-	if ballPos, err := s.gi.State.GetBall().GetEstimatedPosition(); err == nil {
+
+	ballPos, posErr := s.gi.State.GetBall().GetEstimatedPosition()
+
+	ballState, ok := s.gi.State.GetTrackedBall().GetFreshBallState(time.Now(), 200*time.Millisecond)
+
+	ballMoving := false
+
+	if ok {
+		ballPos = ballState.Position
+		ballMoving = ballState.Velocity.Norm2d() > 0.3
+	}
+
+	if ok || posErr == nil {
 		if waitPos, ok := interceptWaitPositionOutsideGoalNoGo(s.gi, ballPos); ok {
 			waitPos.Angle = waitPos.AngleToPosition(ballPos)
 			activity := act.NewMoveToPosition(s.team, s.robotId, waitPos)
@@ -207,8 +219,7 @@ func (s *InterceptBallState) Update() sm.EventName {
 		}
 	}
 
-	ballVel, ok := s.gi.State.GetTrackedBall().GetTrackedVelocity()
-	if ok && ballVel.Norm2d() > 0.3 {
+	if ballMoving {
 		activity := act.NewMoveToBall(s.team, s.robotId)
 		s.activityHandler.AddActivity(activity)
 

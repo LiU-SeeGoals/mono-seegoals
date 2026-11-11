@@ -53,7 +53,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	robotPos, _ := robot.GetPosition()
 	ball := gi.State.GetBall()
 	ballNow, _ := ball.GetEstimatedPosition()
-	ballPred := predictedBallPos(gi, ballLookaheadSec)
+	ballPred := PredictedBallPos(gi, ballLookaheadSec)
 
 	kp.retrievingBall = ball.GetPossessor() != robot
 

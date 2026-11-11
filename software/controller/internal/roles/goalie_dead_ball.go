@@ -244,7 +244,8 @@ func goalieDeadBallBaseCandidate(gi *info.GameInfo, team info.Team, ballPos info
 	if !ballInOwnGoalArea(gi, team, ballPos) {
 		return false
 	}
-	if vel, ok := gi.State.GetTrackedBall().GetTrackedVelocity(); ok && vel.Norm2d() > deadBallMaxTrackedSpeed {
+	vel, ok := gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), 200*time.Millisecond)
+	if !ok || vel.Norm2d() > deadBallMaxTrackedSpeed {
 		return false
 	}
 	return true

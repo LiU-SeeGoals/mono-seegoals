@@ -2,6 +2,7 @@ package ai
 
 import (
 	"math"
+	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
@@ -31,16 +32,20 @@ const (
 	roughAngleTolerance      = 0.05
 	ballLookaheadSec         = 0.2
 	minRollingBallSpeed      = 0.3
+	trackedBallMaxAge        = 200 * time.Millisecond
 )
 
-func predictedBallPos(gi *info.GameInfo, lookaheadSec float64) info.Position {
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-	if !ok || ballVel.Norm2d() < minRollingBallSpeed {
-		return ballPos
+// PredictedBallPos returns the predicted position of a recently tracked moving ball.
+func PredictedBallPos(gi *info.GameInfo, lookaheadSec float64) info.Position {
+	freshState, ok := gi.State.GetTrackedBall().GetFreshBallState(time.Now(), trackedBallMaxAge)
+
+	if ok && freshState.Velocity.Norm2d() >= minRollingBallSpeed {
+		freshState.Position.X += freshState.Velocity.X * 1000 * lookaheadSec
+		freshState.Position.Y += freshState.Velocity.Y * 1000 * lookaheadSec
+		return freshState.Position
 	}
-	ballPos.X += ballVel.X * 1000 * lookaheadSec
-	ballPos.Y += ballVel.Y * 1000 * lookaheadSec
+
+	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 	return ballPos
 }
 
