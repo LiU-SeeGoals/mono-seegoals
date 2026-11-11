@@ -40,6 +40,8 @@ const (
 	goalWallSpacing          = 240.0
 	highDefenderBallOffset   = 900.0
 	lowDefenderDepth         = 3600.0
+
+	lookaheadSec = 0.5
 )
 
 type roleKind string
@@ -379,18 +381,7 @@ func (m *CombinedPlan) getRobotClosestToPosition(
 }
 
 func (m *CombinedPlan) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID) info.ID {
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-
-	targetPos := ballPos
-
-	if ok && ballVel.Norm2d() > 0.3 {
-		lookaheadSeconds := 0.5
-
-		targetPos.X = ballPos.X + ballVel.X*1000*lookaheadSeconds
-		targetPos.Y = ballPos.Y + ballVel.Y*1000*lookaheadSeconds
-	}
-
+	targetPos := act.PredictedBallPos(gi, lookaheadSec)
 	return m.getRobotClosestToPosition(gi, activeRobots, targetPos)
 }
 

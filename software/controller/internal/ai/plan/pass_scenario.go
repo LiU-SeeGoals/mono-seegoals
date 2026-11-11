@@ -73,17 +73,7 @@ func (g *GameScenario) getRobotClosestToPosition(
 }
 
 func (g *GameScenario) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID) info.ID {
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
-
-	targetPos := ballPos
-
-	if ok && ballVel.Norm2d() > 0.3 {
-		lookaheadSeconds := 0.5
-
-		targetPos.X = ballPos.X + ballVel.X*1000*lookaheadSeconds
-		targetPos.Y = ballPos.Y + ballVel.Y*1000*lookaheadSeconds
-	}
+	targetPos := ai.PredictedBallPos(gi, 0.5)
 
 	return g.getRobotClosestToPosition(gi, activeRobots, targetPos)
 }

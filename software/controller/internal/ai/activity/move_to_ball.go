@@ -35,7 +35,7 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 		return NewStop(m.id).GetAction(gi)
 	}
 
-	ballPos := predictedBallPos(gi, ballLookaheadSec)
+	ballPos := PredictedBallPos(gi, ballLookaheadSec)
 	angleToBall := robotPos.AngleToPosition(ballPos)
 	headingErr := math.Abs(info.NormalizeAngleDelta(angleToBall, robotPos.Angle))
 	captureTarget := info.Position{
