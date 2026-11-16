@@ -378,6 +378,34 @@ func (m *CombinedPlan) getRobotClosestToPosition(
 	return closestId
 }
 
+func (m *CombinedPlan) getRobotFarthestToPosition(
+	gi *info.GameInfo,
+	activeRobots []info.ID,
+	target info.Position,
+) info.ID {
+	if len(activeRobots) == 0 {
+		return info.ID(0)
+	}
+
+	farthestID := activeRobots[0]
+	bestDist := 0.0
+
+	for _, id := range activeRobots {
+		robotPos, err := gi.State.GetRobotPosition(m.team, id)
+		if err != nil {
+			continue
+		}
+
+		dist := robotPos.Dist2d(target)
+		if dist > bestDist {
+			bestDist = dist
+			farthestID = id
+		}
+	}
+
+	return farthestID
+}
+
 func (m *CombinedPlan) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID) info.ID {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 	ballVel, ok := gi.State.GetTrackedBall().GetTrackedVelocity()
@@ -489,6 +517,46 @@ func (m *CombinedPlan) splitGoalieFromFieldRobots(
 	}
 
 	return goalieID, true, withoutRobot(activeRobots, goalieID)
+}
+
+func (m *CombinedPlan) splitDismissedFromFieldRobots(
+	gi *GameInfo,
+	dismissedRobots []info.ID,
+	fieldRobots []info.ID,
+) ([]info.ID, []info.ID) {
+	// Prune inactive robots
+	for _, dismissedID := range dismissedRobots {
+		if !containsRobot(fieldRobots, dismissedID) {
+			dismissedRobots = withoutRobot(dismissedRobots, dismissedID)
+		}
+	}
+
+	for _, dismissedID := range dismissedRobots {
+		fieldRobots = withoutRobot(fieldRobots, dismissedID)
+	}
+
+	if gi != nil && gi.Status != nil {
+		teamInfo := gi.Status.GetTeamInfo(m.team == info.Yellow)
+		if teamInfo != nil && teamInfo.MaxAllowedBots != 0 {
+			ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
+			allowedFieldRobots := int(teamInfo.MaxAllowedBots) - 1
+
+			// Dismiss additional robots if too many on field
+			for len(fieldRobots) > allowedFieldRobots {
+				id := m.getRobotFarthestToPosition(gi, fieldRobots, ballPos)
+				dismissedRobots = append(dismissedRobots, id)
+				fieldRobots = withoutRobot(fieldRobots, id)
+			}
+			// Release robots if too few on field
+			for len(fieldRobots) < allowedFieldRobots && len(dismissedRobots) > 0 {
+				id := dismissedRobots[0]
+				dismissedRobots = withoutRobot(dismissedRobots, id)
+				fieldRobots = append(fieldRobots, id)
+			}
+		}
+	}
+
+	return dismissedRobots, fieldRobots
 }
 
 func (m *CombinedPlan) desiredMode(gi *GameInfo, fallback tacticalMode) tacticalMode {
@@ -865,6 +933,7 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 	clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
 
 	var goalieID info.ID
+	var dismissedRobots []info.ID
 	var goalieRole *roles.GoalieRole
 	var activeReceiver info.ID
 	var activeReceiverStart time.Time
@@ -892,7 +961,7 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 			}
 		} else if goalieRole != nil {
 			m.ActivityHandler.ClearActivity(goalieID)
-			debugstate.ClearRobotRole(m.team, goalieID)
+			debugstate.ClearRobotRole(m.team, goalieID)	
 			goalieRole = nil
 		}
 
