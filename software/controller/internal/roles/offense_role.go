@@ -3,7 +3,6 @@ package roles
 import (
 	"fmt"
 	"math"
-	"time"
 
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
@@ -71,6 +70,7 @@ type AttemptGoalIntent struct {
 const (
 	minGoalShotSamples = 3
 	maxGoalShotSamples = 9
+<<<<<<< HEAD
 
 	// Keep support robots out of the primary attacker's sight line to the goal.
 	// This is intentionally wider than the robot body so positioning noise does
@@ -89,6 +89,8 @@ const (
 	kickBallSpeedMMPerS   = 4000.0
 	opponentReachMMPerS   = 1500.0
 	kickLaneBaseRadius    = 90.0 + info.BallRadius + 30.0
+=======
+>>>>>>> a/kick-intersection-detection-c1ac2a
 )
 
 
@@ -377,6 +379,7 @@ func (kr *AttemptGoalIntent) GetFromPosition() info.Position {
 	return kr.CurrentDecision().From
 }
 
+<<<<<<< HEAD
 type SupportAttackIntent struct {
 	gi               *GameInfo
 	team             Team
@@ -757,6 +760,8 @@ func (kr *SupportAttackIntent) GetTargetPosition() info.Position {
 	return pos
 }
 
+=======
+>>>>>>> a/kick-intersection-detection-c1ac2a
 func (kr *OffenseRole) Init() {
 	awaitName := StateName(fmt.Sprintf("Support ID %d", kr.id))
 	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kr.id))
