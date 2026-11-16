@@ -86,8 +86,50 @@ const (
 	supportLaneSwitchConfirmTime      = 400 * time.Millisecond
 	supportLaneInitialSideThresholdMM = 100.0
 	supportLaneEpsilon                = 1e-6
+	kickBallSpeedMMPerS   = 4000.0
+	opponentReachMMPerS   = 1500.0
+	kickLaneBaseRadius    = 90.0 + info.BallRadius + 30.0
 )
 
+
+
+func kickLaneClearance(team info.Team, ignore map[info.ID]bool, from, target info.Position, gi *GameInfo, includeOwn bool) float64 {
+	a, b := from.ToV2(), target.ToV2()
+	length := info.DistV2(a, b)
+	if length < 1 {
+		return math.Inf(1)
+	}
+	minMargin := math.Inf(1)
+	check := func(robots *info.RobotTeam, skip map[info.ID]bool, reach float64) {
+		if robots == nil {
+			return
+		}
+		for id, robot := range robots {
+			if robot == nil || skip[info.ID(id)] {
+				continue
+			}
+			pos, err := robot.GetPosition()
+			if err != nil {
+				continue
+			}
+			closest := info.PointToLineSegment(b, a, pos.ToV2())
+			along := info.DistV2(a, closest)
+			tBall := along / kickBallSpeedMMPerS
+			vel := robot.GetVelocity()
+			predicted := info.Position{X: pos.X + vel.X*tBall, Y: pos.Y + vel.Y*tBall}
+			dist := info.DistToLineSegment(b, a, predicted.ToV2())
+			margin := dist - (kickLaneBaseRadius + reach*tBall)
+			if margin < minMargin {
+				minMargin = margin
+			}
+		}
+	}
+	check(gi.State.GetOtherTeam(team), nil, opponentReachMMPerS)
+	if includeOwn {
+		check(gi.State.GetTeam(team), ignore, 0)
+	}
+	return minMargin
+}
 func goalShotBlockRadius() float64 {
 	return pathplanner.MotionRadius + info.BallRadius
 }
@@ -223,32 +265,38 @@ func (kr *AttemptGoalIntent) bestReceiverID() (info.ID, bool) {
 	field := kr.gi.FieldSize()
 
 	for _, id := range kr.receiverIDs {
-		if id == kr.id {
-			continue
-		}
+			if id == kr.id {
+				continue
+			}
 
-		pos, err := kr.gi.State.GetRobotPosition(kr.team, id)
-		if err != nil {
-			continue
-		}
+			pos, err := kr.gi.State.GetRobotPosition(kr.team, id)
+			if err != nil {
+				continue
+			}
 
-		toReceiverX := pos.X - ballPos.X
-		toReceiverY := pos.Y - ballPos.Y
-		distFromBall := ballPos.Dist2d(pos)
-		progressTowardGoal := toReceiverX*forwardX + toReceiverY*forwardY
-		lateralMiss := math.Abs(toReceiverX*lateralX + toReceiverY*lateralY)
-		passLengthPenalty := 0.15 * distFromBall
-		lateralPenalty := 0.1 * lateralMiss
+			//TODO : should we chip?
+				if kickLaneClearance(kr.team, map[info.ID]bool{kr.id: true}, ballPos, pos, kr.gi, false) < kickLaneBaseRadius {
+					continue
+				}
+		
+			toReceiverX := pos.X - ballPos.X
+			toReceiverY := pos.Y - ballPos.Y
+			distFromBall := ballPos.Dist2d(pos)
+			progressTowardGoal := toReceiverX*forwardX + toReceiverY*forwardY
+			lateralMiss := math.Abs(toReceiverX*lateralX + toReceiverY*lateralY)
+			passLengthPenalty := 0.15 * distFromBall
+			lateralPenalty := 0.1 * lateralMiss
 
-		score := progressTowardGoal - passLengthPenalty - lateralPenalty
-		if isGoalShotAvailable(kr.team, id, pos, kr.gi) {
-			score += field.X * 0.25
-		}
-		if score > bestScore {
-			bestScore = score
-			bestID = id
-			found = true
-		}
+			score := progressTowardGoal - passLengthPenalty - lateralPenalty
+			if isGoalShotAvailable(kr.team, id, pos, kr.gi) {
+				score += field.X * 0.25
+			}
+			if score > bestScore {
+				bestScore = score
+				bestID = id
+				found = true
+			}
+		
 	}
 
 	return bestID, found
@@ -378,6 +426,7 @@ func supportLane(slot OffenseSlot) float64 {
 func supportLaneOptions(slot OffenseSlot, id ID) []float64 {
 	slot = normalizedSupportSlot(slot)
 	lane := supportLane(slot)
+
 	if slot.Count == 1 {
 		if int(id)%2 == 0 {
 			return []float64{-0.5, 0.5}
