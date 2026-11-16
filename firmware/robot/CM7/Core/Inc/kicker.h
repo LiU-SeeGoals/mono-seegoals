@@ -8,6 +8,7 @@ typedef struct {
     int discharge_wait_us;
     int safe_discharge_wait_us;
     int charge_target_ADC; // Minimum 25 
+    float kick_mps_target;
 } KICKER_Settings;
 
 typedef enum
@@ -117,6 +118,6 @@ void KICKER_set_recharge_automatically(bool value);
  * @param speed_mps Requested ball speed in metres per second.
  * @return Discharge duration in microseconds.
  */
-uint16_t KICKER_GetDischargeUs(float speed_mps);
+int KICKER_GetDischargeUs(float speed_mps);
 
 #endif /* KICKER_H */

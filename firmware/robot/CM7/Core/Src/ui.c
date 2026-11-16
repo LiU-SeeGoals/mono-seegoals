@@ -65,14 +65,15 @@ CommandInfo kicker_commands[8] = {
     {'S', "traigt kick"},
     {'C', "hipper kick"},
     {'D', "ischarge"},
-    {'I', "nput = v0; Kick straight at v = v0 / 100"},
+    {'I', "nputted speed kick"},
     {'P', "rint vars"},
     {'E', "dit vars"},
 };
 
-CommandInfo kicker_edit_commands[2] = {
+CommandInfo kicker_edit_commands[3] = {
     {'D', "ischarge wait (us)"},
-    {'C', "harge target in ADC"}
+    {'C', "harge target in ADC"},
+    {'S', "peed to kick at mult 100 (v = input / 100) [m/s]"}
 };
 
 CommandInfo log_commands[4] = {
@@ -355,14 +356,16 @@ void parse_key()
             KICKER_SetKickerMode(KICKER_CHIPPER);
             KICKER_KickStart(KICKER_SPEED_DEFAULT);
             break;
-        case 'I':
-            LOG_UI("Enter m/s to kick at\r\n");
-            start_reading_to_buffer();
+        case 'I': ;
+            KICKER_Settings *set = KICKER_GetSettings();
+            LOG_UI("Kicking at %.2f m/s \r\n", (double)set->kick_mps_target);
+            KICKER_SetKickerMode(KICKER_STRAIGHT);
+            KICKER_KickStartSpeed(set->kick_mps_target);
             break;
         case 'P': // Print vars
         {
             KICKER_Settings* set = KICKER_GetSettings();
-            LOG_UI("Discharge wait (us): %i\r\nCharge_amount_in_ADC: %d\r\n", set->discharge_wait_us, set->charge_target_ADC);
+            LOG_UI("Discharge wait (us): %i\r\nCharge_amount_in_ADC: %d\r\nKick_mps_target: %.2f m/s\r\n", set->discharge_wait_us, set->charge_target_ADC, (double)set->kick_mps_target);
         } break;
         case 'E': // Edit vars
             current_state = state_kicker_edit;
@@ -373,9 +376,10 @@ void parse_key()
         switch (key) {
         case 'D': // Discharge wait
         case 'C': // Charge_amount_in_ADC
+        case 'S': // Speed 
         {
             KICKER_Settings* set = KICKER_GetSettings();
-            LOG_UI("Discharge wait (us): %i\r\nCharge_amount_in_ADC: %d\r\n", set->discharge_wait_us, set->charge_target_ADC);
+            LOG_UI("Discharge wait (us): %i\r\nCharge_amount_in_ADC: %d\r\nKick_mps_target: %.2f m/s\r\n", set->discharge_wait_us, set->charge_target_ADC, (double)set->kick_mps_target);
             start_reading_to_buffer();
         } break;
         }
@@ -539,6 +543,10 @@ void finished_reading_to_buffer()
             break;
         case 'C':
             set->charge_target_ADC = atoi(rx_buffer);
+            break;
+        case 'S':
+            set->kick_mps_target = (float) atoi(rx_buffer) / 100;
+            break;
         }
         LOG_UI("\r\n---\r\nDischarge wait (us): %i\r\nCharge_target_in_ADC", set->discharge_wait_us, set->charge_target_ADC);
     } else if (current_state == state_logs) {
@@ -563,14 +571,6 @@ void finished_reading_to_buffer()
             mod->min_output_level = level;
             LOG_UI("\r\nSetting to: %i\r\n", level);
         } break;
-        }
-    } else if (current_state == state_kicker){
-        switch (current_command) {
-            case 'I': ;
-                KICKER_SetKickerMode(KICKER_STRAIGHT);
-                int input_speed = atoi(rx_buffer);
-                float v = (float) input_speed / 100;
-                KICKER_KickStartSpeed(v);
         }
     }
     else {

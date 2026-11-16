@@ -70,7 +70,7 @@ static const KICKER_SpeedLookupEntry kicker_speed_lookup[] =
 // Kicker tuning Chip discharge: 650000. Kicker tuning straight discharge: 650000
 // Kicker tuning straight goal kick: 350000. kicker straight pass: 250000
 static LOG_Module internal_log_mod;
-static KICKER_Settings settings = {.safe_discharge_wait_us=25, .discharge_wait_us = 65, .charge_target_ADC = KICKER_ADC_CHARGE_VALUE};
+static KICKER_Settings settings = {.safe_discharge_wait_us=25, .discharge_wait_us = 65, .charge_target_ADC = KICKER_ADC_CHARGE_VALUE, .kick_mps_target = 2.00f};
 static volatile bool charging = false;
 static volatile bool charged = false;
 static volatile bool kicking = false;
@@ -253,7 +253,7 @@ void KICKER_KickStartSpeed(float speed_mps)
         return;
     }
 
-    uint16_t discharge_length = KICKER_GetDischargeUs(speed_mps);
+    int discharge_length = KICKER_GetDischargeUs(speed_mps);
 
     kicking = true;
 
@@ -416,7 +416,7 @@ bool KICKER_get_recharge_automatically()
     return recharge_automatically;
 }
 
-uint16_t KICKER_GetDischargeUs(float speed_mps)
+int KICKER_GetDischargeUs(float speed_mps)
 {
     /*
      * Reject NaN.
