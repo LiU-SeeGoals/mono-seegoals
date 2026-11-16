@@ -59,12 +59,13 @@ typedef enum
 //!@{
 CommandInfo default_commands[4] = {{'R', "F"}, {'K', "icker"}, {'L', "ogs"}, {'M', "otors"}};
 
-CommandInfo kicker_commands[7] = {
+CommandInfo kicker_commands[8] = {
     {'T', "oggle automatic charging"},
     {'M', "anual charge up"},
     {'S', "traigt kick"},
     {'C', "hipper kick"},
     {'D', "ischarge"},
+    {'I', "nput = v0; Kick straight at v = v0 / 100"},
     {'P', "rint vars"},
     {'E', "dit vars"},
 };
@@ -333,7 +334,7 @@ void parse_key()
         switch (key) {
         case 'T':
             bool value = !KICKER_get_recharge_automatically();
-            LOG_UI("Toggling automatic recharge to %d", value);
+            LOG_UI("Toggling automatic recharge to %d\r\n", value);
             KICKER_set_recharge_automatically(value);
         case 'M':
             LOG_UI("Charging\r\n");
@@ -353,6 +354,10 @@ void parse_key()
             LOG_UI("Chipper kicking\r\n");
             KICKER_SetKickerMode(KICKER_CHIPPER);
             KICKER_KickStart(KICKER_SPEED_DEFAULT);
+            break;
+        case 'I':
+            LOG_UI("Enter m/s to kick at\r\n");
+            start_reading_to_buffer();
             break;
         case 'P': // Print vars
         {
@@ -559,7 +564,16 @@ void finished_reading_to_buffer()
             LOG_UI("\r\nSetting to: %i\r\n", level);
         } break;
         }
-    } else {
+    } else if (current_state == state_kicker){
+        switch (current_command) {
+            case 'I': ;
+                KICKER_SetKickerMode(KICKER_STRAIGHT);
+                int input_speed = atoi(rx_buffer);
+                float v = (float) input_speed / 100;
+                KICKER_KickStartSpeed(v);
+        }
+    }
+    else {
         LOG_UI("[UI] State not configured to set values.\r\n");
     }
 }

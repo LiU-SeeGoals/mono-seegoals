@@ -54,6 +54,12 @@ void KICKER_ChargeStopForced(int status);
  */
 void KICKER_KickStart(KickerSpeed kickspeed);
 
+/*
+ * @brief Kicks at the given speed
+ * @param speed_mps is the speed in meters per second that we want to kick in
+ */
+void KICKER_KickStartSpeed(float speed_mps);
+
 /**
  *
  */
@@ -101,5 +107,16 @@ bool KICKER_TryGetADC(uint16_t *adc);
 
 bool KICKER_get_recharge_automatically();
 void KICKER_set_recharge_automatically(bool value);
+
+/**
+ * Convert a requested ball speed to the fitted discharge duration.
+ *
+ * Speeds below 0.75 m/s are clamped to 29 us.
+ * Speeds above 6.27 m/s are clamped to 174 us.
+ *
+ * @param speed_mps Requested ball speed in metres per second.
+ * @return Discharge duration in microseconds.
+ */
+uint16_t KICKER_GetDischargeUs(float speed_mps);
 
 #endif /* KICKER_H */

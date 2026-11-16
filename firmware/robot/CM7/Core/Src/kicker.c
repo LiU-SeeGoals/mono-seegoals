@@ -17,6 +17,55 @@
 #define KICKER_BOARD_ADC_CODE 0x08
 #define KICKER_BOARD_SPI_SIZE 2
 
+#define KICKER_LOOKUP_MIN_SPEED_MPS 0.75f
+#define KICKER_LOOKUP_MAX_SPEED_MPS 6.27f
+
+#define KICKER_LOOKUP_SIZE (sizeof(kicker_speed_lookup) / sizeof(kicker_speed_lookup[0]))
+
+typedef struct
+{
+    float speed_mps;
+    uint16_t discharge_us;
+} KICKER_SpeedLookupEntry;
+
+/*
+ * Generated from:
+ *
+ * speed = 6.70446264 * (1 - exp(-0.0180455941 * (discharge_us - 22.8447866)))
+ *
+ * The exponential is not evaluated by the STM32 at runtime.
+ *
+ * The table is limited to 6.27 m/s because that is the highest speed
+ * supported by the current measurement data.
+ */
+static const KICKER_SpeedLookupEntry kicker_speed_lookup[] =
+{
+    {0.75f,  29U},
+    {1.00f,  32U},
+    {1.25f,  34U},
+    {1.50f,  37U},
+    {1.75f,  40U},
+    {2.00f,  42U},
+    {2.25f,  46U},
+    {2.50f,  49U},
+    {2.75f,  52U},
+    {3.00f,  56U},
+    {3.25f,  60U},
+    {3.50f,  64U},
+    {3.75f,  68U},
+    {4.00f,  73U},
+    {4.25f,  79U},
+    {4.50f,  84U},
+    {4.75f,  91U},
+    {5.00f,  99U},
+    {5.25f, 108U},
+    {5.50f, 118U},
+    {5.75f, 131U},
+    {6.00f, 148U},
+    {6.25f, 172U},
+    {6.27f, 174U}
+};
+
 /* Private variables */
 // Kicker tuning Chip discharge: 650000. Kicker tuning straight discharge: 650000
 // Kicker tuning straight goal kick: 350000. kicker straight pass: 250000
@@ -25,7 +74,7 @@ static KICKER_Settings settings = {.safe_discharge_wait_us=25, .discharge_wait_u
 static volatile bool charging = false;
 static volatile bool charged = false;
 static volatile bool kicking = false;
-static volatile bool recharge_automatically = true;
+static volatile bool recharge_automatically = false;
 static TIM_HandleTypeDef* htim_kicker_charge;
 static TIM_HandleTypeDef* htim_kicker_kick;     // One shot timer
 static SPI_HandleTypeDef* hspi5_kicker;
@@ -107,6 +156,7 @@ void KICKER_ChargeStop()
 
     if (kicker_current_charge_adc < settings.charge_target_ADC)
     {
+        LOG_DEBUG("kicker_current_charge_adc = %d\r\n", kicker_current_charge_adc);
         int status = KICKER_StartVoltageMeasurement();
 
         if (status != 0)
@@ -167,6 +217,55 @@ void KICKER_KickStart(KickerSpeed kickspeed)
 
     __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, discharge_length);
     __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
+    htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
+    __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
+
+    HAL_TIM_Base_Start_IT(htim_kicker_kick);
+}
+
+void KICKER_KickStartSpeed(float speed_mps)
+{
+    if (!charged)
+    {
+        LOG_DEBUG("Not yet fully charged\r\n");
+        return;
+    }
+
+    if (charging)
+    {
+        LOG_DEBUG("Currently charging\r\n");
+        return;
+    }
+
+    if (kicking)
+    {
+        LOG_DEBUG("Already kicking\r\n");
+        return;
+    }
+
+    /*
+     * This calibration currently applies only to straight kicks.
+     * The chipper needs its own separately measured lookup table.
+     */
+    if (kickerMode != KICKER_STRAIGHT)
+    {
+        LOG_ERROR("Speed lookup is only calibrated for straight kicks\r\n");
+        return;
+    }
+
+    uint16_t discharge_length = KICKER_GetDischargeUs(speed_mps);
+
+    kicking = true;
+
+    LOG_INFO("Straight kick start: requested %.2f m/s, discharge %u us\r\n", (double)speed_mps, discharge_length);
+
+    /*
+     * Straight kicker is active low.
+     */
+    HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
+
+    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, discharge_length);
+    __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0U);
     htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
     __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
 
@@ -315,6 +414,74 @@ void KICKER_set_recharge_automatically(bool value)
 bool KICKER_get_recharge_automatically()
 {
     return recharge_automatically;
+}
+
+uint16_t KICKER_GetDischargeUs(float speed_mps)
+{
+    /*
+     * Reject NaN.
+     *
+     * NaN is the only floating-point value for which:
+     *     value != value
+     * is true.
+     */
+    if (speed_mps != speed_mps)
+    {
+        LOG_ERROR("Requested kicker speed is NaN\r\n");
+        return kicker_speed_lookup[0].discharge_us;
+    }
+
+    /*
+     * Clamp values outside the calibrated lookup-table range.
+     */
+    if (speed_mps <= kicker_speed_lookup[0].speed_mps)
+    {
+        return kicker_speed_lookup[0].discharge_us;
+    }
+
+    if (speed_mps >= kicker_speed_lookup[KICKER_LOOKUP_SIZE - 1U].speed_mps)
+    {
+        return kicker_speed_lookup[KICKER_LOOKUP_SIZE - 1U].discharge_us;
+    }
+
+    /*
+     * Find the two entries surrounding the requested speed.
+     *
+     * A linear search is appropriate here because the table contains
+     * only 24 entries. The worst case is 23 comparisons.
+     */
+    for (size_t upper_index = 1U;
+         upper_index < KICKER_LOOKUP_SIZE;
+         ++upper_index)
+    {
+        const KICKER_SpeedLookupEntry *lower =
+            &kicker_speed_lookup[upper_index - 1U];
+
+        const KICKER_SpeedLookupEntry *upper =
+            &kicker_speed_lookup[upper_index];
+
+        if (speed_mps <= upper->speed_mps)
+        {
+            float speed_fraction =
+                (speed_mps - lower->speed_mps) /
+                (upper->speed_mps - lower->speed_mps);
+
+            float interpolated_us =
+                (float)lower->discharge_us +
+                speed_fraction *
+                (float)(upper->discharge_us - lower->discharge_us);
+
+            /*
+             * Round to the nearest whole microsecond.
+             */
+            return (uint16_t)(interpolated_us + 0.5f);
+        }
+    }
+
+    /*
+     * Defensive fallback. The upper clamp should make this unreachable.
+     */
+    return kicker_speed_lookup[KICKER_LOOKUP_SIZE - 1U].discharge_us;
 }
 
 /*

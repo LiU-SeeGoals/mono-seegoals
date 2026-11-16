@@ -140,20 +140,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
     /* USER CODE END Callback 0 */
     if (htim->Instance == TIM5) {
         KICKER_ChargeStop();
-        
-        
-        //KICKER_KickStart();
     }
 
     if (htim->Instance == TIM3) {
         KICKER_KickStop();
     }
     if (htim->Instance == TIM7) {
-        NAV_update_motor_state();
+        // NAV_update_motor_state();
     }
 
     if (htim->Instance == TIM12) {
-        NAV_MovementUpdate();
+        // NAV_MovementUpdate();
     }
 
     /* USER CODE BEGIN Callback 1 */
