@@ -146,11 +146,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         KICKER_KickStop();
     }
     if (htim->Instance == TIM7) {
-        // NAV_update_motor_state();
+        NAV_update_motor_state();
     }
 
     if (htim->Instance == TIM12) {
-        // NAV_MovementUpdate();
+        NAV_MovementUpdate();
     }
 
     /* USER CODE BEGIN Callback 1 */
@@ -791,9 +791,11 @@ static void MX_TIM5_Init(void)
 
   /* USER CODE BEGIN TIM5_Init 1 */
 
+  // Prescaler = 399 and Period = 199 works good
+
   /* USER CODE END TIM5_Init 1 */
   htim5.Instance = TIM5;
-  htim5.Init.Prescaler = 399;
+  htim5.Init.Prescaler = 799;
   htim5.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim5.Init.Period = 199;
   htim5.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;

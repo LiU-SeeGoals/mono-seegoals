@@ -16,6 +16,7 @@
 #define KICKER_ADC_CHARGE_VALUE 2600 // On very large discharge wait times won't straight shoot past 6.50 m/s (No dribbler)
 #define KICKER_BOARD_ADC_CODE 0x08
 #define KICKER_BOARD_SPI_SIZE 2
+#define KICKER_ADC_MARGIN 2
 
 #define KICKER_LOOKUP_MIN_SPEED_MPS 0.75f
 #define KICKER_LOOKUP_MAX_SPEED_MPS 6.27f
@@ -86,7 +87,6 @@ static uint8_t kicker_spi_rx[KICKER_BOARD_SPI_SIZE];
 static volatile bool kicker_spi_busy = false;
 static volatile bool kicker_adc_ready = false;
 
-static uint16_t kicker_current_charge_adc = 0;
 static volatile uint16_t kicker_adc_value = 0;
 static volatile float kicker_voltage = 0.0f;
 
@@ -147,6 +147,8 @@ void KICKER_ChargeStop()
         LOG_DEBUG("Not charging\r\n");
         return;
     }
+    
+    uint16_t kicker_current_charge_adc;
     if (!KICKER_TryGetADC(&kicker_current_charge_adc))
     {
         KICKER_StartVoltageMeasurement();
@@ -154,7 +156,7 @@ void KICKER_ChargeStop()
         return;
     }
 
-    if (kicker_current_charge_adc < settings.charge_target_ADC)
+    if (kicker_current_charge_adc < settings.charge_target_ADC - KICKER_ADC_MARGIN)
     {
         LOG_DEBUG("kicker_current_charge_adc = %d\r\n", kicker_current_charge_adc);
         int status = KICKER_StartVoltageMeasurement();
