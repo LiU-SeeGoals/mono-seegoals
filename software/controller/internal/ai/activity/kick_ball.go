@@ -36,12 +36,12 @@ type KickConfig struct {
 }
 
 const (
-	defaultKickBallSpeed      = 1
+	defaultKickBallSpeed      = 500
 	defaultKickBallSimSpeed   = 3.0
 	kickMouthLateralTolerance = info.DribblerHalfWidth + 1.5*info.BallRadius
 	kickDribbleSettleTime     = 250 * time.Millisecond
 	kickHeldHeadingTolerance  = 0.4
-	kickFirmwareDelay         = 300 * time.Millisecond
+	kickFirmwareDelay         = 0 * time.Millisecond
 	kickAssumedFinalSpeed     = 0.65
 	kickMinFirmwareLeadDist   = 50.0
 	kickMaxFirmwareLeadDist   = 220.0
