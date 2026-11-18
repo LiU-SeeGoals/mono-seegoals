@@ -110,7 +110,7 @@ func (g *GameScenario) run() {
 		// handleRef := refereeHandler.HandleReferee()
 		// Only coordinate robot roles, trigger ball events
 
-		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
+		ballVel, ballVelOK := gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), 200*time.Millisecond)
 		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
 		ownerRetained := possession.owner.valid && ownerStillRetained(&gi, possession.owner)
 

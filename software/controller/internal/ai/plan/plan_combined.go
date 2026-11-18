@@ -948,7 +948,7 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 			return
 		}
 
-		ballVel, ballVelOK := gi.State.GetTrackedBall().GetTrackedVelocity()
+		ballVel, ballVelOK := gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), 200*time.Millisecond)
 		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
 		ownerRetained := possession.owner.valid && ownerStillRetained(&gi, possession.owner)
 
