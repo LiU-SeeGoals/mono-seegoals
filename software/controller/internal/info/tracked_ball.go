@@ -30,12 +30,10 @@ func (tb *TrackedBall) SetTracked(pos Position, vel Position, ts float64) {
 }
 
 func (tb *TrackedBall) GetTrackedPosition() (Position, bool) {
-	state, ok := tb.GetFreshBallState(time.Now(), 200*time.Millisecond)
-	if !ok {
+	if !tb.Valid {
 		return Position{}, false
 	}
-
-	return state.Position, true
+	return tb.Pos, true
 }
 
 func (tb *TrackedBall) GetFreshTrackedVelocity(now time.Time, maxAge time.Duration) (Position, bool) {
