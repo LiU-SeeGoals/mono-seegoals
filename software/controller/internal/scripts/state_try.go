@@ -10,22 +10,29 @@ import (
 const pause = time.Second
 const reached = 500.0
 const react = 150.0
+
+// Byt dessa för att testa olika
+const IdToTry = 6
+const InSim = true
 func TryStates(s *scripting.Script) {
-    ball := info.Position{X:-2000, Y:-2000}
-	s.PlaceBall(ball)
-    s.Place(2, info.Position{X: 1000, Y: 0})
-	s.Place(3, info.Position{X: 0, Y: 0})
-    s.Place(4, info.Position{X: 400, Y: -100})
-	s.Place(5, info.Position{X: 2500, Y: 200})
-    s.Place(1, info.Position{X: 830, Y: -100})
-	s.Place(6, info.Position{X: 2500, Y: 2000})
-
-	GetToPos(s,3,ball)
-	TestStopReact2(s,3)
-	TestWhenSurronded2(s,3)
-
-	
-}
+	if InSim == true{
+		ball := info.Position{X:-2000, Y:-2000}
+		s.PlaceBall(ball)
+		s.Place(2, info.Position{X: 1000, Y: 0})
+		s.Place(3, info.Position{X: 0, Y: 0})
+		s.Place(4, info.Position{X: 400, Y: -100})
+		s.Place(5, info.Position{X: 2500, Y: 200})
+		s.Place(1, info.Position{X: 830, Y: -100})
+		s.Place(6, info.Position{X: 2500, Y: 2000})
+		GetToBall(s,IdToTry)
+		TestStopReact(s,IdToTry)
+		TestWhenSurronded(s,IdToTry)
+	}else
+	{
+		GetToBall(s,IdToTry)
+		TestStopReact2(s,IdToTry)
+		TestWhenSurronded2(s,IdToTry)}
+	}
 
 
 // func change_state(s *scripting.Script) info.RefState {
@@ -43,8 +50,31 @@ func GetToPos(s *scripting.Script,id int,pos info.Position ){
 			break}
 		s.Wait(pause)
 	}
+	return}
+func GetToBall(s *scripting.Script, id int){
+// Testar bara som GetToPos men går till bollen. Denna flyttar på bollen under sim så fungerar inte i
+//verkligeheten
+	IDE := info.ID(id)
+	fmt.Printf("inne")
+	i := 0
+	for {
+		BallPos,ok := s.Ball()
+		if !ok{
+			fmt.Printf("FEL")
+		}
+		s.Do(act.NewMoveToPosition(s.Team(), IDE, BallPos))
+		RoboPos,ok := s.Robot(IDE)
+			if ok && RoboPos.Dist2d(BallPos) <=reached{
+			break}
+		s.Wait(pause)
+		i += 1
+		if i == 10{
+			s.PlaceBall(info.Position{X:-2000, Y:2000})
+		}
+	}
 	return
 }
+
 func TestStopReact(s *scripting.Script,id int){
 	//Kollar hur den reagerar när bollen kommer nära
 	IDE := info.ID(id)
