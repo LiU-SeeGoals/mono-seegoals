@@ -335,5 +335,8 @@ func (s *KickState) Update() sm.EventName {
 		}
 		return "KICKED"
 	}
+	if s.KickAct.NeedsRealign(s.Gi) {
+		return "MISALIGNED"
+	}
 	return "NONE"
 }

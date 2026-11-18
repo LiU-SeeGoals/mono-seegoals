@@ -85,6 +85,8 @@ type ConfigBasestation struct {
 
 type ConfigAI struct {
 	Interface string `env:"AI_MULTICAST_INTERFACE,required"`
+
+	RestrictToOpponentHalfTeam string `env:"AI_RESTRICT_ROBOTS_TO_OPPONENT_HALF" envDefault:""`
 }
 
 // Config struct for sim
@@ -221,6 +223,11 @@ func GetSSLTrackedClientAddressReal() string {
 func GetAIMulticastInterface() string {
 	cfg := GetInstance()
 	return cfg.AI.Interface
+}
+
+func RestrictToOpponentHalfTeam() string {
+	cfg := GetInstance()
+	return cfg.AI.RestrictToOpponentHalfTeam
 }
 
 func GetGameViewerAdress() string {

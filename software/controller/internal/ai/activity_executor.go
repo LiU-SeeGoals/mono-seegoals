@@ -9,8 +9,10 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
+	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	. "github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 const (
@@ -45,6 +47,8 @@ type activityExecutor struct {
 	activities        *[info.TEAM_SIZE]ai.Activity // <-- pointer to a slice
 	activity_lock     *sync.Mutex                  // shared mutex for synchronization
 	defenseAreaEscape defenseAreaEscapeState
+
+	restrictToOpponentHalf bool
 }
 
 type defenseAreaEscapeState struct {
@@ -72,6 +76,10 @@ func (fb *activityExecutor) Init(
 	fb.outgoingActions = outgoing
 	fb.team = team
 	fb.activity_lock = lock
+	fb.restrictToOpponentHalf = restrictsTeamToOpponentHalf(config.RestrictToOpponentHalfTeam(), team)
+	if fb.restrictToOpponentHalf {
+		Logger.Warnf("%v robots are restricted to the opponent half", team)
+	}
 
 	// Store the pointer directly
 	fb.activities = activities
@@ -140,6 +148,9 @@ func (fb *activityExecutor) Run() {
 		for _, result := range results {
 			safeAction := stoppedPlaySafetyAction(result.action, fb.team, &gameInfo)
 			safeAction = fb.defenseAreaEscape.apply(safeAction, fb.team, &gameInfo)
+			if fb.restrictToOpponentHalf {
+				safeAction = clampActionToOpponentHalf(safeAction, &gameInfo, fb.team)
+			}
 			safeAction = clampMoveActionToField(safeAction, &gameInfo)
 			actions = append(actions, finalStoppedPlayAction(safeAction, &gameInfo))
 		}

@@ -182,6 +182,7 @@ func actionsToJson(actions []action.Action) []byte {
 	output, err := json.Marshal(GameViewerActionPacket{
 		Actions:    actionDTOs,
 		RobotRoles: debugstate.SnapshotRobotRoles(),
+		VisionMask: currentVisionMask(),
 	})
 	if err != nil {
 		Logger.Error("The action packet could not be marshalled to JSON.")
@@ -244,4 +245,5 @@ type GameViewerCommand struct {
 type GameViewerActionPacket struct {
 	Actions    []action.ActionDTO        `json:"Actions"`
 	RobotRoles []debugstate.RobotRoleDTO `json:"RobotRoles"`
+	VisionMask *VisionMaskDTO            `json:"VisionMask,omitempty"`
 }

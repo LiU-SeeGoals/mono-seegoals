@@ -74,6 +74,7 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		return
 	}
 
+	rememberVisionMask(gi)
 	ts := frame.GetTimestamp()
 	replaceRobotTime := gi.State.GetMessageReceivedTime()
 	gi.State.SetTimestamp(ts)
@@ -111,7 +112,7 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		default:
 			team = info.UNKNOWN
 		}
-		if team == info.UNKNOWN {
+		if team == info.UNKNOWN || visionMasked(gi, p.X) {
 			continue
 		}
 
@@ -119,9 +120,14 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		gi.State.SetRobotFromTracked(team, robotId.GetId(), p, play_time, replaceRobotTime, ts)
 	}
 
-	balls := frame.GetBalls()
-	if len(balls) > 0 {
-		b := balls[0]
+	var b *ssl_vision.TrackedBall
+	for _, candidate := range frame.GetBalls() {
+		if candidate.GetPos() != nil && !visionMasked(gi, float64(candidate.GetPos().GetX())*trackedMetersToMM) {
+			b = candidate
+			break
+		}
+	}
+	if b != nil {
 		pos := b.GetPos()
 		vel := b.GetVel()
 
