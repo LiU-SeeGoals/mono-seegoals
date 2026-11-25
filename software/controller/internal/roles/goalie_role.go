@@ -8,7 +8,10 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
-const GoalieBallControlRadius = 300.0
+const (
+	GoalieBallControlRadius      = 300.0
+	goalieClearGoalWidthFraction = 0.7
+)
 
 type GoalieRole struct {
 	id              info.ID
@@ -54,7 +57,7 @@ func (gr *GoalieRole) HasBallControl(radius float64) bool {
 	return robotPos.Dist2d(ballPos) <= radius
 }
 
-func (gr *GoalieRole) ShouldClearBall(radius float64, minDefendedX float64) bool {
+func (gr *GoalieRole) ShouldClearBall(radius float64) bool {
 	if !gr.HasBallControl(radius) {
 		return false
 	}
@@ -64,7 +67,18 @@ func (gr *GoalieRole) ShouldClearBall(radius float64, minDefendedX float64) bool
 		return false
 	}
 
-	return defenseXSign(gr.gi, gr.team)*ballPos.X > minDefendedX
+	goalCenter, ok := gr.gi.OwnGoalCenter(gr.team)
+	if !ok {
+		return false
+	}
+	geometry, ok := gr.gi.FieldGeometry()
+	if !ok || geometry.PenaltyAreaDepth <= 0 || geometry.GoalWidth <= 0 {
+		return false
+	}
+	xSign := gr.gi.OwnHalfXSign(gr.team)
+	goalieClearGoalInset := geometry.PenaltyAreaDepth + geometry.GoalWidth*goalieClearGoalWidthFraction
+	clearBoundaryX := goalCenter.X - xSign*goalieClearGoalInset
+	return xSign*ballPos.X > xSign*clearBoundaryX
 }
 
 func (gr *GoalieRole) Init() {

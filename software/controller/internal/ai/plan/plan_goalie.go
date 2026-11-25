@@ -78,7 +78,7 @@ func (m *plannerGoalie) GetTeam() info.Team {
 // This is the main loop of the AI in this slow brain
 func (m *plannerGoalie) run() {
 	goalieID := info.ID(6)
-	clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
+	clearTarget := info.Position{}
 	goalieRole := roles.NewGoalieRole(goalieID, m.ActivityHandler, m.team, clearTarget)
 	goalieRole.Init()
 
@@ -86,7 +86,7 @@ func (m *plannerGoalie) run() {
 		gi := <-m.incomingGameInfo
 		goalieRole.SetGameInfo(gi)
 
-		if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
+		if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius) {
 			m.changeBallOwner(goalieID, "goalie has ball control")
 			goalieRole.TriggerEvent("BALL_OWNER")
 		} else if goalieRole.ShouldCollectDeadBall() {

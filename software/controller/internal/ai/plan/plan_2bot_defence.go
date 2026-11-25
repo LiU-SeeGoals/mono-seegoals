@@ -11,13 +11,10 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
 
-// attackerThreatX — x threshold (mm) at which the wall formation is triggered.
-// Set to 2800 so the wall forms when the attacker enters Blue's half.
-const attackerThreatX = 2800.0
-
-const wallSpacing = 200.0 // mm — spacing between adjacent wall bots
-
-var blueGoalCenter = Position{X: 4500, Y: 0, Z: 0, Angle: 0}
+const (
+	defenseThreatGoalWidthFraction = 0.7
+	wallSpacing                    = 200.0 // mm — spacing between adjacent wall bots
+)
 
 type TwoBotDefence struct {
 	plannerCore
@@ -45,9 +42,9 @@ func (m *TwoBotDefence) Init(
 	go m.run()
 }
 
-// getAttackerPosition finds the yellow robot closest to the ball
+// getAttackerPosition finds the opponent closest to the ball.
 func (m *TwoBotDefence) getAttackerPosition(gi *GameInfo) (Position, bool) {
-	yellowTeam := gi.State.GetTeam(Yellow)
+	opponents := gi.State.GetOtherTeam(m.team)
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 
 	minDist := math.Inf(1)
@@ -56,7 +53,7 @@ func (m *TwoBotDefence) getAttackerPosition(gi *GameInfo) (Position, bool) {
 
 	var i ID
 	for i = 0; i < TEAM_SIZE; i++ {
-		robotPos, err := yellowTeam[i].GetPosition()
+		robotPos, err := opponents[i].GetPosition()
 		if err != nil {
 			continue
 		}
@@ -73,13 +70,17 @@ func (m *TwoBotDefence) getAttackerPosition(gi *GameInfo) (Position, bool) {
 // calcWallPositions returns wall positions for bots 5, 6, and 7.
 // The three bots are placed perpendicular to the shot line, centered at the
 // midpoint between attacker and goal, spaced wallSpacing apart.
-func (m *TwoBotDefence) calcWallPositions(attackerPos Position) (Position, Position, Position) {
+func (m *TwoBotDefence) calcWallPositions(gi *GameInfo, attackerPos Position) (Position, Position, Position, bool) {
+	goalCenter, ok := gi.OwnGoalCenter(m.team)
+	if !ok {
+		return Position{}, Position{}, Position{}, false
+	}
 	// Shot vector: attacker → goal, normalized
-	shotVec := blueGoalCenter.Sub(&attackerPos)
+	shotVec := goalCenter.Sub(&attackerPos)
 	shotVecNorm := shotVec.Normalize2d()
 
 	// Midpoint between attacker and goal — wall forms here
-	mid := attackerPos.Add(&blueGoalCenter)
+	mid := attackerPos.Add(&goalCenter)
 	mid.Div2d(2.0)
 
 	// Perpendicular to shot line (rotate 90°)
@@ -96,7 +97,22 @@ func (m *TwoBotDefence) calcWallPositions(attackerPos Position) (Position, Posit
 	bot6Pos.Angle = bot6Pos.AngleToPosition(attackerPos)
 	bot7Pos.Angle = bot7Pos.AngleToPosition(attackerPos)
 
-	return bot5Pos, bot6Pos, bot7Pos
+	return bot5Pos, bot6Pos, bot7Pos, true
+}
+
+func (m *TwoBotDefence) attackerInDefensiveZone(gi *GameInfo, attackerPos Position) bool {
+	goalCenter, ok := gi.OwnGoalCenter(m.team)
+	if !ok {
+		return false
+	}
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.PenaltyAreaDepth <= 0 || geometry.GoalWidth <= 0 {
+		return false
+	}
+	xSign := gi.OwnHalfXSign(m.team)
+	goalInset := geometry.PenaltyAreaDepth + geometry.GoalWidth*defenseThreatGoalWidthFraction
+	boundaryX := goalCenter.X - xSign*goalInset
+	return xSign*attackerPos.X > xSign*boundaryX
 }
 
 func (m *TwoBotDefence) run() {
@@ -133,9 +149,12 @@ func (m *TwoBotDefence) run() {
 
 		attackerPos, found := m.getAttackerPosition(&gi)
 
-		if found && attackerPos.X > attackerThreatX {
-			// Attacker is in Blue's half — form the 3-bot wall
-			bot5Pos, bot6Pos, bot7Pos := m.calcWallPositions(attackerPos)
+		if found && m.attackerInDefensiveZone(&gi, attackerPos) {
+			// Attacker is deep in our Vision-reported half — form the 3-bot wall.
+			bot5Pos, bot6Pos, bot7Pos, ok := m.calcWallPositions(&gi, attackerPos)
+			if !ok {
+				continue
+			}
 			defenders[5].SetWallPosition(bot5Pos)
 			defenders[6].SetWallPosition(bot6Pos)
 			defenders[7].SetWallPosition(bot7Pos)

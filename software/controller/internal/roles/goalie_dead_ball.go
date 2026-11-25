@@ -14,7 +14,6 @@ const (
 	deadBallStillDuration     = 3 * time.Second
 	deadBallMaxTrackedSpeed   = 0.04
 	deadBallStillRadius       = 60.0
-	deadBallGoalieMaxDistance = 1900.0
 	goalieRescueControlRadius = 420.0
 
 	goalieChipKickSpeed         = 2
@@ -103,11 +102,23 @@ func (gr *GoalieRole) ShouldCollectDeadBall() bool {
 	}
 
 	goaliePos, err := gr.gi.State.GetRobotPosition(gr.team, gr.id)
-	if err != nil || goaliePos.Dist2d(ballPos) > deadBallGoalieMaxDistance {
+	maxDistance, ok := goalieDeadBallMaxDistance(gr.gi)
+	if err != nil || !ok || goaliePos.Dist2d(ballPos) > maxDistance {
 		return false
 	}
 
 	return true
+}
+
+func goalieDeadBallMaxDistance(gi *info.GameInfo) (float64, bool) {
+	if gi == nil {
+		return 0, false
+	}
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.PenaltyAreaDepth <= 0 || geometry.PenaltyAreaWidth <= 0 || geometry.GoalWidth <= 0 {
+		return 0, false
+	}
+	return math.Hypot(geometry.PenaltyAreaDepth, geometry.PenaltyAreaWidth/2) + geometry.GoalWidth/2, true
 }
 
 func (s *GoalieCollectDeadBallState) Initialize() {}
@@ -299,18 +310,15 @@ func chooseSimpleGoalieChipTarget(gi *info.GameInfo, team info.Team, selfID info
 	}
 
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-	field := gi.FieldSize()
-	halfX := field.X / 2
-	halfY := field.Y / 2
-	if halfX <= 0 {
-		halfX = 4500
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.Length <= 0 || geometry.Width <= 0 {
+		return info.Position{}, false
 	}
-	if halfY <= 0 {
-		halfY = 3000
-	}
+	halfX := geometry.Length / 2
+	halfY := geometry.Width / 2
 
 	xSign := defenseXSign(gi, team)
-	fieldMargin := 500.0
+	fieldMargin := geometry.GoalWidth / 2
 	target := info.Position{
 		X: -xSign * halfX * 0.25,
 		Y: math.Max(-halfY+fieldMargin, math.Min(halfY-fieldMargin, ballPos.Y)),

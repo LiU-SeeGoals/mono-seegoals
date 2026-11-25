@@ -117,7 +117,71 @@ func (gi GameInfo) FieldGeometry() (FieldGeometry, bool) {
 		PenaltyAreaDepth: float64(gi.field.GetPenaltyAreaDepth()),
 		PenaltyAreaWidth: float64(gi.field.GetPenaltyAreaWidth()),
 	}
+
+	// penalty_area_depth and penalty_area_width are optional in the SSL-Vision
+	// protocol. Older geometry publishers commonly omit them while still
+	// publishing the standard penalty-stretch and goal-line markings. Derive
+	// only missing dimensions from those Vision lines so all callers see one
+	// complete, field-size-independent geometry representation.
+	if geometry.PenaltyAreaDepth <= 0 || geometry.PenaltyAreaWidth <= 0 {
+		if depth, width, found := gi.penaltyAreaDimensionsFromFieldLines(); found {
+			if geometry.PenaltyAreaDepth <= 0 {
+				geometry.PenaltyAreaDepth = depth
+			}
+			if geometry.PenaltyAreaWidth <= 0 {
+				geometry.PenaltyAreaWidth = width
+			}
+		}
+	}
 	return geometry, geometry.Length > 0 && geometry.Width > 0
+}
+
+func (gi GameInfo) penaltyAreaDimensionsFromFieldLines() (depth, width float64, found bool) {
+	if !gi.HasField() {
+		return 0, 0, false
+	}
+
+	findLine := func(name string) *ssl_vision.SSL_FieldLineSegment {
+		for _, line := range gi.field.GetFieldLines() {
+			if line != nil && strings.EqualFold(line.GetName(), name) {
+				return line
+			}
+		}
+		return nil
+	}
+
+	for _, names := range [][2]string{
+		{"LeftPenaltyStretch", "LeftGoalLine"},
+		{"RightPenaltyStretch", "RightGoalLine"},
+	} {
+		front := findLine(names[0])
+		goal := findLine(names[1])
+		if front == nil || goal == nil || front.GetP1() == nil || front.GetP2() == nil || goal.GetP1() == nil {
+			continue
+		}
+
+		depth = math.Abs(float64(front.GetP1().GetX() - goal.GetP1().GetX()))
+		width = math.Hypot(
+			float64(front.GetP2().GetX()-front.GetP1().GetX()),
+			float64(front.GetP2().GetY()-front.GetP1().GetY()),
+		)
+		if depth > 0 && width > 0 {
+			return depth, width, true
+		}
+	}
+
+	return 0, 0, false
+}
+
+// OwnGoalCenter returns the center of the team's own goal using the field
+// dimensions reported by SSL-Vision. Callers must handle ok=false instead of
+// assuming a particular competition field size.
+func (gi GameInfo) OwnGoalCenter(team Team) (Position, bool) {
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.Length <= 0 || geometry.GoalWidth <= 0 {
+		return Position{}, false
+	}
+	return Position{X: gi.OwnHalfXSign(team) * geometry.Length / 2}, true
 }
 
 func (gi GameInfo) FieldBoundaryWidth() float64 {

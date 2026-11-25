@@ -37,10 +37,9 @@ const (
 
 	preferredGoalieID = info.ID(6)
 
-	goalWallDistanceFromGoal = 800.0
-	goalWallYClamp           = 1200.0
-	goalWallSpacing          = 240.0
-	highDefenderBallOffset   = 900.0
+	goalWallPenaltyDepthFraction = 0.8
+	goalWallSpacing              = 240.0
+	highDefenderPenaltyFraction  = 0.9
 )
 
 type roleKind string
@@ -245,7 +244,7 @@ func (rm *combinedRoleManager) setSlot(id info.ID, slot tacticalSlotKind, now ti
 		}
 	case tacticalSlotDefenderWall:
 		if defender, ok := rm.defenders[id]; ok {
-			defender.SetSlot(roles.DefenseSlot{Kind: roles.DefenseRoleCover})
+			defender.SetSlot(roles.DefenseSlot{Kind: roles.DefenseRoleWall})
 		}
 	case tacticalSlotDefenderHigh:
 		if defender, ok := rm.defenders[id]; ok {
@@ -512,7 +511,11 @@ func (m *CombinedPlan) chooseGoalie(gi *GameInfo, activeRobots []info.ID) (info.
 		return 0, false
 	}
 
-	return m.getRobotClosestToPosition(gi, activeRobots, m.defendedGoalCenter(gi)), true
+	goalCenter, ok := m.defendedGoalCenter(gi)
+	if !ok {
+		return activeRobots[0], true
+	}
+	return m.getRobotClosestToPosition(gi, activeRobots, goalCenter), true
 }
 
 func (m *CombinedPlan) splitGoalieFromFieldRobots(
@@ -673,18 +676,29 @@ func (m *CombinedPlan) chooseSupportShooter(gi *GameInfo, candidates []info.ID) 
 }
 
 func (m *CombinedPlan) highDefenderTarget(gi *GameInfo, ballPos Position) Position {
-	goalPos := m.defendedGoalCenter(gi)
+	goalPos, ok := m.defendedGoalCenter(gi)
+	if !ok {
+		return ballPos
+	}
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.PenaltyAreaDepth <= 0 {
+		return ballPos
+	}
+	highDefenderBallOffset := geometry.PenaltyAreaDepth * highDefenderPenaltyFraction
 	toGoal := goalPos.Sub(&ballPos)
 	dist := toGoal.Norm2d()
 	if dist < 1 {
-		target := Position{X: -m.defenseXSign(gi) * 1000, Y: 0, Z: 0, Angle: 0}
+		target := goalPos
+		target.X -= m.defenseXSign(gi) * highDefenderBallOffset
 		target.Angle = target.AngleToPosition(ballPos)
 		return target
 	}
 
 	step := toGoal.Normalize2d().Scale(highDefenderBallOffset)
 	target := ballPos.Add(&step)
-	target.Y = clampFloat(target.Y, -goalWallYClamp, goalWallYClamp)
+	if lateralLimit, ok := m.defenderLateralLimit(gi); ok {
+		target.Y = clampFloat(target.Y, -lateralLimit, lateralLimit)
+	}
 	target.Angle = target.AngleToPosition(ballPos)
 	return target
 }
@@ -757,30 +771,6 @@ func (m *CombinedPlan) configuredStaticSlots(robots []info.ID) map[info.ID]tacti
 	return assignments
 }
 
-func (m *CombinedPlan) getAttackerPosition(gi *GameInfo) (Position, bool) {
-	opponents := gi.State.GetOtherTeam(m.team)
-	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
-
-	minDist := math.Inf(1)
-	var closestPos Position
-	found := false
-
-	var i ID
-	for i = 0; i < TEAM_SIZE; i++ {
-		robotPos, err := opponents[i].GetPosition()
-		if err != nil {
-			continue
-		}
-		dist := ballPos.Dist2d(robotPos)
-		if dist < minDist {
-			minDist = dist
-			closestPos = robotPos
-			found = true
-		}
-	}
-	return closestPos, found
-}
-
 func (m *CombinedPlan) defendsPositiveHalf(gi *GameInfo) bool {
 	isBlueTeam := m.team == Blue
 	isBlueOnPositiveHalf := gi.Status.GetBlueTeamOnPositiveHalf()
@@ -794,14 +784,15 @@ func (m *CombinedPlan) defenseXSign(gi *GameInfo) float64 {
 	return -1.0
 }
 
-func (m *CombinedPlan) defendedGoalCenter(gi *GameInfo) Position {
-	goalCenter := blueGoalCenter
-	goalCenter.X = m.defenseXSign(gi) * math.Abs(blueGoalCenter.X)
-	return goalCenter
+func (m *CombinedPlan) defendedGoalCenter(gi *GameInfo) (Position, bool) {
+	if gi == nil {
+		return Position{}, false
+	}
+	return gi.OwnGoalCenter(m.team)
 }
 
-func (m *CombinedPlan) attackerIsThreatening(gi *GameInfo, attackerPos Position) bool {
-	return m.defenseXSign(gi)*attackerPos.X > attackerThreatX
+func (m *CombinedPlan) defenderLateralLimit(gi *GameInfo) (float64, bool) {
+	return roles.DefenderLateralLimit(gi)
 }
 
 func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Position, count int) []Position {
@@ -809,8 +800,20 @@ func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Po
 		return nil
 	}
 
-	goalCenter := m.defendedGoalCenter(gi)
+	goalCenter, ok := m.defendedGoalCenter(gi)
+	if !ok {
+		return nil
+	}
+	lateralLimit, ok := m.defenderLateralLimit(gi)
+	if !ok {
+		return nil
+	}
 	xSign := m.defenseXSign(gi)
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.PenaltyAreaDepth <= 0 {
+		return nil
+	}
+	goalWallDistanceFromGoal := geometry.PenaltyAreaDepth * goalWallPenaltyDepthFraction
 	wallX := goalCenter.X - xSign*goalWallDistanceFromGoal
 	wallY := threatPos.Y
 
@@ -819,7 +822,7 @@ func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Po
 		t := (wallX - threatPos.X) / dx
 		wallY = threatPos.Y + (goalCenter.Y-threatPos.Y)*t
 	}
-	wallY = clampFloat(wallY, -goalWallYClamp, goalWallYClamp)
+	wallY = clampFloat(wallY, -lateralLimit, lateralLimit)
 
 	positions := make([]Position, count)
 	centerOffset := float64(count-1) / 2.0
@@ -827,7 +830,7 @@ func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Po
 		y := wallY + (float64(i)-centerOffset)*goalWallSpacing
 		pos := Position{
 			X: wallX,
-			Y: clampFloat(y, -goalWallYClamp, goalWallYClamp),
+			Y: clampFloat(y, -lateralLimit, lateralLimit),
 			Z: 0,
 		}
 		pos.Angle = pos.AngleToPosition(threatPos)
@@ -849,23 +852,37 @@ func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
 	if stopped && gi.Status.GetGameEvent().GetDesignatedPosition() != nil {
 		pos := gi.Status.GetGameEvent().GetDesignatedPosition()
 		threatPos = info.Position{X: pos.AtVec(0), Y: pos.AtVec(1)}
-	} else if attackerPos, found := m.getAttackerPosition(gi); !stopped && found && m.attackerIsThreatening(gi, attackerPos) {
-		threatPos = attackerPos
 	}
 
 	wallRobots := roleManager.idsForSlot(tacticalSlotDefenderWall)
-	coverAssignments := roleManager.coverMarking.update(gi, m.team, wallRobots)
 	wallPositions := m.calcGoalWallPositionsForRobots(gi, threatPos, len(wallRobots))
 	for i, id := range wallRobots {
 		if defender, ok := roleManager.defenders[id]; ok {
-			opponentID, assigned := coverAssignments[id]
+			if i < len(wallPositions) {
+				defender.SetWallPosition(wallPositions[i])
+			}
+			defender.TriggerEvent("ATTACKER_FAR")
+		}
+	}
+
+	// High Def blocks the passing lane to the highest-ranked receiver. Existing
+	// assignments are retained with hysteresis to avoid switching target on
+	// every noisy vision frame.
+	highRobots := roleManager.idsForSlot(tacticalSlotDefenderHigh)
+	receiverAssignments := roleManager.coverMarking.update(gi, m.team, highRobots)
+	for _, id := range highRobots {
+		if defender, ok := roleManager.defenders[id]; ok {
+			opponentID, assigned := receiverAssignments[id]
 			defender.SetCoverOpponent(opponentID, assigned)
-			defender.SetWallPosition(wallPositions[i])
-			defender.TriggerEvent("ATTACKER_NEAR")
+			if assigned {
+				defender.TriggerEvent("ATTACKER_NEAR")
+			} else {
+				defender.TriggerEvent("ATTACKER_FAR")
+			}
 		}
 	}
 	for id, defender := range roleManager.defenders {
-		if containsRobot(wallRobots, id) {
+		if containsRobot(wallRobots, id) || containsRobot(highRobots, id) {
 			continue
 		}
 		defender.TriggerEvent("ATTACKER_FAR")
@@ -882,7 +899,7 @@ func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
 	goalieRole.SetGameInfo(*gi)
 	if stopped {
 		goalieRole.TriggerEvent("BALL_LOST")
-	} else if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
+	} else if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius) {
 		goalieRole.TriggerEvent("BALL_OWNER")
 	} else if goalieRole.ShouldCollectDeadBall() {
 		goalieRole.TriggerEvent("DEAD_BALL_TRAPPED")
@@ -901,7 +918,7 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 	mode := tacticalModeAttack
 	candidateMode := tacticalMode("")
 	candidateModeSince := time.Time{}
-	clearTarget := info.Position{X: 2000, Y: -1500, Z: 0, Angle: 0}
+	clearTarget := info.Position{}
 
 	var goalieID info.ID
 	var goalieRole *roles.GoalieRole

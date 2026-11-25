@@ -55,7 +55,11 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	ballPos, err := ball.GetEstimatedPosition()
 	if err != nil {
 		fmt.Println("Error getting ball position:", err)
-		return NewMoveToPosition(g.team, g.id, info.Position{X: 0, Y: 0}).GetAction(gi)
+		robotPos, robotErr := gi.State.GetRobotPosition(g.team, g.id)
+		if robotErr != nil {
+			return &action.Stop{Id: int(g.id)}
+		}
+		return NewMoveToPosition(g.team, g.id, robotPos).GetAction(gi)
 	}
 
 	// Cover the angle between the ball and both posts. This is the normal

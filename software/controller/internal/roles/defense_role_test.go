@@ -8,10 +8,55 @@ import (
 	ai "github.com/LiU-SeeGoals/controller/internal/ai"
 	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
+	"google.golang.org/protobuf/proto"
 )
 
-func TestClosestOpponentToOwnGoal(t *testing.T) {
+func newDefenseRoleTestGameInfo() *info.GameInfo {
+	return newDefenseRoleTestGameInfoWithSize(9000, 6000, 1000, 1000, 2000)
+}
+
+func newDefenseRoleTestGameInfoWithSize(length, width, goalWidth, penaltyDepth, penaltyWidth int32) *info.GameInfo {
 	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.SetField(&ssl_vision.SSL_GeometryFieldSize{
+		FieldLength:      proto.Int32(length),
+		FieldWidth:       proto.Int32(width),
+		GoalWidth:        proto.Int32(goalWidth),
+		GoalDepth:        proto.Int32(180),
+		PenaltyAreaDepth: proto.Int32(penaltyDepth),
+		PenaltyAreaWidth: proto.Int32(penaltyWidth),
+	})
+	return gi
+}
+
+func newDefenseRoleLegacyVisionGameInfo() *info.GameInfo {
+	fieldLine := func(name string, x1, y1, x2, y2 float32) *ssl_vision.SSL_FieldLineSegment {
+		return &ssl_vision.SSL_FieldLineSegment{
+			Name:      proto.String(name),
+			P1:        &ssl_vision.Vector2F{X: proto.Float32(x1), Y: proto.Float32(y1)},
+			P2:        &ssl_vision.Vector2F{X: proto.Float32(x2), Y: proto.Float32(y2)},
+			Thickness: proto.Float32(10),
+		}
+	}
+
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi.SetField(&ssl_vision.SSL_GeometryFieldSize{
+		FieldLength: proto.Int32(9000),
+		FieldWidth:  proto.Int32(6000),
+		GoalWidth:   proto.Int32(1000),
+		GoalDepth:   proto.Int32(180),
+		FieldLines: []*ssl_vision.SSL_FieldLineSegment{
+			fieldLine("LeftGoalLine", -4500, -3000, -4500, 3000),
+			fieldLine("LeftPenaltyStretch", -3500, -1000, -3500, 1000),
+			fieldLine("RightGoalLine", 4500, -3000, 4500, 3000),
+			fieldLine("RightPenaltyStretch", 3500, -1000, 3500, 1000),
+		},
+	})
+	return gi
+}
+
+func TestClosestOpponentToOwnGoal(t *testing.T) {
+	gi := newDefenseRoleTestGameInfo()
 	opponents := gi.State.GetOtherTeam(info.Blue)
 
 	opponents[1].SetPositionTime(-4000, 100, 0, 1)
@@ -45,7 +90,7 @@ func TestClosestOpponentToOwnGoalReturnsFalseWithoutGameState(t *testing.T) {
 }
 
 func TestCoverTargetBlocksPassingLaneCloserToDangerousOpponent(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	opponents := gi.State.GetOtherTeam(info.Blue)
 	ballPos := info.Position{X: -1000, Y: 300}
 
@@ -74,7 +119,7 @@ func TestCoverTargetBlocksPassingLaneCloserToDangerousOpponent(t *testing.T) {
 }
 
 func TestCoverTargetParksWhenReceiverIsNotDangerous(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	opponents := gi.State.GetOtherTeam(info.Blue)
 	ballPos := info.Position{}
 
@@ -91,7 +136,7 @@ func TestCoverTargetParksWhenReceiverIsNotDangerous(t *testing.T) {
 }
 
 func TestCoverTargetParksWithoutOpponentNearBall(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	state := &DefensePressState{gi: gi, team: info.Blue, robotId: 7}
 	ballPos := info.Position{X: -500, Y: 725}
 
@@ -108,7 +153,7 @@ func TestCoverTargetParksWithoutOpponentNearBall(t *testing.T) {
 }
 
 func TestCoverParkingPositionUsesTeamHalf(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	ballPos := info.Position{X: 250, Y: -640}
 	blueState := &DefensePressState{gi: gi, team: info.Blue}
 	yellowState := &DefensePressState{gi: gi, team: info.Yellow}
@@ -122,7 +167,7 @@ func TestCoverParkingPositionUsesTeamHalf(t *testing.T) {
 }
 
 func TestLowDefenderTargetsProjectedBallPath(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	gi.State.SetBall(0, 0, 0, 1000)
 	gi.State.SetBall(-1000, 200, 0, 1020)
 	ballPos := info.Position{X: -1000, Y: 200}
@@ -135,7 +180,7 @@ func TestLowDefenderTargetsProjectedBallPath(t *testing.T) {
 }
 
 func TestLowDefenderUsesPositiveHalfForYellow(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	gi.State.SetBall(0, 0, 0, 1000)
 	gi.State.SetBall(1000, 200, 0, 1020)
 	ballPos := info.Position{X: 1000, Y: 200}
@@ -160,7 +205,7 @@ func TestLowDefenderRetreatsPastMinimumDepth(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			gi := info.NewGameInfo(int(info.TEAM_SIZE))
+			gi := newDefenseRoleTestGameInfo()
 			ballPos := info.Position{X: test.ballX, Y: 250}
 			gi.State.GetBall().SetEstimatedPosition(ballPos)
 
@@ -173,20 +218,24 @@ func TestLowDefenderRetreatsPastMinimumDepth(t *testing.T) {
 }
 
 func TestLowDefenderClampsProjectedBallPath(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	gi.State.SetBall(0, 0, 0, 1000)
 	gi.State.SetBall(-1000, 1000, 0, 1020)
 	ballPos := info.Position{X: -1000, Y: 1000}
 
 	state := &DefensePressState{gi: gi, team: info.Blue}
 	target := LowDefenderTarget(state.gi, state.team, ballPos, 0)
-	if target.X != -3000 || target.Y != coverYClamp {
-		t.Fatalf("clamped Low Def target = %+v, want X=-3000 Y=%.0f", target, coverYClamp)
+	lateralLimit, ok := DefenderLateralLimit(gi)
+	if !ok {
+		t.Fatal("expected Vision geometry to provide a lateral limit")
+	}
+	if target.X != -3000 || target.Y != lateralLimit {
+		t.Fatalf("clamped Low Def target = %+v, want X=-3000 Y=%.0f", target, lateralLimit)
 	}
 }
 
 func TestLowDefenderPredictsWhereStationaryShooterAims(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	opponent := gi.State.GetOtherTeam(info.Blue)[2]
 	opponentPos := info.Position{X: 500, Y: 200}
 	wantedHit := info.Position{X: -3000, Y: 900}
@@ -206,7 +255,7 @@ func TestLowDefenderPredictsWhereStationaryShooterAims(t *testing.T) {
 }
 
 func TestLowDefenderIgnoresShooterAimingAwayFromDefenseLine(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	opponent := gi.State.GetOtherTeam(info.Blue)[2]
 	opponent.SetPositionTime(0, 200, 0, 1)
 	ballPos := opponent.DribblerPos()
@@ -220,7 +269,7 @@ func TestLowDefenderIgnoresShooterAimingAwayFromDefenseLine(t *testing.T) {
 }
 
 func TestCoverTargetBlocksDangerousOpponentWithoutBallPossessor(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	opponents := gi.State.GetOtherTeam(info.Blue)
 	ballPos := info.Position{X: 0, Y: 400}
 	dangerousPos := info.Position{X: -3500, Y: -200}
@@ -246,7 +295,7 @@ func TestCoverTargetBlocksDangerousOpponentWithoutBallPossessor(t *testing.T) {
 }
 
 func TestCoverTargetUsesAssignedOpponentInsteadOfClosestToGoal(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	opponents := gi.State.GetOtherTeam(info.Blue)
 	ballPos := info.Position{X: 0, Y: 0}
 	opponents[1].SetPositionTime(-3900, -900, 0, 1)
@@ -275,7 +324,7 @@ func TestCoverTargetUsesAssignedOpponentInsteadOfClosestToGoal(t *testing.T) {
 }
 
 func TestCoverTargetParksWhenDangerousOpponentIsNearBall(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	opponents := gi.State.GetOtherTeam(info.Blue)
 	ballPos := info.Position{X: -3500, Y: 0}
 
@@ -294,7 +343,7 @@ func TestCoverTargetParksWhenDangerousOpponentIsNearBall(t *testing.T) {
 }
 
 func TestCoverRoleCanKickNearbySlowBall(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	gi.State.SetBlueRobot(3, 0, 0, 0, 1)
 	ballPos := info.Position{X: defenseKickBallDistance - 1, Y: 0}
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
@@ -314,7 +363,7 @@ func TestCoverRoleCanKickNearbySlowBall(t *testing.T) {
 }
 
 func TestCoverRoleStartsAligningBeforeKick(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	gi.State.SetBlueRobot(3, 0, 0, 0, 1)
 	ballPos := info.Position{X: defenseKickBallDistance - 1}
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
@@ -340,7 +389,7 @@ func TestCoverRoleStartsAligningBeforeKick(t *testing.T) {
 }
 
 func TestLowDefenseStartsAligningBeforeKick(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	gi.State.SetBlueRobot(5, 0, 0, 0, 1)
 	ballPos := info.Position{X: defenseKickBallDistance - 1}
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
@@ -366,7 +415,7 @@ func TestLowDefenseStartsAligningBeforeKick(t *testing.T) {
 }
 
 func TestCoverRoleDoesNotKickFarOrFastBall(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	gi.State.SetBlueRobot(3, 0, 0, 0, 1)
 	dr := NewDefenseRole(3, ai.ActivityHandler{}, gi, info.Blue)
 	dr.Init()
@@ -389,7 +438,7 @@ func TestCoverRoleDoesNotKickFarOrFastBall(t *testing.T) {
 }
 
 func TestCoverRoleCannotKickWithoutBallAssignment(t *testing.T) {
-	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	gi := newDefenseRoleTestGameInfo()
 	gi.State.SetBlueRobot(3, 0, 0, 0, 1)
 	ballPos := info.Position{X: defenseKickBallDistance - 1}
 	gi.State.GetBall().SetEstimatedPosition(ballPos)
@@ -413,7 +462,7 @@ func TestCoverRoleCannotKickWithoutBallAssignment(t *testing.T) {
 }
 
 func TestAttackerNearActivatesCoverState(t *testing.T) {
-	dr := NewDefenseRole(7, ai.ActivityHandler{}, info.NewGameInfo(int(info.TEAM_SIZE)), info.Blue)
+	dr := NewDefenseRole(7, ai.ActivityHandler{}, newDefenseRoleTestGameInfo(), info.Blue)
 	dr.Init()
 	dr.SetRoleKind(DefenseRoleHigh)
 
@@ -428,5 +477,136 @@ func TestAttackerNearActivatesCoverState(t *testing.T) {
 	}
 	if got := dr.pressState.slot.Kind; got != DefenseRoleHigh {
 		t.Fatalf("assigned defense kind after cover = %q, want %q", got, DefenseRoleHigh)
+	}
+}
+
+func TestWallRoleUsesPlanProvidedWallPosition(t *testing.T) {
+	gi := newDefenseRoleTestGameInfo()
+	gi.State.SetBlueRobot(3, -2500, 0, 0, 1)
+	gi.State.GetBall().SetEstimatedPosition(info.Position{X: -500, Y: 200})
+
+	activities := [info.TEAM_SIZE]act.Activity{}
+	handler := ai.ActivityHandler{
+		Activities:    &activities,
+		Activity_lock: &sync.Mutex{},
+	}
+	role := NewDefenseRole(3, handler, gi, info.Blue)
+	role.Init()
+	role.SetRoleKind(DefenseRoleWall)
+	want := info.Position{X: -3300, Y: 450}
+	role.SetWallPosition(want)
+	role.Run()
+
+	move, ok := activities[3].(*act.MoveToPosition)
+	if !ok {
+		t.Fatalf("Wall activity = %T, want *activity.MoveToPosition", activities[3])
+	}
+	got := move.GetMoveToAction(gi).Dest
+	if got.X != want.X || got.Y != want.Y {
+		t.Fatalf("Wall destination = %+v, want X=%.0f Y=%.0f", got, want.X, want.Y)
+	}
+}
+
+func TestHighDefenseBlocksAssignedPassReceiver(t *testing.T) {
+	gi := newDefenseRoleTestGameInfo()
+	gi.State.SetBlueRobot(4, -2500, 0, 0, 1)
+	ballPos := info.Position{}
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+	receiverPos := info.Position{X: -3500, Y: 800}
+	gi.State.GetOtherTeam(info.Blue)[2].SetPositionTime(receiverPos.X, receiverPos.Y, 0, 1)
+
+	activities := [info.TEAM_SIZE]act.Activity{}
+	handler := ai.ActivityHandler{
+		Activities:    &activities,
+		Activity_lock: &sync.Mutex{},
+	}
+	role := NewDefenseRole(4, handler, gi, info.Blue)
+	role.Init()
+	role.SetRoleKind(DefenseRoleHigh)
+	role.SetCoverOpponent(2, true)
+	role.TriggerEvent("ATTACKER_NEAR")
+	role.Run()
+
+	move, ok := activities[4].(*act.MoveToPosition)
+	if !ok {
+		t.Fatalf("High Def activity = %T, want *activity.MoveToPosition", activities[4])
+	}
+	got := move.GetMoveToAction(gi).Dest
+	want := info.Position{
+		X: ballPos.X + (receiverPos.X-ballPos.X)*coverReceiverWeight,
+		Y: ballPos.Y + (receiverPos.Y-ballPos.Y)*coverReceiverWeight,
+	}
+	if math.Abs(got.X-want.X) > 1e-9 || math.Abs(got.Y-want.Y) > 1e-9 {
+		t.Fatalf("High Def destination = %+v, want pass block %+v", got, want)
+	}
+}
+
+func TestLowDefenderUsesNonStandardVisionField(t *testing.T) {
+	gi := newDefenseRoleTestGameInfoWithSize(12000, 8000, 1200, 1500, 3000)
+	ballPos := info.Position{X: -1000, Y: 3500}
+	gi.State.GetBall().SetEstimatedPosition(ballPos)
+
+	target := LowDefenderTarget(gi, info.Blue, ballPos, 0)
+	if got, want := target.X, -3900.0; got != want {
+		t.Fatalf("Low Def X = %.0f, want %.0f from Vision goal line", got, want)
+	}
+	if got, want := target.Y, 2100.0; got != want {
+		t.Fatalf("Low Def Y = %.0f, want %.0f from Vision penalty width", got, want)
+	}
+}
+
+func TestHighAndLowDefenseMoveWithLegacyVisionPenaltyLines(t *testing.T) {
+	for _, kind := range []DefenseRoleKind{DefenseRoleHigh, DefenseRoleLow} {
+		t.Run(string(kind), func(t *testing.T) {
+			gi := newDefenseRoleLegacyVisionGameInfo()
+			start := info.Position{X: -1234, Y: 567}
+			gi.State.SetBlueRobot(3, start.X, start.Y, 0, 1)
+			gi.State.GetBall().SetEstimatedPosition(info.Position{X: 500, Y: -800})
+
+			activities := [info.TEAM_SIZE]act.Activity{}
+			handler := ai.ActivityHandler{
+				Activities:    &activities,
+				Activity_lock: &sync.Mutex{},
+			}
+			role := NewDefenseRole(3, handler, gi, info.Blue)
+			role.Init()
+			role.SetRoleKind(kind)
+			role.Run()
+
+			move, ok := activities[3].(*act.MoveToPosition)
+			if !ok {
+				t.Fatalf("%s activity = %T, want *activity.MoveToPosition", kind, activities[3])
+			}
+			target := move.GetMoveToAction(gi).Dest
+			if target.X == start.X && target.Y == start.Y {
+				t.Fatalf("%s held its position %+v despite valid Vision penalty lines", kind, target)
+			}
+		})
+	}
+}
+
+func TestDefenseRoleHoldsPositionWithoutVisionGeometry(t *testing.T) {
+	gi := info.NewGameInfo(int(info.TEAM_SIZE))
+	want := info.Position{X: -1234, Y: 567}
+	gi.State.SetBlueRobot(3, want.X, want.Y, 0, 1)
+	gi.State.GetBall().SetEstimatedPosition(info.Position{X: 2000, Y: -2000})
+
+	activities := [info.TEAM_SIZE]act.Activity{}
+	handler := ai.ActivityHandler{
+		Activities:    &activities,
+		Activity_lock: &sync.Mutex{},
+	}
+	role := NewDefenseRole(3, handler, gi, info.Blue)
+	role.Init()
+	role.SetRoleKind(DefenseRoleHigh)
+	role.Run()
+
+	move, ok := activities[3].(*act.MoveToPosition)
+	if !ok {
+		t.Fatalf("activity without geometry = %T, want *activity.MoveToPosition", activities[3])
+	}
+	got := move.GetMoveToAction(gi).Dest
+	if got.X != want.X || got.Y != want.Y {
+		t.Fatalf("destination without geometry = %+v, want held position %+v", got, want)
 	}
 }

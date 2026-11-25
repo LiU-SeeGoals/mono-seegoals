@@ -16,7 +16,7 @@ func NewStaticPlan(team info.Team) *StaticPlan {
 			staticSlots: map[info.ID]tacticalSlotKind{
 				1: tacticalSlotBallChaser,
 				2: tacticalSlotSupportShooter,
-				3: tacticalSlotDefenderWall,
+				3: tacticalSlotDefenderHigh,
 				4: tacticalSlotSupportShooter,
 				5: tacticalSlotDefenderLow,
 			},

@@ -11,25 +11,24 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
-const coverYClamp = 1500.0
-
 const (
-	forwardDefenderBallOffset  = 700.0
-	middleDefenderBallOffset   = 1700.0
-	backwardDefenderDepth      = 3200.0
-	highDefenderBallOffset     = 900.0
-	defenderMinimumDepth       = 3000.0
-	CoverDangerousGoalDistance = 2500.0
-	CoverDangerousBallDistance = 500.0
-	CoverReleaseGoalDistance   = 2700.0
-	CoverReleaseBallDistance   = 350.0
-	coverReceiverWeight        = 4.0 / 5.0
-	defenseKickBallDistance    = 600.0
-	defenseKickMaxBallSpeed    = 0.3
-	defenseShooterBallDist     = 350.0
+	forwardDefenderGoalWidthFraction     = 0.7
+	middleDefenderGoalWidthFraction      = 0.7
+	backwardDefenderGoalWidthFraction    = 0.3
+	highDefenderPenaltyDepthFraction     = 0.9
+	minimumDefenderGoalWidthFraction     = 0.5
+	defenderLateralGoalWidthFraction     = 0.5
+	coverDangerousGoalWidthFraction      = 0.5
+	coverReleaseGoalWidthFraction        = 0.2
+	passReceiverReleaseGoalWidthFraction = 0.3
+	CoverDangerousBallDistance           = 500.0
+	CoverReleaseBallDistance             = 350.0
+	coverReceiverWeight                  = 4.0 / 5.0
+	defenseKickBallDistance              = 600.0
+	defenseKickMaxBallSpeed              = 0.3
+	defenseShooterBallDist               = 350.0
 )
 
-var neutralHoldPos = info.Position{X: 0, Y: -1500, Z: 0, Angle: 0}
 var defenseKickTarget = info.Position{X: 0, Y: 0, Z: 0, Angle: 0}
 
 type DefenseRoleKind string
@@ -47,6 +46,39 @@ const (
 type DefenseSlot struct {
 	Kind          DefenseRoleKind
 	LateralOffset float64
+}
+
+type defenseTacticalGeometry struct {
+	forwardBallOffset       float64
+	middleBallOffset        float64
+	backwardGoalInset       float64
+	highBallOffset          float64
+	minimumGoalInset        float64
+	lateralLimit            float64
+	coverAcquireDistance    float64
+	coverReleaseDistance    float64
+	passReceiverReleaseDist float64
+}
+
+func newDefenseTacticalGeometry(gi *info.GameInfo) (defenseTacticalGeometry, bool) {
+	if gi == nil {
+		return defenseTacticalGeometry{}, false
+	}
+	geometry, ok := gi.FieldGeometry()
+	if !ok || geometry.Width <= 0 || geometry.GoalWidth <= 0 || geometry.PenaltyAreaDepth <= 0 || geometry.PenaltyAreaWidth <= 0 {
+		return defenseTacticalGeometry{}, false
+	}
+	return defenseTacticalGeometry{
+		forwardBallOffset:       geometry.GoalWidth * forwardDefenderGoalWidthFraction,
+		middleBallOffset:        geometry.PenaltyAreaDepth + geometry.GoalWidth*middleDefenderGoalWidthFraction,
+		backwardGoalInset:       geometry.PenaltyAreaDepth + geometry.GoalWidth*backwardDefenderGoalWidthFraction,
+		highBallOffset:          geometry.PenaltyAreaDepth * highDefenderPenaltyDepthFraction,
+		minimumGoalInset:        geometry.PenaltyAreaDepth + geometry.GoalWidth*minimumDefenderGoalWidthFraction,
+		lateralLimit:            math.Min(geometry.Width/2, geometry.PenaltyAreaWidth/2+geometry.GoalWidth*defenderLateralGoalWidthFraction),
+		coverAcquireDistance:    2*geometry.PenaltyAreaDepth + geometry.GoalWidth*coverDangerousGoalWidthFraction,
+		coverReleaseDistance:    2*geometry.PenaltyAreaDepth + geometry.GoalWidth*(coverDangerousGoalWidthFraction+coverReleaseGoalWidthFraction),
+		passReceiverReleaseDist: geometry.GoalWidth * passReceiverReleaseGoalWidthFraction,
+	}, true
 }
 
 type coverOpponentSelection struct {
@@ -72,6 +104,7 @@ type DefensePressState struct {
 	activityHandler *ai.ActivityHandler
 	slot            DefenseSlot
 	coverOpponent   *coverOpponentSelection
+	wallPosition    *info.Position
 }
 
 func (s *DefensePressState) Initialize() {}
@@ -81,26 +114,42 @@ func (s *DefensePressState) GetName() StateName {
 }
 
 func (s *DefensePressState) Update() EventName {
-	xSign := defenseXSign(s.gi, s.team)
+	if s.gi == nil || s.gi.State == nil {
+		return "NONE"
+	}
+	dimensions, ok := newDefenseTacticalGeometry(s.gi)
+	if !ok {
+		target, err := s.gi.State.GetRobotPosition(s.team, s.robotId)
+		if err == nil {
+			s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, target))
+		}
+		return "NONE"
+	}
 
 	ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
 	var target info.Position
 	switch s.slot.Kind {
+	case DefenseRoleWall:
+		if s.wallPosition != nil {
+			target = *s.wallPosition
+			target.Angle = target.AngleToPosition(ballPos)
+		} else {
+			target = s.ballGoalLineTarget(ballPos, dimensions.highBallOffset, s.slot.LateralOffset)
+		}
 	case DefenseRoleHigh:
-		target = s.ballGoalLineTarget(ballPos, highDefenderBallOffset, s.slot.LateralOffset)
+		target = s.ballGoalLineTarget(ballPos, dimensions.highBallOffset, s.slot.LateralOffset)
 	case DefenseRoleLow:
 		target = LowDefenderTarget(s.gi, s.team, ballPos, s.slot.LateralOffset)
 	case DefenseRoleForward:
-		target = s.ballGoalLineTarget(ballPos, forwardDefenderBallOffset, s.slot.LateralOffset)
+		target = s.ballGoalLineTarget(ballPos, dimensions.forwardBallOffset, s.slot.LateralOffset)
 	case DefenseRoleMiddle:
-		target = s.ballGoalLineTarget(ballPos, middleDefenderBallOffset, s.slot.LateralOffset)
+		target = s.ballGoalLineTarget(ballPos, dimensions.middleBallOffset, s.slot.LateralOffset)
 	case DefenseRoleBackward:
 		target = s.backwardDefenderTarget(ballPos, s.slot.LateralOffset)
 	case DefenseRoleCover:
 		target = s.coverTarget(ballPos)
 	default:
-		target = info.Position{X: xSign * backwardDefenderDepth, Y: ballPos.Y, Z: 0, Angle: 0}
-		target = clampCoverTarget(target)
+		target = s.backwardDefenderTarget(ballPos, s.slot.LateralOffset)
 		target.Angle = target.AngleToPosition(ballPos)
 	}
 
@@ -109,13 +158,16 @@ func (s *DefensePressState) Update() EventName {
 }
 
 func (s *DefensePressState) ballGoalLineTarget(ballPos info.Position, ballOffset float64, lateralOffset float64) info.Position {
-	goalPos := s.gi.HomeGoalDefPos(s.team)
+	goalPos, ok := s.gi.OwnGoalCenter(s.team)
+	if !ok {
+		return ballPos
+	}
 	toGoalX := goalPos.X - ballPos.X
 	toGoalY := goalPos.Y - ballPos.Y
 	dist := math.Sqrt(toGoalX*toGoalX + toGoalY*toGoalY)
 	if dist < 1 {
-		hold := neutralHoldPos
-		hold.X *= defenseXSign(s.gi, s.team)
+		hold := goalPos
+		hold.X -= defenseXSign(s.gi, s.team) * ballOffset
 		hold.Angle = hold.AngleToPosition(ballPos)
 		return hold
 	}
@@ -125,30 +177,48 @@ func (s *DefensePressState) ballGoalLineTarget(ballPos info.Position, ballOffset
 		Y: ballPos.Y + toGoalY/dist*ballOffset + toGoalX/dist*lateralOffset,
 		Z: 0,
 	}
-	target = clampCoverTarget(target)
+	target = clampCoverTarget(s.gi, target)
 	target.Angle = target.AngleToPosition(ballPos)
 	return target
 }
 
 func (s *DefensePressState) backwardDefenderTarget(ballPos info.Position, lateralOffset float64) info.Position {
+	dimensions, ok := newDefenseTacticalGeometry(s.gi)
+	if !ok {
+		return ballPos
+	}
+	targetX, ok := defensiveLineX(s.gi, s.team, dimensions.backwardGoalInset)
+	if !ok {
+		return ballPos
+	}
 	target := info.Position{
-		X: defenseXSign(s.gi, s.team) * backwardDefenderDepth,
+		X: targetX,
 		Y: ballPos.Y + lateralOffset,
 		Z: 0,
 	}
-	target = clampCoverTarget(target)
+	target = clampCoverTarget(s.gi, target)
 	target.Angle = target.AngleToPosition(ballPos)
 	return target
 }
 
 // LowDefenderTarget is shared by role assignment and the running defense role,
 // so the robot selected for Low Def is evaluated against the same position it
-// will actually drive to. The +/-3000 line is a minimum defensive depth; once
-// the ball moves deeper into our half, Low Def may retreat with it.
+// will actually drive to. The minimum line is measured inward from the goal
+// line reported by Vision; once the ball moves deeper, Low Def retreats with it.
 func LowDefenderTarget(gi *info.GameInfo, team info.Team, ballPos info.Position, lateralOffset float64) info.Position {
+	dimensions, ok := newDefenseTacticalGeometry(gi)
+	if !ok {
+		return ballPos
+	}
+	minimumX, ok := defensiveLineX(gi, team, dimensions.minimumGoalInset)
+	if !ok {
+		return ballPos
+	}
 	xSign := defenseXSign(gi, team)
-	targetDepth := math.Max(defenderMinimumDepth, xSign*ballPos.X)
-	targetX := xSign * targetDepth
+	targetX := minimumX
+	if xSign*ballPos.X > xSign*minimumX {
+		targetX = ballPos.X
+	}
 	targetY := ballPos.Y
 	state := DefensePressState{gi: gi, team: team}
 	if aimedY, ok := state.opponentAimYAtX(ballPos, targetX); ok {
@@ -164,7 +234,7 @@ func LowDefenderTarget(gi *info.GameInfo, team info.Team, ballPos info.Position,
 		Y: targetY + lateralOffset,
 		Z: 0,
 	}
-	target = clampCoverTarget(target)
+	target = clampCoverTarget(gi, target)
 	target.Angle = target.AngleToPosition(ballPos)
 	return target
 }
@@ -221,23 +291,52 @@ func (s *DefensePressState) opponentAimingAtBall(ballPos info.Position) (*info.R
 	return shooter, shooter != nil
 }
 
-func clampCoverTarget(target info.Position) info.Position {
-	if target.Y > coverYClamp {
-		target.Y = coverYClamp
+func defensiveLineX(gi *info.GameInfo, team info.Team, goalInset float64) (float64, bool) {
+	if gi == nil {
+		return 0, false
 	}
-	if target.Y < -coverYClamp {
-		target.Y = -coverYClamp
+	goalCenter, ok := gi.OwnGoalCenter(team)
+	if !ok {
+		return 0, false
 	}
-	return target
+	return goalCenter.X - gi.OwnHalfXSign(team)*goalInset, true
+}
+
+// DefenderLateralLimit returns the shared lateral boundary used by both role
+// assignment and the executing defense role.
+func DefenderLateralLimit(gi *info.GameInfo) (float64, bool) {
+	dimensions, ok := newDefenseTacticalGeometry(gi)
+	if !ok {
+		return 0, false
+	}
+	return dimensions.lateralLimit, true
+}
+
+func clampCoverTarget(gi *info.GameInfo, target info.Position) info.Position {
+	limit, ok := DefenderLateralLimit(gi)
+	if !ok {
+		return target
+	}
+	target.Y = math.Max(-limit, math.Min(limit, target.Y))
+	return gi.ClampToField(target, 0)
 }
 
 // coverParkingPos returns where Cover should wait when no dangerous opponent is found.
 func (s *DefensePressState) coverParkingPos(ballPos info.Position) info.Position {
+	dimensions, ok := newDefenseTacticalGeometry(s.gi)
+	if !ok {
+		return ballPos
+	}
+	targetX, ok := defensiveLineX(s.gi, s.team, dimensions.minimumGoalInset)
+	if !ok {
+		return ballPos
+	}
 	target := info.Position{
-		X: defenseXSign(s.gi, s.team) * defenderMinimumDepth,
+		X: targetX,
 		Y: ballPos.Y,
 		Z: 0,
 	}
+	target = clampCoverTarget(s.gi, target)
 	target.Angle = target.AngleToPosition(ballPos)
 	return target
 }
@@ -254,6 +353,7 @@ func (s *DefensePressState) coverTarget(ballPos info.Position) info.Position {
 		Y: ballPos.Y + (dangerousPos.Y-ballPos.Y)*coverReceiverWeight,
 		Z: 0,
 	}
+	target = clampCoverTarget(s.gi, target)
 	target.Angle = target.AngleToPosition(ballPos)
 	return target
 }
@@ -263,17 +363,90 @@ func (s *DefensePressState) selectedCoverOpponent(ballPos info.Position) (*info.
 		if !s.coverOpponent.assigned {
 			return nil, info.Position{}, false
 		}
-		return LockedCoverThreat(s.gi, s.team, s.coverOpponent.id, ballPos)
+		return LockedPassReceiverThreat(s.gi, s.team, s.coverOpponent.id, ballPos)
 	}
 
 	opponent, position, goalDistance, found := s.closestOpponentToOwnGoal()
-	if !found || goalDistance > CoverDangerousGoalDistance {
+	acquireDistance, _, ok := coverGoalDistances(s.gi)
+	if !found || !ok || goalDistance > acquireDistance {
 		return nil, info.Position{}, false
 	}
 	if position.Dist2d(ballPos) <= CoverDangerousBallDistance {
 		return nil, info.Position{}, false
 	}
 	return opponent, position, true
+}
+
+// PassReceiverThreat accepts opponents throughout our defensive half. It is
+// intentionally wider than CoverThreat so High Def reacts before a receiver
+// has already entered the final goal-protection zone.
+func PassReceiverThreat(
+	gi *info.GameInfo,
+	team info.Team,
+	opponentID info.ID,
+	ballPos info.Position,
+) (*info.Robot, info.Position, bool) {
+	if gi == nil {
+		return nil, info.Position{}, false
+	}
+	if _, ok := gi.FieldGeometry(); !ok {
+		return nil, info.Position{}, false
+	}
+	return passReceiverThreatWithin(
+		gi,
+		team,
+		opponentID,
+		ballPos,
+		0,
+		CoverDangerousBallDistance,
+	)
+}
+
+// LockedPassReceiverThreat adds hysteresis to the defensive-half boundary so
+// that small vision changes do not release and reacquire the same receiver.
+func LockedPassReceiverThreat(
+	gi *info.GameInfo,
+	team info.Team,
+	opponentID info.ID,
+	ballPos info.Position,
+) (*info.Robot, info.Position, bool) {
+	if gi == nil {
+		return nil, info.Position{}, false
+	}
+	if _, ok := gi.FieldGeometry(); !ok {
+		return nil, info.Position{}, false
+	}
+	dimensions, ok := newDefenseTacticalGeometry(gi)
+	if !ok {
+		return nil, info.Position{}, false
+	}
+	return passReceiverThreatWithin(
+		gi,
+		team,
+		opponentID,
+		ballPos,
+		-dimensions.passReceiverReleaseDist,
+		CoverReleaseBallDistance,
+	)
+}
+
+func passReceiverThreatWithin(
+	gi *info.GameInfo,
+	team info.Team,
+	opponentID info.ID,
+	ballPos info.Position,
+	minimumOwnHalfProgress float64,
+	minimumBallDistance float64,
+) (*info.Robot, info.Position, bool) {
+	opponent, opponentPos, ok := activeOpponent(gi, team, opponentID)
+	if !ok {
+		return nil, info.Position{}, false
+	}
+	progressIntoOwnHalf := gi.OwnHalfXSign(team) * opponentPos.X
+	if progressIntoOwnHalf < minimumOwnHalfProgress || opponentPos.Dist2d(ballPos) <= minimumBallDistance {
+		return nil, info.Position{}, false
+	}
+	return opponent, opponentPos, true
 }
 
 // CoverThreat returns an active opponent only while it qualifies as a pass
@@ -284,12 +457,16 @@ func CoverThreat(
 	opponentID info.ID,
 	ballPos info.Position,
 ) (*info.Robot, info.Position, bool) {
+	acquireDistance, _, ok := coverGoalDistances(gi)
+	if !ok {
+		return nil, info.Position{}, false
+	}
 	return coverThreatWithin(
 		gi,
 		team,
 		opponentID,
 		ballPos,
-		CoverDangerousGoalDistance,
+		acquireDistance,
 		CoverDangerousBallDistance,
 	)
 }
@@ -303,12 +480,16 @@ func LockedCoverThreat(
 	opponentID info.ID,
 	ballPos info.Position,
 ) (*info.Robot, info.Position, bool) {
+	_, releaseDistance, ok := coverGoalDistances(gi)
+	if !ok {
+		return nil, info.Position{}, false
+	}
 	return coverThreatWithin(
 		gi,
 		team,
 		opponentID,
 		ballPos,
-		CoverReleaseGoalDistance,
+		releaseDistance,
 		CoverReleaseBallDistance,
 	)
 }
@@ -321,6 +502,25 @@ func coverThreatWithin(
 	maxGoalDistance float64,
 	minBallDistance float64,
 ) (*info.Robot, info.Position, bool) {
+	opponent, opponentPos, ok := activeOpponent(gi, team, opponentID)
+	if !ok {
+		return nil, info.Position{}, false
+	}
+
+	goalPos, ok := gi.OwnGoalCenter(team)
+	if !ok {
+		return nil, info.Position{}, false
+	}
+	if opponentPos.Dist2d(goalPos) > maxGoalDistance {
+		return nil, info.Position{}, false
+	}
+	if opponentPos.Dist2d(ballPos) <= minBallDistance {
+		return nil, info.Position{}, false
+	}
+	return opponent, opponentPos, true
+}
+
+func activeOpponent(gi *info.GameInfo, team info.Team, opponentID info.ID) (*info.Robot, info.Position, bool) {
 	if gi == nil || gi.State == nil {
 		return nil, info.Position{}, false
 	}
@@ -336,26 +536,15 @@ func coverThreatWithin(
 	if err != nil {
 		return nil, info.Position{}, false
 	}
-
-	goalPos := ownGoalCenter(gi, team)
-	if opponentPos.Dist2d(goalPos) > maxGoalDistance {
-		return nil, info.Position{}, false
-	}
-	if opponentPos.Dist2d(ballPos) <= minBallDistance {
-		return nil, info.Position{}, false
-	}
 	return opponent, opponentPos, true
 }
 
-func ownGoalCenter(gi *info.GameInfo, team info.Team) info.Position {
-	halfFieldLength := 4500.0
-	if gi != nil && gi.HasField() {
-		fieldSize := gi.FieldSize()
-		if fieldSize.X > 0 {
-			halfFieldLength = fieldSize.X / 2
-		}
+func coverGoalDistances(gi *info.GameInfo) (acquire, release float64, ok bool) {
+	dimensions, ok := newDefenseTacticalGeometry(gi)
+	if !ok {
+		return 0, 0, false
 	}
-	return info.Position{X: gi.OwnHalfXSign(team) * halfFieldLength}
+	return dimensions.coverAcquireDistance, dimensions.coverReleaseDistance, true
 }
 
 // closestOpponentToOwnGoal finds the most dangerous opponent by distance to our goal.
@@ -364,7 +553,10 @@ func (s *DefensePressState) closestOpponentToOwnGoal() (*info.Robot, info.Positi
 		return nil, info.Position{}, 0, false
 	}
 
-	goalPos := ownGoalCenter(s.gi, s.team)
+	goalPos, ok := s.gi.OwnGoalCenter(s.team)
+	if !ok {
+		return nil, info.Position{}, 0, false
+	}
 
 	opponents := s.gi.State.GetOtherTeam(s.team)
 	var closestOpponent *info.Robot
@@ -468,6 +660,7 @@ func (dr *DefenseRole) Init() {
 		activityHandler: dr.activityHandler,
 		slot:            DefenseSlot{Kind: DefenseRoleCover},
 		coverOpponent:   coverOpponent,
+		wallPosition:    &dr.wallPosition,
 	}
 	coverState := &DefensePressState{
 		gi:              dr.gi,
