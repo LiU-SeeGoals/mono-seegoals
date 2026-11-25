@@ -1,34 +1,31 @@
 package pathplanner
 
-import (
-	"math"
-	"testing"
+import "testing"
 
-	"github.com/LiU-SeeGoals/controller/internal/info"
-)
+func TestAStarDirectPathWhenClear(t *testing.T) {
+	t.Skip("TODO: no obstacles → path is exactly [start, goal]")
+}
 
-func TestPointSegmentDist(t *testing.T) {
-	a := info.Position{X: 0, Y: 0}
-	b := info.Position{X: 1000, Y: 0}
+func TestAStarGoesAroundRobot(t *testing.T) {
+	t.Skip("TODO: robot between start and goal → path bends around it")
+}
 
-	cases := []struct {
-		name string
-		p    info.Position
-		want float64
-	}{
-		{"above middle", info.Position{X: 500, Y: 300}, 300},
-		{"on segment", info.Position{X: 200, Y: 0}, 0},
-		{"before start", info.Position{X: -300, Y: 400}, 500},
-		{"after end", info.Position{X: 1300, Y: -400}, 500},
-	}
-	for _, c := range cases {
-		if got := pointSegmentDist(c.p, a, b); math.Abs(got-c.want) > 1e-9 {
-			t.Errorf("%s: got %v, want %v", c.name, got, c.want)
-		}
-	}
+func TestAStarGoesAroundGoalArea(t *testing.T) {
+	t.Skip("TODO: rectangle obstacle between start and goal → path uses its corners")
+}
 
-	// Zero-length segment: distance to the single point.
-	if got := pointSegmentDist(info.Position{X: 300, Y: 400}, a, a); math.Abs(got-500) > 1e-9 {
-		t.Errorf("zero-length: got %v, want 500", got)
-	}
+func TestAStarPathSegmentsAreClear(t *testing.T) {
+	t.Skip("TODO: every segment of the result passes IsPathClear")
+}
+
+func TestAStarIsDeterministic(t *testing.T) {
+	t.Skip("TODO: same input twice → identical path")
+}
+
+func TestAStarBlockedGoalReturnsNil(t *testing.T) {
+	t.Skip("TODO: goal unreachable → nil")
+}
+
+func TestGraphNodesAreOutsideObstacles(t *testing.T) {
+	t.Skip("TODO: every node from graphNodes passes isNodeValid")
 }

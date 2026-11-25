@@ -1,22 +1,37 @@
 package pathplanner
 
-import (
-	"math"
+import "github.com/LiU-SeeGoals/controller/internal/info"
 
-	"github.com/LiU-SeeGoals/controller/internal/info"
+// Visibility-graph construction for the A* planner (see astar.go).
+//
+// Graph nodes are placed just outside every obstacle: a ring of points around
+// each disc and one point outside each corner of each rectangle. Edges are
+// checked lazily by A* with IsPathClear.
+
+const (
+	// visRingNodes is the number of graph nodes placed around each disc.
+	visRingNodes = 8
+	// visMargin is extra clearance (mm) between graph nodes and obstacles.
+	visMargin = 20.0
 )
 
-// Visibility-graph geometry for the A* planner (see astar.go).
+// graphNodes returns all obstacle-hugging nodes (without start and goal),
+// keeping only those inside the planning bounds and outside every obstacle.
+func graphNodes(obstacles []Obstacle, cfg RRTConfig) []info.Position {
+	// TODO: ringNodes for discs, rectCornerNodes for rectangles, then filter.
+	return nil
+}
 
-// pointSegmentDist returns the shortest distance from p to the segment a→b.
-func pointSegmentDist(p, a, b info.Position) float64 {
-	dx, dy := b.X-a.X, b.Y-a.Y
-	lenSq := dx*dx + dy*dy
-	if lenSq == 0 {
-		return distanceBetween(p, a)
-	}
-	// t is how far along a→b the closest point lies (0 = a, 1 = b).
-	t := ((p.X-a.X)*dx + (p.Y-a.Y)*dy) / lenSq
-	t = math.Max(0, math.Min(1, t))
-	return math.Hypot(p.X-(a.X+t*dx), p.Y-(a.Y+t*dy))
+// ringNodes returns visRingNodes points on a circle around a disc obstacle,
+// far enough out that edges between neighbouring points don't cut the disc.
+func ringNodes(obstacle Obstacle) []info.Position {
+	// TODO
+	return nil
+}
+
+// rectCornerNodes returns one point just outside each corner of a
+// rectangular obstacle (using its expandedRect).
+func rectCornerNodes(obstacle Obstacle) []info.Position {
+	// TODO
+	return nil
 }
