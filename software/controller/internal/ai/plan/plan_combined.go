@@ -105,6 +105,11 @@ type combinedRoleManager struct {
 	lastChanged     map[info.ID]time.Time
 }
 
+type dismissedState struct {
+	side float64
+	activity *act.MoveToPosition
+}
+
 func newCombinedRoleManager(activityHandler *coreai.ActivityHandler, gi *GameInfo, team Team) *combinedRoleManager {
 	return &combinedRoleManager{
 		activityHandler: activityHandler,
@@ -531,9 +536,7 @@ func (m *CombinedPlan) splitDismissedFromFieldRobots(
 		}
 	}
 
-	for _, dismissedID := range dismissedRobots {
-		fieldRobots = withoutRobot(fieldRobots, dismissedID)
-	}
+	fieldRobots = m.removeDismissed(dismissedRobots, fieldRobots)
 
 	if gi != nil && gi.Status != nil {
 		teamInfo := gi.Status.GetTeamInfo(m.team == info.Yellow)
@@ -557,6 +560,63 @@ func (m *CombinedPlan) splitDismissedFromFieldRobots(
 	}
 
 	return dismissedRobots, fieldRobots
+}
+
+func (m *CombinedPlan) removeDismissed(dismissedRobots []info.ID, activeRobots []info.ID) []info.ID {
+	for _, dismissedID := range dismissedRobots {
+		activeRobots = withoutRobot(activeRobots, dismissedID)
+	}
+
+	return activeRobots
+}
+
+func (m *CombinedPlan) updateDismissedStates(gi *GameInfo, dismissedRobots []info.ID, dismissedStates map[info.ID]*dismissedState) {
+	// If dismissedID in dismissedRobots but not in dismissedStates, add it to dismissedStates
+	for _, dismissedID := range dismissedRobots {
+		if _, found := dismissedStates[dismissedID]; !found {
+			dismissedStates[dismissedID] = &dismissedState{side: m.getClosestSide(gi, dismissedID)}
+		}
+	}
+
+	// If dismissedID in dismissedStates but not in dismissedRobots, remove it from dismissedStates
+	for dismissedID := range dismissedStates {
+		if !containsRobot(dismissedRobots, dismissedID) {
+			delete(dismissedStates, dismissedID)
+			m.ActivityHandler.ClearActivity(dismissedID)
+		}
+	}
+}
+
+func (m *CombinedPlan) getClosestSide(gi *GameInfo, dismissedID info.ID) float64 {
+	side := 1.0
+
+    pos, err := gi.State.GetRobotPosition(m.team, dismissedID)
+    if err == nil {
+        if pos.Y < 0 {
+        	side = -side
+        }
+    }
+
+	return side
+}
+
+func (m *CombinedPlan) updateDismissedActivities(gi *GameInfo, dismissedRobots []info.ID, dismissedStates map[info.ID]*dismissedState) {
+	yPos := gi.FieldSize().Y / 2 + gi.FieldBoundaryWidth() / 2
+	for _, dismissedID := range dismissedRobots {
+		state := dismissedStates[dismissedID]
+
+		if state.activity == nil {
+			substitutionX := 0.0
+			substitutionY := state.side * yPos
+			target := info.Position{X: substitutionX, Y: substitutionY}
+			newActivity := act.NewMoveToPosition(m.team, dismissedID, target)
+			newActivity.AllowOutsideField(true)
+			state.activity = newActivity
+		}
+
+		m.ActivityHandler.AddActivity(state.activity)
+		debugstate.SetRobotRole(m.team, dismissedID, "Dismissed")
+	}
 }
 
 func (m *CombinedPlan) desiredMode(gi *GameInfo, fallback tacticalMode) tacticalMode {
@@ -934,6 +994,7 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 
 	var goalieID info.ID
 	var dismissedRobots []info.ID
+	dismissedStates := make(map[info.ID]*dismissedState)
 	var goalieRole *roles.GoalieRole
 	var activeReceiver info.ID
 	var activeReceiverStart time.Time
@@ -961,9 +1022,13 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 			}
 		} else if goalieRole != nil {
 			m.ActivityHandler.ClearActivity(goalieID)
-			debugstate.ClearRobotRole(m.team, goalieID)	
+			debugstate.ClearRobotRole(m.team, goalieID)
 			goalieRole = nil
 		}
+
+		dismissedRobots, fieldRobots = m.splitDismissedFromFieldRobots(&gi, dismissedRobots, fieldRobots)
+		m.updateDismissedStates(&gi, dismissedRobots, dismissedStates)
+		activeRobots = m.removeDismissed(dismissedRobots, activeRobots) // Ensure kickoffs and free kicks only pick from robots currently on the field
 
 		desiredMode := desiredModeForTrackedOwner(possession.owner, m.team, mode)
 		if restartMode, announced := stoppedRestartMode(gi.Status.GetGameEvent(), m.team); announced {
@@ -1006,6 +1071,8 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 		}
 		roleManager.configureOffenseReceivers(receiverIDs)
 
+		m.updateDismissedActivities(&gi, dismissedRobots, dismissedStates)
+		
 		if isStoppedFrame(&gi) {
 			hasActiveReceiver = false
 			actorTracker.switchTo(roleManager.attackers, noOffenseBallActor())
