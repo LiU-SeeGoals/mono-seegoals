@@ -299,6 +299,11 @@ int main(void)
     bool on = false;
 
     NAV_StopDribbler();
+    if (KICKER_get_recharge_automatically())
+    {
+      LOG_INFO("Charging kicker\r\n");
+      KICKER_ChargeStart();
+    }
     float out[3];
     while (1) {
 

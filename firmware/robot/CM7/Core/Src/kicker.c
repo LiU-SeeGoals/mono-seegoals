@@ -81,6 +81,9 @@ static TIM_HandleTypeDef* htim_kicker_kick;     // One shot timer
 static SPI_HandleTypeDef* hspi5_kicker;
 static volatile KickerMode kickerMode = NONE;
 
+static volatile float kick_mps_target = 2.00f;
+static volatile bool kick_on_IR_break = false;
+
 static uint8_t kicker_spi_tx[KICKER_BOARD_SPI_SIZE] = {KICKER_BOARD_ADC_CODE, 0x00};
 static uint8_t kicker_spi_rx[KICKER_BOARD_SPI_SIZE];
 
@@ -88,7 +91,10 @@ static volatile bool kicker_spi_busy = false;
 static volatile bool kicker_adc_ready = false;
 
 static volatile uint16_t kicker_adc_value = 0;
+static volatile uint16_t kicker_previous_charge_adc = 0X1FFF;
+static volatile bool broken = false;
 static volatile float kicker_voltage = 0.0f;
+
 
 /*
  * Private function declaration
@@ -121,9 +127,15 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
 
 void KICKER_ChargeStart()
 {
+    if (broken)
+    {
+        LOG_ERROR("This kickerboard failed to communicate with ADC. Do not attempt to charge it\r\n");
+        return;
+    }
+
     if (kicking)
     {
-        LOG_DEBUG("Currently kicking");
+        LOG_DEBUG("Currently kicking\r\n");
         return;
     }
     if (charging) {
@@ -148,7 +160,7 @@ void KICKER_ChargeStop()
         return;
     }
     
-    uint16_t kicker_current_charge_adc;
+    uint16_t kicker_current_charge_adc = 0;
     if (!KICKER_TryGetADC(&kicker_current_charge_adc))
     {
         KICKER_StartVoltageMeasurement();
@@ -156,9 +168,20 @@ void KICKER_ChargeStop()
         return;
     }
 
+    if (kicker_current_charge_adc == kicker_previous_charge_adc)
+    {
+        LOG_ERROR("While charging the ADC values that we acquired from the kickerboard remained unchanged. The ADC on this board does not function\r\n");
+        recharge_automatically = false;
+        broken = true;
+        KICKER_ChargeStopForced(1);
+        return;
+    }
+
+    kicker_previous_charge_adc = kicker_current_charge_adc;
+
     if (kicker_current_charge_adc < settings.charge_target_ADC - KICKER_ADC_MARGIN)
     {
-        LOG_DEBUG("kicker_current_charge_adc = %d\r\n", kicker_current_charge_adc);
+        LOG_INFO("kicker_current_charge_adc = %d\r\n", kicker_current_charge_adc);
         int status = KICKER_StartVoltageMeasurement();
 
         if (status != 0)
@@ -167,6 +190,7 @@ void KICKER_ChargeStop()
         }
         return;
     }
+    kicker_previous_charge_adc = 0X1FFF;
     // Literally identical to what we want
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
     HAL_TIM_Base_Stop_IT(htim_kicker_charge);
@@ -177,6 +201,7 @@ void KICKER_ChargeStop()
 
 void KICKER_ChargeStopForced(int status)
 {
+    kicker_previous_charge_adc = 0X1FFF;
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
     LOG_ERROR("Something with starting the SPI transfer went wrong and I don't know what %d \r\n", status);
     HAL_TIM_Base_Stop_IT(htim_kicker_charge);
@@ -187,13 +212,13 @@ void KICKER_KickStart(KickerSpeed kickspeed)
 {
     if (!charged)
     {
-        LOG_DEBUG("Not yet fully charged");
+        LOG_DEBUG("Not yet fully charged\r\n");
         return;
     }
 
     if (charging)
     {
-        LOG_DEBUG("Currently charging");
+        LOG_DEBUG("Currently charging\r\n");
     }
 
     if (kicking)
@@ -225,7 +250,7 @@ void KICKER_KickStart(KickerSpeed kickspeed)
     HAL_TIM_Base_Start_IT(htim_kicker_kick);
 }
 
-void KICKER_KickStartSpeed(float speed_mps)
+void KICKER_KickStartSpeed()
 {
     if (!charged)
     {
@@ -255,11 +280,11 @@ void KICKER_KickStartSpeed(float speed_mps)
         return;
     }
 
-    int discharge_length = KICKER_GetDischargeUs(speed_mps);
+    int discharge_length = KICKER_GetDischargeUs(kick_mps_target);
 
     kicking = true;
 
-    LOG_INFO("Straight kick start: requested %.2f m/s, discharge %u us\r\n", (double)speed_mps, discharge_length);
+    LOG_INFO("Straight kick start: requested %.2f m/s, discharge %u us\r\n", (double)kick_mps_target, discharge_length);
 
     /*
      * Straight kicker is active low.
@@ -291,6 +316,21 @@ void KICKER_KickStop()
 void KICKER_SetKickerMode(KickerMode mode)
 {
     kickerMode = mode;
+}
+
+void KICKER_SetSpeedTarget(float speed_mps)
+{
+    kick_mps_target = speed_mps;
+}
+
+void KICKER_SetKickOnIRBreak(bool value)
+{
+    kick_on_IR_break = value;
+}
+
+bool KICKER_GetKickOnIRBreak(void)
+{
+    return kick_on_IR_break;
 }
 
 void KICKER_KickSafe()

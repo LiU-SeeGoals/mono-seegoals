@@ -56,10 +56,9 @@ void KICKER_ChargeStopForced(int status);
 void KICKER_KickStart(KickerSpeed kickspeed);
 
 /*
- * @brief Kicks at the given speed
- * @param speed_mps is the speed in meters per second that we want to kick in
+ * @brief Kicks at the speed set before
  */
-void KICKER_KickStartSpeed(float speed_mps);
+void KICKER_KickStartSpeed();
 
 /**
  *
@@ -69,6 +68,10 @@ void KICKER_KickStop();
 void KICKER_KickSafe();
 
 void KICKER_SetKickerMode(KickerMode mode);
+
+void KICKER_SetSpeedTarget(float speed_mps);
+void KICKER_SetKickOnIRBreak(bool value);
+bool KICKER_GetKickOnIRBreak(void);
 
 /**
  * Returns a reference to the current kicker settings.

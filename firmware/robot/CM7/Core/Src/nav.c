@@ -303,8 +303,9 @@ void NAV_HandleCommand(RobotCommand* cmd)
     } break;
     case ACTION_TYPE_ROTATE:
         break;
-    case ACTION_TYPE_KICK:
+    case ACTION_TYPE_KICK: ;
 
+        /*
         // First bit is set -> hard/soft kick
         // if second bit -> chip/straight kick mode
         if(check_bit(cmd->kick_speed, 0u))
@@ -325,8 +326,12 @@ void NAV_HandleCommand(RobotCommand* cmd)
         {
             KICKER_SetKickerMode(KICKER_STRAIGHT);
         }
+        */
+        float speed = (float)(cmd->kick_speed & 0x0FFF) / 100.0f;
+        KICKER_SetKickerMode(KICKER_STRAIGHT);
+        KICKER_SetKickOnIRBreak(true);
+        KICKER_SetSpeedTarget(speed);
 
-        KICKER_ChargeStart(kickerSpeed);
         NAV_SetMovement(cmd, NAV_POSITION_MOVEMENT);
         break;
     default:
