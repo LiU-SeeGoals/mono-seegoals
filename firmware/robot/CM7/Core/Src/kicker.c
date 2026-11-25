@@ -91,7 +91,6 @@ static volatile bool kicker_spi_busy = false;
 static volatile bool kicker_adc_ready = false;
 
 static volatile uint16_t kicker_adc_value = 0;
-static volatile uint16_t kicker_previous_charge_adc = 0X1FFF;
 static volatile bool broken = false;
 static volatile float kicker_voltage = 0.0f;
 
@@ -127,12 +126,6 @@ void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, S
 
 void KICKER_ChargeStart()
 {
-    if (broken)
-    {
-        LOG_ERROR("This kickerboard failed to communicate with ADC. Do not attempt to charge it\r\n");
-        return;
-    }
-
     if (kicking)
     {
         LOG_DEBUG("Currently kicking\r\n");
@@ -168,17 +161,6 @@ void KICKER_ChargeStop()
         return;
     }
 
-    if (kicker_current_charge_adc == kicker_previous_charge_adc)
-    {
-        LOG_ERROR("While charging the ADC values that we acquired from the kickerboard remained unchanged. The ADC on this board does not function\r\n");
-        recharge_automatically = false;
-        broken = true;
-        KICKER_ChargeStopForced(1);
-        return;
-    }
-
-    kicker_previous_charge_adc = kicker_current_charge_adc;
-
     if (kicker_current_charge_adc < settings.charge_target_ADC - KICKER_ADC_MARGIN)
     {
         LOG_INFO("kicker_current_charge_adc = %d\r\n", kicker_current_charge_adc);
@@ -190,7 +172,6 @@ void KICKER_ChargeStop()
         }
         return;
     }
-    kicker_previous_charge_adc = 0X1FFF;
     // Literally identical to what we want
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
     HAL_TIM_Base_Stop_IT(htim_kicker_charge);
@@ -201,7 +182,6 @@ void KICKER_ChargeStop()
 
 void KICKER_ChargeStopForced(int status)
 {
-    kicker_previous_charge_adc = 0X1FFF;
     HAL_GPIO_WritePin(KICKER_CHARGE_GPIO_Port, KICKER_CHARGE_Pin, GPIO_PIN_RESET);
     LOG_ERROR("Something with starting the SPI transfer went wrong and I don't know what %d \r\n", status);
     HAL_TIM_Base_Stop_IT(htim_kicker_charge);
