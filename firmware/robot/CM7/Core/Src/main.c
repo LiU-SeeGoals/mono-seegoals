@@ -150,11 +150,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef* htim)
         KICKER_KickStop();
     }
     if (htim->Instance == TIM7) {
-        //NAV_update_motor_state();
+        NAV_update_motor_state();
     }
 
     if (htim->Instance == TIM12) {
-        //NAV_MovementUpdate();
+        NAV_MovementUpdate();
         if (KICKER_GetKickOnIRBreak() && IR_SensorOcluded())
         {
           KICKER_KickStartSpeed();
