@@ -3,6 +3,9 @@
 /* Private includes */
 #include "common.h"
 #include "log.h"
+#include "stm32h7xx_hal_adc.h"
+#include "stm32h7xx_hal_def.h"
+#include "stm32h7xx_hal_gpio.h"
 #include "stm32h7xx_hal_spi.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -94,6 +97,9 @@ static volatile uint16_t kicker_adc_value = 0;
 static volatile bool broken = false;
 static volatile float kicker_voltage = 0.0f;
 
+static ADC_HandleTypeDef* ir_adc;
+const uint32_t ir_threshold = 2000;
+
 
 /*
  * Private function declaration
@@ -105,12 +111,13 @@ float KICKER_ADC_To_Voltage_Simple(uint16_t adc);
 /*
  * Public functions implementations
  */
-void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, SPI_HandleTypeDef* hspi5)
+void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, SPI_HandleTypeDef* hspi5, ADC_HandleTypeDef* adc)
 {
     LOG_InitModule(&internal_log_mod, "KICKER", LOG_LEVEL_INFO, 0);
     htim_kicker_charge = htim_charge;
     htim_kicker_kick = htim_kick;
     hspi5_kicker = hspi5;
+    ir_adc = adc;
 
     kicker_spi_busy = false;
     kicker_adc_ready = false;
@@ -147,9 +154,9 @@ void KICKER_ChargeStart()
 
 void KICKER_ChargeStop()
 {
-    if (!charging)
+    if (!charging || charged)
     {
-        LOG_DEBUG("Not charging\r\n");
+        LOG_DEBUG("Not charging or already charged\r\n");
         return;
     }
     
@@ -206,28 +213,32 @@ void KICKER_KickStart(KickerSpeed kickspeed)
         LOG_DEBUG("Already kicking\r\n");
         return;
     }
-    kicking = true;
 
-    LOG_INFO("Kicking start\r\n");
-    int discharge_length = get_discharge_us(kickspeed);
-    
-    // Kicks on low
-    if (kickerMode == KICKER_STRAIGHT)
+    if (kick_on_IR_break && IR_SensorOcluded())
     {
-        HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
+        kicking = true;
+
+        LOG_INFO("Kicking start\r\n");
+        int discharge_length = get_discharge_us(kickspeed);
+        
+        // Kicks on low
+        if (kickerMode == KICKER_STRAIGHT)
+        {
+            HAL_GPIO_WritePin(KICKER_DISCHARGE2_GPIO_Port, KICKER_DISCHARGE2_Pin, GPIO_PIN_RESET);
+        }
+        else if (kickerMode == KICKER_CHIPPER)
+        {
+            HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_RESET);
+        }
+
+
+        __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, discharge_length);
+        __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
+        htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
+        __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
+
+        HAL_TIM_Base_Start_IT(htim_kicker_kick);
     }
-    else if (kickerMode == KICKER_CHIPPER)
-    {
-        HAL_GPIO_WritePin(KICKER_DISCHARGE1_GPIO_Port, KICKER_DISCHARGE1_Pin, GPIO_PIN_RESET);
-    }
-
-
-    __HAL_TIM_SET_AUTORELOAD(htim_kicker_kick, discharge_length);
-    __HAL_TIM_SET_COUNTER(htim_kicker_kick, 0);
-    htim_kicker_kick->Instance->EGR = TIM_EGR_UG;
-    __HAL_TIM_CLEAR_FLAG(htim_kicker_kick, TIM_FLAG_UPDATE);
-
-    HAL_TIM_Base_Start_IT(htim_kicker_kick);
 }
 
 void KICKER_KickStartSpeed()
@@ -259,6 +270,8 @@ void KICKER_KickStartSpeed()
         LOG_ERROR("Speed lookup is only calibrated for straight kicks\r\n");
         return;
     }
+    kick_on_IR_break = false;
+
 
     int discharge_length = KICKER_GetDischargeUs(kick_mps_target);
 
@@ -287,10 +300,63 @@ void KICKER_KickStop()
     LOG_DEBUG("Kicking stop\r\n");
     HAL_TIM_Base_Stop_IT(htim_kicker_kick);
     kicking = false;
+    kick_on_IR_break = false;
+    charged = false;
     if (recharge_automatically)
     {
         KICKER_ChargeStart();
     }
+}
+
+bool IR_SensorOcluded()
+{
+    // CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    // DWT->CYCCNT = 0;
+    // DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+
+    // uint32_t start = DWT->CYCCNT;
+
+    HAL_StatusTypeDef status = HAL_ERROR;
+    status = HAL_ADC_Start(ir_adc);
+    if (status != HAL_OK) {
+        LOG_ERROR("IR sensor ADC failed start.\r\n");
+    }
+
+    // Wait for conversion to complete, timeout 20ms
+    status = HAL_ADC_PollForConversion(ir_adc, 20);
+    if (status != HAL_OK) {
+        LOG_ERROR("ADC poll wait failed.\r\n");
+    }
+
+    uint32_t raw = HAL_ADC_GetValue(ir_adc);
+
+    status = HAL_ADC_Stop(ir_adc);
+    if (status != HAL_OK) {
+        LOG_ERROR("ADC stop failed.\r\n");
+    }
+    // LOG_INFO("IR measurement: %u\r\n", raw);
+
+    /*
+     * false => adc reading above threshold, the light is reaching the sensor
+     * true  => adc reading bellow threshold, less light is reaching the sensor
+     *          so it is probablly ocluded, possibly by ball
+     */
+    bool ball_status;
+    if (raw > ir_threshold) {
+        ball_status = false;
+        // LOG_INFO("Ball?: No\r\n");
+    } else {
+        ball_status = true;
+        // LOG_INFO("Ball?: Yes!\r\n");
+    }
+    // uint32_t end = DWT->CYCCNT;
+    // uint32_t cycles = end - start;
+
+    // LOG_INFO("IR sensor read clk cycles: %u \r\n", cycles);
+
+    // LOG_INFO("IR sensor ball_status: %d\r\n", ball_status);
+
+    return ball_status;
 }
 
 void KICKER_SetKickerMode(KickerMode mode)

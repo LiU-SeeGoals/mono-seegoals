@@ -93,6 +93,8 @@ extern volatile atomic_uint main_tasks;
 #define LED_GREEN_GPIO_Port GPIOB
 #define MOTOR1_BREAK_Pin GPIO_PIN_2
 #define MOTOR1_BREAK_GPIO_Port GPIOB
+#define IR_OUT_ADC1_INP2_Pin GPIO_PIN_11
+#define IR_OUT_ADC1_INP2_GPIO_Port GPIOF
 #define MOTOR3_REVERSE_Pin GPIO_PIN_7
 #define MOTOR3_REVERSE_GPIO_Port GPIOE
 #define MOTOR2_REVERSE_Pin GPIO_PIN_8

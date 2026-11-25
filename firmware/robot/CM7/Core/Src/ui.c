@@ -360,7 +360,8 @@ void parse_key()
             KICKER_Settings *set = KICKER_GetSettings();
             LOG_UI("Kicking at %.2f m/s \r\n", (double)set->kick_mps_target);
             KICKER_SetKickerMode(KICKER_STRAIGHT);
-            KICKER_KickStartSpeed(set->kick_mps_target);
+            KICKER_SetSpeedTarget(set->kick_mps_target);
+            KICKER_SetKickOnIRBreak(true);
             break;
         case 'P': // Print vars
         {

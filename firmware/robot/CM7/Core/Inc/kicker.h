@@ -2,6 +2,7 @@
 #define KICKER_H
 
 #include "main.h"
+#include "stm32h7xx_hal_adc.h"
 #include <stdbool.h>
 
 typedef struct {
@@ -30,7 +31,7 @@ typedef enum
  * Initalize the kicker subsystem.
  * Curently initializes the log module
  */
-void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, SPI_HandleTypeDef* hspi5);
+void KICKER_Init(TIM_HandleTypeDef* htim_charge, TIM_HandleTypeDef* htim_kick, SPI_HandleTypeDef* hspi5,  ADC_HandleTypeDef* adc);
 
 /**
  * @brief Starts charging the capacitors. 
@@ -59,6 +60,8 @@ void KICKER_KickStart(KickerSpeed kickspeed);
  * @brief Kicks at the speed set before
  */
 void KICKER_KickStartSpeed();
+
+bool IR_SensorOcluded();
 
 /**
  *
