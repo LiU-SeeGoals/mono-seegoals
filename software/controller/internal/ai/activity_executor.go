@@ -3,7 +3,6 @@ package ai
 import (
 	"fmt"
 	"math"
-	"sort"
 	"sync"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
@@ -42,11 +41,10 @@ type goalAreaBounds struct {
 
 type activityExecutor struct {
 	team              info.Team
-	incomingGameInfo  <-chan info.GameInfo
-	outgoingActions   chan<- []action.Action
-	activities        *[info.TEAM_SIZE]activity.Activity // <-- pointer to a slice
-	activity_lock     *sync.Mutex                        // shared mutex for synchronization
+	activities        *[info.TEAM_SIZE]activity.Activity
+	activityLock      *sync.Mutex
 	defenseAreaEscape defenseAreaEscapeState
+	frameMonitor      *helper.FrameSkipMonitor
 
 	restrictToOpponentHalf bool
 }
@@ -56,108 +54,56 @@ type defenseAreaEscapeState struct {
 	headingSet [info.TEAM_SIZE]bool
 }
 
-type activityResult struct {
-	index  int
-	action action.Action
-}
-
-func NewActivityExecutor() *activityExecutor {
-	return &activityExecutor{}
-}
-
-func (fb *activityExecutor) Init(
-	incoming <-chan info.GameInfo,
-	activities *[info.TEAM_SIZE]activity.Activity,
-	lock *sync.Mutex,
-	outgoing chan<- []action.Action,
-	team info.Team,
-) {
-	fb.incomingGameInfo = incoming
-	fb.outgoingActions = outgoing
-	fb.team = team
-	fb.activity_lock = lock
-	fb.restrictToOpponentHalf = restrictsTeamToOpponentHalf(config.RestrictToOpponentHalfTeam(), team)
+func newActivityExecutor(team info.Team, activities *[info.TEAM_SIZE]activity.Activity, lock *sync.Mutex) *activityExecutor {
+	fb := &activityExecutor{
+		team:                   team,
+		activities:             activities,
+		activityLock:           lock,
+		frameMonitor:           helper.NewFrameSkipMonitor(fmt.Sprintf("%s activity_executor", team)),
+		restrictToOpponentHalf: restrictsTeamToOpponentHalf(config.RestrictToOpponentHalfTeam(), team),
+	}
 	if fb.restrictToOpponentHalf {
 		logger.Logger.Warnf("%v robots are restricted to the opponent half", team)
 	}
-
-	// Store the pointer directly
-	fb.activities = activities
-
-	go fb.Run()
+	return fb
 }
 
-func (fb *activityExecutor) Run() {
-	frameMonitor := helper.NewFrameSkipMonitor(fmt.Sprintf("%s activity_executor", fb.team))
-	for {
-		gameInfo := <-fb.incomingGameInfo
-		frameMonitor.Observe(gameInfo.VisionFrame())
-		if gameInfo.Status == nil || gameInfo.Status.GetGameEvent() == nil ||
-			!gameInfo.Status.GetGameEvent().IsPlacementStop() {
-			fb.defenseAreaEscape.reset()
-		}
+// execute turns the current activities into safety-checked actions, in robot
+// ID order.
+func (fb *activityExecutor) execute(gi *info.GameInfo) []action.Action {
+	fb.frameMonitor.Observe(gi.VisionFrame())
+	if gi.Status == nil || gi.Status.GetGameEvent() == nil ||
+		!gi.Status.GetGameEvent().IsPlacementStop() {
+		fb.defenseAreaEscape.reset()
+	}
 
-		// HALT is a hard safety boundary. Do not depend on the slower planner
-		// replacing every activity before this executor snapshots them: an old
-		// kick activity must never produce a command from a halted frame.
-		if actions, halted := haltSafetyActions(&gameInfo); halted {
-			fb.outgoingActions <- actions
+	// HALT is a hard safety boundary: an old kick activity must never produce
+	// a command from a halted frame.
+	if actions, halted := haltSafetyActions(gi); halted {
+		return actions
+	}
+
+	fb.activityLock.Lock()
+	current := *fb.activities
+	fb.activityLock.Unlock()
+
+	actions := make([]action.Action, 0, info.TEAM_SIZE)
+	for _, act := range current {
+		if act == nil {
 			continue
 		}
-
-		// Make a snapshot of current activities under lock
-		fb.activity_lock.Lock()
-		var activitiesCopy [info.TEAM_SIZE]activity.Activity
-		copy(activitiesCopy[:], (*fb.activities)[:])
-		fb.activity_lock.Unlock()
-
-		results := make([]activityResult, 0, info.TEAM_SIZE)
-		resultCh := make(chan activityResult, info.TEAM_SIZE)
-		var wg sync.WaitGroup
-
-		var i info.ID
-		for i = 0; i < info.TEAM_SIZE; i++ { // Loop through all activities
-			act := activitiesCopy[i]
-			if act == nil {
-				continue
-			} // Skip nil activities
-
-			wg.Add(1)
-			go func(index int, act activity.Activity) {
-				defer wg.Done()
-
-				_ = act.Achieved(&gameInfo)
-				resultCh <- activityResult{
-					index:  index,
-					action: act.GetAction(&gameInfo),
-				}
-			}(int(i), act)
+		// Achieved has a side effect MoveToPosition relies on (clearing its
+		// cached path once reached); keep calling it before GetAction.
+		_ = act.Achieved(gi)
+		safeAction := stoppedPlaySafetyAction(act.GetAction(gi), fb.team, gi)
+		safeAction = fb.defenseAreaEscape.apply(safeAction, fb.team, gi)
+		if fb.restrictToOpponentHalf {
+			safeAction = clampActionToOpponentHalf(safeAction, gi, fb.team)
 		}
-
-		wg.Wait()
-		close(resultCh)
-
-		for result := range resultCh {
-			results = append(results, result)
-		}
-		sort.Slice(results, func(i, j int) bool {
-			return results[i].index < results[j].index
-		})
-
-		actions := make([]action.Action, 0, len(results))
-		for _, result := range results {
-			safeAction := stoppedPlaySafetyAction(result.action, fb.team, &gameInfo)
-			safeAction = fb.defenseAreaEscape.apply(safeAction, fb.team, &gameInfo)
-			if fb.restrictToOpponentHalf {
-				safeAction = clampActionToOpponentHalf(safeAction, &gameInfo, fb.team)
-			}
-			safeAction = clampMoveActionToField(safeAction, &gameInfo)
-			actions = append(actions, finalStoppedPlayAction(safeAction, &gameInfo))
-		}
-
-		// Send actions
-		fb.outgoingActions <- actions
+		safeAction = clampMoveActionToField(safeAction, gi)
+		actions = append(actions, finalStoppedPlayAction(safeAction, gi))
 	}
+	return actions
 }
 
 // stoppedPlaySafetyAction is the final safety boundary for tactical formation

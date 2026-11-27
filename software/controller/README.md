@@ -31,9 +31,9 @@ ATTENTION: If you cant view the logs because of permission issues, its because d
 sudo chown -R $USER logs
 ```
 
-This project uses the [zap logger](https://pkg.go.dev/go.uber.org/zap). The logger is configured in the `logging` package, which is also the package you need to import to log something. The logger is used throughout the project and should be used for all logging.
+This project uses the [zap logger](https://pkg.go.dev/go.uber.org/zap), exposed as `logger.Logger` from `internal/logger`. Importing the package has no side effects: the logger discards everything until `cmd/main.go` calls `logger.Init(dir)`, so tests never create log files.
 
-The logs are written to files in project_root/logs called readable.log and structured.log. The readable.log file is a human readable log file and the structured.log file is a structured log file. The structured log file is used for log analysis and can be used to create dashboards etc. The readable log file is used for debugging and should be used when you want to see the logs in a human readable format. The log files are automatically rotated when they reach a certain size.
+The logs are written to `SEEGOALS_LOG_DIR` (default `../logs`, relative to the working directory; in Docker that is `software/controller/logs`) as readable.log and structured.log. The readable.log file is a human readable log file and the structured.log file is a structured log file. The structured log file is used for log analysis and can be used to create dashboards etc. The readable log file is used for debugging and should be used when you want to see the logs in a human readable format. The log files are automatically rotated when they reach a certain size.
 
 you can view this file by running:
 ```
@@ -59,15 +59,11 @@ To log something you can use the logger like this:
 ```go
 package main
 
-import (
-    . "github.com/LiU-SeeGoals/controller/logging" // The dot is used avoid having to write logging.logger every time
-)
+import "github.com/LiU-SeeGoals/controller/internal/logger"
 
 func main() {
-    Logger.Info("Hello world")
-    Logger.Error("Hello world")
-    Logger.Debug("Hello world")
-    Logger.Warn("Hello world")
+    logger.Logger.Info("Hello world")
+    logger.Logger.Errorf("robot %d lost", 3)
 }
 ```
 
@@ -93,18 +89,16 @@ The packets received are serialized with protobuf and contains information about
 The GameInfo is a struct that contains the source of truth for the gamestate, referee status and the field geometry. This is the only place where the gamestate is updated and should be the only place where the gamestate is read from. The gamestate is updated by the GameInfo when new packets are received from the Receiver. 
 
 ### AI
-The AI consists of a slow decision pipeline (slowBrain) and a fast decision pipeline (fastBrain). The slowBrain is responsible for making high level decisions like which strategy to use and which roles robots should have. The fastBrain is responsible for making low level decisions like acting on the roles that have been assigned to the robots, referee decisions, collision avoidance etc. 
+Each team has an `ai.Ai` that runs one synchronous pipeline per control frame on the runner's goroutine: the planner (strategy, roles, referee handling) updates each robot's activity, then the activity executor turns the activities into actions, in robot ID order, and applies the referee and field safety limits. Nothing in the pipeline runs in the background.
 
-
-#### Communication
-Each control frame, the AI first runs the slowBrain (planner) on the control loop goroutine, then sends the gamestate to the fastBrain (activity executor) over a channel and waits for its actions. The planner and executor share the gamestate and activity objects, so they must never run at the same time; the planner therefore has no goroutine of its own. The planner updates the activities that the executor turns into actions in the same frame, and the executor is responsible for real-time decisions such as collision avoidance and referee safety limits.
+AI code reads time through `gi.Now()` (an `info.Clock`, the wall clock by default) instead of `time.Now()`, so tests can control time with `info.ManualClock`.
 
 
 ### WebServer
 Todo
 
 ### Client
-This is where we send actions to the robots, the client is indifferent to whether it's the real robots or the simulation.
+Actions (`internal/action`) are plain commands with no wire format. The clients translate them: `BaseStationClient` encodes the 32-byte radio frame for the real robots (`base_station_encoding.go`), and `SimClient` runs `SimMotion`, a simulator-side stand-in for the robots' onboard position controller. Its limits are set with `SIM_MAX_LINEAR_MPS` (default 1.0), `SIM_MAX_ANGULAR_RADPS` (3.0) and `SIM_MAX_LINEAR_ACC_MPS2` (0 = no acceleration limit).
 
 ## Code standard
 This project uses the [SeeGoals Go standard](https://github.com/LiU-SeeGoals/wiki/wiki/1.1.-Processes-&-Standards#seegoal---go-coding-standard).
@@ -115,7 +109,7 @@ This project uses the [SeeGoals Go standard](https://github.com/LiU-SeeGoals/wik
 The project can be compiled by running `/scripts/build.sh`. This generates the executable in `/build` folder.
 
 ## Environment
-Environment configuration cen be found in `.env`. This file is automatically loaded by the `config` package by the controller. It's strongly advised to use this file instead of hard coded solutions. Apart from the controller, the docker environment loads the `.env` file into its containers.
+The `config` package reads settings from environment variables. Every setting has a default matching the repository's `environment.ini`, so tests and local runs need no file. A `.env` file is optional: the controller loads the file named by `SEEGOALS_ENV_FILE`, or else the first `.env` in the working directory or one of its parents (docker-compose mounts `environment.ini` there). Variables already set in the environment win over the file.
 
 Following are the most important environment variables:
 

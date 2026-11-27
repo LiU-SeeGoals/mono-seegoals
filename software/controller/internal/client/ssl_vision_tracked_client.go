@@ -112,7 +112,7 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		default:
 			team = info.UNKNOWN
 		}
-		if team == info.UNKNOWN || visionMasked(gi, p.X) {
+		if team == info.UNKNOWN || visionMasked(gi, p.X) || !trackedRobotVisible(robot) {
 			continue
 		}
 
@@ -179,6 +179,15 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 	}
 
 	gi.State.SetValid(true)
+	// Tracked poses replace raw samples; recompute derived state from them.
+	gi.State.Update()
+}
+
+// trackedRobotVisible drops robots the tracker reports as not visible (it
+// keeps predicting lost robots for a while). Sources that omit visibility are
+// trusted.
+func trackedRobotVisible(robot *ssl_vision.TrackedRobot) bool {
+	return robot.Visibility == nil || robot.GetVisibility() > 0
 }
 
 func (receiver *SSLTrackedVisionClient) handleTrackedPacket(packet *ssl_vision.TrackerWrapperPacket, ok bool, gi *info.GameInfo, play_time int64) {

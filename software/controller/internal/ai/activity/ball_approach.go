@@ -44,7 +44,7 @@ const (
 
 // PredictedBallPos returns the predicted position of a recently tracked moving ball.
 func PredictedBallPos(gi *info.GameInfo, lookaheadSec float64) info.Position {
-	freshState, ok := gi.State.GetTrackedBall().GetFreshBallState(time.Now(), trackedBallMaxAge)
+	freshState, ok := gi.State.GetTrackedBall().GetFreshBallState(gi.Now(), trackedBallMaxAge)
 
 	if ok && freshState.Velocity.Norm2d() >= minRollingBallSpeed {
 		freshState.Position.X += freshState.Velocity.X * 1000 * lookaheadSec

@@ -22,16 +22,15 @@ type BaseStationClient struct {
 	connections   []Connection
 	address       string
 	queueMutex    sync.Mutex
-	queue         []*robot_action.Command
+	queue         []baseStationCommand
 	wake          chan struct{}
 	hasBeenInited bool
 }
 
+// NewBaseStationClient sends robot commands to address ("<group>:<port>", see
+// config.GetBasestationMulticastAddress) on every matching interface.
 func NewBaseStationClient(address string) *BaseStationClient {
-
-	multicastIP := config.GetBasestationAdress()
-	multicastPort := config.GetBasestationPort()
-	remoteAddr, err := net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%s", multicastIP, multicastPort))
+	remoteAddr, err := net.ResolveUDPAddr("udp", address)
 	if err != nil {
 		panic(err)
 	}
@@ -72,8 +71,8 @@ func NewBaseStationClient(address string) *BaseStationClient {
 				continue
 			}
 
-			fmt.Printf("Multicast from %s via %s to %s:%s (basedstation)\n",
-				ipnet.IP, iface.Name, multicastIP, multicastPort)
+			fmt.Printf("Multicast from %s via %s to %s (basestation)\n",
+				ipnet.IP, iface.Name, address)
 			connections = append(connections, connection)
 		}
 	}
@@ -84,8 +83,8 @@ func NewBaseStationClient(address string) *BaseStationClient {
 
 	return &BaseStationClient{
 		connections:   connections,
-		address:       "",
-		queue:         make([]*robot_action.Command, 0),
+		address:       address,
+		queue:         make([]baseStationCommand, 0),
 		wake:          make(chan struct{}, 1),
 		hasBeenInited: false,
 	}
@@ -112,10 +111,9 @@ func (b *BaseStationClient) sendCommands() {
 		cmd := b.queue[0]
 		b.queue = b.queue[1:]
 		b.queueMutex.Unlock()
-		// Use custom binary encoder instead of protobuf
-		encoded, err := action.EncodeCommand(cmd)
+		encoded, err := cmd.encode()
 		if err != nil {
-			fmt.Printf("Failed to encode command for robot %d: %v\n", cmd.RobotId, err)
+			fmt.Printf("Failed to encode command for robot %d: %v\n", cmd.robotID, err)
 			continue
 		}
 		if err := b.sendMessage(encoded); err != nil {
@@ -133,23 +131,27 @@ func (b *BaseStationClient) SendActions(actions []action.Action) {
 	}
 
 	for _, robotAction := range actions {
-		command := robotAction.TranslateReal()
-		if command.GetCommandId() == robot_action.ActionType_STOP_ACTION {
+		command, ok := baseStationCommandFor(robotAction)
+		if !ok {
+			fmt.Printf("Base station: unsupported action %T for robot %d\n", robotAction, robotAction.RobotID())
+			continue
+		}
+		if command.kind == robot_action.ActionType_STOP_ACTION {
 			// A stop supersedes every command that has not yet been sent for this
 			// robot. In particular, do not leave a pre-HALT kick ahead of it.
 			queue := b.queue[:0]
 			for _, queuedCommand := range b.queue {
-				if queuedCommand.GetRobotId() != command.GetRobotId() {
+				if queuedCommand.robotID != command.robotID {
 					queue = append(queue, queuedCommand)
 				}
 			}
 			b.queue = queue
-		} else if isMotionCommand(command) {
+		} else if command.isMotion() {
 			// A later position or velocity update supersedes unsent motion for
 			// the same robot. Keep kicks, init, and stops in their original order.
 			queue := b.queue[:0]
 			for _, queuedCommand := range b.queue {
-				if queuedCommand.GetRobotId() != command.GetRobotId() || !isMotionCommand(queuedCommand) {
+				if queuedCommand.robotID != command.robotID || !queuedCommand.isMotion() {
 					queue = append(queue, queuedCommand)
 				}
 			}
@@ -162,17 +164,6 @@ func (b *BaseStationClient) SendActions(actions []action.Action) {
 		case b.wake <- struct{}{}:
 		default:
 		}
-	}
-}
-
-func isMotionCommand(command *robot_action.Command) bool {
-	switch command.GetCommandId() {
-	case robot_action.ActionType_MOVE_TO_ACTION,
-		robot_action.ActionType_MOVE_ACTION,
-		robot_action.ActionType_ROTATE_ACTION:
-		return true
-	default:
-		return false
 	}
 }
 

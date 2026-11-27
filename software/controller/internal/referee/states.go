@@ -234,7 +234,7 @@ func (s *Penalty) Initialize() {
 	s.ballInPlay = false
 	s.postKickHeading = 0
 	s.postKickHeadingOK = false
-	s.penaltyStart = time.Now()
+	s.penaltyStart = s.gi.Now()
 	s.originalBallPos = kickoffBallPosition(s.gi)
 
 	if s.gi.Status.GetGameEvent().TeamWithPossession != s.team {
@@ -280,7 +280,7 @@ func (s *Penalty) Update() state_machine.EventName {
 	pos, ok := trackedBall.GetTrackedPosition()
 	ballMoved := ok && restartBallMovedIntoPlay(s.originalBallPos, pos)
 	gameEvent := s.gi.Status.GetGameEvent()
-	if restartActionTimedOut(gameEvent, s.penaltyStart, PenaltyMaxTime(s.gi.Status.GetDivision())) {
+	if restartActionTimedOut(gameEvent, s.penaltyStart, PenaltyMaxTime(s.gi.Status.GetDivision()), s.gi.Now()) {
 		stopPenaltyRobots(s.activeRobots, s.activityHandler)
 		gameEvent.CurrentState = info.STATE_STOPPED
 		gameEvent.BallInPlay = false
@@ -374,7 +374,7 @@ func (s *FreeKickIntent) GetFromPosition() info.Position {
 }
 
 func (s *FreeKick) Initialize() {
-	s.freeKickStart = time.Now()
+	s.freeKickStart = s.gi.Now()
 	s.freeKick = nil
 	s.kickTaken = false
 	s.postKickStart = time.Time{}
@@ -414,12 +414,12 @@ func (s *FreeKick) Update() state_machine.EventName {
 
 	if !s.kickTaken && ballMoved {
 		s.kickTaken = true
-		s.postKickStart = time.Now()
+		s.postKickStart = s.gi.Now()
 		s.postKickHeading, s.postKickHeadingOK = restartKickerHeading(s.gi, s.team, s.kickerID)
 		s.gi.Status.GetGameEvent().SetBallMoved()
 	}
 	if s.kickTaken {
-		if restartPostKickHoldComplete(s.postKickStart, s.originalBallPos, pos, time.Now()) {
+		if restartPostKickHoldComplete(s.postKickStart, s.originalBallPos, pos, s.gi.Now()) {
 			return GAME_RUNNING_DETECTED
 		}
 		holdRestartKickerHeading(
@@ -433,7 +433,7 @@ func (s *FreeKick) Update() state_machine.EventName {
 		return "NONE"
 	}
 
-	if restartActionTimedOut(s.gi.Status.GetGameEvent(), s.freeKickStart, FreeKickMaxTime(s.gi.Status.GetDivision())) {
+	if restartActionTimedOut(s.gi.Status.GetGameEvent(), s.freeKickStart, FreeKickMaxTime(s.gi.Status.GetDivision()), s.gi.Now()) {
 		s.gi.Status.GetGameEvent().SetBallMoved()
 		return GAME_RUNNING_DETECTED
 	}
@@ -502,7 +502,7 @@ func (s *Kickoff) Initialize() {
 	kickName := state_machine.StateName(fmt.Sprintf("Kick ID %d", kickOffID))
 
 	originalBallPos, ok := s.gi.State.GetTrackedBall().GetTrackedPosition()
-	s.kickStart = time.Now()
+	s.kickStart = s.gi.Now()
 
 	if !ok {
 		fmt.Println("Failed retriving original ball pos during KickOff")
@@ -532,12 +532,12 @@ func (s *Kickoff) Update() state_machine.EventName {
 
 	if !s.kickTaken && ballMoved {
 		s.kickTaken = true
-		s.postKickStart = time.Now()
+		s.postKickStart = s.gi.Now()
 		s.postKickHeading, s.postKickHeadingOK = restartKickerHeading(s.gi, s.team, s.kickOffID)
 		s.gi.Status.GetGameEvent().SetBallMoved()
 	}
 	if s.kickTaken {
-		if restartPostKickHoldComplete(s.postKickStart, s.originalBallPos, pos, time.Now()) {
+		if restartPostKickHoldComplete(s.postKickStart, s.originalBallPos, pos, s.gi.Now()) {
 			return GAME_RUNNING_DETECTED
 		}
 		holdRestartKickerHeading(
@@ -551,7 +551,7 @@ func (s *Kickoff) Update() state_machine.EventName {
 		return "NONE"
 	}
 
-	if restartActionTimedOut(s.gi.Status.GetGameEvent(), s.kickStart, KickoffMaxTime(s.gi.Status.GetDivision())) {
+	if restartActionTimedOut(s.gi.Status.GetGameEvent(), s.kickStart, KickoffMaxTime(s.gi.Status.GetDivision()), s.gi.Now()) {
 		s.gi.Status.GetGameEvent().SetBallMoved()
 		return GAME_RUNNING_DETECTED
 	}
@@ -721,11 +721,11 @@ func holdRestartKickerHeading(
 	activityHandler.AddActivity(move)
 }
 
-func restartActionTimedOut(gameEvent *info.GameEvent, fallbackStart time.Time, fallbackTimeout time.Duration) bool {
+func restartActionTimedOut(gameEvent *info.GameEvent, fallbackStart time.Time, fallbackTimeout time.Duration, now time.Time) bool {
 	if gameEvent != nil && gameEvent.HasCurrentActionTimeRemaining() {
 		return gameEvent.CurrentActionTimedOut()
 	}
-	return time.Since(fallbackStart) >= fallbackTimeout
+	return now.Sub(fallbackStart) >= fallbackTimeout
 }
 
 func isBallPlacementCommand(rc info.RefCommand) bool {

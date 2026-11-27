@@ -103,7 +103,7 @@ func (m *KickBall) SetKickAngle(angle float32) {
 }
 
 func (m *KickBall) ballMoving(gi *info.GameInfo) bool {
-	vel, ok := gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), alignTrackedBallMaxAge)
+	vel, ok := gi.State.GetTrackedBall().GetFreshTrackedVelocity(gi.Now(), alignTrackedBallMaxAge)
 	return ok && vel.Norm2d() > alignRollingEnterSpeed
 }
 
@@ -115,7 +115,7 @@ func (m *KickBall) ballPos(gi *info.GameInfo) info.Position {
 		m.hold.held = false
 		return ballPos
 	}
-	return m.hold.update(ballPos, time.Now())
+	return m.hold.update(ballPos, gi.Now())
 }
 
 func (m *KickBall) GetTargetPos(gi *info.GameInfo) info.Position {
@@ -196,7 +196,7 @@ func (m *KickBall) GetAction(gi *info.GameInfo) action.Action {
 
 	ballHeldInMouth := ok &&
 		kickBallHeldInMouth(dribblerDist, forward, lateral, headingErr)
-	kickAfterSettle := updateKickDribbleSettle(&m.dribbleSince, ballHeldInMouth)
+	kickAfterSettle := updateKickDribbleSettle(&m.dribbleSince, ballHeldInMouth, gi.Now())
 	firmwareLeadDist := kickFirmwareLeadDist(robot)
 	impactReady := captureReady && ok && kickBallImpactReady(forward, lateral, headingErr, firmwareLeadDist)
 	// Keep control of the ball while the kick is armed. In particular, the
@@ -268,15 +268,15 @@ func kickFirmwareArmingDist(leadDist float64) float64 {
 	return math.Max(kickerStandoffDist(maxMarginToBall), info.Center2DribblerDist+info.BallRadius+leadDist)
 }
 
-func updateKickDribbleSettle(dribbleSince *time.Time, ballHeldInMouth bool) bool {
+func updateKickDribbleSettle(dribbleSince *time.Time, ballHeldInMouth bool, now time.Time) bool {
 	if !ballHeldInMouth {
 		*dribbleSince = time.Time{}
 		return false
 	}
 	if dribbleSince.IsZero() {
-		*dribbleSince = time.Now()
+		*dribbleSince = now
 	}
-	return time.Since(*dribbleSince) >= kickDribbleSettleTime
+	return now.Sub(*dribbleSince) >= kickDribbleSettleTime
 }
 
 func kickBallShouldFire(dribblerDist float64, kickAfterSettle bool, impactReady bool) bool {
@@ -284,7 +284,7 @@ func kickBallShouldFire(dribblerDist float64, kickAfterSettle bool, impactReady 
 }
 
 func (m *KickBall) NeedsRealign(gi *info.GameInfo) bool {
-	return m.needsRealignAt(gi, time.Now())
+	return m.needsRealignAt(gi, gi.Now())
 }
 
 func (m *KickBall) needsRealignAt(gi *info.GameInfo, now time.Time) bool {

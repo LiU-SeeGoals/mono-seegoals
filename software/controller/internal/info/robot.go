@@ -106,60 +106,67 @@ func (r *Robot) Facing(target Position, threshold float64) bool {
 	return pos.FacingPosition(target, threshold)
 }
 
+// GetVelocity averages the velocity between the newest sample and each older
+// one in the history. X, Y are in mm/ms (= m/s); Angle is the angular
+// velocity in rad/ms, computed from wrapped heading differences so crossing
+// ±π does not produce a 2π spike.
 func (r *Robot) GetVelocity() Position {
 	if r.history.Len() < 2 {
-		return Position{0, 0, 0, 0}
+		return Position{}
 	}
 
-	element := r.history.Front()
-	robot := element.Value.(*rawRobotPos)
-
-	sum_deltas := Position{}
+	newest := r.history.Front().Value.(*rawRobotPos)
+	var sum Position
 	count := 0
-
 	for e := r.history.Front().Next(); e != nil; e = e.Next() {
-		robot2 := e.Value.(*rawRobotPos)
-		dt := float64(robot2.time - robot.time)
+		older := e.Value.(*rawRobotPos)
+		dt := float64(newest.time - older.time)
 		if dt == 0 {
 			continue
 		}
-		dPos := robot2.pos.Sub(&robot.pos)
-		// TODO: lets add exponential decay so that the most recent deltas have more weight
-		scaled := dPos.Scale(1 / dt)
-		sum_deltas = sum_deltas.Add(&scaled)
+		sum.X += (newest.pos.X - older.pos.X) / dt
+		sum.Y += (newest.pos.Y - older.pos.Y) / dt
+		sum.Z += (newest.pos.Z - older.pos.Z) / dt
+		sum.Angle += NormalizeAngleDelta(newest.pos.Angle, older.pos.Angle) / dt
 		count++
 	}
 	if count == 0 {
-		return Position{0, 0, 0, 0}
+		return Position{}
 	}
-	return sum_deltas.Scale(1 / float64(count))
+	n := float64(count)
+	return Position{X: sum.X / n, Y: sum.Y / n, Z: sum.Z / n, Angle: sum.Angle / n}
 }
 
+// GetAcceleration is the mean rate of change of planar speed over the
+// history, in mm/ms² (multiply by 1000 for m/s²). Positive means speeding up.
 func (r *Robot) GetAcceleration() float64 {
 	if r.history.Len() < 3 {
-		return float64(0) // Not enough data points to calculate acceleration
+		return 0
 	}
 
-	accelerations := float64(0)
-	for f, s, t := r.history.Front(), r.history.Front().Next(), r.history.Front().Next().Next(); t != nil; f, s, t = f.Next(), s.Next(), t.Next() {
+	sum := 0.0
+	count := 0
+	// The history is newest first: a is newer than b, b newer than c.
+	for a, b, c := r.history.Front(), r.history.Front().Next(), r.history.Front().Next().Next(); c != nil; a, b, c = a.Next(), b.Next(), c.Next() {
+		pa := a.Value.(*rawRobotPos)
+		pb := b.Value.(*rawRobotPos)
+		pc := c.Value.(*rawRobotPos)
 
-		robot1 := f.Value.(*rawRobotPos)
-		robot2 := s.Value.(*rawRobotPos)
-		robot3 := t.Value.(*rawRobotPos)
-
-		vel1 := robot2.pos.Sub(&robot1.pos)
-		vel2 := robot3.pos.Sub(&robot2.pos)
-
-		dist1 := vel1.Norm()
-		dist2 := vel2.Norm()
-
-		dt := float64(robot3.time - robot1.time)
-
-		accelerations += (dist2 - dist1) / dt
-
+		dtNew := float64(pa.time - pb.time)
+		dtOld := float64(pb.time - pc.time)
+		if dtNew <= 0 || dtOld <= 0 {
+			continue
+		}
+		speedNew := pa.pos.Dist2d(pb.pos) / dtNew
+		speedOld := pb.pos.Dist2d(pc.pos) / dtOld
+		// Speeds are means over each segment, so they sit at segment midpoints.
+		sum += (speedNew - speedOld) / ((dtNew + dtOld) / 2)
+		count++
 	}
-
-	return accelerations / float64(r.history.Len()-1)
+	if count == 0 {
+		return 0
+	}
+	return sum / float64(count)
 }
 
 func (r *Robot) GetTeam() Team {

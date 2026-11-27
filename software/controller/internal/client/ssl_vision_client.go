@@ -15,6 +15,7 @@ import (
 const (
 	// Read buffer size
 	READ_BUFFER_SIZE = 8192
+	visionQueueSize  = 16
 )
 
 // SSL Vision receiver
@@ -156,7 +157,9 @@ func (receiver *SSLVisionClient) Connect() {
 }
 
 func NewSSLVisionClient(sslReceiverAddress string) *SSLVisionClient {
-	ssl_channel := make(chan *ssl_vision.SSL_WrapperPacket, 1)
+	// Room for one packet per camera (and geometry) between control ticks;
+	// NB_Send drops the oldest only if the loop falls far behind.
+	ssl_channel := make(chan *ssl_vision.SSL_WrapperPacket, visionQueueSize)
 	receiver := &SSLVisionClient{
 		ssl:         NewSSLConnection(sslReceiverAddress),
 		ssl_channel: ssl_channel,

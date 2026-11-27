@@ -3,7 +3,6 @@ package activity
 import (
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
@@ -230,7 +229,7 @@ func (m *AlignBall) nearLyingBall(myPos info.Position, gi *info.GameInfo) bool {
 	if m.ballRolling(gi) {
 		enterDist = nearBallOrbitRetainDist
 	}
-	return m.latch.orbitBall(myPos.Dist2d(ballPos), enterDist, time.Now())
+	return m.latch.orbitBall(myPos.Dist2d(ballPos), enterDist, gi.Now())
 }
 
 func (m *AlignBall) ballPos(gi *info.GameInfo) info.Position {
@@ -239,7 +238,7 @@ func (m *AlignBall) ballPos(gi *info.GameInfo) info.Position {
 		m.latch.releaseBall()
 		return ballPos
 	}
-	return m.latch.holdBall(ballPos, time.Now())
+	return m.latch.holdBall(ballPos, gi.Now())
 }
 
 func (m *AlignBall) onKickLine(gi *info.GameInfo, robot *info.Robot, myPos, ballPos info.Position, headingErr float64) bool {
@@ -247,7 +246,7 @@ func (m *AlignBall) onKickLine(gi *info.GameInfo, robot *info.Robot, myPos, ball
 	if !ok {
 		return false
 	}
-	now := time.Now()
+	now := gi.Now()
 	vel, fresh := gi.State.GetTrackedRobot(m.team, uint32(m.id)).GetFreshTrackedVelocity(now, alignTrackedBallMaxAge)
 	if !fresh {
 		vel = robot.GetVelocity()
@@ -257,7 +256,7 @@ func (m *AlignBall) onKickLine(gi *info.GameInfo, robot *info.Robot, myPos, ball
 }
 
 func (m *AlignBall) ballRolling(gi *info.GameInfo) bool {
-	now := time.Now()
+	now := gi.Now()
 	ballVel, ok := gi.State.GetTrackedBall().GetFreshTrackedVelocity(now, alignTrackedBallMaxAge)
 	return m.latch.ballRolling(ballVel.Norm2d(), ok, now)
 }

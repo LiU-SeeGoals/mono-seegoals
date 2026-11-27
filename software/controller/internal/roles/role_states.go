@@ -84,7 +84,7 @@ func (s *AlignState) Update() state_machine.EventName {
 	direct := !s.PlanApproach && s.latch.DirectApproach(
 		enemyCloseToBall(s.Gi, s.Team, fromPos, directAlignEnemyRadius),
 		enemyCloseToBall(s.Gi, s.Team, fromPos, directAlignReleaseRadius),
-		time.Now(),
+		s.Gi.Now(),
 	)
 	if direct {
 		act = activity.NewDirectAlign(s.Team, s.RobotId, targetPos, fromPos)
@@ -94,7 +94,7 @@ func (s *AlignState) Update() state_machine.EventName {
 	act.SetLatch(s.latch)
 	//activity := act.NewAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
 	s.ActivityHandler.AddActivity(act)
-	if updateAlignConfirmation(&s.alignedSince, act.Achieved(s.Gi), time.Now()) {
+	if updateAlignConfirmation(&s.alignedSince, act.Achieved(s.Gi), s.Gi.Now()) {
 		return "ALIGNED"
 	}
 	return "NONE"
@@ -201,7 +201,7 @@ func (s *InterceptBallState) Update() state_machine.EventName {
 
 	ballPos, posErr := s.gi.State.GetBall().GetEstimatedPosition()
 
-	ballState, ok := s.gi.State.GetTrackedBall().GetFreshBallState(time.Now(), 200*time.Millisecond)
+	ballState, ok := s.gi.State.GetTrackedBall().GetFreshBallState(s.gi.Now(), 200*time.Millisecond)
 
 	ballMoving := false
 

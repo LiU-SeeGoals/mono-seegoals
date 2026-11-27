@@ -3,15 +3,59 @@ package info
 import (
 	"fmt"
 	"math"
-
-	// "github.com/LiU-SeeGoals/controller/internal/info"
 )
 
+// Vec2 is a plain 2D vector (a point, offset or velocity) with no heading.
+// Prefer it for geometry; Position mixes a point with a heading.
 type Vec2 struct {
 	X float64
 	Y float64
 }
 
+// Pose2D is a robot pose: a field position plus a heading in radians.
+type Pose2D struct {
+	Pos     Vec2
+	Heading float64
+}
+
+func (v Vec2) Plus(o Vec2) Vec2             { return Vec2{v.X + o.X, v.Y + o.Y} }
+func (v Vec2) Minus(o Vec2) Vec2            { return Vec2{v.X - o.X, v.Y - o.Y} }
+func (v Vec2) Scaled(k float64) Vec2        { return Vec2{v.X * k, v.Y * k} }
+func (v Vec2) Dot(o Vec2) float64           { return v.X*o.X + v.Y*o.Y }
+func (v Vec2) Cross(o Vec2) float64         { return v.X*o.Y - v.Y*o.X }
+func (v Vec2) Len() float64                 { return math.Hypot(v.X, v.Y) }
+func (v Vec2) DistTo(o Vec2) float64        { return v.Minus(o).Len() }
+func (v Vec2) Heading() float64             { return math.Atan2(v.Y, v.X) }
+func (v Vec2) WithHeading(h float64) Pose2D { return Pose2D{Pos: v, Heading: h} }
+
+// Unit returns v scaled to length 1; the zero vector stays zero.
+func (v Vec2) Unit() Vec2 {
+	n := v.Len()
+	if n == 0 {
+		return Vec2{}
+	}
+	return Vec2{v.X / n, v.Y / n}
+}
+
+// Rotated rotates v counter-clockwise by rads around the origin.
+func (v Vec2) Rotated(rads float64) Vec2 {
+	c, s := math.Cos(rads), math.Sin(rads)
+	return Vec2{v.X*c - v.Y*s, v.X*s + v.Y*c}
+}
+
+// Position converts the pose to the legacy Position type (Z = 0).
+func (p Pose2D) Position() Position {
+	return Position{X: p.Pos.X, Y: p.Pos.Y, Angle: p.Heading}
+}
+
+// HeadingError is the signed shortest rotation from p's heading to target.
+func (p Pose2D) HeadingError(target float64) float64 {
+	return NormalizeAngleDelta(target, p.Heading)
+}
+
+// Position is the legacy combined point/pose type used across the AI: X, Y,
+// Z in mm plus Angle (heading) in radians. Use XY() or Pose() to get the
+// typed views for new code.
 type Position struct {
 	X     float64
 	Y     float64
@@ -155,6 +199,8 @@ func (p Position) String() string {
 	return fmt.Sprintf("(%f, %f, %f, %f)", p.X, p.Y, p.Z, p.Angle)
 }
 
+// Deprecated: Add also applies to Angle componentwise, which is wrong for
+// headings (no wrap-around). Use XY() and the Vec2 methods for vectors.
 func (p Position) Add(other *Position) Position {
 	return Position{
 		X:     p.X + other.X,
@@ -164,6 +210,8 @@ func (p Position) Add(other *Position) Position {
 	}
 }
 
+// Deprecated: Sub also applies to Angle componentwise, which is wrong for
+// headings (no wrap-around). Use XY() and the Vec2 methods for vectors.
 func (p Position) Sub(other *Position) Position {
 	return Position{
 		X:     p.X - other.X,
@@ -185,6 +233,8 @@ func (p Position) Norm() float64 {
 	return float64(math.Sqrt(float64(p.X*p.X + p.Y*p.Y + p.Z*p.Z)))
 }
 
+// Deprecated: Scale also applies to Angle componentwise, which is wrong for
+// headings (no wrap-around). Use XY() and the Vec2 methods for vectors.
 func (p Position) Scale(scalar float64) Position {
 	return Position{
 		X:     p.X * scalar,
@@ -229,8 +279,14 @@ func (p Position) ToDTO() string {
 }
 
 func (p Position) ToV2() Vec2 {
-	return Vec2{p.X,p.Y}
+	return Vec2{p.X, p.Y}
 }
+
+// XY is the position without Z or heading.
+func (p Position) XY() Vec2 { return Vec2{p.X, p.Y} }
+
+// Pose is the 2D pose (X, Y, Angle).
+func (p Position) Pose() Pose2D { return Pose2D{Pos: Vec2{p.X, p.Y}, Heading: p.Angle} }
 
 func PointToLineSegment(a, b, c Vec2) Vec2 {
 
@@ -250,6 +306,6 @@ func PointToLineSegment(a, b, c Vec2) Vec2 {
 
 func DistToLineSegment(a, b, c Vec2) float64 {
 
-	pointOnLine := PointToLineSegment(a,b,c)
+	pointOnLine := PointToLineSegment(a, b, c)
 	return DistV2(pointOnLine, c)
 }

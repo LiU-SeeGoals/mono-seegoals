@@ -11,72 +11,21 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
-	"google.golang.org/protobuf/proto"
 )
 
 // This test starts a client and a sever and then sends a action to the server
 // and then checks if the response matches what was sent.
 // Only checks commandID and robotID in the message.
+// TestSocketCommunication sends every supported action through a loopback
+// socket and checks the received frame decodes to the same command.
 func TestSocketCommunication(t *testing.T) {
-
-	// Define stop action
-	stopAction := &action.Stop{Id: 2}
-	stopCommand := &robot_action.Command{CommandId: robot_action.ActionType_STOP_ACTION, RobotId: 2}
-
-	// Define kick action
-	kickAction := &action.Kick{Id: 6, KickSpeed: 5}
-	kickCommand := &robot_action.Command{CommandId: robot_action.ActionType_KICK_ACTION, RobotId: 6, KickSpeed: 5}
-
-	// Define init action
-	initAction := &action.Init{Id: 3}
-	initCommand := &robot_action.Command{CommandId: robot_action.ActionType_INIT_ACTION, RobotId: 3}
-
-	// Define move action
-	moveToAction := &action.MoveTo{
-		Id:   1,
-		Pos:  info.Position{X: 100, Y: 200, Angle: math.Pi},
-		Dest: info.Position{X: 300, Y: 400, Angle: -math.Pi},
-	}
-	moveToCommand := &robot_action.Command{
-		CommandId: robot_action.ActionType_MOVE_TO_ACTION,
-		RobotId:   1,
-		Pos:       &robot_action.Vector3D{X: int32(100), Y: int32(200), W: float32(math.Pi)},
-		Dest:      &robot_action.Vector3D{X: int32(300), Y: int32(400), W: float32(-math.Pi)},
-	}
-
-	// Define set navigation direction action.
-	moveAction := &action.Move{
-		Id:        9,
-		Direction: mat.NewVecDense(2, []float64{100, 200}),
-	}
-	moveCommand := &robot_action.Command{
-		CommandId: robot_action.ActionType_MOVE_ACTION,
-		RobotId:   9,
-		Direction: &robot_action.Vector2D{X: int32(100), Y: int32(200)},
-	}
-
-	// Define rotate.
-	rotateAction := &action.Rotate{
-		Id:         3,
-		AngularVel: 5,
-	}
-	rotateCommand := &robot_action.Command{
-		CommandId:  robot_action.ActionType_ROTATE_ACTION,
-		RobotId:    3,
-		AngularVel: 5,
-	}
-
-	// Test cases
-	testCases := []struct {
-		input    action.Action
-		expected *robot_action.Command
-	}{
-		{stopAction, stopCommand},
-		{kickAction, kickCommand},
-		{initAction, initCommand},
-		{moveToAction, moveToCommand},
-		{moveAction, moveCommand},
-		{rotateAction, rotateCommand},
+	actions := []action.Action{
+		&action.Stop{Id: 2},
+		&action.Kick{Id: 6, KickSpeed: 5},
+		&action.Init{Id: 3},
+		&action.MoveTo{Id: 1, Pos: info.Position{X: 100, Y: 200, Angle: math.Pi}, Dest: info.Position{X: 300, Y: 400, Angle: -math.Pi}},
+		&action.Move{Id: 9, Direction: mat.NewVecDense(2, []float64{100, 200})},
+		&action.Rotate{Id: 3, AngularVel: 5},
 	}
 
 	// Bind before sending and use an ephemeral loopback port. Construct the
@@ -92,16 +41,17 @@ func TestSocketCommunication(t *testing.T) {
 	}
 	defer connection.Close()
 	client := &BaseStationClient{connections: []Connection{connection}, hasBeenInited: true}
-	for _, tc := range testCases {
-		client.SendActions([]action.Action{tc.input})
+	for _, a := range actions {
+		client.SendActions([]action.Action{a})
 		if len(client.queue) != 1 {
 			t.Fatalf("expected one queued command, got %d", len(client.queue))
 		}
-		data, err := proto.Marshal(client.queue[0])
+		want := client.queue[0]
+		client.queue = nil
+		data, err := want.encode()
 		if err != nil {
 			t.Fatal(err)
 		}
-		client.queue = nil
 		if err := client.sendMessage(data); err != nil {
 			t.Fatal(err)
 		}
@@ -113,12 +63,12 @@ func TestSocketCommunication(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		command := &robot_action.Command{}
-		if err := proto.Unmarshal(buffer[:n], command); err != nil {
+		got, err := decodeBaseStationCommand(buffer[:n])
+		if err != nil {
 			t.Fatal(err)
 		}
-		if command.GetRobotId() != tc.expected.GetRobotId() || command.GetCommandId() != tc.expected.GetCommandId() {
-			t.Fatalf("expected robot %d command %v, got %v", tc.expected.GetRobotId(), tc.expected.GetCommandId(), command)
+		if got.robotID != want.robotID || got.kind != want.kind {
+			t.Fatalf("%T: expected robot %d command %v, got %+v", a, want.robotID, want.kind, got)
 		}
 	}
 }
@@ -127,8 +77,8 @@ func TestStopReplacesQueuedCommandsForItsRobot(t *testing.T) {
 	client := &BaseStationClient{hasBeenInited: true}
 	client.SendActions([]action.Action{&action.Kick{Id: 1, KickSpeed: 3}, &action.MoveTo{Id: 2}, &action.MoveTo{Id: 1}})
 	client.SendActions([]action.Action{&action.Stop{Id: 1}})
-	if len(client.queue) != 2 || client.queue[0].GetRobotId() != 2 ||
-		client.queue[1].GetRobotId() != 1 || client.queue[1].GetCommandId() != robot_action.ActionType_STOP_ACTION {
+	if len(client.queue) != 2 || client.queue[0].robotID != 2 ||
+		client.queue[1].robotID != 1 || client.queue[1].kind != robot_action.ActionType_STOP_ACTION {
 		t.Fatalf("STOP did not replace stale commands: %v", client.queue)
 	}
 }
@@ -145,10 +95,10 @@ func TestNewMotionDropsOnlyOlderUnsentMotionForSameRobot(t *testing.T) {
 	if len(client.queue) != 3 {
 		t.Fatalf("expected other robot motion, kick, and latest motion; got %v", client.queue)
 	}
-	if client.queue[0].GetRobotId() != 2 ||
-		client.queue[1].GetCommandId() != robot_action.ActionType_KICK_ACTION ||
-		client.queue[2].GetRobotId() != 1 ||
-		client.queue[2].GetDest().GetX() != 300 {
+	if client.queue[0].robotID != 2 ||
+		client.queue[1].kind != robot_action.ActionType_KICK_ACTION ||
+		client.queue[2].robotID != 1 ||
+		client.queue[2].destX != 300 {
 		t.Fatalf("unexpected command order or latest destination: %v", client.queue)
 	}
 }

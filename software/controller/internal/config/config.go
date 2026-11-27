@@ -1,257 +1,254 @@
+// Package config reads the controller's settings from the process environment.
+//
+// Every setting has a default matching the repository's environment.ini, so
+// tests and local runs work without any .env file. A .env file is optional:
+// Load reads the file named by SEEGOALS_ENV_FILE, or else the first .env found
+// in the working directory or one of its parents. Variables already present in
+// the process environment always win over the file.
 package config
 
 import (
+	"errors"
 	"fmt"
-	"log"
+	"io/fs"
+	"os"
 	"path/filepath"
-	"runtime"
 	"sync"
 
 	"github.com/caarlos0/env/v10"
 	"github.com/joho/godotenv"
 )
 
-// Config wraps around specific config object.
-//
-// Check the .env file to make changes.
-// Unless you have a good reason, you shouldn't need to use this directly.
-// It's better to use the helper methods in this file instead.
-type Config struct {
-	// Environment - e.g. "docker"
-	Env string `env:"ENVIRONMENT,required"`
+// EnvFileVar names an explicit .env file to load instead of searching for one.
+const EnvFileVar = "SEEGOALS_ENV_FILE"
 
-	// SSL vision config
+type Config struct {
+	// "simulation" selects simulator addresses and outputs; anything else is
+	// treated as real hardware.
+	Env string `env:"ENVIRONMENT" envDefault:"simulation"`
+
 	SSLVision        ConfigSSLVision
 	SSLTrackedVision ConfigSSLTrackedVision
-
-	Real ConfigReal
-
-	// Sim config
-	Sim ConfigSim
-
-	// Game controller config
-	GC ConfigGameController
-
-	GW ConfigGameViewer
-
-	BS ConfigBasestation
-
-	AI ConfigAI
+	Real             ConfigReal
+	Sim              ConfigSim
+	GC               ConfigGameController
+	GW               ConfigGameViewer
+	BS               ConfigBasestation
+	AI               ConfigAI
+	Log              ConfigLog
 }
 
-// Config struct for SSL Vision.
-//
-// Check the .env file to make changes.
-// Unless you have a good reason, you
-// shouldn't need to use this directly.
 type ConfigSSLVision struct {
-	// Multicast address.
-	Address string `env:"SSL_VISION_MULTICAST_ADDR,required"`
-
-	// Tracker, detection, and geometry packets.
-	Port      string `env:"SSL_VISION_SIM_MAIN_PORT,required"`
-	Port_real string `env:"SSL_VISION_REAL_MAIN_PORT,required"`
-
-	// Visualization packets.
-	VizPort string `env:"SSL_VISION_VIZ_PORT,required"`
+	Address   string `env:"SSL_VISION_MULTICAST_ADDR" envDefault:"224.5.23.2"`
+	Port      string `env:"SSL_VISION_SIM_MAIN_PORT" envDefault:"10020"`
+	Port_real string `env:"SSL_VISION_REAL_MAIN_PORT" envDefault:"10006"`
+	VizPort   string `env:"SSL_VISION_VIZ_PORT" envDefault:"11011"`
 }
 
 type ConfigSSLTrackedVision struct {
-	// Multicast address.
-	Address string `env:"SSL_VISION_MULTICAST_ADDR,required"`
-
-	// Tracker, detection, and geometry packets.
-	Port      string `env:"SSL_TRACKER_PORT,required"`
-	Port_real string `env:"SSL_TRACKER_PORT,required"`
-
-	// Visualization packets.
-	VizPort string `env:"SSL_VISION_VIZ_PORT,required"`
+	Address string `env:"SSL_VISION_MULTICAST_ADDR" envDefault:"224.5.23.2"`
+	Port    string `env:"SSL_TRACKER_PORT" envDefault:"10010"`
 }
 
+// ConfigReal holds the basestation's own unicast address. Commands are sent to
+// the multicast group in ConfigBasestation, which the basestation joins.
 type ConfigReal struct {
-	BASESTATION_ADDR string `env:"BASESTATION_ADDR,required"`
-	BASESTATION_PORT string `env:"BASESTATION_PORT,required"`
+	BASESTATION_ADDR string `env:"BASESTATION_ADDR" envDefault:"192.168.1.150"`
+	BASESTATION_PORT string `env:"BASESTATION_PORT" envDefault:"6001"`
 }
 
 type ConfigGameViewer struct {
-	Address string `env:"VITE_AI_GAME_VIEWER_SOCKET_ADDR,required"`
-	Port    string `env:"VITE_AI_GAME_VIEWER_SOCKET_PORT,required"`
+	Address string `env:"VITE_AI_GAME_VIEWER_SOCKET_ADDR" envDefault:"127.0.0.1"`
+	Port    string `env:"VITE_AI_GAME_VIEWER_SOCKET_PORT" envDefault:"5174"`
 }
 
 type ConfigBasestation struct {
-	Address string `env:"AI_ACTIONS_BASESTATION_MULTICAST_ADDR,required"`
-	Port    string `env:"AI_ACTIONS_BASESTATION_MULTICAST_PORT,required"`
+	Address string `env:"AI_ACTIONS_BASESTATION_MULTICAST_ADDR" envDefault:"239.0.0.2"`
+	Port    string `env:"AI_ACTIONS_BASESTATION_MULTICAST_PORT" envDefault:"9999"`
 }
 
 type ConfigAI struct {
-	Interface string `env:"AI_MULTICAST_INTERFACE,required"`
-
+	// Empty means every multicast-capable interface.
+	Interface                  string `env:"AI_MULTICAST_INTERFACE" envDefault:""`
 	RestrictToOpponentHalfTeam string `env:"AI_RESTRICT_ROBOTS_TO_OPPONENT_HALF" envDefault:""`
 }
 
-// Config struct for sim
-//
-// Check the .env file to make changes.
-// Unless you have a good reason, you
-// shouldn't need to use this directly.
 type ConfigSim struct {
-	// Sim address
-	Address string `env:"SIM_ADDR,required"`
+	Address              string `env:"SIM_ADDR" envDefault:"127.0.0.1"`
+	CommandPort          string `env:"SIM_COMMAND_LISTEN_PORT" envDefault:"20011"`
+	BlueStatusPort       string `env:"SIM_BLUE_STATUS_SEND_PORT" envDefault:"30011"`
+	YellowStatusPort     string `env:"SIM_YELLOW_STATUS_SEND_PORT" envDefault:"30012"`
+	SimControllerPort    string `env:"SIM_SIM_CONTROLLER_SEND_PORT" envDefault:"10300"`
+	BlueControllerPort   string `env:"SIM_BLUE_CONTROLLER_LISTEN_PORT" envDefault:"10301"`
+	YellowControllerPort string `env:"SIM_YELLOW_CONTROLLER_LISTEN_PORT" envDefault:"10302"`
 
-	// Command listen port.
-	// Accepts robots commands.
-	CommandPort string `env:"SIM_COMMAND_LISTEN_PORT,required"`
-
-	// Blue team status listen port.
-	// Use unknown.
-	BlueStatusPort string `env:"SIM_BLUE_STATUS_SEND_PORT,required"`
-
-	// Yellow team status listen port.
-	// Use unknown.
-	YellowStatusPort string `env:"SIM_YELLOW_STATUS_SEND_PORT,required"`
-
-	// Simulation controller send port.
-	// Use unknown.
-	SimControllerPort string `env:"SIM_SIM_CONTROLLER_SEND_PORT,required"`
-
-	// Blue team controller listen port.
-	// Use unknown.
-	BlueControllerPort string `env:"SIM_BLUE_CONTROLLER_LISTEN_PORT,required"`
-
-	// Yellow team controller listen port.
-	// Use unknown.
-	YellowControllerPort string `env:"SIM_YELLOW_CONTROLLER_LISTEN_PORT,required"`
+	// Limits of the simulator-side motion controller (client.SimMotion).
+	// The defaults reproduce the controller's historical behaviour; the real
+	// robots run their own onboard controller and document no limits.
+	MaxLinearMPS    float64 `env:"SIM_MAX_LINEAR_MPS" envDefault:"1.0"`
+	MaxAngularRadPS float64 `env:"SIM_MAX_ANGULAR_RADPS" envDefault:"3.0"`
+	// Zero disables acceleration limiting.
+	MaxLinearAccMPS2 float64 `env:"SIM_MAX_LINEAR_ACC_MPS2" envDefault:"0"`
 }
 
-// Config struct for game controller (GC)
-//
-// Check the .env file to make changes.
-// Unless you have a good reason, you
-// shouldn't need to use this directly.
 type ConfigGameController struct {
-	// GC multicast publish address
-	Address string `env:"SSL_GAME_CONTROLLER_PUBLISH_ADDR,required"`
+	Address string `env:"SSL_GAME_CONTROLLER_PUBLISH_ADDR" envDefault:"224.5.23.1"`
+	Port    string `env:"SSL_GAME_CONTROLLER_PUBLISH_PORT" envDefault:"10003"`
+}
 
-	// GC publish port
-	Port string `env:"SSL_GAME_CONTROLLER_PUBLISH_PORT,required"`
+type ConfigLog struct {
+	// Directory for readable.log and structured.log, relative to the working
+	// directory. Empty disables file logging.
+	Dir string `env:"SEEGOALS_LOG_DIR" envDefault:"../logs"`
 }
 
 var (
-	// Config instance
+	mu       sync.Mutex
 	instance *Config
-
-	// Init helper
-	once sync.Once
+	envFile  string
 )
 
-// Loads config from .env file.
-// Config object saved as global object in this file.
-func loadConfig() {
-	// Determine the path to the config file.
-	_, filename, _, ok := runtime.Caller(0)
-	if !ok {
-		panic("loadConfig: unable to determine current directory")
+// Load reads the optional .env file and parses the environment. It is safe to
+// call more than once; the first successful result is kept.
+func Load() (*Config, error) {
+	mu.Lock()
+	defer mu.Unlock()
+	if instance != nil {
+		return instance, nil
 	}
-	envPath := filepath.Join(filepath.Dir(filename), "../../.env")
-	envPath = filepath.Clean(envPath)
 
-	err := godotenv.Load(envPath)
+	path, err := findEnvFile()
 	if err != nil {
-		log.Fatalf("Unable to load .env file path:%s \n %e", envPath, err)
+		return nil, err
+	}
+	if path != "" {
+		// godotenv.Load never overrides variables already in the environment.
+		if err := godotenv.Load(path); err != nil {
+			return nil, fmt.Errorf("config: load %s: %w", path, err)
+		}
 	}
 
+	cfg, err := Parse()
+	if err != nil {
+		return nil, err
+	}
+	instance, envFile = cfg, path
+	return cfg, nil
+}
+
+// Parse builds a Config from the current process environment only.
+func Parse() (*Config, error) {
 	cfg := &Config{}
-	err = env.Parse(cfg)
-	if err != nil {
-		log.Fatalf("Unable to parse config path:%s \n %e", envPath, err)
+	if err := env.Parse(cfg); err != nil {
+		return nil, fmt.Errorf("config: %w", err)
 	}
-
-	instance = cfg
+	return cfg, nil
 }
 
-// GetInstance returns the singleton instance of the Config object,
-// initializing it if necessary.
+// EnvFile reports which .env file Load used ("" when none).
+func EnvFile() string {
+	mu.Lock()
+	defer mu.Unlock()
+	return envFile
+}
+
+func findEnvFile() (string, error) {
+	if explicit := os.Getenv(EnvFileVar); explicit != "" {
+		if _, err := os.Stat(explicit); err != nil {
+			return "", fmt.Errorf("config: %s=%s: %w", EnvFileVar, explicit, err)
+		}
+		return explicit, nil
+	}
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", nil
+	}
+	for {
+		candidate := filepath.Join(dir, ".env")
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, nil
+		} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+			return "", fmt.Errorf("config: %w", err)
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", nil
+		}
+		dir = parent
+	}
+}
+
+// GetInstance returns the loaded config, loading it on first use. A malformed
+// value (e.g. a non-numeric speed limit) is a programming/deployment error and
+// panics with the parse error.
 func GetInstance() *Config {
-	once.Do(loadConfig)
-	return instance
+	cfg, err := Load()
+	if err != nil {
+		panic(err)
+	}
+	return cfg
 }
 
-// GetSSLClientAddress returns the SSL client address from the config.
+func join(host, port string) string { return host + ":" + port }
+
 func GetGCClientAddress() string {
 	cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.GC.Address, cfg.GC.Port)
+	return join(cfg.GC.Address, cfg.GC.Port)
 }
 
-// GetSSLClientAddress returns the SSL client address from the config.
 func GetSSLClientAddress() string {
 	cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.SSLVision.Address, cfg.SSLVision.Port)
+	return join(cfg.SSLVision.Address, cfg.SSLVision.Port)
 }
 
-// Get SimAddress returns the Sim address from the config.
+func GetSSLClientAddressReal() string {
+	cfg := GetInstance()
+	return join(cfg.SSLVision.Address, cfg.SSLVision.Port_real)
+}
+
+func GetSSLTrackedClientAddress() string {
+	cfg := GetInstance()
+	return join(cfg.SSLTrackedVision.Address, cfg.SSLTrackedVision.Port)
+}
+
 func GetSimControlAddress() string {
 	cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.SimControllerPort)
+	return join(cfg.Sim.Address, cfg.Sim.SimControllerPort)
 }
 
 func GetSimBlueTeamAddress() string {
 	cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.BlueControllerPort)
+	return join(cfg.Sim.Address, cfg.Sim.BlueControllerPort)
 }
 
 func GetSimYellowTeamAddress() string {
 	cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.Sim.Address, cfg.Sim.YellowControllerPort)
+	return join(cfg.Sim.Address, cfg.Sim.YellowControllerPort)
 }
 
-func GetBasestationAddress() string {
+// GetBasestationMulticastAddress is where robot commands are sent; the
+// basestation firmware joins this group.
+func GetBasestationMulticastAddress() string {
 	cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.Real.BASESTATION_ADDR, cfg.Real.BASESTATION_PORT)
-}
-
-// GetSSLClientAddress returns the SSL client address from the config.
-func GetSSLClientAddressReal() string {
-	cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.SSLVision.Address, cfg.SSLVision.Port_real)
-}
-
-func GetSSLTrackedClientAddressReal() string {
-	cfg := GetInstance()
-	return fmt.Sprintf("%s:%s", cfg.SSLTrackedVision.Address, cfg.SSLTrackedVision.Port_real)
+	return join(cfg.BS.Address, cfg.BS.Port)
 }
 
 func GetAIMulticastInterface() string {
-	cfg := GetInstance()
-	return cfg.AI.Interface
+	return GetInstance().AI.Interface
 }
 
 func RestrictToOpponentHalfTeam() string {
-	cfg := GetInstance()
-	return cfg.AI.RestrictToOpponentHalfTeam
-}
-
-func GetGameViewerAdress() string {
-	cfg := GetInstance()
-	println(cfg.GW.Address)
-	return cfg.GW.Address
+	return GetInstance().AI.RestrictToOpponentHalfTeam
 }
 
 func GetGameViewerPort() string {
-	cfg := GetInstance()
-	return ":" + cfg.GW.Port
+	return ":" + GetInstance().GW.Port
 }
 
-func GetBasestationAdress() string {
-	cfg := GetInstance()
-	return cfg.BS.Address
-}
-
-func GetBasestationPort() string {
-	cfg := GetInstance()
-	return cfg.BS.Port
+func GetLogDir() string {
+	return GetInstance().Log.Dir
 }
 
 func IsSimulated() bool {
-	cfg := GetInstance()
-	return cfg.Env == "simulation"
+	return GetInstance().Env == "simulation"
 }

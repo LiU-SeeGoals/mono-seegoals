@@ -408,7 +408,7 @@ func (m *CombinedPlan) ballTouchRestriction() (info.ID, bool) {
 
 func (m *CombinedPlan) activeRobots(gi *info.GameInfo) []info.ID {
 	team := gi.State.GetTeam(m.team)
-	nowMillis := time.Now().UnixMilli()
+	nowMillis := gi.Now().UnixMilli()
 	recent := []info.ID{}
 	seen := []info.ID{}
 
@@ -861,8 +861,8 @@ func (m *CombinedPlan) newTick() func(info.GameInfo) {
 	hasActiveReceiver := false
 
 	return func(frame info.GameInfo) {
-		tickStart := time.Now()
 		gi = frame
+		tickStart := gi.Now()
 		frameMonitor.Observe(gi.VisionFrame())
 		possession := possessionTracker.update(&gi, tickStart)
 		rawOwner := observedBallOwner(&gi)
@@ -947,14 +947,14 @@ func (m *CombinedPlan) newTick() func(info.GameInfo) {
 			return
 		}
 
-		ballVel, ballVelOK := gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), 200*time.Millisecond)
+		ballVel, ballVelOK := gi.State.GetTrackedBall().GetFreshTrackedVelocity(gi.Now(), 200*time.Millisecond)
 		ballMoving := ballVelOK && ballVel.Norm2d() > 0.3
 		ownerRetained := possession.owner.valid && ownerStillRetained(&gi, possession.owner)
 
 		handledByOffense := false
 		passInFlight := hasActiveReceiver &&
 			containsRobot(offenseRobots, activeReceiver) &&
-			time.Since(activeReceiverStart) < 2*time.Second &&
+			gi.Now().Sub(activeReceiverStart) < 2*time.Second &&
 			(!rawOwner.valid || rawOwner.team != m.team) &&
 			(ballMoving || !ownerRetained)
 		ownerMayPlayBall := !hasRestrictedRobot || possession.owner.id != restrictedRobot
@@ -972,7 +972,7 @@ func (m *CombinedPlan) newTick() func(info.GameInfo) {
 					receiver, ok := roleManager.attackers[decision.ReceiverID]
 					if ok {
 						activeReceiver = decision.ReceiverID
-						activeReceiverStart = time.Now()
+						activeReceiverStart = gi.Now()
 						hasActiveReceiver = true
 						receiver.ReceivePass(decision.Target)
 					}

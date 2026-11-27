@@ -8,9 +8,8 @@ import (
 )
 
 type plannerCore struct {
-	team             info.Team
-	incomingGameInfo <-chan info.GameInfo
-	start            time.Time
-	ActivityHandler  ai.ActivityHandler
-	Active           bool
+	team            info.Team
+	start           time.Time
+	ActivityHandler ai.ActivityHandler
+	Active          bool
 }

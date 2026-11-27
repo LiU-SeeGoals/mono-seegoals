@@ -207,7 +207,7 @@ func (p *Planner) PlanPath(
 	}
 	path = shortcutPath(path, obstacles, PlanningRadius)
 	path = clampPathToPlanningBounds(path, cfg)
-	p.commit(id, path, finalDestination)
+	p.commit(id, path, finalDestination, gi.Now())
 	return p.copyPath(id)
 }
 
@@ -224,10 +224,11 @@ func (p *Planner) copyPath(id info.ID) []info.Position {
 func newCommittedState(
 	path []info.Position,
 	goal info.Position,
+	now time.Time,
 ) *robotPathState {
 	s := &robotPathState{
 		path:      append([]info.Position(nil), path...),
-		plannedAt: time.Now(),
+		plannedAt: now,
 		goal:      goal,
 	}
 	return s
@@ -237,10 +238,11 @@ func (p *Planner) commit(
 	id info.ID,
 	path []info.Position,
 	goal info.Position,
+	now time.Time,
 ) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.session[id] = newCommittedState(path, goal)
+	p.session[id] = newCommittedState(path, goal, now)
 }
 
 func shouldCreateNewPath(
@@ -259,7 +261,7 @@ func shouldCreateNewPath(
 	if !isStoredPathValid(st, myPos, goal, obstacles, cfg, perm.goalMatchEpsilon) {
 		return true
 	}
-	if time.Since(st.plannedAt) > maxPlanAgeForContext(myPos, goal, team, selfID, gi, perm) {
+	if gi.Now().Sub(st.plannedAt) > maxPlanAgeForContext(myPos, goal, team, selfID, gi, perm) {
 		return true
 	}
 	return false
@@ -357,7 +359,7 @@ func maxPlanAgeForContext(
 			if err != nil {
 				continue
 			}
-			if time.Now().UnixMilli()-rototTime > 200 {
+			if gi.Now().UnixMilli()-rototTime > 200 {
 				continue
 			}
 			if distanceSquared(myPos, pos) < perm.nearRobotDistance*perm.nearRobotDistance {
@@ -874,8 +876,8 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoalline
 		}
 	}
 
-	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Blue), team, id)
-	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Yellow), team, id)
+	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Blue), team, id, gi.Now().UnixMilli())
+	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Yellow), team, id, gi.Now().UnixMilli())
 	if avoidGoallines {
 		obstacles = append(obstacles, goalLineObstacles(gi)...)
 	}
@@ -892,7 +894,7 @@ func ballObstacleRadius(team info.Team, avoidBall bool, gi *info.GameInfo) (floa
 	return 0, false
 }
 
-func appendRobotObstacles(obstacles []Obstacle, robots *info.RobotTeam, ownTeam info.Team, ownID info.ID) []Obstacle {
+func appendRobotObstacles(obstacles []Obstacle, robots *info.RobotTeam, ownTeam info.Team, ownID info.ID, nowMillis int64) []Obstacle {
 	for _, robot := range robots {
 		if robot == nil {
 			continue
@@ -904,7 +906,7 @@ func appendRobotObstacles(obstacles []Obstacle, robots *info.RobotTeam, ownTeam 
 		if err != nil {
 			continue
 		}
-		if time.Now().UnixMilli()-rototTime > 200 {
+		if nowMillis-rototTime > 200 {
 			continue
 		}
 		obstacles = append(obstacles, Obstacle{Position: pos, Size: RobotSafetyRadius})

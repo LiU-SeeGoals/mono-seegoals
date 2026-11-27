@@ -13,6 +13,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/controller/internal/runner"
 	"github.com/LiU-SeeGoals/controller/internal/scripts"
 )
@@ -30,6 +31,16 @@ const (
 )
 
 func main() {
+	if _, err := config.Load(); err != nil {
+		log.Fatal(err)
+	}
+	if path := config.EnvFile(); path != "" {
+		fmt.Println("Loaded environment from", path)
+	}
+	if err := logger.Init(config.GetLogDir()); err != nil {
+		log.Fatal(err)
+	}
+
 	if RUN_PROFILER {
 		go func() {
 			fmt.Println("Pprof server running on port 6060")

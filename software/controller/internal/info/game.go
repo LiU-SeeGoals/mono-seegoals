@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
@@ -15,6 +16,7 @@ type GameInfo struct {
 	Status      *GameStatus
 	field       *ssl_vision.SSL_GeometryFieldSize
 	visionFrame uint64
+	clock       Clock
 }
 
 // FieldGeometry contains the dimensions reported by SSL-Vision, in millimeters.
@@ -33,7 +35,25 @@ func NewGameInfo(capacity int) *GameInfo {
 		State:  NewGameState(capacity),
 		Status: NewGameStatus(),
 		field:  nil,
+		clock:  SystemClock{},
 	}
+}
+
+// Now is the AI's notion of the current time (the wall clock unless SetClock
+// replaced it). Use it instead of time.Now in planners, roles and activities.
+func (gi *GameInfo) Now() time.Time {
+	if gi == nil || gi.clock == nil {
+		return time.Now()
+	}
+	return gi.clock.Now()
+}
+
+// SetClock replaces the clock returned by Now; nil restores the wall clock.
+func (gi *GameInfo) SetClock(c Clock) {
+	if c == nil {
+		c = SystemClock{}
+	}
+	gi.clock = c
 }
 
 func (gi GameInfo) PrintField() {

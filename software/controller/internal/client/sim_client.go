@@ -3,30 +3,25 @@ package client
 import (
 	"fmt"
 	"net"
-	"sync"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
-	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/proto_go/gc"
 	"github.com/LiU-SeeGoals/proto_go/simulation"
 	"google.golang.org/protobuf/proto"
 )
 
+// SimClient sends commands to the simulator. Robot commands go through a
+// SimMotion controller; simulator-control messages use Send directly.
 type SimClient struct {
-	conn *net.UDPConn
-
-	addr *net.UDPAddr
-
-	savedActions    []action.Action
-	actionListMutex sync.Mutex
-	gameState       *info.GameState
+	conn   *net.UDPConn
+	addr   *net.UDPAddr
+	motion *SimMotion
 }
 
-// Create new sim client
-// Address should be <ip>:<port>
-// gameState is optionaly provided
-func NewSimClient(addr string, gameInfo ...*info.GameInfo) *SimClient {
+// NewSimClient connects to addr ("<ip>:<port>") and drives robots with the
+// configured SimMotionLimits.
+func NewSimClient(addr string) *SimClient {
 	fmt.Println("Creating new SimClient with address: ", addr)
 	logger.Logger.Info("Creating new SimClient with address: ", addr)
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
@@ -35,12 +30,8 @@ func NewSimClient(addr string, gameInfo ...*info.GameInfo) *SimClient {
 	}
 
 	sim_client := &SimClient{
-		conn: nil,
-		addr: udpAddr,
-	}
-
-	if len(gameInfo) > 0 && gameInfo[0] != nil {
-		sim_client.gameState = gameInfo[0].State
+		addr:   udpAddr,
+		motion: NewSimMotion(SimMotionLimitsFromConfig()),
 	}
 	sim_client.Init()
 
@@ -62,14 +53,14 @@ func (client *SimClient) CloseConnection() {
 }
 
 func (client *SimClient) SendActions(actions []action.Action) {
-	if client.gameState == nil {
-		fmt.Println("Please provide gamestate in the sim_client constructor")
-		logger.Logger.Panic("Please provide gamestate in the sim_client constructor")
-	}
-
 	robotCommands := make([]*simulation.RobotCommand, 0, len(actions))
-	for _, action := range actions {
-		robotCommands = append(robotCommands, action.TranslateSim())
+	for _, a := range actions {
+		cmd, ok := client.motion.Command(a)
+		if !ok {
+			logger.Logger.Warnf("Simulator: unsupported action %T for robot %d", a, a.RobotID())
+			continue
+		}
+		robotCommands = append(robotCommands, cmd)
 	}
 
 	robotControl := &simulation.RobotControl{

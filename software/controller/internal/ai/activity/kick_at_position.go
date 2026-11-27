@@ -86,7 +86,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 	captureReady := capturePoseReady(robotPos, ballPred, kp.targetPosition, headingErr)
 	firmwareLeadDist := kickFirmwareLeadDist(robot)
 
-	if kp.armed(robotPos, ballNow, headingErr, lineErr, ballReachable, firmwareLeadDist) {
+	if kp.armed(robotPos, ballNow, headingErr, lineErr, ballReachable, firmwareLeadDist, gi.Now()) {
 		// Aim held: drive through the ball toward the target, but only kick
 		// once the ball is at the front of the robot or has settled in the mouth.
 		dest := info.Position{
@@ -94,7 +94,7 @@ func (kp *KickAtPosition) GetAction(gi *info.GameInfo) action.Action {
 			Y:     ballPred.Y + kickRunUpDist*math.Sin(finalOrientation),
 			Angle: finalOrientation,
 		}
-		kickAfterSettle := updateKickDribbleSettle(&kp.dribbleSince, ballHeldInMouth)
+		kickAfterSettle := updateKickDribbleSettle(&kp.dribbleSince, ballHeldInMouth, gi.Now())
 		impactReady := approachReady && ok && kickBallImpactReady(forward, lateral, headingErr, firmwareLeadDist)
 		kickSpeedCmd := 0
 		if kickBallShouldFire(dribblerDist, kickAfterSettle, impactReady) {
@@ -181,6 +181,7 @@ func (kp *KickAtPosition) armed(
 	headingErr, lineErr float64,
 	ballReachable bool,
 	firmwareLeadDist float64,
+	now time.Time,
 ) bool {
 	nearBall := robotPos.Dist2d(ballPos) < kickFirmwareArmingDist(firmwareLeadDist)
 	aligned := headingErr < roughAngleTolerance &&
@@ -192,9 +193,9 @@ func (kp *KickAtPosition) armed(
 		return false
 	}
 	if kp.alignedSince.IsZero() {
-		kp.alignedSince = time.Now()
+		kp.alignedSince = now
 	}
-	return time.Since(kp.alignedSince) >= kickAlignConfirmTime
+	return now.Sub(kp.alignedSince) >= kickAlignConfirmTime
 }
 
 func (kp *KickAtPosition) Achieved(gi *info.GameInfo) bool {

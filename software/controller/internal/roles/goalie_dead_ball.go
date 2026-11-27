@@ -78,7 +78,7 @@ func (t *deadBallTracker) Observe(gi *info.GameInfo, team info.Team) {
 	}
 
 	t.active = true
-	t.since = time.Now()
+	t.since = gi.Now()
 	t.anchor = ballPos
 }
 
@@ -88,12 +88,12 @@ func (t *deadBallTracker) Reset() {
 	t.anchor = info.Position{}
 }
 
-func (t *deadBallTracker) StillLongEnough() bool {
-	return t.active && time.Since(t.since) >= deadBallStillDuration
+func (t *deadBallTracker) StillLongEnough(now time.Time) bool {
+	return t.active && now.Sub(t.since) >= deadBallStillDuration
 }
 
 func (gr *GoalieRole) ShouldCollectDeadBall() bool {
-	if gr.HasBallControl(GoalieBallControlRadius) || !gr.deadBall.StillLongEnough() {
+	if gr.HasBallControl(GoalieBallControlRadius) || !gr.deadBall.StillLongEnough(gr.gi.Now()) {
 		return false
 	}
 
@@ -247,7 +247,7 @@ func goalieDeadBallBaseCandidate(gi *info.GameInfo, team info.Team, ballPos info
 	if !ballInOwnGoalArea(gi, team, ballPos) {
 		return false
 	}
-	vel, ok := gi.State.GetTrackedBall().GetFreshTrackedVelocity(time.Now(), 200*time.Millisecond)
+	vel, ok := gi.State.GetTrackedBall().GetFreshTrackedVelocity(gi.Now(), 200*time.Millisecond)
 	if !ok || vel.Norm2d() > deadBallMaxTrackedSpeed {
 		return false
 	}

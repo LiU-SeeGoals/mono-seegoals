@@ -94,7 +94,7 @@ func Run(cfg Config) {
 	gameInfo := info.NewGameInfo(10)
 	client.StartGameViewerServer()
 
-	sslClientTracked := client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
+	sslClientTracked := client.NewSSLTrackedClient(config.GetSSLTrackedClientAddress())
 	var sslClientRaw *client.SSLClient
 	var simController *simulator.SimControl
 	var basestation *client.BaseStationClient
@@ -108,7 +108,7 @@ func Run(cfg Config) {
 		simController.SetPresentRobots(cfg.PresentYellow, cfg.PresentBlue)
 	} else {
 		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddressReal())
-		basestation = client.NewBaseStationClient(config.GetBasestationAddress())
+		basestation = client.NewBaseStationClient(config.GetBasestationMulticastAddress())
 		basestation.Init()
 	}
 
@@ -118,9 +118,9 @@ func Run(cfg Config) {
 		if cfg.ManualPlanner != nil {
 			tr.manual = cfg.ManualPlanner(team)
 		}
-		tr.ai = ai.NewAi(team, tr.game, ai.NewActivityExecutor())
+		tr.ai = ai.NewAi(team, tr.game)
 		if cfg.Simulated {
-			tr.send = client.NewSimClient(simAddressForTeam(team), gameInfo).SendActions
+			tr.send = client.NewSimClient(simAddressForTeam(team)).SendActions
 		} else {
 			tr.send = basestation.SendActions
 		}

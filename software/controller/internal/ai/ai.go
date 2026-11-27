@@ -8,7 +8,6 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
-	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
@@ -21,73 +20,47 @@ type Planner interface {
 	Kill()
 }
 
-type executor interface {
-	Init(incoming <-chan info.GameInfo,
-		activities *[info.TEAM_SIZE]activity.Activity,
-		lock *sync.Mutex,
-		outgoing chan<- []action.Action,
-		team info.Team,
-	)
-}
-
+// Ai runs one team's decision pipeline synchronously on the caller's
+// goroutine: planner -> activities -> safety -> actions. Nothing runs in the
+// background, so GetActions returns once every action for the frame is ready.
 type Ai struct {
-	team               info.Team
-	planner            Planner
-	executor           executor
-	gameInfoSenderFB   chan<- info.GameInfo
-	gameInfoRecieverFB <-chan info.GameInfo // Save game reciever to pass it to hotswapped ais
-	actionReceiver     chan []action.Action
-	activities         *[info.TEAM_SIZE]activity.Activity // Shared slice of Activity
-	activity_lock      *sync.Mutex                        // Shared mutex for synchronization
+	team       info.Team
+	planner    Planner
+	executor   *activityExecutor
+	activities *[info.TEAM_SIZE]activity.Activity // written by the planner, read by the executor
+	lock       *sync.Mutex                        // guards activities; scripts write them from their own goroutine
 }
 
-func (m *Ai) HotswapPlanner(team info.Team, planner Planner) {
-
-	m.activity_lock.Lock()
-	defer m.activity_lock.Unlock()
-
-	m.planner.Kill()
-	planner.Init(m.activities, m.activity_lock, team)
-	m.planner = planner
-}
-
-func NewAi(team info.Team, planner Planner, executor executor) *Ai {
+func NewAi(team info.Team, planner Planner) *Ai {
 	activities := &[info.TEAM_SIZE]activity.Activity{}
 	lock := &sync.Mutex{}
 
-	gameInfoSenderFB, gameInfoReceiverFB := helper.NB_KeepLatestChan[info.GameInfo]()
-	actionReceiver := make(chan []action.Action)
-
-	// Initialize plan and executor with the shared resources
 	planner.Init(activities, lock, team)
-	executor.Init(gameInfoReceiverFB, activities, lock, actionReceiver, team)
-
 	activity.SetPathService(team, pathplanner.New())
 
-	// Construct the AI object
-	ai := &Ai{
-		team:               team,
-		planner:            planner,
-		executor:           executor,
-		activities:         activities,
-		gameInfoSenderFB:   gameInfoSenderFB,
-		gameInfoRecieverFB: gameInfoReceiverFB, // Save game reciever to pass it to hotswapped ais
-		activity_lock:      lock,
-		actionReceiver:     actionReceiver,
+	return &Ai{
+		team:       team,
+		planner:    planner,
+		executor:   newActivityExecutor(team, activities, lock),
+		activities: activities,
+		lock:       lock,
 	}
-	return ai
 }
 
-// Decides on new actions for the robots
-func (ai *Ai) GetActions(gi *info.GameInfo) []action.Action {
-	// Planner and executor share state, so they must not run concurrently
-	ai.planner.Tick(gi)
+// HotswapPlanner replaces the planner, keeping the shared activity array.
+func (m *Ai) HotswapPlanner(team info.Team, planner Planner) {
+	m.lock.Lock()
+	defer m.lock.Unlock()
 
-	// Send the game state to the executor so it can execute gamestate aware activities (e.g. avoid obstacles)
-	ai.gameInfoSenderFB <- *gi
+	m.planner.Kill()
+	planner.Init(m.activities, m.lock, team)
+	m.planner = planner
+}
 
-	// Get the actions from the executor, this will block until it has decided on actions
-	return <-ai.actionReceiver
+// GetActions plans and executes one frame.
+func (m *Ai) GetActions(gi *info.GameInfo) []action.Action {
+	m.planner.Tick(gi)
+	return m.executor.execute(gi)
 }
 
 type ActivityHandler struct {
@@ -124,13 +97,9 @@ func (m *ActivityHandler) AddActivity(act activity.Activity) {
 }
 
 func (m *ActivityHandler) GetActivity(id info.ID) activity.Activity {
-	return m.Activities[id]
-}
-
-func (m *ActivityHandler) ReplaceActivities(activities *[info.TEAM_SIZE]activity.Activity) {
 	m.Activity_lock.Lock()
 	defer m.Activity_lock.Unlock()
-	m.Activities = activities
+	return m.Activities[id]
 }
 
 func (m *ActivityHandler) GetActionTypeName(act activity.Activity) string {

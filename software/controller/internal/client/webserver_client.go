@@ -170,9 +170,9 @@ func (server *WebServer) removeConnection(ws *websocket.Conn) {
 // and the functions under handles all of it so multiple instances are not created
 
 func actionsToJson(actions []action.Action) []byte {
-	actionDTOs := make([]action.ActionDTO, 0, len(actions))
-	for _, action := range actions {
-		dto := action.ToDTO()
+	actionDTOs := make([]ActionDTO, 0, len(actions))
+	for _, a := range actions {
+		dto := actionDTO(a)
 		if dto.Team != 0 {
 			dto.Role = debugstate.GetRobotRole(info.Team(dto.Team), info.ID(dto.Id))
 		}
@@ -243,7 +243,7 @@ type GameViewerCommand struct {
 }
 
 type GameViewerActionPacket struct {
-	Actions    []action.ActionDTO        `json:"Actions"`
+	Actions    []ActionDTO               `json:"Actions"`
 	RobotRoles []debugstate.RobotRoleDTO `json:"RobotRoles"`
 	VisionMask *VisionMaskDTO            `json:"VisionMask,omitempty"`
 }

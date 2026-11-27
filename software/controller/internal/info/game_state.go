@@ -110,18 +110,12 @@ func (gs *GameState) ClosestRobot(target Position) (*Robot, float64) {
 	return closestRobot, shortestDistance
 }
 
+// RobotUnseenAfterMs is how long a robot may be missing from vision, while
+// other vision packets keep arriving, before it is treated as off the field.
+const RobotUnseenAfterMs = 3000
+
 func (gs *GameState) Update() {
-	for _, robot := range gs.Blue_team {
-		if !robot.IsActive() {
-			continue
-		}
-	}
-	for _, robot := range gs.Yellow_team {
-		if !robot.IsActive() {
-			continue
-		}
-		// robot.Update()
-	}
+	gs.expireUnseenRobots(gs.MessageReceived)
 
 	newPossessor := gs.FindBallPossessor()
 	gs.Ball.SetPossessor(newPossessor)
@@ -404,4 +398,26 @@ func (gs GameState) ToJson() []byte {
 		logger.Logger.Error("The gamestate packet could not be marshalled to JSON.")
 	}
 	return gameStateJson
+}
+
+// expireUnseenRobots deactivates robots whose newest sample is older than
+// RobotUnseenAfterMs relative to now, the receive time of the latest vision
+// packet. Measuring against vision time (not the wall clock) means a complete
+// vision outage does not wipe the team; a robot taken off the field does
+// expire. A robot is reactivated by its next sample.
+func (gs *GameState) expireUnseenRobots(now int64) {
+	if now == 0 {
+		return
+	}
+	for _, team := range []*RobotTeam{gs.Blue_team, gs.Yellow_team} {
+		for _, robot := range team {
+			if robot == nil || !robot.IsActive() {
+				continue
+			}
+			_, seenAt, err := robot.GetPositionTime()
+			if err != nil || now-seenAt > RobotUnseenAfterMs {
+				robot.SetActive(false)
+			}
+		}
+	}
 }
