@@ -20,7 +20,7 @@ import {
   getDefaultLog,
   getDefaultVisibleRobots,
 } from './helper/defaultValues';
-import { SSLGeometryFieldSize as SSL_GeometryFieldSize } from './proto/ssl_vision_geometry';
+import { SSLGeometryFieldSize as SSL_GeometryFieldSize } from './proto/ssl_vision/ssl_vision_geometry';
 
 function fotballFieldClick(event){
 

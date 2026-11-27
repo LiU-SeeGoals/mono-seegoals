@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SSLFieldUpdate } from '../types/SSLFieldUpdate';
-import { SSLGeometryFieldSize } from '../proto/ssl_vision_geometry';
-import { SSLWrapperPacket } from '../proto/ssl_wrapper';
+import { SSLGeometryFieldSize } from '../proto/ssl_vision/ssl_vision_geometry';
+import { SSLWrapperPacket } from '../proto/ssl_vision/ssl_wrapper';
 
 export const useSSLVision = (
   setSSLFieldUpdate: React.Dispatch<React.SetStateAction<SSLFieldUpdate>>,

@@ -19,6 +19,16 @@ This needs `protoc` and `protoc-gen-go` v1.34.2 on your PATH. The output in
 `replace` directive in `software/controller/go.mod`, so rebuild the controller
 after regenerating.
 
+### For the GameViewer (TypeScript / JavaScript)
+```bash
+./build_ts.sh
+```
+
+Writes ts-proto classes for raw vision to `GameViewer/src/proto/ssl_vision/`
+and a protobufjs JSON bundle for tracked vision to
+`GameViewer/src/backend/proto/tracked.json`. Needs `protoc`, `node` and `npm`;
+the generator versions are pinned in the script. The output is committed.
+
 ### For C
 To build the C code, run the following script from the root of this directory:
 

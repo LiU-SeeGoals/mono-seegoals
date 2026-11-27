@@ -1,5 +1,5 @@
 import './GameViewer.css';
-import { SSL_GeometryFieldSize } from '../../proto/ssl_vision_geometry';
+import { SSLGeometryFieldSize as SSL_GeometryFieldSize } from '../../proto/ssl_vision/ssl_vision_geometry';
 import useResizeSidebar from '../../hooks/useResizeSidebar';
 import FootballField from './footballField/FootballField';
 import { VisionMask } from '../../types/VisionMask';

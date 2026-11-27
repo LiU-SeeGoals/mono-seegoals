@@ -6,8 +6,8 @@ const encode = frame => TrackerWrapperPacket.encode(TrackerWrapperPacket.create(
 })).finish();
 test('converts both teams and balls from meters to millimeters', () => {
   const update = decodeTrackedFrame(encode({ robots: [
-    { robotId: { id: 0, teamColor: 1 }, pos: { x: 1, y: -2 }, orientation: 0 },
-    { robotId: { id: 3, teamColor: 2 }, pos: { x: -1, y: 2 }, orientation: 1 },
+    { robotId: { id: 0, team: 1 }, pos: { x: 1, y: -2 }, orientation: 0 },
+    { robotId: { id: 3, team: 2 }, pos: { x: -1, y: 2 }, orientation: 1 },
   ], balls: [{ pos: { x: 1, y: 2, z: 0 } }] }));
   assert.deepEqual(update.robotsYellow, [{ robotId: 0, x: 1000, y: -2000, orientation: 0 }]);
   assert.equal(update.robotsBlue[0].robotId, 3);
@@ -15,7 +15,7 @@ test('converts both teams and balls from meters to millimeters', () => {
 });
 test('drops explicitly invisible objects and replaces the whole frame', () => {
   assert.deepEqual(decodeTrackedFrame(encode({ robots: [
-    { robotId: { id: 1, teamColor: 1 }, pos: { x: 1, y: 1 }, orientation: 0, visibility: 0 },
+    { robotId: { id: 1, team: 1 }, pos: { x: 1, y: 1 }, orientation: 0, visibility: 0 },
   ], balls: [{ pos: { x: 1, y: 1, z: 0 }, visibility: 0 }] })),
   { balls: [], robotsYellow: [], robotsBlue: [] });
   assert.deepEqual(decodeTrackedFrame(encode({})), { balls: [], robotsYellow: [], robotsBlue: [] });

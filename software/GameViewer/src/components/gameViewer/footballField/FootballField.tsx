@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './FootballField.css';
 import { AIRobot } from '../../../types/AIRobot';
 import { actionToStr } from '../../../helper/defaultValues';
-import { SSL_GeometryFieldSize } from '../../../proto/ssl_vision_geometry';
+import { SSLGeometryFieldSize as SSL_GeometryFieldSize } from '../../../proto/ssl_vision/ssl_vision_geometry';
 import { VisionMask } from '../../../types/VisionMask';
 
 const TEAM_IDS = Object.freeze({

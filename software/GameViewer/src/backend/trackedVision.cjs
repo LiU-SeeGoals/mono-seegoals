@@ -1,8 +1,6 @@
-const path = require('path');
 const protobuf = require('protobufjs');
-const root = new protobuf.Root();
-root.resolvePath = (_origin, target) => path.join(__dirname, 'proto', target);
-root.loadSync('ssl_vision/ssl_wrapper_tracked.proto');
+// Generated from software/proto-messages by its build_ts.sh.
+const root = protobuf.Root.fromJSON(require('./proto/tracked.json').root);
 const TrackerWrapperPacket = root.lookupType('TrackerWrapperPacket');
 
 function decodeTrackedFrame(buffer) {
@@ -14,8 +12,8 @@ function decodeTrackedFrame(buffer) {
   const update = { balls: [], robotsBlue: [], robotsYellow: [] };
   for (const robot of frame.robots) {
     if (!visible(robot) || !robot.pos || !robot.robotId) continue;
-    const team = robot.robotId.teamColor === 1 ? update.robotsYellow
-      : robot.robotId.teamColor === 2 ? update.robotsBlue : null;
+    const team = robot.robotId.team === 1 ? update.robotsYellow
+      : robot.robotId.team === 2 ? update.robotsBlue : null;
     team?.push({ robotId: robot.robotId.id, x: robot.pos.x * 1000,
       y: robot.pos.y * 1000, orientation: robot.orientation });
   }
