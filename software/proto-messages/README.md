@@ -25,8 +25,8 @@ after regenerating.
 ```
 
 Writes ts-proto classes for raw vision to `GameViewer/src/proto/ssl_vision/`
-and a protobufjs JSON bundle for tracked vision to
-`GameViewer/src/backend/proto/tracked.json`. Needs `protoc`, `node` and `npm`;
+and a protobufjs JSON bundle for the GameViewer server (tracked vision, raw
+wrapper and referee packets) to `GameViewer/server/proto/ssl.json`. Needs `protoc`, `node` and `npm`;
 the generator versions are pinned in the script. The output is committed.
 
 ### For C

@@ -1,184 +1,90 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import './Sidebar.css';
 import useResizeSidebar from '../../hooks/useResizeSidebar';
 import ExternalLink from './externalLink/ExternalLink';
 import Header from './header/Header';
 import RobotTable from './robotTable/RobotTable';
-import { Action } from '../../types/Action';
+import { VisionSource } from '../../hooks/useVisionServer';
+import { Referee } from '../../types/Referee';
 
 interface SidebarProps {
-  visionSource: 'raw' | 'tigers';
-  setVisionSource: (source: 'raw' | 'tigers') => void;
-  vectorSettingBlue: boolean[];
-  setVectorSettingBlue: React.Dispatch<React.SetStateAction<boolean[]>>;
-  vectorSettingYellow: boolean[];
-  setVectorSettingYellow: React.Dispatch<React.SetStateAction<boolean[]>>;
-  traceSetting: boolean[];
-  setTraceSetting: React.Dispatch<React.SetStateAction<boolean[]>>;
-  robotActions: Action[];
-  visibleRobots: boolean[];
+  visionSource: VisionSource;
+  setVisionSource: (source: VisionSource) => void;
   isConnectedToVision: boolean;
   isConnectedToAI: boolean;
-  isConnectedToGameController: boolean;
-  sslFieldUpdate: SSLFieldUpdate;
-  sidebarWidth: number;
-  setSidebarWidth: React.Dispatch<React.SetStateAction<number>>;
+  referee: Referee | null;
+  controllerSend: (data: unknown) => void;
 }
+
+const RESIZER_WIDTH = 5;
+const START_WIDTH = 320;
+
+const StatusRow: React.FC<{ ok: boolean; label: string }> = ({ ok, label }) => (
+  <div className="sidebar-status-row">
+    <div className="sidebar-status-dot" style={{
+      backgroundColor: ok ? '#4CAF50' : '#f44336',
+      boxShadow: ok ? '0 0 8px #4CAF50' : 'none',
+    }} />
+    <span>{label}</span>
+  </div>
+);
 
 const Sidebar: React.FC<SidebarProps> = ({
   visionSource,
   setVisionSource,
-  vectorSettingBlue,
-  setVectorSettingBlue,
-  vectorSettingYellow,
-  setVectorSettingYellow,
-  traceSetting,
-  setTraceSetting,
-  robotActions,
-  visibleRobots,
   isConnectedToVision,
   isConnectedToAI,
-  isConnectedToGameController,
-  sslFieldUpdate,
-  sidebarWidth,
-  setSidebarWidth,
+  referee,
   controllerSend,
 }) => {
-  const resizerWidth = 5;
-  const { value: resizerValue, startResizing, isHidden } = useResizeSidebar(false, sidebarWidth);
+  const { value: sidebarWidth, startResizing, isHidden } = useResizeSidebar(false, START_WIDTH);
 
-  useEffect(() => {
-    setSidebarWidth(resizerValue);
-  }, [resizerValue, setSidebarWidth]);
-
-  const contentDisplay: string = resizerValue < resizerWidth ? 'none' : 'inline';
+  const changeScenario = (type: 'Game' | 'Manual') =>
+    controllerSend({ Command: 'CHANGE_SCENARIO', Type: type });
 
   return (
     <div className="sidebar-wrapper">
-      <div className="sidebar" style={{
-        display: isHidden ? "none" : "inline",
-        width: sidebarWidth
-      }}>
+      <div className="sidebar" style={{ display: isHidden ? 'none' : 'inline', width: sidebarWidth }}>
         <div className="sidebar-content">
           <Header />
+          <hr />
+          <ExternalLink text="SSL Vision Client" link="http://localhost:8082" />
+          <ExternalLink text="SSL Game Controller" link="http://localhost:8081" />
+          <hr />
 
-          <div>
-            <hr />
-            <ExternalLink text={"SSL Vision Client"} link={"http://localhost:8082"} target="_blank" />
-            <ExternalLink text={"SSL Game Controller"} link={"http://localhost:8081"} target="_blank" />
-            <hr />
-
-            <div style={{ padding: '10px 15px' }}>
-              <label style={{ display: 'block', marginBottom: 12 }}>
-                Vision source
-                <select aria-label="Vision source" value={visionSource}
-                  onChange={(event) => setVisionSource(event.target.value as 'raw' | 'tigers')}
-                  style={{ display: 'block', width: '100%', marginTop: 6 }}>
-                  <option value="tigers">Tigers filter</option>
-                  <option value="raw">Raw SSL Vision</option>
-                </select>
-              </label>
-              <div style={{ marginBottom: "10px" }}>Connection status</div>
-
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginBottom: '8px'
-              }}>
-                <div style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  backgroundColor: isConnectedToVision ? '#4CAF50' : '#f44336',
-                  boxShadow: isConnectedToVision ? '0 0 8px #4CAF50' : 'none'
-                }} />
-                <span style={{ fontSize: '14px' }}>{visionSource === 'tigers' ? 'Tigers filter' : 'SSL Vision'}</span>
+          <div style={{ padding: '10px 15px' }}>
+            <label style={{ display: 'block', marginBottom: 12 }}>
+              Vision source
+              <select aria-label="Vision source" value={visionSource}
+                onChange={(event) => setVisionSource(event.target.value as VisionSource)}
+                style={{ display: 'block', width: '100%', marginTop: 6 }}>
+                <option value="tigers">Tigers filter</option>
+                <option value="raw">Raw SSL Vision</option>
+              </select>
+            </label>
+            <div style={{ marginBottom: 10 }}>Connection status</div>
+            <StatusRow ok={isConnectedToVision} label={visionSource === 'tigers' ? 'Tigers filter' : 'SSL Vision'} />
+            <StatusRow ok={referee !== null} label="Game Controller" />
+            <StatusRow ok={isConnectedToAI} label="AI Controller" />
+            {referee && (
+              <div className="sidebar-referee">
+                <div><b>{referee.command}</b> · {referee.stage}</div>
+                <div>
+                  <span className="sidebar-team-yellow">{referee.yellow.name || 'Yellow'}</span>
+                  {' '}{referee.yellow.score} : {referee.blue.score}{' '}
+                  <span className="sidebar-team-blue">{referee.blue.name || 'Blue'}</span>
+                </div>
               </div>
-
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginBottom: '8px'
-              }}>
-                <div style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  backgroundColor: isConnectedToGameController ? '#4CAF50' : '#f44336',
-                  boxShadow: isConnectedToGameController ? '0 0 8px #4CAF50' : 'none'
-                }} />
-                  <span style={{ fontSize: '14px' }}>Game Controller</span>
-                </div>
-
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                marginBottom: '8px'
-              }}>
-                <div style={{
-                  width: '10px',
-                  height: '10px',
-                  borderRadius: '50%',
-                  backgroundColor: isConnectedToAI ? '#4CAF50' : '#f44336',
-                  boxShadow: isConnectedToAI ? '0 0 8px #4CAF50' : 'none'
-                }} />
-                  <span style={{ fontSize: '14px' }}>AI Controller</span>
-                </div>
-            </div>
-
-            <hr />
-            <RobotTable
-              robotActions={[]}
-              visibleRobots={visibleRobots}
-              sslFieldUpdate={sslFieldUpdate}
-            />
+            )}
           </div>
-          <button
-            style={{
-              margin: '10px 15px',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              border: 'none',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              cursor: 'pointer'
-            }}
-            onClick={() => {
-              const change_mode = {"Command":"CHANGE_SCENARIO", "Type":"Game"}
-              console.log('Mode changed');
-              controllerSend(change_mode)
-            }}
-          >
-          Game
-          </button>
-          <button
-            style={{
-              margin: '10px 15px',
-              padding: '8px 12px',
-              borderRadius: '6px',
-              border: 'none',
-              backgroundColor: '#2196F3',
-              color: 'white',
-              cursor: 'pointer'
-            }}
-            onClick={() => {
-              const change_mode = {"Command":"CHANGE_SCENARIO", "Type":"Manual"}
-              console.log('Mode changed');
-              controllerSend(change_mode)
-            }}
-          >
-          Manual
-          </button>
+
+          <hr />
+          <RobotTable />
+          <button className="sidebar-button" onClick={() => changeScenario('Game')}>Game</button>
+          <button className="sidebar-button" onClick={() => changeScenario('Manual')}>Manual</button>
         </div>
       </div>
-      <div
-        className="sidebar-resizer"
-        style={{ width: resizerWidth }}
-        onMouseDown={startResizing}
-      />
+      <div className="sidebar-resizer" style={{ width: RESIZER_WIDTH }} onMouseDown={startResizing} />
     </div>
   );
 };

@@ -1,59 +1,46 @@
 import React from 'react';
-import { SSLFieldUpdate } from '../../../types/SSLFieldUpdate';
 import './RobotTable.css';
-import { Action } from '../../../types/Action';
+import { applyVisionMask } from '../../../helper/visionMask';
+import { useThrottledStore } from '../../../state/liveStore';
+import { fieldStore, visionMaskStore } from '../../../state/stores';
+import { SSLRobot } from '../../../types/SSLRobot';
 
-interface RobotTableProps {
-  robotActions: Action[];
-  visibleRobots: boolean[];
-  sslFieldUpdate: SSLFieldUpdate;
-}
+// Human-readable numbers do not need 60 Hz; refresh the table 5 times a second.
+const REFRESH_MS = 200;
 
-const RobotTable: React.FC<RobotTableProps> = ({
-  sslFieldUpdate,
-}) => {
+const TeamTable: React.FC<{ title: string; robots: SSLRobot[] }> = ({ title, robots }) => (
+  <>
+    <h5>{title}</h5>
+    <div className="robotTable-wrapper">
+      <div className="robotItem header">
+        <p>ID</p>
+        <p>x</p>
+        <p>y</p>
+        <p>Angle</p>
+      </div>
+      {[...robots]
+        .sort((a, b) => (a.robotId ?? 0) - (b.robotId ?? 0))
+        .map((robot, index) => (
+          <div className="robotItem" key={robot.robotId ?? `unknown-${index}`}>
+            <p>{robot.robotId}</p>
+            <p>{robot.x.toFixed(1)}</p>
+            <p>{robot.y.toFixed(1)}</p>
+            <p>{robot.orientation?.toFixed(5) ?? '—'}</p>
+          </div>
+        ))}
+    </div>
+  </>
+);
+
+const RobotTable: React.FC = () => {
+  const field = useThrottledStore(fieldStore, REFRESH_MS);
+  const mask = useThrottledStore(visionMaskStore, REFRESH_MS);
+  const visible = applyVisionMask(field, mask);
   return (
     <div>
       <h4>Robots</h4>
-      <h5>Yellow</h5>
-      <div className="robotTable-wrapper">
-        <div className="robotItem header">
-          <p>ID</p>
-          <p>x</p>
-          <p>y</p>
-          <p>Angle</p>
-        </div>
-        {[...sslFieldUpdate.robotsYellow]
-          .sort((a, b) => (a.robotId ?? 0) - (b.robotId ?? 0))
-          .map((robot, index) => (
-        <div className="robotItem" key={index}>
-          <p>{robot.robotId}</p>
-          <p>{robot.x.toFixed(1)}</p>
-          <p>{robot.y.toFixed(1)}</p>
-          <p>{robot.orientation?.toFixed(5) ?? '—'}</p>
-        </div>
-        ))}
-      </div>
-
-      <h5>Blue</h5>
-      <div className="robotTable-wrapper">
-        <div className="robotItem header">
-          <p>ID</p>
-          <p>x</p>
-          <p>y</p>
-          <p>Angle</p>
-        </div>
-        {[...sslFieldUpdate.robotsBlue]
-          .sort((a, b) => (a.robotId ?? 0) - (b.robotId ?? 0))
-          .map((robot, index) => (
-        <div className="robotItem" key={index}>
-          <p>{robot.robotId}</p>
-          <p>{robot.x.toFixed(1)}</p>
-          <p>{robot.y.toFixed(1)}</p>
-          <p>{robot.orientation?.toFixed(5) ?? '—'}</p>
-        </div>
-        ))}
-      </div>
+      <TeamTable title="Yellow" robots={visible.robotsYellow} />
+      <TeamTable title="Blue" robots={visible.robotsBlue} />
     </div>
   );
 };

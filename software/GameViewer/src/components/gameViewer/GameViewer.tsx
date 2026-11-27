@@ -1,69 +1,43 @@
+import { useEffect, useRef, useState } from 'react';
 import './GameViewer.css';
-import { SSLGeometryFieldSize as SSL_GeometryFieldSize } from '../../proto/ssl_vision/ssl_vision_geometry';
-import useResizeSidebar from '../../hooks/useResizeSidebar';
+import { SSLGeometryFieldSize } from '../../proto/ssl_vision/ssl_vision_geometry';
 import FootballField from './footballField/FootballField';
-import { VisionMask } from '../../types/VisionMask';
 
-interface gameViewerProps {
-  sslFieldUpdate: SSLFieldUpdate;
-  visionMask: VisionMask | null;
-  aiRobotUpdate: AIRobotUpdate;
-  robotActions: Action[];
-  robotRoles: Record<string, string>;
-  errorOverlay: string;
-  vectorSettingBlue: boolean[];
-  vectorSettingYellow: boolean[];
-  sidebarWidth: number;
-  fieldGeometry: SSL_GeometryFieldSize | null;
+interface GameViewerProps {
+  errorOverlay: string | undefined;
+  fieldGeometry: SSLGeometryFieldSize | null;
+  controllerSend: (data: unknown) => void;
 }
 
-const GameViewer: React.FC<gameViewerProps> = ({
-  sslFieldUpdate,
-  visionMask,
-  aiRobotUpdate,
-  robotActions,
-  robotRoles,
-  errorOverlay,
-  vectorSettingBlue,
-  vectorSettingYellow,
-  sidebarWidth,
-  fieldGeometry,
-  controllerSend,
-}) => {
-  const startHeightResizer = 1000;
-  const resizerWidth = 5;
+// Fills the space next to the sidebar and tells the field its size. It only
+// re-renders when that size changes (window or sidebar resize).
+const GameViewer: React.FC<GameViewerProps> = ({ errorOverlay, fieldGeometry, controllerSend }) => {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
 
-  const { value: resizerValue, startResizing, isHidden } = useResizeSidebar(
-    true,
-    startHeightResizer
-  );
-  const width: number = window.innerWidth - sidebarWidth;
-  const footballFieldHeight: number = window.innerHeight
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const width = Math.floor(entry.contentRect.width);
+      const height = Math.floor(entry.contentRect.height);
+      setSize((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="game-viewer">
-      <FootballField
-        height={footballFieldHeight}
-        width={width}
-        sslFieldUpdate={sslFieldUpdate}
-        visionMask={visionMask}
-        aiRobotUpdate={aiRobotUpdate}
-        robotActions={robotActions}
-        robotRoles={robotRoles}
-        errorOverlay={errorOverlay}
-        vectorSettingBlue={vectorSettingBlue}
-        vectorSettingYellow={vectorSettingYellow}
-        fieldGeometry={fieldGeometry}
-        controllerSend={controllerSend}
-      />
-
-      <div
-        className="game-viewer-resizer"
-        style={{
-            height: resizerWidth,
-            zIndex: 11,
-        }}
-        onMouseDown={startResizing}
-      />
+    <div className="game-viewer" ref={ref}>
+      {size.width > 0 && size.height > 0 && (
+        <FootballField
+          width={size.width}
+          height={size.height}
+          fieldGeometry={fieldGeometry}
+          controllerSend={controllerSend}
+        />
+      )}
+      {errorOverlay && <div className="game-viewer-error">{errorOverlay}</div>}
     </div>
   );
 };

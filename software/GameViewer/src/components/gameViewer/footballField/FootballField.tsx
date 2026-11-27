@@ -1,555 +1,326 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import './FootballField.css';
-import { AIRobot } from '../../../types/AIRobot';
-import { actionToStr } from '../../../helper/defaultValues';
-import { SSLGeometryFieldSize as SSL_GeometryFieldSize } from '../../../proto/ssl_vision/ssl_vision_geometry';
+import { SSLGeometryFieldSize } from '../../../proto/ssl_vision/ssl_vision_geometry';
+import { applyVisionMask } from '../../../helper/visionMask';
+import { actionsStore, fieldStore, rolesStore, visionMaskStore } from '../../../state/stores';
+import { SSLFieldUpdate } from '../../../types/SSLFieldUpdate';
+import { SSLRobot } from '../../../types/SSLRobot';
 import { VisionMask } from '../../../types/VisionMask';
+import { Action } from '../../../types/Action';
 
 const TEAM_IDS = Object.freeze({
   YELLOW: 1,
   BLUE: 2,
 });
 
-const REAL_WIDTH_FIELD: number = 9600;
-const ROBOT_RADIUS: number = 90;
-const FONT_SIZE: number = 120;
-const ROLE_FONT_SIZE: number = 85;
+const REAL_WIDTH_FIELD = 9600;
+const ROBOT_RADIUS = 90;
+const FONT_SIZE = 120;
+const ROLE_FONT_SIZE = 85;
+const MIN_WIDTH_FOR_HORIZONTAL = 810;
+const CLICK_SELECT_RADIUS = 200;
 
-const ARROW_HEAD_LENGTH: number = 5;
-const SPEED_ARROW_COLOR: string = 'rgba(0, 0, 0, 1)';
-const SPEED_ARROW_THICKNESS: number = 3;
-const ARROW_DRAW_MIN_SPEED_THRESHOLD: number = 0.005;
-
-const COLOR_MAP: Record<string, string> = {
+const COLOR_MAP = {
   yellow: 'rgba(245, 239, 66, 1)',
   blue: 'rgb(19, 109, 253)',
   black: 'rgba(0, 0, 0, 1)',
   white: 'rgba(255, 255, 255, 1)',
 };
 
-function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
-  const dx = a.x - b.x;
-  const dy = a.y - b.y;
-  return Math.sqrt(dx * dx + dy * dy);
-}
+type Point = { x: number; y: number };
 
-function findClosestRobot(robots: any[], posX, posY, threshold: number) {
-  let closest = null;
-  let minDist = Infinity;
-
-  for (const robot of robots) {
-
-    // console.log(robot)
-    // console.log(posX,posY)
-    const dist = distance(robot, {x:posX, y:posY});
-
-    if (dist < minDist && dist < threshold) {
-      minDist = dist;
-      closest = robot;
-    }
-  }
-
-  return closest;
-}
-function sendMouseClick(e, canvas, container, rotation, controllerSend, sslFieldUpdate, selectedRobot, setSelectedRobot){
-  const coords = getWorldFromMouseEvent(e, canvas, container, rotation);
-
-  const robotYellow = findClosestRobot(sslFieldUpdate.robotsYellow, coords.worldX, coords.worldY, 200)
-  const robotBlue = findClosestRobot(sslFieldUpdate.robotsBlue, coords.worldX, coords.worldY, 200)
-
- if (robotYellow != null)
-  {
-    setSelectedRobot(robotYellow.robotId);
-    selectedRobot = robotYellow.robotId;
-  }
-
-  const moveCommand = {"Command":"MOVE_ROBOT",
-    x:parseInt(coords.worldX),
-    y:parseInt(coords.worldY),
-    Id: selectedRobot}
-
-  console.log(moveCommand);
-  controllerSend(moveCommand);
-};
-
-const withAlpha = (color: string, alpha: number): string => {
-  if (color.startsWith('#')) {
-    const r = parseInt(color.slice(1, 3), 16);
-    const g = parseInt(color.slice(3, 5), 16);
-    const b = parseInt(color.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  } else if (color.startsWith('rgb')) {
-    return color.replace(/rgb(a?)\(([^)]+)\)/, (_, a, values) => {
-      const rgbValues = values.split(',').map((v: string) => v.trim());
-      return `rgba(${rgbValues[0]}, ${rgbValues[1]}, ${rgbValues[2]}, ${alpha})`;
-    });
-  }
-  return color;
-};
-
-interface FootBallFieldProps {
-  height: number;
+interface FootballFieldProps {
   width: number;
-  sslFieldUpdate: SSLFieldUpdate;
-  visionMask: VisionMask | null;
-  aiRobotUpdate: AIRobotUpdate;
-  robotActions: Action[];
-  robotRoles: Record<string, string>;
-  errorOverlay: string;
-  vectorSettingBlue: boolean[];
-  vectorSettingYellow: boolean[];
-  fieldGeometry: SSL_GeometryFieldSize | null;
+  height: number;
+  fieldGeometry: SSLGeometryFieldSize | null;
+  controllerSend: (data: unknown) => void;
 }
 
-const FootballField: React.FC<FootBallFieldProps> = ({
-  height,
-  width,
-  sslFieldUpdate,
-  visionMask,
-  aiRobotUpdate,
-  robotActions,
-  robotRoles,
-  errorOverlay,
-  vectorSettingBlue,
-  vectorSettingYellow,
-  fieldGeometry,
-  controllerSend,
-}) => {
-  const minimumWidthForVertical = 810;
-  const canvasRef = React.useRef<HTMLCanvasElement>(null);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [zoomLevel, setZoomLevel] = useState(1);
-  const [selectedRobot, setSelectedRobot] = useState(0);
+// Draws the field on a canvas. Live data (vision, actions, roles, mask) is
+// read from the stores and drawn on the next animation frame, at most once
+// per frame; React only re-renders this component on resize or new geometry.
+const FootballField: React.FC<FootballFieldProps> = ({ width, height, fieldGeometry, controllerSend }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const geometryRef = useRef(fieldGeometry);
+  const frameRef = useRef<number | null>(null);
+  const selectedRobotRef = useRef(0);
+  const rotation = width <= MIN_WIDTH_FOR_HORIZONTAL ? 90 : 0;
 
-  const drawField = (context: CanvasRenderingContext2D, geometry: SSL_GeometryFieldSize) => {
-    context.fillStyle = '#1a5f1a';
-    context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-
-    geometry.fieldLines?.forEach(line => {
-      drawLineSegment(context, line);
+  const requestDraw = useCallback(() => {
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      const context = canvasRef.current?.getContext('2d');
+      if (context) drawScene(context, geometryRef.current);
     });
-
-    geometry.fieldArcs?.forEach(arc => {
-      drawCircularArc(context, arc);
-    });
-  };
-
-  const drawLineSegment = (
-    context: CanvasRenderingContext2D, 
-    line: any
-  ) => {
-    const { canvasX: x1, canvasY: y1 } = getCanvasCoordinates(line.p1.x, line.p1.y, context);
-    const { canvasX: x2, canvasY: y2 } = getCanvasCoordinates(line.p2.x, line.p2.y, context);
-  
-    context.beginPath();
-    context.moveTo(x1, y1);
-    context.lineTo(x2, y2);
-    context.strokeStyle = 'white';
-    context.lineWidth = line.thickness * getScaler(context.canvas.width, context.canvas.height);
-    context.lineCap = 'butt';
-    context.stroke();
-  };
-
-  const drawCircularArc = (
-    context: CanvasRenderingContext2D,
-    arc: any
-  ) => {
-    const { canvasX, canvasY } = getCanvasCoordinates(arc.center.x, arc.center.y, context);
-    const radius = arc.radius * getScaler(context.canvas.width, context.canvas.height);
-  
-    context.beginPath();
-    context.arc(canvasX, canvasY, radius, arc.a1, arc.a2, false);
-    context.strokeStyle = 'white';
-    context.lineWidth = arc.thickness * getScaler(context.canvas.width, context.canvas.height);
-    context.stroke();
-  };
-
-  function draw(canvas: HTMLCanvasElement) {
-    const context: CanvasRenderingContext2D | null = canvas.getContext('2d');
-    if (!context) {
-      return;
-    }
-
-    context.clearRect(0, 0, context.canvas.width, context.canvas.height);
-
-    context.save();
-    context.translate(context.canvas.width / 2, context.canvas.height / 2);
-    // context.scale(zoomLevel, zoomLevel);
-    context.translate(-context.canvas.width / 2, -context.canvas.height / 2);
-
-    if (fieldGeometry) {
-      drawField(context, fieldGeometry);
-    }
-    drawVisionMask(context);
-
-    drawAllRobots(context);
-    drawBall(context);
-    drawActions(context);
-
-    context.restore();
-  }
-
-  const drawVisionMask = (context: CanvasRenderingContext2D) => {
-    if (!visionMask) return;
-
-    const { canvasX: edgeX } = getCanvasCoordinates(visionMask.MaskedSign * visionMask.MarginMM, 0, context);
-    const left = visionMask.MaskedSign > 0 ? edgeX : 0;
-    const right = visionMask.MaskedSign > 0 ? context.canvas.width : edgeX;
-
-    context.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    context.fillRect(left, 0, right - left, context.canvas.height);
-
-    context.font = `bold ${Math.max(12, FONT_SIZE * 1.5 * getScaler(context.canvas.width, context.canvas.height))}px Arial`;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    context.fillText('Vision masked', (left + right) / 2, context.canvas.height / 2);
-  };
-
-  const drawBall = (context: CanvasRenderingContext2D) => {
-    try {
-      const ball: SSLBall = sslFieldUpdate.balls[0];
-      const { canvasX, canvasY } = getCanvasCoordinates(
-        ball.x,
-        ball.y,
-        context
-      );
-      context.beginPath();
-      context.arc(canvasX, canvasY, 5, 0, 2 * Math.PI);
-      context.strokeStyle = 'rgba(0, 0, 0, 0)';
-      context.fillStyle = 'orange';
-      context.fill();
-      context.stroke();
-    } catch (e) {
-      //console.error('Ball does not exist to draw');
-    }
-  };
-
-  const drawAllRobots = (context: CanvasRenderingContext2D) => {
-    sslFieldUpdate.robotsBlue.map((robot) => {
-      drawRobot(context, robot, TEAM_IDS.BLUE, COLOR_MAP.blue, COLOR_MAP.white, 1.0);
-    });
-
-    sslFieldUpdate.robotsYellow.map((robot) => {
-      drawRobot(context, robot, TEAM_IDS.YELLOW, COLOR_MAP.yellow, COLOR_MAP.black, 1.0);
-    });
-  };
-
-  const getRobotPositionById = (id: number, team?: number): { x: number; y: number } | null => {
-    if (team === TEAM_IDS.BLUE) {
-      const blue = sslFieldUpdate.robotsBlue.find((r) => r.robotId === id);
-      return blue ? { x: blue.x, y: blue.y } : null;
-    }
-
-    if (team === TEAM_IDS.YELLOW) {
-      const yellow = sslFieldUpdate.robotsYellow.find((r) => r.robotId === id);
-      return yellow ? { x: yellow.x, y: yellow.y } : null;
-    }
-
-    const blue = sslFieldUpdate.robotsBlue.find((r) => r.robotId === id);
-    if (blue) return { x: blue.x, y: blue.y };
-    const yellow = sslFieldUpdate.robotsYellow.find((r) => r.robotId === id);
-    if (yellow) return { x: yellow.x, y: yellow.y };
-    return null;
-  };
-
-  const drawPolyline = (
-    context: CanvasRenderingContext2D,
-    points: { x: number; y: number }[],
-    strokeStyle: string,
-    lineWidth: number
-  ) => {
-    if (points.length < 2) return;
-
-    const start = getCanvasCoordinates(points[0].x, points[0].y, context);
-    context.beginPath();
-    context.moveTo(start.canvasX, start.canvasY);
-    for (let i = 1; i < points.length; i++) {
-      const p = getCanvasCoordinates(points[i].x, points[i].y, context);
-      context.lineTo(p.canvasX, p.canvasY);
-    }
-    context.strokeStyle = strokeStyle;
-    context.lineWidth = lineWidth;
-    context.lineJoin = 'round';
-    context.lineCap = 'round';
-    context.stroke();
-  };
-
-  const drawActions = (context: CanvasRenderingContext2D) => {
-    const actions: Action[] = robotActions;
-
-    if (robotActions && robotActions.length > 0) {
-      for (const action of robotActions) {
-        const destX = (action as any).Dest?.X ?? action.DestX;
-        const destY = (action as any).Dest?.Y ?? action.DestY;
-        if (destX === undefined || destY === undefined) {
-          console.log("[FootballField.tsx] Got weird robot action", action);
-          continue;
-        }
-
-        const { canvasX, canvasY } = getCanvasCoordinates(destX, destY, context);
-
-        // Draw the full planned path (robot -> ...waypoints... -> goal) if present.
-        // We prepend the *observed* robot position so the line starts where the robot is now.
-        const robotPos = getRobotPositionById(action.Id, action.Team);
-        if (robotPos && action.Path && action.Path.length > 0) {
-          const polyPoints = [
-            robotPos,
-            ...action.Path.map((p) => ({ x: p.X, y: p.Y })),
-          ];
-          drawPolyline(context, polyPoints, 'rgba(255, 255, 255, 0.8)', 2);
-        }
-
-        const dotColor = "black";
-        context.beginPath();
-        context.arc(canvasX, canvasY, 4, 0, 2 * Math.PI);
-        context.fillStyle = dotColor;
-        context.fill();
-        context.closePath();
-
-        context.fillStyle = "white";
-        context.font = "bold 8px Arial";
-        context.textAlign = "center";
-        context.textBaseline = "middle";
-        context.fillText(`${action.Id}`, canvasX, canvasY);
-
-        if (action.Dribble) {
-          const dribbleText = "Dribbling";
-          context.fillStyle = "blue";
-          context.font = "italic 10px Arial";
-          context.fillText(dribbleText, canvasX, canvasY + 20);
-        }
-      }
-    }
-  };
-
-  const drawRobot = (
-    context: CanvasRenderingContext2D,
-    robot: SSLRobot,
-    team: number,
-    fillColor: string,
-    textColor: string,
-    alpha: number
-  ) => {
-    const { canvasX, canvasY } = getCanvasCoordinates(
-      robot.x,
-      robot.y,
-      context
-    );
-    const canvasRadius = ROBOT_RADIUS * getScaler(context.canvas.width, context.canvas.height);
-    const flatStartFrontAngle = (45 * Math.PI) / 180;
-    const robotOrientation =
-      robot.orientation !== undefined ? robot.orientation : 0;
-
-    context.beginPath();
-    context.arc(
-      canvasX,
-      canvasY,
-      canvasRadius,
-      -flatStartFrontAngle - robotOrientation,
-      flatStartFrontAngle - robotOrientation,
-      true
-    );
-    context.fillStyle = withAlpha(fillColor, alpha);
-    context.fill();
-    context.strokeStyle = 'black';
-    context.stroke();
-
-    const flatFrontStartX =
-      canvasX +
-      canvasRadius * Math.cos(-flatStartFrontAngle - robotOrientation);
-    const flatFrontStartY =
-      canvasY +
-      canvasRadius * Math.sin(-flatStartFrontAngle - robotOrientation);
-    const flatFrontEndX =
-      canvasX + canvasRadius * Math.cos(flatStartFrontAngle - robotOrientation);
-    const flatFrontEndY =
-      canvasY + canvasRadius * Math.sin(flatStartFrontAngle - robotOrientation);
-
-    context.moveTo(flatFrontStartX, flatFrontStartY);
-    context.lineTo(flatFrontEndX, flatFrontEndY);
-    context.strokeStyle = 'black';
-    context.stroke();
-
-    drawId(context, robot, withAlpha(textColor, alpha));
-    drawRoleLabel(context, robot, team);
-  };
-
-  const drawCircle = (
-    context: CanvasRenderingContext2D,
-    robot: SSLRobot,
-    radius: number,
-    color: string
-  ) => {
-    const { canvasX, canvasY } = getCanvasCoordinates(
-      robot.x,
-      robot.y,
-      context
-    );
-    context.beginPath();
-    context.arc(canvasX, canvasY, radius, 0, 2 * Math.PI);
-    context.strokeStyle = 'rgba(0, 0, 0, 0)';
-    context.fillStyle = color;
-    context.fill();
-    context.stroke();
-  };
-
-  const drawId = (
-    context: CanvasRenderingContext2D,
-    robot: SSLRobot,
-    textColor: string
-  ) => {
-    const { canvasX, canvasY } = getCanvasCoordinates(
-      robot.x,
-      robot.y,
-      context
-    );
-    context.font = `bold ${FONT_SIZE * getScaler(context.canvas.width, context.canvas.height)}px Arial`;
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.fillStyle = textColor;
-    context.fillText(String(robot.robotId), canvasX, canvasY);
-  };
-
-  const drawRoleLabel = (
-    context: CanvasRenderingContext2D,
-    robot: SSLRobot,
-    team: number
-  ) => {
-    const role = robotRoles[`${team}:${robot.robotId}`];
-    if (!role) {
-      return;
-    }
-
-    const { canvasX, canvasY } = getCanvasCoordinates(
-      robot.x,
-      robot.y,
-      context
-    );
-    const scaler = getScaler(context.canvas.width, context.canvas.height);
-    const canvasRadius = ROBOT_RADIUS * scaler;
-    const fontSize = Math.max(9, ROLE_FONT_SIZE * scaler);
-
-    context.font = `bold ${fontSize}px Arial`;
-    context.textAlign = 'center';
-    context.textBaseline = 'bottom';
-    context.lineWidth = 3;
-    context.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    context.fillStyle = 'white';
-    context.strokeText(role, canvasX, canvasY - canvasRadius - 6);
-    context.fillText(role, canvasX, canvasY - canvasRadius - 6);
-  };
+  }, []);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.width = width;
-      canvas.height = height;
-      draw(canvas);
-    }
-  }, [sslFieldUpdate, visionMask, robotActions, robotRoles, width, height, zoomLevel, fieldGeometry]);
-
-  useEffect(() => {
-    const handleWheel = (event: WheelEvent) => {
-      event.preventDefault();
-      const newZoomLevel = zoomLevel + event.deltaY * -0.001;
-      setZoomLevel(Math.max(0.5, Math.min(2, newZoomLevel)));
+    const unsubscribe = [fieldStore, actionsStore, rolesStore, visionMaskStore]
+      .map((store) => store.subscribe(requestDraw));
+    return () => {
+      unsubscribe.forEach((fn) => fn());
+      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
     };
+  }, [requestDraw]);
 
+  // Resizing a canvas reallocates its buffer, so only do it on a real resize.
+  useEffect(() => {
     const canvas = canvasRef.current;
-    if (canvas) {
-      canvas.addEventListener('wheel', handleWheel);
-      return () => {
-        canvas.removeEventListener('wheel', handleWheel);
-      };
-    }
-  }, [zoomLevel]);
+    if (!canvas) return;
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+    requestDraw();
+  }, [width, height, requestDraw]);
+
+  useEffect(() => {
+    geometryRef.current = fieldGeometry;
+    requestDraw();
+  }, [fieldGeometry, requestDraw]);
+
+  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const world = getWorldFromMouseEvent(e, canvas, rotation);
+    const field = visibleField();
+    const robot = findClosestRobot(field.robotsYellow, world, CLICK_SELECT_RADIUS);
+    if (robot?.robotId !== undefined) selectedRobotRef.current = robot.robotId;
+    controllerSend({
+      Command: 'MOVE_ROBOT',
+      x: Math.round(world.x),
+      y: Math.round(world.y),
+      Id: selectedRobotRef.current,
+    });
+  };
 
   return (
     <div
       className="football-field-container"
-      style={{
-        height: height,
-        width: width,
-        transform: `
-          ${width <= minimumWidthForVertical ? "rotate(90deg)" : ""}
-        `,
-      }}
-      ref={containerRef}
+      style={{ height, width, transform: rotation ? `rotate(${rotation}deg)` : undefined }}
     >
       <canvas
         className="football-field-canvas"
         ref={canvasRef}
-        style={{ height: height, width: width }}
-        tabIndex='0'
-        onMouseDown={(e) =>
-          sendMouseClick(
-            e,
-            canvasRef.current,
-            containerRef.current,
-            width <= minimumWidthForVertical ? 90 : 0,
-            controllerSend,
-            sslFieldUpdate,
-            selectedRobot,
-            setSelectedRobot
-          )
-        }
+        style={{ height, width }}
+        tabIndex={0}
+        onMouseDown={onMouseDown}
       />
     </div>
   );
 };
 
-function getCanvasCoordinates(
-  x: number,
-  y: number,
-  context: CanvasRenderingContext2D
-) {
-  const scaler = getScaler(context.canvas.width, context.canvas.height);
-  const canvasX = x * scaler + context.canvas.width / 2;
-  const canvasY = context.canvas.height / 2 - y * scaler;
-  return { canvasX, canvasY };
+function visibleField(): SSLFieldUpdate {
+  return applyVisionMask(fieldStore.get(), visionMaskStore.get());
 }
 
-function getWorldFromMouseEvent(
-  e: React.MouseEvent,
-  canvas: HTMLCanvasElement,
-  container: HTMLDivElement,
-  rotationDeg: number,
-) {
-  const rect = canvas.getBoundingClientRect();
+function drawScene(context: CanvasRenderingContext2D, geometry: SSLGeometryFieldSize | null) {
+  const field = visibleField();
+  context.clearRect(0, 0, context.canvas.width, context.canvas.height);
+  if (geometry) drawField(context, geometry);
+  drawVisionMask(context, visionMaskStore.get());
+  const roles = rolesStore.get();
+  for (const robot of field.robotsBlue) {
+    drawRobot(context, robot, TEAM_IDS.BLUE, COLOR_MAP.blue, COLOR_MAP.white, roles);
+  }
+  for (const robot of field.robotsYellow) {
+    drawRobot(context, robot, TEAM_IDS.YELLOW, COLOR_MAP.yellow, COLOR_MAP.black, roles);
+  }
+  drawBall(context, field);
+  drawActions(context, actionsStore.get(), field);
+}
 
-  let x = e.clientX - rect.left;
-  let y = e.clientY - rect.top;
+function drawField(context: CanvasRenderingContext2D, geometry: SSLGeometryFieldSize) {
+  const scaler = getScaler(context.canvas.width, context.canvas.height);
+  context.fillStyle = '#1a5f1a';
+  context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+  context.strokeStyle = 'white';
+  context.lineCap = 'butt';
 
-  const w = rect.width;
-  const h = rect.height;
-
-  let canvasX: number;
-  let canvasY: number;
-
-  if (rotationDeg === 90) {
-    canvasX = y;
-    canvasY = w - x;
-  } else if (rotationDeg === -90) {
-    canvasX = h - y;
-    canvasY = x;
-  } else {
-    canvasX = x;
-    canvasY = y;
+  for (const line of geometry.fieldLines ?? []) {
+    if (!line.p1 || !line.p2) continue;
+    const a = toCanvas(line.p1.x, line.p1.y, context);
+    const b = toCanvas(line.p2.x, line.p2.y, context);
+    context.beginPath();
+    context.moveTo(a.x, a.y);
+    context.lineTo(b.x, b.y);
+    context.lineWidth = line.thickness * scaler;
+    context.stroke();
   }
 
-  const scale = getScaler(canvas.width, canvas.height);
-
-  const worldX = (canvasX - canvas.width / 2) / scale;
-  const worldY = (canvas.height / 2 - canvasY) / scale;
-
-  return { worldX, worldY };
+  for (const arc of geometry.fieldArcs ?? []) {
+    if (!arc.center) continue;
+    const c = toCanvas(arc.center.x, arc.center.y, context);
+    context.beginPath();
+    context.arc(c.x, c.y, arc.radius * scaler, arc.a1, arc.a2, false);
+    context.lineWidth = arc.thickness * scaler;
+    context.stroke();
+  }
 }
 
-function getScaler(width, height) {
-  const widthScale = width / REAL_WIDTH_FIELD;
-  const heightScale = height / REAL_WIDTH_FIELD;
-  return Math.min(widthScale, heightScale);
+function drawVisionMask(context: CanvasRenderingContext2D, mask: VisionMask | null) {
+  if (!mask) return;
+  const edgeX = toCanvas(mask.MaskedSign * mask.MarginMM, 0, context).x;
+  const left = mask.MaskedSign > 0 ? edgeX : 0;
+  const right = mask.MaskedSign > 0 ? context.canvas.width : edgeX;
+
+  context.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  context.fillRect(left, 0, right - left, context.canvas.height);
+
+  const scaler = getScaler(context.canvas.width, context.canvas.height);
+  context.font = `bold ${Math.max(12, FONT_SIZE * 1.5 * scaler)}px Arial`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = 'rgba(255, 255, 255, 0.7)';
+  context.fillText('Vision masked', (left + right) / 2, context.canvas.height / 2);
+}
+
+function drawBall(context: CanvasRenderingContext2D, field: SSLFieldUpdate) {
+  const ball = field.balls[0];
+  if (!ball) return;
+  const p = toCanvas(ball.x, ball.y, context);
+  context.beginPath();
+  context.arc(p.x, p.y, 5, 0, 2 * Math.PI);
+  context.fillStyle = 'orange';
+  context.fill();
+}
+
+function findRobot(field: SSLFieldUpdate, id: number, team?: number): Point | null {
+  const teams = team === TEAM_IDS.BLUE ? [field.robotsBlue]
+    : team === TEAM_IDS.YELLOW ? [field.robotsYellow]
+      : [field.robotsBlue, field.robotsYellow];
+  for (const robots of teams) {
+    const robot = robots.find((r) => r.robotId === id);
+    if (robot) return { x: robot.x, y: robot.y };
+  }
+  return null;
+}
+
+function drawPolyline(context: CanvasRenderingContext2D, points: Point[], strokeStyle: string, lineWidth: number) {
+  if (points.length < 2) return;
+  context.beginPath();
+  points.forEach((point, i) => {
+    const p = toCanvas(point.x, point.y, context);
+    if (i === 0) context.moveTo(p.x, p.y);
+    else context.lineTo(p.x, p.y);
+  });
+  context.strokeStyle = strokeStyle;
+  context.lineWidth = lineWidth;
+  context.lineJoin = 'round';
+  context.lineCap = 'round';
+  context.stroke();
+}
+
+function drawActions(context: CanvasRenderingContext2D, actions: Action[], field: SSLFieldUpdate) {
+  for (const action of actions) {
+    if (action.DestX === undefined || action.DestY === undefined) continue;
+    const dest = toCanvas(action.DestX, action.DestY, context);
+
+    // Planned path, starting where the robot is observed now.
+    const robotPos = findRobot(field, action.Id, action.Team);
+    if (robotPos && action.Path && action.Path.length > 0) {
+      drawPolyline(context, [robotPos, ...action.Path.map((p) => ({ x: p.X, y: p.Y }))],
+        'rgba(255, 255, 255, 0.8)', 2);
+    }
+
+    context.beginPath();
+    context.arc(dest.x, dest.y, 4, 0, 2 * Math.PI);
+    context.fillStyle = 'black';
+    context.fill();
+
+    context.fillStyle = 'white';
+    context.font = 'bold 8px Arial';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillText(`${action.Id}`, dest.x, dest.y);
+
+    if (action.Dribble) {
+      context.fillStyle = 'blue';
+      context.font = 'italic 10px Arial';
+      context.fillText('Dribbling', dest.x, dest.y + 20);
+    }
+  }
+}
+
+function drawRobot(
+  context: CanvasRenderingContext2D,
+  robot: SSLRobot,
+  team: number,
+  fillColor: string,
+  textColor: string,
+  roles: Record<string, string>
+) {
+  const p = toCanvas(robot.x, robot.y, context);
+  const scaler = getScaler(context.canvas.width, context.canvas.height);
+  const radius = ROBOT_RADIUS * scaler;
+  const flatFront = (45 * Math.PI) / 180;
+  const orientation = robot.orientation ?? 0;
+
+  // Body: a circle with the front flattened.
+  context.beginPath();
+  context.arc(p.x, p.y, radius, -flatFront - orientation, flatFront - orientation, true);
+  context.closePath();
+  context.fillStyle = fillColor;
+  context.fill();
+  context.strokeStyle = 'black';
+  context.lineWidth = 1;
+  context.stroke();
+
+  context.font = `bold ${FONT_SIZE * scaler}px Arial`;
+  context.textAlign = 'center';
+  context.textBaseline = 'middle';
+  context.fillStyle = textColor;
+  context.fillText(String(robot.robotId), p.x, p.y);
+
+  const role = roles[`${team}:${robot.robotId}`];
+  if (role) {
+    context.font = `bold ${Math.max(9, ROLE_FONT_SIZE * scaler)}px Arial`;
+    context.textBaseline = 'bottom';
+    context.lineWidth = 3;
+    context.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    context.fillStyle = 'white';
+    context.strokeText(role, p.x, p.y - radius - 6);
+    context.fillText(role, p.x, p.y - radius - 6);
+  }
+}
+
+function findClosestRobot(robots: SSLRobot[], target: Point, threshold: number): SSLRobot | null {
+  let closest: SSLRobot | null = null;
+  let minDist = threshold;
+  for (const robot of robots) {
+    const dist = Math.hypot(robot.x - target.x, robot.y - target.y);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = robot;
+    }
+  }
+  return closest;
+}
+
+function toCanvas(x: number, y: number, context: CanvasRenderingContext2D): Point {
+  const scaler = getScaler(context.canvas.width, context.canvas.height);
+  return {
+    x: x * scaler + context.canvas.width / 2,
+    y: context.canvas.height / 2 - y * scaler,
+  };
+}
+
+function getWorldFromMouseEvent(e: React.MouseEvent, canvas: HTMLCanvasElement, rotationDeg: number): Point {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  // Undo the container's CSS rotation.
+  const canvasX = rotationDeg === 90 ? y : x;
+  const canvasY = rotationDeg === 90 ? rect.width - x : y;
+  const scale = getScaler(canvas.width, canvas.height);
+  return {
+    x: (canvasX - canvas.width / 2) / scale,
+    y: (canvas.height / 2 - canvasY) / scale,
+  };
+}
+
+function getScaler(width: number, height: number) {
+  return Math.min(width / REAL_WIDTH_FIELD, height / REAL_WIDTH_FIELD);
 }
 
 export default FootballField;

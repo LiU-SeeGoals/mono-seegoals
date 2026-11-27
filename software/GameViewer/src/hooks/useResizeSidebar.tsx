@@ -27,6 +27,17 @@ const useResizeSidebar = (
     []
   );
 
+  const toggleVisibility = useCallback(() => {
+    if (!isHidden) {
+      setPreviousValue(value);
+      setIsHidden(true);
+      setValue(0);
+    } else {
+      setValue(previousValue);
+      setIsHidden(false);
+    }
+  }, [isHidden, value, previousValue]);
+
   const stopResizing = useCallback((mouseUpEvent: MouseEvent) => {
     if (isResizing) {
       const mouseUpTime = Date.now();
@@ -40,19 +51,7 @@ const useResizeSidebar = (
 
       setIsResizing(false);
     }
-  }, [isResizing, mouseDownPosition, mouseDownTime]);
-
-  const toggleVisibility = useCallback(() => {
-    if (!isHidden) {
-      setPreviousValue(value);
-      setIsHidden(true);
-      setValue(0);
-    } else {
-      setValue(previousValue);
-      setIsHidden(false);
-      setValue(previousValue);
-    }
-  }, [isHidden, value, previousValue]);
+  }, [isResizing, mouseDownPosition, mouseDownTime, toggleVisibility]);
 
   const resize = useCallback(
     (mouseMoveEvent: MouseEvent) => {

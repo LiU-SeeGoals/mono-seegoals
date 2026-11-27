@@ -1,7 +1,8 @@
 #!/bin/bash
 # Regenerates GameViewer's protobuf code from the .proto files here:
 #   - src/proto/ssl_vision/*.ts      ts-proto classes for the React frontend
-#   - src/backend/proto/tracked.json protobufjs bundle for trackedVision.cjs
+#   - server/proto/ssl.json          protobufjs bundle for server/decode.cjs
+#                                    (tracked vision, raw wrapper, referee)
 # Needs protoc, node and npm. The generator versions are pinned below and
 # installed into .ts-tools/ (gitignored) on first run.
 set -euo pipefail
@@ -28,19 +29,20 @@ protoc --plugin=protoc-gen-ts_proto="${TOOLS_DIR}/node_modules/.bin/protoc-gen-t
 	--proto_path="${SCRIPT_DIR}" --ts_proto_out="${TS_OUT}" \
 	ssl_vision/ssl_wrapper.proto ssl_vision/ssl_vision_detection.proto ssl_vision/ssl_vision_geometry.proto
 
-# Backend: tracked vision packets, resolved with their gc/ imports.
-NODE_PATH="${TOOLS_DIR}/node_modules" node - "${SCRIPT_DIR}" "${VIEWER_DIR}/src/backend/proto/tracked.json" <<'EOF'
+# Server: tracked + raw vision and referee packets, resolved with their gc/ imports.
+NODE_PATH="${TOOLS_DIR}/node_modules" node - "${SCRIPT_DIR}" "${VIEWER_DIR}/server/proto/ssl.json" <<'EOF'
 const fs = require('fs');
 const path = require('path');
 const protobuf = require('protobufjs');
 const [protoDir, outFile] = process.argv.slice(2);
 const root = new protobuf.Root();
 root.resolvePath = (_origin, target) => path.join(protoDir, target);
-root.loadSync('ssl_vision/ssl_wrapper_tracked.proto');
+root.loadSync(['ssl_vision/ssl_wrapper_tracked.proto', 'ssl_vision/ssl_wrapper.proto',
+  'gc/ssl_gc_referee_message.proto']);
 fs.mkdirSync(path.dirname(outFile), { recursive: true });
 fs.writeFileSync(outFile,
   '{"//": "Generated from software/proto-messages by build_ts.sh. DO NOT EDIT.",\n' +
   ' "root": ' + JSON.stringify(root.toJSON()) + '}\n');
 EOF
 
-echo "GameViewer proto code built in ${TS_OUT}/ssl_vision and src/backend/proto/tracked.json"
+echo "GameViewer proto code built in ${TS_OUT}/ssl_vision and server/proto/ssl.json"

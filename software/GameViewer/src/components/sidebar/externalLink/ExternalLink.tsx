@@ -1,25 +1,18 @@
 import React from 'react';
 import './ExternalLink.css';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 
-interface ExternalLinksProps {
+interface ExternalLinkProps {
   text: string;
   link: string;
-  title?: string | undefined;
+  title?: string;
 }
 
-const ExternalLinks: React.FC<ExternalLinksProps> = ({
-  text,
-  link,
-  title,
-}: ExternalLinksProps) => {
-  return (
-    <div className="externalLinks-wrapper">
-      <a href={link} target="_blank" rel="noopener noreferrer" title={title}>
-        <OpenInNewIcon className="icon" /> {text}
-      </a>
-    </div>
-  );
-};
+const ExternalLink: React.FC<ExternalLinkProps> = ({ text, link, title }) => (
+  <div className="externalLinks-wrapper">
+    <a href={link} target="_blank" rel="noopener noreferrer" title={title}>
+      <span className="icon" aria-hidden="true">↗</span> {text}
+    </a>
+  </div>
+);
 
-export default ExternalLinks;
+export default ExternalLink;

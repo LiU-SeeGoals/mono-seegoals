@@ -5,23 +5,21 @@
   flex-direction: column;
   background: rgb(96, 126, 61);
   overflow: hidden;
+  position: relative;
+  /* Let the flex item shrink below the canvas's current size. */
+  min-width: 0;
+  min-height: 0;
 }
 
-.game-viewer-resizer {
-  width: 100%;
-  background-color: rgb(44, 131, 190);
-  flex-grow: 0;
-  cursor: ns-resize;
-}
-
-.game-viewer-resizer:hover {
-  background-color: rgb(100, 150, 200);
-}
-
-.game-viewer-container {
-  background: black;
+.game-viewer-error {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border-radius: 4px;
+  background: rgba(180, 30, 30, 0.85);
   color: white;
-  flex-grow: 1;
-  padding-left: 10px;
-  font-family: 'Courier New';
+  font-size: 14px;
+  z-index: 3;
 }

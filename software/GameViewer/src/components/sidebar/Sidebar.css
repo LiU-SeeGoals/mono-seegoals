@@ -26,21 +26,44 @@
   margin-bottom: 15px;
 }
 
-.header-status-container {
+.sidebar-status-row {
   display: flex;
-  justify-content: flex-start;
   align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
 }
 
-.header-status-container > *:not(:last-child) {
-  margin-right: 10px;
-}
-
-.status-circle {
-  width: 12px;
-  height: 12px;
+.sidebar-status-dot {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  border: 2px solid black;
+}
+
+.sidebar-referee {
+  margin-top: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.sidebar-team-yellow {
+  color: rgb(170, 150, 0);
+  font-weight: bold;
+}
+
+.sidebar-team-blue {
+  color: rgb(19, 109, 253);
+  font-weight: bold;
+}
+
+.sidebar-button {
+  margin: 10px 15px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  background-color: #2196F3;
+  color: white;
+  cursor: pointer;
 }
 
 .sidebar-content {
