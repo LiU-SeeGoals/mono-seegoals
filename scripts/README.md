@@ -21,7 +21,7 @@ Start everything with:
 
 ```bash
 sg-start --vision-processor
-# Equivalent: sg-start 8, or select the new vision processor in the menu.
+# Equivalent: sg-start 10, or select the new vision processor in the menu.
 ```
 
 This starts the geometry publisher with `geometry-seagoals.yml` and one

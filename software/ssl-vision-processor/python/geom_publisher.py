@@ -42,7 +42,8 @@ def _generate_default_lines(wrapper, config):
 
     lines = wrapper.geometry.field.field_lines
 
-    default_lines = config['default_lines'] if 'default_lines' in config else {}
+    # wrapper_backend renamed the key to optional_field_lines; accept both.
+    default_lines = config.get('optional_field_lines', config.get('default_lines')) or {}
     field = config['field']
     thickness = field['line_thickness']
     half_length = field['field_length'] / 2

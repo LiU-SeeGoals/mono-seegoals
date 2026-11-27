@@ -12,3 +12,11 @@ Dockerfile
 Dockerfile.archive
 docker-compose.yml
 
+.bash_history
+cmd/cmd
+cmd/Support
+*.out
+*.prof
+*.trace
+logs
+**/logs

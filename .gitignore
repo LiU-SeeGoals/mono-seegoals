@@ -26,3 +26,13 @@ software/controller/tests/**
 /software/controller/logs*/
 /software/temp-logs.txt
 /software/ssl-vision-processor/img/
+
+# Local build outputs, traces and shell history
+/software/controller/cmd/cmd
+/software/controller/cmd/Support
+*.out
+*.trace
+.bash_history
+/software/ssl-vision/camera*.tmp
+/software/ssl-vision/camera*.base64
+/software/ssl-vision-processor/temo

@@ -194,23 +194,33 @@ func (p Position) Scale(scalar float64) Position {
 	}
 }
 
+// Normalize2d returns the unit vector of (X, Y), keeping Z and Angle.
+// A zero vector stays zero instead of becoming NaN.
 func (p Position) Normalize2d() Position {
-	norm := p.Norm()
+	norm := math.Hypot(p.X, p.Y)
+	if norm == 0 {
+		return Position{Z: p.Z, Angle: p.Angle}
+	}
 	return Position{
-		X:     p.X/norm + 0.00001,
-		Y:     p.Y/norm + 0.00001,
+		X:     p.X / norm,
+		Y:     p.Y / norm,
 		Z:     p.Z,
 		Angle: p.Angle,
 	}
 }
 
+// Normalize returns the unit vector of (X, Y, Z), keeping Angle.
+// A zero vector stays zero instead of becoming NaN.
 func (p Position) Normalize() Position {
 	norm := p.Norm()
+	if norm == 0 {
+		return Position{Angle: p.Angle}
+	}
 	return Position{
 		X:     p.X / norm,
 		Y:     p.Y / norm,
 		Z:     p.Z / norm,
-		Angle: p.Angle / norm,
+		Angle: p.Angle,
 	}
 }
 

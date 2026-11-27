@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  controller:
+    name: Controller (Go vet + race tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: software/controller
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: software/controller/go.mod
+          cache-dependency-path: software/controller/go.sum
+      # config.go loads software/controller/.env and requires every key;
+      # the tracked file is empty, so use the repo's default environment.
+      - name: Provide .env
+        run: cp ../../environment.ini .env
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test -race -count=1 ./...
+
+  gameviewer:
+    name: GameViewer (node tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: software/GameViewer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: pnpm
+          cache-dependency-path: software/GameViewer/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: node --test src/backend/
+      # TODO: add `pnpm exec tsc --noEmit` once the existing type errors are fixed.
+
+  scripts:
+    name: Scripts (Python unittest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -B -m unittest discover -s scripts/tests -v

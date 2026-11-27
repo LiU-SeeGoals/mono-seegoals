@@ -167,11 +167,11 @@ func unpackTracked(packet *ssl_vision.TrackerWrapperPacket, gi *info.GameInfo, p
 		}
 
 		gi.State.SetKickedBall(
-			float64(pos.GetX()),
-			float64(pos.GetY()),
+			float64(pos.GetX())*trackedMetersToMM,
+			float64(pos.GetY())*trackedMetersToMM,
 			startTs,
-			float64(stopPos.GetX()),
-			float64(stopPos.GetY()),
+			float64(stopPos.GetX())*trackedMetersToMM,
+			float64(stopPos.GetY())*trackedMetersToMM,
 			stopTs,
 			team,
 			rid.GetId(),

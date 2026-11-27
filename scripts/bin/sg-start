@@ -145,8 +145,10 @@ choices = [
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
+            # autoref.yml must come before fetdatorn.yml: both define the
+            # auto-referee command and the last file wins (real camera port).
             "-f", f"{docker_dir}/docker-compose.autoref.yml",
+            "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
             "-p", project_name, "up", "-d"
         ],
         "container_to_enter": AI
@@ -252,7 +254,8 @@ def check_submodule_status():
     result = subprocess.run(["git", "submodule", "status"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
-    return b"^-" not in result.stdout
+    # Uninitialized submodules are listed with a leading "-".
+    return not any(line.startswith(b"-") for line in result.stdout.splitlines())
 
 
 def remove_old_containers():

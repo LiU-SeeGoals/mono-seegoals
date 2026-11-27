@@ -78,7 +78,7 @@ If you want to try out the project on the field in the lab, then:
 
 To use the new `ssl-vision-processor`, follow the one-time build instructions in
 the [scripts startup guide](scripts/README.md), then run
-`sg-start --vision-processor` (menu option 8). `sg-kill` stops both the processor
+`sg-start --vision-processor` (menu option 10). `sg-kill` stops both the processor
 service and the containers.
 
 Debugging:
