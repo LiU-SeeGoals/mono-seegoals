@@ -48,11 +48,10 @@ func (m *CombinedPlanWithRef) Tick(gi *info.GameInfo) {
 
 func (m *CombinedPlanWithRef) routeFrame(gi info.GameInfo) bool {
 	m.currentGameInfo = gi
-	refereeHandled := m.refereeHandlesFrame()
-	if refereeHandled && !isStoppedFrame(&m.currentGameInfo) {
+	if m.refereeHandlesFrame() {
 		return false
 	}
-
+	// STOP and normal play: the planner owns the robots.
 	m.normalPlan.Tick(&m.currentGameInfo)
 	return true
 }
@@ -72,7 +71,6 @@ func (m *CombinedPlanWithRef) refereeHandlesFrame() bool {
 				Activity_lock: m.ActivityHandler.Activity_lock,
 			},
 		)
-		m.refereeHandler.DelegateStopPositioning()
 	}
 	activeRobots := m.normalPlan.activeRobots(&m.currentGameInfo)
 	m.refereeHandler.UpdateActiveRobots(activeRobots)

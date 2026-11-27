@@ -1,6 +1,7 @@
 package roles
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 	"math"
 
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
@@ -17,7 +18,6 @@ const (
 	supportGoalSightClearance = 400.0
 	supportGridStep           = 400.0
 	supportFieldMargin        = pathplanner.RobotSafetyRadius
-	supportDefenseAreaMargin  = 200.0
 	supportMinBallDistance    = 1000.0
 	supportMaxBehindBall      = 1000.0
 
@@ -167,10 +167,10 @@ func supportSpotAllowed(spot, ballPos, goalPos info.Position, sign float64, defe
 		return false
 	}
 	for _, area := range defenseAreas {
-		minX := math.Min(area.FrontX, area.BackX) - supportDefenseAreaMargin
-		maxX := math.Max(area.FrontX, area.BackX) + supportDefenseAreaMargin
+		minX := math.Min(area.FrontX, area.BackX) - rules.SupportDefenseAreaClearance
+		maxX := math.Max(area.FrontX, area.BackX) + rules.SupportDefenseAreaClearance
 		if spot.X >= minX && spot.X <= maxX &&
-			spot.Y >= area.MinY-supportDefenseAreaMargin && spot.Y <= area.MaxY+supportDefenseAreaMargin {
+			spot.Y >= area.MinY-rules.SupportDefenseAreaClearance && spot.Y <= area.MaxY+rules.SupportDefenseAreaClearance {
 			return false
 		}
 	}

@@ -15,7 +15,7 @@ func TestRestartPostKickHoldComplete(t *testing.T) {
 	started := time.Unix(10, 0)
 	original := info.Position{}
 	clearBall := info.Position{X: restartPostKickBallClearanceMM}
-	nearBall := info.Position{X: BALL_IN_PLAY_DISTANCE_MM}
+	nearBall := info.Position{X: info.BallInPlayDistance}
 
 	tests := []struct {
 		name    string

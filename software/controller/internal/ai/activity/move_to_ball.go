@@ -12,6 +12,7 @@ import (
 type MoveToBall struct {
 	GenericComposition
 	// MovementComposition
+	move *MoveToPosition // inner move of the last frame
 }
 
 func (m *MoveToBall) String() string {
@@ -65,7 +66,8 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 		dribble = true
 	}
 
-	move := NewMoveToPosition(m.team, m.id, target)
+	move := continueMove(m.move, m.team, m.id, target)
+	m.move = move
 	move.AvoidBall(false)
 	moveAction := move.GetMoveToAction(gi)
 	moveAction.Dest.Angle = angleToBall
@@ -108,4 +110,11 @@ func (m *MoveToBall) Achieved(gi *info.GameInfo) bool {
 
 func (m *MoveToBall) GetID() info.ID {
 	return m.id
+}
+
+// ContinueFrom keeps the previous frame's inner move.
+func (m *MoveToBall) ContinueFrom(previous Activity) {
+	if prev, ok := previous.(*MoveToBall); ok && prev != nil && prev != m && prev.team == m.team && prev.id == m.id {
+		m.move = prev.move
+	}
 }

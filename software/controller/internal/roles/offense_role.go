@@ -353,22 +353,22 @@ func (kr *OffenseRole) Init() {
 
 	sm := state_machine.NewStateMachine(awaitBall)
 
-	sm.AddTransition(awaitName, "BALL_OWNER", prepareKick)
-	sm.AddTransition(awaitName, "BALL_APPROACHING", intercept)
-	sm.AddTransition(awaitName, "PASS_TARGETED", receivePass)
+	sm.AddTransition(awaitName, EventBallOwner, prepareKick)
+	sm.AddTransition(awaitName, EventBallApproaching, intercept)
+	sm.AddTransition(awaitName, EventPassTargeted, receivePass)
 
-	sm.AddTransition(interceptName, "BALL_OWNER", prepareKick)
-	sm.AddTransition(interceptName, "BALL_LOST", awaitBall)
+	sm.AddTransition(interceptName, EventBallOwner, prepareKick)
+	sm.AddTransition(interceptName, EventBallLost, awaitBall)
 
-	sm.AddTransition(kickPrepareName, "ALIGNED", kick)
-	sm.AddTransition(kickPrepareName, "BALL_LOST", awaitBall)
-	sm.AddTransition(kickName, "KICKED", prepareKick)
-	sm.AddTransition(kickName, "MISALIGNED", prepareKick)
-	sm.AddTransition(kickName, "BALL_LOST", awaitBall)
-	sm.AddTransition(receiveName, "BALL_OWNER", prepareKick)
-	sm.AddTransition(receiveName, "BALL_RECEIVED", prepareKick)
-	sm.AddTransition(receiveName, "BALL_APPROACHING", intercept)
-	sm.AddTransition(receiveName, "BALL_LOST", awaitBall)
+	sm.AddTransition(kickPrepareName, EventAligned, kick)
+	sm.AddTransition(kickPrepareName, EventBallLost, awaitBall)
+	sm.AddTransition(kickName, EventKicked, prepareKick)
+	sm.AddTransition(kickName, EventMisaligned, prepareKick)
+	sm.AddTransition(kickName, EventBallLost, awaitBall)
+	sm.AddTransition(receiveName, EventBallOwner, prepareKick)
+	sm.AddTransition(receiveName, EventBallReceived, prepareKick)
+	sm.AddTransition(receiveName, EventBallApproaching, intercept)
+	sm.AddTransition(receiveName, EventBallLost, awaitBall)
 
 	kr.sm = sm
 	kr.slot = OffenseSlot{Kind: OffenseRoleChaser}
@@ -382,7 +382,7 @@ func (kr *OffenseRole) TriggerEvent(event state_machine.EventName) {
 	stateName := kr.sm.CurrentStateName()
 	transitions := kr.sm.StateTransitions[stateName]
 	nextState, canTransition := transitions[event]
-	if event == "BALL_LOST" && canTransition {
+	if event == EventBallLost && canTransition {
 		fmt.Printf(
 			"OffenseRole %d %s BALL_LOST: slot=%s state=%s -> %s\n",
 			kr.id,
@@ -409,7 +409,7 @@ func (kr *OffenseRole) CurrentDecision() KickDecision {
 
 func (kr *OffenseRole) ReceivePass(target info.Position) {
 	kr.receiveTarget = target
-	kr.sm.TriggerEvent("PASS_TARGETED")
+	kr.sm.TriggerEvent(EventPassTargeted)
 }
 
 func (kr *OffenseRole) SetSlot(slot OffenseSlot) {

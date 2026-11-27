@@ -6,7 +6,6 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/ai/plan"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/controller/internal/referee"
 	"github.com/LiU-SeeGoals/controller/internal/scripting"
 )
 
@@ -38,7 +37,7 @@ func FreeKick(s *scripting.Script) {
 	}
 
 	kickFrom, _ := s.Ball()
-	limit := referee.FreeKickMaxTime(s.Game().Status.GetDivision())
+	limit := info.RestartTimeLimit(info.STATE_FREE_KICK, s.Game().Status.GetDivision())
 	start := time.Now()
 	kicked := s.WaitUntil(func(*info.GameInfo) bool {
 		pos, ok := s.Ball()

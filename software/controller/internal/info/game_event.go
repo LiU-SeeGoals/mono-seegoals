@@ -81,6 +81,34 @@ type GameEvent struct {
 	CurrentActionTimeRemaining      int64
 	CurrentActionTimeRemainingValid bool
 	BallInPlay                      bool
+	// RestartKicked is set when a kickoff, free kick or penalty was taken
+	// (the ball moved BallInPlayDistance), as opposed to timing out.
+	RestartKicked bool
+
+	// Restart bookkeeping for ObserveRestart.
+	restartPending  bool // a restart was issued and waits for its first observation
+	restartActive   bool
+	restartStart    time.Time
+	restartAnchor   Position // ball position when the restart was issued
+	restartAnchored bool
+}
+
+// BallInPlayDistance is how far the ball must move after a kickoff, free kick
+// or penalty is issued before it is in play (SSL rules: 0.05 m).
+const BallInPlayDistance = 50.0
+
+// RestartTimeLimit is how long a team may take to execute a restart in state
+// when the game controller sends no action timer.
+func RestartTimeLimit(state RefState, division Division) time.Duration {
+	switch state {
+	case STATE_FREE_KICK:
+		if division == DivisionA {
+			return 5 * time.Second
+		}
+		return 10 * time.Second
+	default: // kickoff and penalty
+		return 10 * time.Second
+	}
 }
 
 func NewGameEvent() *GameEvent {
@@ -279,9 +307,8 @@ func (ge *GameEvent) UpdateFromRefCommandWithDesignatedPosition(
 		ge.DesignatedPosition = nil
 	}
 
-	ge.PreviousState = ge.CurrentState
-
 	if newCommand {
+		ge.PreviousState = ge.CurrentState
 		switch refCommand {
 		case HALT:
 			ge.CurrentState = STATE_HALTED
@@ -353,14 +380,80 @@ func (ge *GameEvent) UpdateFromRefCommandWithDesignatedPosition(
 		}
 	}
 
-	// Preparation timers are not permission to kick. Only an issued start or
-	// free-kick command can time out into open play.
 	_, freeKickCommand := refCommand.FreeKickTeam()
-	if ge.CurrentActionTimedOut() && (freeKickCommand || refCommand == NORMAL_START) {
-		ge.SetBallMoved()
+	if newCommand {
+		ge.restartPending = !ge.BallInPlay && (freeKickCommand ||
+			(refCommand == NORMAL_START && (ge.CurrentState == STATE_KICKOFF_PREPARATION ||
+				ge.CurrentState == STATE_PENALTY_PREPARATION)))
+		ge.restartActive = false
+		ge.restartAnchored = false
+		ge.RestartKicked = false
 	}
 
-	// Check for timeouts and automatically update state if needed
+	// Preparation timers are not permission to kick. Only an issued start or
+	// free-kick command can time out.
+	if ge.CurrentActionTimedOut() && (freeKickCommand || refCommand == NORMAL_START) {
+		ge.timeOutRestart()
+	}
+}
+
+// ObserveRestart tracks a pending kickoff, free kick or penalty. Call it once
+// per frame, after the frame's referee packets and ball observations; ballOK
+// is false when the ball is not seen. It puts the ball in play once it moved
+// BallInPlayDistance from where it lay when the restart was issued, and
+// applies the restart time limit when the game controller sends no timer.
+//
+// This is the only place, besides referee packets, that changes the restart
+// state, so every team's planner sees the same answer.
+func (ge *GameEvent) ObserveRestart(ball Position, ballOK bool, now time.Time, division Division) {
+	if ge.restartPending {
+		ge.restartPending = false
+		ge.restartActive = true
+		ge.restartStart = now
+	}
+	if !ge.restartActive || ge.BallInPlay || !isRestartState(ge.CurrentState) {
+		ge.restartActive = false
+		return
+	}
+	if ballOK {
+		if !ge.restartAnchored {
+			ge.restartAnchor = ball
+			ge.restartAnchored = true
+		} else if ball.Dist2d(ge.restartAnchor) >= BallInPlayDistance {
+			ge.RestartKicked = true
+			ge.SetBallMoved()
+			ge.restartActive = false
+			return
+		}
+	}
+	if !ge.CurrentActionTimeRemainingValid &&
+		now.Sub(ge.restartStart) >= RestartTimeLimit(ge.CurrentState, division) {
+		ge.timeOutRestart()
+	}
+}
+
+// RestartBallAnchor is where the ball lay when the current restart was issued.
+func (ge *GameEvent) RestartBallAnchor() (Position, bool) {
+	return ge.restartAnchor, ge.restartAnchored
+}
+
+// timeOutRestart ends a restart that was not taken in time: an expired penalty
+// returns to STOP, an expired kickoff or free kick continues as open play.
+func (ge *GameEvent) timeOutRestart() {
+	ge.restartActive = false
+	switch ge.CurrentState {
+	case STATE_PENALTY_PREPARATION:
+		if !ge.BallInPlay {
+			ge.PreviousState = ge.CurrentState
+			ge.CurrentState = STATE_STOPPED
+		}
+	case STATE_KICKOFF_PREPARATION, STATE_FREE_KICK:
+		ge.SetBallMoved()
+	}
+}
+
+func isRestartState(state RefState) bool {
+	return state == STATE_KICKOFF_PREPARATION || state == STATE_PENALTY_PREPARATION || state == STATE_FREE_KICK
 }
 
 func isBallPlacementRefCommand(command RefCommand) bool {
@@ -405,89 +498,11 @@ func (ge *GameEvent) currentActionTimeRemainingString() string {
 	return fmt.Sprintf("%d microseconds", ge.CurrentActionTimeRemaining)
 }
 
-// If we should keep distance from ball it is 500 mm
-func (ge *GameEvent) ShouldKeepDistanceFromBall(robotTeam Team) bool {
-	if ge.CurrentState == STATE_HALTED {
-		return true
-	}
-
-	if ge.CurrentState == STATE_STOPPED {
-		return true
-	}
-
-	// For free kicks, only the non-possessing team needs to keep distance
-	if ge.CurrentState == STATE_FREE_KICK {
-		return ge.TeamWithPossession != robotTeam
-	}
-
-	// For kickoff preparations
-	if ge.CurrentState == STATE_KICKOFF_PREPARATION && !ge.BallInPlay {
-		// If we don't have possession, all robots need to keep distance
-		if ge.TeamWithPossession != robotTeam {
-			return true
-		}
-		// If we have possession, all robots except one kicker need to keep distance
-		// Note: The actual kicker robot should be determined by the strategy code
-		return true
-	}
-
-	// For penalty preparations
-	if ge.CurrentState == STATE_PENALTY_PREPARATION && !ge.BallInPlay {
-		// If we don't have possession, all robots except goalkeeper need to keep distance
-		if ge.TeamWithPossession != robotTeam {
-			// Note: The goalkeeper determination should be handled by strategy code
-			return true
-		}
-		// If we have possession, all robots except one kicker need to keep distance
-		// Note: The actual kicker robot should be determined by the strategy code
-		return true
-	}
-
-	return false
-}
-
-// GetMaxRobotSpeed returns the maximum allowed robot speed in m/s
-func (ge *GameEvent) GetMaxRobotSpeed() float64 {
-	if ge.CurrentState == STATE_HALTED {
-		return 0.0 // No movement allowed during HALT (with 2 second grace period)
-	}
-
-	if ge.CurrentState == STATE_STOPPED || ge.CurrentState == STATE_BALL_PLACEMENT {
-		return 1.5 // Limited to 1.5 m/s during STOP
-	}
-
-	// No speed limit during normal play
-	return 999.0
-}
-
-// CanManipulateBall returns true if robots of the given team are allowed to manipulate the ball
-func (ge *GameEvent) CanManipulateBall(robotTeam Team) bool {
-	if ge.CurrentState == STATE_HALTED || ge.CurrentState == STATE_STOPPED {
-		return false
-	}
-
-	if ge.CurrentState == STATE_PLAYING {
-		return true
-	}
-
-	// For states where only one team can manipulate the ball
-	if !ge.BallInPlay {
-		// Only the team with possession can manipulate the ball
-		if ge.TeamWithPossession == robotTeam {
-			// Note: The kicker decision should be made by the strategy code
-			return true
-		}
-
-		return false
-	}
-
-	return ge.BallInPlay
-}
-
+// SetBallMoved puts a pending restart in play. Normally ObserveRestart calls it.
 func (ge *GameEvent) SetBallMoved() {
-	switch ge.CurrentState {
-	case STATE_KICKOFF_PREPARATION, STATE_PENALTY_PREPARATION, STATE_FREE_KICK:
+	if isRestartState(ge.CurrentState) {
 		ge.BallInPlay = true
+		ge.PreviousState = ge.CurrentState
 		ge.CurrentState = STATE_PLAYING
 	}
 }

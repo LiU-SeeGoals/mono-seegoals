@@ -812,14 +812,14 @@ func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
 	for i, id := range wallRobots {
 		if defender, ok := roleManager.defenders[id]; ok {
 			defender.SetWallPosition(wallPositions[i])
-			defender.TriggerEvent("ATTACKER_NEAR")
+			defender.TriggerEvent(roles.EventAttackerNear)
 		}
 	}
 	for id, defender := range roleManager.defenders {
 		if containsRobot(wallRobots, id) {
 			continue
 		}
-		defender.TriggerEvent("ATTACKER_FAR")
+		defender.TriggerEvent(roles.EventAttackerFar)
 	}
 	for _, defender := range roleManager.defenders {
 		defender.Run()
@@ -832,13 +832,13 @@ func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
 	debugstate.SetRobotRole(m.team, goalieID, tacticalSlotGoalie.label())
 	goalieRole.SetGameInfo(*gi)
 	if stopped {
-		goalieRole.TriggerEvent("BALL_LOST")
+		goalieRole.TriggerEvent(roles.EventBallLost)
 	} else if goalieRole.ShouldClearBall(roles.GoalieBallControlRadius, attackerThreatX) {
-		goalieRole.TriggerEvent("BALL_OWNER")
+		goalieRole.TriggerEvent(roles.EventBallOwner)
 	} else if goalieRole.ShouldCollectDeadBall() {
-		goalieRole.TriggerEvent("DEAD_BALL_TRAPPED")
+		goalieRole.TriggerEvent(roles.EventDeadBallTrapped)
 	} else if !goalieRole.IsDeadBallRescueActive() {
-		goalieRole.TriggerEvent("BALL_LOST")
+		goalieRole.TriggerEvent(roles.EventBallLost)
 	}
 	goalieRole.Run()
 }
@@ -907,7 +907,7 @@ func (m *CombinedPlan) newTick() func(info.GameInfo) {
 		roleManager.applySlotAssignments(slotAssignments, tickStart)
 		if hasRestrictedRobot {
 			if restrictedAttacker, ok := roleManager.attackers[restrictedRobot]; ok {
-				restrictedAttacker.TriggerEvent("BALL_LOST")
+				restrictedAttacker.TriggerEvent(roles.EventBallLost)
 			}
 		}
 		offenseRobots := roleManager.offenseIDs()
@@ -934,7 +934,7 @@ func (m *CombinedPlan) newTick() func(info.GameInfo) {
 				return
 			}
 			for id, attacker := range roleManager.attackers {
-				attacker.TriggerEvent("BALL_LOST")
+				attacker.TriggerEvent(roles.EventBallLost)
 				m.ActivityHandler.AddActivity(activity.NewRefStop(m.team, id))
 			}
 			m.updateDefenseAndGoaliePositioning(&gi, roleManager, goalieID, goalieRole, true)
@@ -966,7 +966,7 @@ func (m *CombinedPlan) newTick() func(info.GameInfo) {
 				hasActiveReceiver = false
 
 				actorTracker.switchTo(roleManager.attackers, newOffenseBallActor(ownerID, offenseBallActorOwner))
-				owner.TriggerEvent("BALL_OWNER")
+				owner.TriggerEvent(roles.EventBallOwner)
 				decision := owner.CurrentDecision()
 				if decision.IsPass && decision.ReceiverID != ownerID {
 					receiver, ok := roleManager.attackers[decision.ReceiverID]
@@ -999,7 +999,7 @@ func (m *CombinedPlan) newTick() func(info.GameInfo) {
 				}
 				if interceptor, ok := roleManager.attackers[interceptorID]; hasInterceptor && ok {
 					actorTracker.switchTo(roleManager.attackers, newOffenseBallActor(interceptorID, offenseBallActorChaser))
-					interceptor.TriggerEvent("BALL_APPROACHING")
+					interceptor.TriggerEvent(roles.EventBallApproaching)
 				} else {
 					actorTracker.switchTo(roleManager.attackers, noOffenseBallActor())
 				}

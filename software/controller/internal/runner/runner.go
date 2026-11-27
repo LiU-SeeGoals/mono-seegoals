@@ -156,6 +156,7 @@ func Run(cfg Config) {
 		if !gameInfo.HasField() || !gameInfo.State.IsValid() {
 			continue
 		}
+		gameInfo.ObserveRestart()
 
 		for _, tr := range teams {
 			actions := tr.ai.GetActions(gameInfo)

@@ -60,6 +60,21 @@ func (gi GameInfo) PrintField() {
 	fmt.Println(gi.field)
 }
 
+// ObserveRestart feeds this frame's ball position to the referee state so a
+// pending kickoff, free kick or penalty is put in play (or times out) once for
+// all teams. The runner calls it once per frame before any planner runs.
+func (gi *GameInfo) ObserveRestart() {
+	if gi.Status == nil || gi.State == nil {
+		return
+	}
+	ball, ok := gi.State.GetTrackedBall().GetTrackedPosition()
+	if !ok {
+		raw, err := gi.State.GetBall().GetPosition()
+		ball, ok = raw, err == nil
+	}
+	gi.Status.GetGameEvent().ObserveRestart(ball, ok, gi.Now(), gi.Status.GetDivision())
+}
+
 func (gi *GameInfo) AdvanceVisionFrame() {
 	gi.visionFrame++
 }

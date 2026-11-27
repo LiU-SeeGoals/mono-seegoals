@@ -27,6 +27,10 @@ type simulatedBallHandler struct {
 	pending  bool
 	since    time.Time
 	lastSend time.Time
+	// lastState is the referee state of the previous frame; kickoff and
+	// penalty placement happen once, on entering the preparation.
+	lastState    info.RefState
+	lastStateSet bool
 }
 
 type ballTeleporter interface {
@@ -39,8 +43,12 @@ func (h *simulatedBallHandler) handle(gameInfo *info.GameInfo, simController bal
 	ballPos, ballTime, _ := ball.GetPositionTime()
 
 	ge := gameInfo.Status.GetGameEvent()
-	previousState := ge.GetPreviousState()
 	currentState := ge.GetCurrentState()
+	previousState := ge.GetPreviousState() // first frame: use the referee's edge
+	if h.lastStateSet {
+		previousState = h.lastState
+	}
+	h.lastState, h.lastStateSet = currentState, true
 	if ge.IsPlacementStop() {
 		target, needed := refereePlacementTarget(ge, ballPos)
 		// Derive a fallback only when the referee has supplied no target.

@@ -1,6 +1,7 @@
 package pathplanner
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 	"math"
 	"testing"
 
@@ -222,7 +223,7 @@ func TestClampBallKeepoutDestinationProjectsOpponentFreeKickDestination(t *testi
 
 	got := ClampBallKeepoutDestination(info.Blue, info.Position{X: -1000}, destination, gi)
 
-	wantX := RestartBallKeepoutRadius + ballKeepoutDestinationEpsilon
+	wantX := rules.RestartBallKeepout + ballKeepoutDestinationEpsilon
 	if math.Abs(got.X-wantX) > 1e-9 || math.Abs(got.Y) > 1e-9 {
 		t.Fatalf("expected destination projected to (%.1f, 0), got %#v", wantX, got)
 	}
@@ -236,7 +237,7 @@ func TestClampBallKeepoutDestinationUsesRobotSideWhenDestinationIsBall(t *testin
 
 	got := ClampBallKeepoutDestination(info.Blue, info.Position{X: -1000}, info.Position{}, gi)
 
-	wantX := -(RestartBallKeepoutRadius + ballKeepoutDestinationEpsilon)
+	wantX := -(rules.RestartBallKeepout + ballKeepoutDestinationEpsilon)
 	if math.Abs(got.X-wantX) > 1e-9 || math.Abs(got.Y) > 1e-9 {
 		t.Fatalf("expected destination projected away on robot side to (%.1f, 0), got %#v", wantX, got)
 	}
@@ -272,7 +273,7 @@ func TestStopBallKeepoutAppliesToBothTeams(t *testing.T) {
 			t.Fatalf("expected %s team to keep distance during STOP", team)
 		}
 		got := ClampBallKeepoutDestination(team, info.Position{X: -1000}, info.Position{}, gi)
-		wantX := -(StopBallKeepoutRadius + ballKeepoutDestinationEpsilon)
+		wantX := -(rules.StopBallKeepout + ballKeepoutDestinationEpsilon)
 		if math.Abs(got.X-wantX) > 1e-9 || math.Abs(got.Y) > 1e-9 {
 			t.Fatalf("%s destination = %#v, want (%.1f, 0)", team, got, wantX)
 		}
@@ -287,8 +288,8 @@ func TestObstaclesForRobotUsesStopKeepoutEvenWhenAvoidBallIsFalse(t *testing.T) 
 	if len(obstacles) != 1 {
 		t.Fatalf("expected only the stop ball obstacle, got %d obstacles: %#v", len(obstacles), obstacles)
 	}
-	if obstacles[0].Size != StopBallKeepoutRadius {
-		t.Fatalf("expected stop ball obstacle radius %.1f, got %.1f", StopBallKeepoutRadius, obstacles[0].Size)
+	if obstacles[0].Size != rules.StopBallKeepout {
+		t.Fatalf("expected stop ball obstacle radius %.1f, got %.1f", rules.StopBallKeepout, obstacles[0].Size)
 	}
 }
 
@@ -300,8 +301,8 @@ func TestObstaclesForRobotUsesRestartKeepoutEvenWhenAvoidBallIsFalse(t *testing.
 	if len(obstacles) != 1 {
 		t.Fatalf("expected only the restart ball obstacle, got %d obstacles: %#v", len(obstacles), obstacles)
 	}
-	if obstacles[0].Size != RestartBallKeepoutRadius {
-		t.Fatalf("expected restart ball obstacle radius %.1f, got %.1f", RestartBallKeepoutRadius, obstacles[0].Size)
+	if obstacles[0].Size != rules.RestartBallKeepout {
+		t.Fatalf("expected restart ball obstacle radius %.1f, got %.1f", rules.RestartBallKeepout, obstacles[0].Size)
 	}
 }
 

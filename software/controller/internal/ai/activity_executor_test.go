@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 	"testing"
 	"time"
 
@@ -21,7 +22,7 @@ func TestStoppedRobotMovesOutOfDefenseArea(t *testing.T) {
 		t.Fatalf("action = %T, want *action.MoveTo", got)
 	}
 
-	clearance := defenseAreaClearance(goalLineBaseClearanceMM, gi)
+	clearance := defenseAreaClearance(rules.GoalLineBaseClearance, rules.For(gi, info.Blue))
 	if positionInGoalArea(move.Dest, getGoalAreaBounds(gi), clearance) {
 		t.Fatalf("retreat destination remains inside a defense area: %+v", move.Dest)
 	}

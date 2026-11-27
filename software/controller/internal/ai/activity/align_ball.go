@@ -44,6 +44,8 @@ type AlignBall struct {
 	allowOutsideField bool
 	allowBehindGoal   bool
 	latch             *AlignLatch
+	latchOwned        bool            // set by SetLatch: the caller manages the latch
+	move              *MoveToPosition // inner move of the last frame
 }
 
 func (m *AlignBall) String() string {
@@ -67,6 +69,20 @@ func NewAlign(team info.Team, id info.ID, to info.Position, from info.Position) 
 func (m *AlignBall) SetLatch(latch *AlignLatch) {
 	if latch != nil {
 		m.latch = latch
+		m.latchOwned = true
+	}
+}
+
+// ContinueFrom keeps the previous alignment's inner move and, unless a caller
+// manages the latch with SetLatch, its latch.
+func (m *AlignBall) ContinueFrom(previous Activity) {
+	prev, ok := previous.(*AlignBall)
+	if !ok || prev == nil || prev == m || prev.team != m.team || prev.id != m.id {
+		return
+	}
+	m.move = prev.move
+	if !m.latchOwned && !prev.latchOwned {
+		m.latch = prev.latch
 	}
 }
 
@@ -157,7 +173,8 @@ func (m *AlignBall) GetAction(gi *info.GameInfo) action.Action {
 		avoidBall = false
 	}
 
-	moveTo := NewMoveToPosition(m.team, m.id, moveTarget)
+	moveTo := continueMove(m.move, m.team, m.id, moveTarget)
+	m.move = moveTo
 	moveTo.SetUseRRT(useRRT)
 	moveTo.AvoidBall(avoidBall)
 	moveTo.AvoidGoallines(!m.allowGoalArea)

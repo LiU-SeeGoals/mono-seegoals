@@ -73,8 +73,9 @@ func TestGetActionsIsSynchronousAndOrdered(t *testing.T) {
 		}
 	}
 	for id, act := range planner.acts {
-		if act.achieved != 3 {
-			t.Fatalf("robot %d: Achieved called %d times, want 3", id, act.achieved)
+		// Planners decide on achievement; the executor only asks for actions.
+		if act.achieved != 0 {
+			t.Fatalf("robot %d: executor called Achieved %d times, want 0", id, act.achieved)
 		}
 	}
 	if after := runtime.NumGoroutine(); after > before {
@@ -94,5 +95,25 @@ func TestHotswapPlannerKeepsSharedActivities(t *testing.T) {
 	actions := ai.GetActions(gi)
 	if len(actions) != 1 || actions[0].(*action.Stop).Id != 4 {
 		t.Fatalf("after hotswap got %v, want a single action for robot 4", actions)
+	}
+}
+
+type continuingActivity struct {
+	stubActivity
+	from activity.Activity
+}
+
+func (c *continuingActivity) ContinueFrom(previous activity.Activity) { c.from = previous }
+
+func TestAddActivityContinuesPreviousActivity(t *testing.T) {
+	var activities [info.TEAM_SIZE]activity.Activity
+	handler := &ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
+	first := &continuingActivity{stubActivity: stubActivity{id: 4}}
+	second := &continuingActivity{stubActivity: stubActivity{id: 4}}
+
+	handler.AddActivity(first)
+	handler.AddActivity(second)
+	if first.from != nil || second.from != first {
+		t.Fatal("AddActivity did not hand the previous activity to ContinueFrom")
 	}
 }

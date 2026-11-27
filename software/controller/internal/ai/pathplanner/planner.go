@@ -2,6 +2,7 @@
 package pathplanner
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 	"math"
 	"math/rand"
 	"sync"
@@ -10,15 +11,13 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
-// Field/planning constants (mm) — same semantics as the former move_to_position locals.
+// Planning constants (mm). Rule-driven clearances (ball keep-out, defense
+// areas) live in package rules.
 const (
-	RobotSafetyRadius        = 240.0
-	BallSafetyRadius         = 150.0
-	RestartBallKeepoutRadius = 500.0
-	StopBallKeepoutRadius    = 700.0
-	GoalLineSafetyRadius     = 100.0
-	PlanningRadius           = 400.0
-	MotionRadius             = 100.0
+	RobotSafetyRadius = 240.0
+	BallSafetyRadius  = 150.0
+	PlanningRadius    = 400.0
+	MotionRadius      = 100.0
 )
 
 const noGoZoneEscapeClearance = MotionRadius
@@ -408,30 +407,15 @@ func ignoreRobotObstaclesForBallApproach(
 }
 
 // RestartBallKeepoutActive reports whether this team must keep a referee-state
-// distance from the ball. During STOP this applies to both teams; during a
-// restart it applies only to the non-possessing team.
+// distance from the ball (rules.MatchRules.BallKeepout).
 func RestartBallKeepoutActive(team info.Team, gi *info.GameInfo) bool {
 	_, active := requiredBallKeepoutRadius(team, gi)
 	return active
 }
 
 func requiredBallKeepoutRadius(team info.Team, gi *info.GameInfo) (float64, bool) {
-	if gi == nil || gi.Status == nil {
-		return 0, false
-	}
-	gameEvent := gi.Status.GetGameEvent()
-	if gameEvent == nil || gameEvent.BallInPlay {
-		return 0, false
-	}
-
-	switch gameEvent.CurrentState {
-	case info.STATE_STOPPED, info.STATE_BALL_PLACEMENT:
-		return StopBallKeepoutRadius, true
-	case info.STATE_FREE_KICK, info.STATE_KICKOFF_PREPARATION:
-		return RestartBallKeepoutRadius, gameEvent.TeamWithPossession != team
-	default:
-		return 0, false
-	}
+	r := rules.For(gi, team).BallKeepout
+	return r, r > 0
 }
 
 // ClampBallKeepoutDestination projects illegal restart destinations to the
@@ -867,7 +851,7 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoalline
 	if ballRadius, ok := ballObstacleRadius(team, avoidBall, gi); ok {
 		ballPos, _ := gi.State.Ball.GetPosition()
 		obstacles = append(obstacles, Obstacle{Position: ballPos, Size: ballRadius})
-		if ge := gi.Status.GetGameEvent(); ge.IsPlacementStop() && ge.GetDesignatedPosition() != nil {
+		if ge := gi.Status.GetGameEvent(); rules.For(gi, team).Stopped && ge.GetDesignatedPosition() != nil {
 			pos := ge.GetDesignatedPosition()
 			target := info.Position{X: pos.AtVec(0), Y: pos.AtVec(1)}
 			if target.Dist2d(ballPos) > 1 {
@@ -920,7 +904,7 @@ func goalLineObstacles(gi *info.GameInfo) []Obstacle {
 	}
 	zones := make([]Obstacle, 0, 2)
 	for _, area := range gi.DefenseAreas() {
-		zones = append(zones, rectObstacle(area.FrontX, area.BackX, area.MinY, area.MaxY, GoalLineSafetyRadius))
+		zones = append(zones, rectObstacle(area.FrontX, area.BackX, area.MinY, area.MaxY, rules.DefenseAreaMotionClearance))
 	}
 	return zones
 }

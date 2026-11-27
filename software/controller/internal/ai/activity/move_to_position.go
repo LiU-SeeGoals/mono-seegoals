@@ -82,6 +82,26 @@ func NewMoveToPosition(team info.Team, id info.ID, dest info.Position) *MoveToPo
 	}
 }
 
+// ContinueFrom keeps the previous move's look-ahead hysteresis. The sticky
+// carrot is tied to the path fingerprint, so a changed plan still resets it.
+func (m *MoveToPosition) ContinueFrom(previous Activity) {
+	prev, ok := previous.(*MoveToPosition)
+	if !ok || prev == nil || prev == m || prev.team != m.team || prev.id != m.id {
+		return
+	}
+	m.stickyDest, m.stickySet, m.stickyPathID = prev.stickyDest, prev.stickySet, prev.stickyPathID
+}
+
+// continueMove builds the inner MoveToPosition of a wrapping activity, keeping
+// the state of the one it used last frame (prev may be nil).
+func continueMove(prev *MoveToPosition, team info.Team, id info.ID, dest info.Position) *MoveToPosition {
+	move := NewMoveToPosition(team, id, dest)
+	if prev != nil {
+		move.ContinueFrom(prev)
+	}
+	return move
+}
+
 func (m *MoveToPosition) SetUseRRT(use bool) {
 	m.useRRT = use
 }
@@ -118,6 +138,11 @@ func (m *MoveToPosition) GetMoveToAction(gi *info.GameInfo) *action.MoveTo {
 	finalDestination := m.clampedFinalDestination(gi, myPos)
 
 	if m.closeEnoughToGoal(gi) {
+		// Arrived: drop the stored path so the next move plans from scratch.
+		if ps := getPathService(m.team); ps != nil {
+			ps.Clear(m.id)
+		}
+		m.path = nil
 		act := &action.MoveTo{}
 		act.Id = int(m.id)
 		act.Team = m.team
@@ -232,16 +257,10 @@ func clampPathToField(path []info.Position, gi *info.GameInfo, margin float64) [
 	return clamped
 }
 
-// Achieved returns true if the robot is sufficiently close to the final destination.
-// When true, the path planner is cleared for this robot so no stale path state remains.
+// Achieved reports whether the robot is close enough to the final destination.
+// It has no side effects; GetAction clears the stored path on arrival.
 func (m *MoveToPosition) Achieved(gi *info.GameInfo) bool {
-	if m.closeEnoughToGoal(gi) {
-		if p := getPathService(m.team); p != nil {
-			p.Clear(m.id)
-		}
-		return true
-	}
-	return false
+	return m.closeEnoughToGoal(gi)
 }
 
 func (m *MoveToPosition) String() string {

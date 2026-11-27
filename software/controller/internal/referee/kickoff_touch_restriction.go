@@ -1,13 +1,13 @@
 package referee
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
 const (
-	sslRobotRadiusMM            = 90.0
 	robotBallContactToleranceMM = 10.0
 	maxRobotHeightMM            = 150.0
 	ballTouchRobotTimeout       = time.Second
@@ -49,7 +49,7 @@ func anotherRobotTouchesBall(gi *info.GameInfo, restrictedTeam info.Team, restri
 		return false
 	}
 
-	contactDistance := sslRobotRadiusMM + info.BallRadius + robotBallContactToleranceMM
+	contactDistance := rules.RobotRadius + info.BallRadius + robotBallContactToleranceMM
 	for _, team := range []info.Team{info.Blue, info.Yellow} {
 		robots := gi.State.GetTeam(team)
 		for id, robot := range robots {

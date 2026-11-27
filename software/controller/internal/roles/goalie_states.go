@@ -24,5 +24,5 @@ func (s *GoalieDefendState) GetName() state_machine.StateName {
 
 func (s *GoalieDefendState) Update() state_machine.EventName {
 	s.activityHandler.AddActivity(activity.NewGoalie(s.team, s.robotId))
-	return "NONE"
+	return state_machine.NoEvent
 }

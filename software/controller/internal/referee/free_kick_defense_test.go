@@ -1,6 +1,7 @@
 package referee
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 	"math"
 	"sync"
 	"testing"
@@ -93,8 +94,8 @@ func TestFreeKickDefenseStaysClearOfDefenseAreaAndFieldLines(t *testing.T) {
 		if !freeKickSlotLegal(gi, slot) {
 			t.Fatalf("illegal wall slot: %+v", slot)
 		}
-		if slot.Dist2d(ball) < freeKickBallClearanceMM {
-			t.Fatalf("slot distance to ball = %.1f, want at least %.1f", slot.Dist2d(ball), freeKickBallClearanceMM)
+		if slot.Dist2d(ball) < rules.FreeKickWallBallClearance {
+			t.Fatalf("slot distance to ball = %.1f, want at least %.1f", slot.Dist2d(ball), rules.FreeKickWallBallClearance)
 		}
 	}
 

@@ -26,10 +26,18 @@ type Goalie struct {
 	team info.Team
 	id   info.ID
 	Activity
+	move *MoveToPosition // inner move of the last frame
 }
 
 func (g *Goalie) String() string {
 	return fmt.Sprintf("Goalie(%d, %d)", g.team, g.id)
+}
+
+// ContinueFrom keeps the previous frame's inner move.
+func (g *Goalie) ContinueFrom(previous Activity) {
+	if prev, ok := previous.(*Goalie); ok && prev != nil && prev != g && prev.team == g.team && prev.id == g.id {
+		g.move = prev.move
+	}
 }
 
 // NewGoalie creates a new Goalie struct.
@@ -83,7 +91,8 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	myRobotPos, _ := gi.State.GetTeam(g.team)[g.id].GetPosition()
 	goaliePos.Angle = myRobotPos.AngleToPosition(ballPos)
 
-	move := NewMoveToPosition(g.team, g.id, goaliePos)
+	move := continueMove(g.move, g.team, g.id, goaliePos)
+	g.move = move
 	// The keeper must be able to enter its defense area. Disabling goal-line
 	// obstacles still leaves robot and restart-ball obstacles enabled in RRT.
 	move.AvoidGoallines(false)

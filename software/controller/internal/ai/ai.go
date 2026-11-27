@@ -80,15 +80,21 @@ func (m *ActivityHandler) ClearActivity(id info.ID) {
 	m.Activities[id] = nil
 }
 
+// AddActivity sets the robot's activity for this frame. If the new activity
+// continues the previous one (activity.Continuer), it inherits its
+// frame-to-frame state first.
 func (m *ActivityHandler) AddActivity(act activity.Activity) {
 	m.Activity_lock.Lock()
 	idx := act.GetID()
 	previous := m.Activities[idx]
+	if c, ok := act.(activity.Continuer); ok && previous != nil {
+		c.ContinueFrom(previous)
+	}
 	m.Activities[idx] = act
 	m.Activity_lock.Unlock()
 
-	previousName, name := m.GetActionTypeName(previous), m.GetActionTypeName(act)
-	if previousName != name {
+	if previous == nil || reflect.TypeOf(previous) != reflect.TypeOf(act) {
+		previousName := m.GetActionTypeName(previous)
 		if previousName == "" {
 			previousName = "none"
 		}

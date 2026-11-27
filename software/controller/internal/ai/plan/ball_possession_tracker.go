@@ -149,7 +149,7 @@ func (t *offenseBallActorTracker) switchTo(attackers map[info.ID]*roles.OffenseR
 	}
 	if t.current.valid {
 		if attacker, ok := attackers[t.current.id]; ok {
-			attacker.TriggerEvent("BALL_LOST")
+			attacker.TriggerEvent(roles.EventBallLost)
 		}
 	}
 	t.current = next

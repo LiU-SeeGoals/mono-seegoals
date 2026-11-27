@@ -118,16 +118,16 @@ func (s *GoalieCollectDeadBallState) GetName() state_machine.StateName {
 
 func (s *GoalieCollectDeadBallState) Update() state_machine.EventName {
 	if goalieHasBallControl(s.gi, s.team, s.robotId, goalieRescueControlRadius) {
-		return "BALL_OWNER"
+		return EventBallOwner
 	}
 
 	ballPos, err := s.gi.State.GetBall().GetEstimatedPosition()
 	if err != nil || !goalieDeadBallBaseCandidate(s.gi, s.team, ballPos) {
-		return "BALL_LOST"
+		return EventBallLost
 	}
 
 	s.activityHandler.AddActivity(activity.NewGoalieCollectDeadBall(s.team, s.robotId))
-	return "NONE"
+	return state_machine.NoEvent
 }
 
 func (s *GoalieSafeAlignState) Initialize() {
@@ -142,12 +142,12 @@ func (s *GoalieSafeAlignState) GetName() state_machine.StateName {
 func (s *GoalieSafeAlignState) Update() state_machine.EventName {
 	if !goalieHasBallControl(s.Gi, s.Team, s.RobotId, goalieRescueControlRadius) {
 		s.Ctx.ResetTarget()
-		return "BALL_LOST"
+		return EventBallLost
 	}
 
 	if !s.Ctx.HasSafeTarget() {
 		s.ActivityHandler.AddActivity(activity.NewGoalieCollectDeadBall(s.Team, s.RobotId))
-		return "NONE"
+		return state_machine.NoEvent
 	}
 
 	act := activity.NewDirectAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
@@ -157,9 +157,9 @@ func (s *GoalieSafeAlignState) Update() state_machine.EventName {
 	act.AllowBehindGoalLine(true)
 	s.ActivityHandler.AddActivity(act)
 	if act.Achieved(s.Gi) {
-		return "ALIGNED"
+		return EventAligned
 	}
-	return "NONE"
+	return state_machine.NoEvent
 }
 
 func (s *GoalieSafeKickState) Initialize() {
@@ -184,16 +184,16 @@ func (s *GoalieSafeKickState) GetName() state_machine.StateName {
 func (s *GoalieSafeKickState) Update() state_machine.EventName {
 	if s.KickAct == nil {
 		s.Ctx.ResetTarget()
-		return "BALL_LOST"
+		return EventBallLost
 	}
 	if s.KickAct.Achieved(s.Gi) {
 		s.Ctx.ResetTarget()
-		return "KICKED"
+		return EventKicked
 	}
 	if s.KickAct.NeedsRealign(s.Gi) {
-		return "MISALIGNED"
+		return EventMisaligned
 	}
-	return "NONE"
+	return state_machine.NoEvent
 }
 
 func (gc *GoalieSafeClearIntent) FreezeTarget() {

@@ -116,15 +116,15 @@ func (gr *GoalieRole) Init() {
 	}
 
 	sm := state_machine.NewStateMachine(defend)
-	sm.AddTransition(defendName, "DEAD_BALL_TRAPPED", collect)
-	sm.AddTransition(defendName, "BALL_OWNER", align)
-	sm.AddTransition(collectName, "BALL_OWNER", align)
-	sm.AddTransition(collectName, "BALL_LOST", defend)
-	sm.AddTransition(alignName, "ALIGNED", kick)
-	sm.AddTransition(alignName, "BALL_LOST", defend)
-	sm.AddTransition(kickName, "KICKED", defend)
-	sm.AddTransition(kickName, "MISALIGNED", align)
-	sm.AddTransition(kickName, "BALL_LOST", defend)
+	sm.AddTransition(defendName, EventDeadBallTrapped, collect)
+	sm.AddTransition(defendName, EventBallOwner, align)
+	sm.AddTransition(collectName, EventBallOwner, align)
+	sm.AddTransition(collectName, EventBallLost, defend)
+	sm.AddTransition(alignName, EventAligned, kick)
+	sm.AddTransition(alignName, EventBallLost, defend)
+	sm.AddTransition(kickName, EventKicked, defend)
+	sm.AddTransition(kickName, EventMisaligned, align)
+	sm.AddTransition(kickName, EventBallLost, defend)
 
 	gr.sm = sm
 }
@@ -142,7 +142,7 @@ func (gr *GoalieRole) IsDeadBallRescueActive() bool {
 }
 
 func (gr *GoalieRole) TriggerEvent(event state_machine.EventName) {
-	if event == "BALL_LOST" && gr.safeClear != nil {
+	if event == EventBallLost && gr.safeClear != nil {
 		gr.safeClear.ResetTarget()
 	}
 	gr.sm.TriggerEvent(event)

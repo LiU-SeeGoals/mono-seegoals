@@ -5,11 +5,20 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 )
 
 type RefStop struct {
 	GenericComposition
 	keepDistance float64
+	move         *MoveToPosition // inner move of the last frame
+}
+
+// ContinueFrom keeps the previous frame's inner move.
+func (m *RefStop) ContinueFrom(previous Activity) {
+	if prev, ok := previous.(*RefStop); ok && prev != nil && prev != m && prev.team == m.team && prev.id == m.id {
+		m.move = prev.move
+	}
 }
 
 func (m *RefStop) String() string {
@@ -22,7 +31,7 @@ func NewRefStop(team info.Team, id info.ID) *RefStop {
 			id:   id,
 			team: team,
 		},
-		keepDistance: 700,
+		keepDistance: rules.StopBallKeepout,
 	}
 
 }
@@ -42,7 +51,7 @@ func (m *RefStop) GetAction(gi *info.GameInfo) action.Action {
 	}
 
 	// Clear the announced destination before the simulator places the ball.
-	if ge := gi.Status.GetGameEvent(); ge.IsPlacementStop() && ge.GetDesignatedPosition() != nil {
+	if ge := gi.Status.GetGameEvent(); rules.For(gi, m.team).Stopped && ge.GetDesignatedPosition() != nil {
 		p := ge.GetDesignatedPosition()
 		target := info.Position{X: p.AtVec(0), Y: p.AtVec(1)}
 		if robotPos.Dist2d(target) < robotPos.Dist2d(ballPos) {
@@ -55,7 +64,8 @@ func (m *RefStop) GetAction(gi *info.GameInfo) action.Action {
 
 		direction := ballPos.AngleToPosition(robotPos)
 		targetPos := ballPos.OnRadius(m.keepDistance, direction)
-		act = NewMoveToPosition(m.team, m.id, targetPos).GetAction(gi)
+		m.move = continueMove(m.move, m.team, m.id, targetPos)
+		act = m.move.GetAction(gi)
 	}
 
 	return act

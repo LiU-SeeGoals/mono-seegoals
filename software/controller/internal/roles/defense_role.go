@@ -86,7 +86,7 @@ func (s *DefensePressState) Update() state_machine.EventName {
 	}
 
 	s.activityHandler.AddActivity(activity.NewMoveToPosition(s.team, s.robotId, target))
-	return "NONE"
+	return state_machine.NoEvent
 }
 
 func (s *DefensePressState) ballGoalLineTarget(ballPos info.Position, ballOffset float64, lateralOffset float64) info.Position {
@@ -161,7 +161,7 @@ func (s *DefenseWallState) GetName() state_machine.StateName {
 func (s *DefenseWallState) Update() state_machine.EventName {
 	act := activity.NewMoveToPosition(s.team, s.robotId, *s.wallPos)
 	s.activityHandler.AddActivity(act)
-	return "NONE"
+	return state_machine.NoEvent
 }
 
 type DefenseRole struct {
@@ -207,8 +207,8 @@ func (dr *DefenseRole) Init() {
 	}
 
 	sm := state_machine.NewStateMachine(pressState)
-	sm.AddTransition(pressName, "ATTACKER_NEAR", wallState)
-	sm.AddTransition(wallName, "ATTACKER_FAR", pressState)
+	sm.AddTransition(pressName, EventAttackerNear, wallState)
+	sm.AddTransition(wallName, EventAttackerFar, pressState)
 
 	dr.sm = sm
 	dr.pressState = pressState

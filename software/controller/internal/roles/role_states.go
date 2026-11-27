@@ -1,6 +1,7 @@
 package roles
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 	"math"
 	"time"
 
@@ -95,9 +96,9 @@ func (s *AlignState) Update() state_machine.EventName {
 	//activity := act.NewAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
 	s.ActivityHandler.AddActivity(act)
 	if updateAlignConfirmation(&s.alignedSince, act.Achieved(s.Gi), s.Gi.Now()) {
-		return "ALIGNED"
+		return EventAligned
 	}
-	return "NONE"
+	return state_machine.NoEvent
 }
 
 func updateAlignConfirmation(alignedSince *time.Time, aligned bool, now time.Time) bool {
@@ -135,13 +136,8 @@ func (s *SupportState) GetName() state_machine.StateName {
 
 func (s *SupportState) Update() state_machine.EventName {
 
-	act := activity.NewMoveToPosition(s.team, s.robotId, s.ctx.GetFromPosition())
-	s.activityHandler.AddActivity(act)
-	achieved := act.Achieved(s.gi)
-	if achieved {
-		return "WAITING"
-	}
-	return "NONE"
+	s.activityHandler.AddActivity(activity.NewMoveToPosition(s.team, s.robotId, s.ctx.GetFromPosition()))
+	return state_machine.NoEvent
 }
 
 type ReceivePassState struct {
@@ -175,10 +171,10 @@ func (s *ReceivePassState) Update() state_machine.EventName {
 
 	possessor := s.gi.State.GetBall().GetPossessor()
 	if possessor != nil && possessor.GetTeam() == s.team && possessor.GetID() == s.robotId {
-		return "BALL_RECEIVED"
+		return EventBallReceived
 	}
 
-	return "NONE"
+	return state_machine.NoEvent
 }
 
 type InterceptBallState struct {
@@ -215,7 +211,7 @@ func (s *InterceptBallState) Update() state_machine.EventName {
 			waitPos.Angle = waitPos.AngleToPosition(ballPos)
 			act := activity.NewMoveToPosition(s.team, s.robotId, waitPos)
 			s.activityHandler.AddActivity(act)
-			return "NONE"
+			return state_machine.NoEvent
 		}
 	}
 
@@ -224,10 +220,10 @@ func (s *InterceptBallState) Update() state_machine.EventName {
 		s.activityHandler.AddActivity(act)
 
 		if act.Achieved(s.gi) {
-			return "BALL_OWNER"
+			return EventBallOwner
 		}
 
-		return "NONE"
+		return state_machine.NoEvent
 	}
 
 	targetPos := s.ctx.GetTargetPosition()
@@ -236,10 +232,10 @@ func (s *InterceptBallState) Update() state_machine.EventName {
 	s.activityHandler.AddActivity(act)
 
 	if act.Achieved(s.gi) {
-		return "BALL_OWNER"
+		return EventBallOwner
 	}
 
-	return "NONE"
+	return state_machine.NoEvent
 }
 
 type interceptGoalNoGoZone struct {
@@ -281,7 +277,7 @@ func interceptGoalNoGoZoneForSide(gi *info.GameInfo, positive bool) (interceptGo
 	}
 	for _, area := range gi.DefenseAreas() {
 		if (area.FrontX > 0) == positive {
-			margin := pathplanner.GoalLineSafetyRadius
+			margin := rules.DefenseAreaMotionClearance
 			return interceptGoalNoGoZone{
 				minX: math.Min(area.FrontX, area.BackX) - margin,
 				maxX: math.Max(area.FrontX, area.BackX) + margin,
@@ -333,10 +329,10 @@ func (s *KickState) Update() state_machine.EventName {
 		if ctx, ok := s.Ctx.(FreezableTargetContext); ok {
 			ctx.ResetTarget()
 		}
-		return "KICKED"
+		return EventKicked
 	}
 	if s.KickAct.NeedsRealign(s.Gi) {
-		return "MISALIGNED"
+		return EventMisaligned
 	}
-	return "NONE"
+	return state_machine.NoEvent
 }

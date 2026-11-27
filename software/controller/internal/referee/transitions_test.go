@@ -38,30 +38,89 @@ func TestRefereePreparationAndTimeoutTransitions(t *testing.T) {
 	}
 }
 
-func TestPenaltyTimeoutReturnsToStop(t *testing.T) {
-	gi := info.NewGameInfo(10)
-	ge := gi.Status.GetGameEvent()
-	ge.CurrentState = info.STATE_PENALTY_PREPARATION
-	ge.CurrentActionTimeRemainingValid = true
-	ge.CurrentActionTimeRemaining = 0
+func newTestHandler(gi *info.GameInfo, team info.Team, robots []info.ID) *RefereeHandler {
 	var activities [info.TEAM_SIZE]activity.Activity
 	handler := &ai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
-	ref := NewRefereeHandler(gi, nil, info.Blue, handler)
-	for _, event := range []state_machine.EventName{STOP, PREPARE_PENALTY, NORMAL_START} {
-		ref.refereeSM.TriggerEvent(event)
+	return NewRefereeHandler(gi, robots, team, handler)
+}
+
+func TestPenaltyTimeoutReturnsToStop(t *testing.T) {
+	gi := info.NewGameInfo(10)
+	gi.State.SetBall(0, 0, 0, 1)
+	ge := gi.Status.GetGameEvent()
+	ref := newTestHandler(gi, info.Blue, nil)
+
+	ge.UpdateFromRefCommand(info.PREPARE_PENALTY_BLUE, 100, 0, 0, info.UNINITIALIZED, 10_000_000, true)
+	ref.HandleReferee()
+	ge.UpdateFromRefCommand(info.NORMAL_START, 200, 0, 0, info.UNINITIALIZED, 0, true)
+	gi.ObserveRestart()
+	ref.HandleReferee()
+	if ref.refereeSM.CurrentStateName() != StateStop || ge.CurrentState != info.STATE_STOPPED || ge.BallInPlay {
+		t.Fatalf("expired penalty: referee %s, game state %s, in play %v; want STOP, Stopped, false",
+			ref.refereeSM.CurrentStateName(), ge.CurrentState, ge.BallInPlay)
 	}
-	ref.refereeSM.Update()
-	if ref.refereeSM.CurrentStateName() != "STOP" || ge.CurrentState != info.STATE_STOPPED || ge.BallInPlay {
-		t.Fatal("expired penalty did not return both referee representations to STOP")
+}
+
+func TestStopIsLeftToThePlanner(t *testing.T) {
+	gi := info.NewGameInfo(10)
+	ref := newTestHandler(gi, info.Blue, []info.ID{1, 2})
+	gi.Status.GetGameEvent().UpdateFromRefCommand(info.STOP, 100, 0, 0, info.UNINITIALIZED, 0, false)
+	if ref.HandleReferee() {
+		t.Fatal("STOP handled by the referee; the planner should own it")
+	}
+	gi.Status.GetGameEvent().UpdateFromRefCommand(info.BALL_PLACEMENT_YELLOW, 200, 0, 0, info.UNINITIALIZED, 0, false)
+	if !ref.HandleReferee() {
+		t.Fatal("ball placement not handled by the referee")
+	}
+}
+
+// Both teams' handlers read the same GameEvent; neither may change it.
+func TestHandlersDoNotWriteRefereeState(t *testing.T) {
+	gi := info.NewGameInfo(10)
+	gi.State.SetBall(0, 0, 0, 1)
+	gi.State.SetBlueRobot(1, -1000, 0, 0, 1)
+	gi.State.SetYellowRobot(1, 1000, 0, 0, 1)
+	ge := gi.Status.GetGameEvent()
+	blue := newTestHandler(gi, info.Blue, []info.ID{1})
+	yellow := newTestHandler(gi, info.Yellow, []info.ID{1})
+
+	for i, command := range []info.RefCommand{info.STOP, info.DIRECT_FREE_BLUE, info.PREPARE_PENALTY_YELLOW, info.NORMAL_START} {
+		ge.UpdateFromRefCommand(command, uint64(100*(i+1)), 0, 0, info.UNINITIALIZED, 10_000_000, true)
+		gi.ObserveRestart()
+		before := *ge
+		blue.HandleReferee()
+		yellow.HandleReferee()
+		if *ge != before {
+			t.Fatalf("%v: a referee handler changed the shared GameEvent", command)
+		}
+	}
+}
+
+func TestFreeKickHandsOverOnceTheBallMoved(t *testing.T) {
+	gi := info.NewGameInfo(10)
+	gi.State.SetBall(0, 0, 0, 1)
+	ge := gi.Status.GetGameEvent()
+	ref := newTestHandler(gi, info.Blue, nil)
+
+	ge.UpdateFromRefCommand(info.DIRECT_FREE_BLUE, 100, 0, 0, info.UNINITIALIZED, 10_000_000, true)
+	gi.ObserveRestart()
+	ref.HandleReferee()
+	if ref.refereeSM.CurrentStateName() != StateFreeKick || ge.BallInPlay {
+		t.Fatal("free kick did not start")
+	}
+
+	gi.State.SetBall(info.BallInPlayDistance+1, 0, 0, 2)
+	gi.ObserveRestart()
+	ref.HandleReferee()
+	if !ge.BallInPlay || !ge.RestartKicked || !ref.freeKick.kickTaken {
+		t.Fatal("moved ball did not put the free kick in play")
 	}
 }
 
 func TestFreeKickStartsWithoutStopAndRepeatedPacketDoesNotRestartIt(t *testing.T) {
 	gi := info.NewGameInfo(10)
 	gi.State.SetBall(0, 0, 0, 1)
-	var activities [info.TEAM_SIZE]activity.Activity
-	handler := &ai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
-	ref := NewRefereeHandler(gi, nil, info.Blue, handler)
+	ref := newTestHandler(gi, info.Blue, nil)
 	ge := gi.Status.GetGameEvent()
 	ge.UpdateFromRefCommand(info.FORCE_START, 100, 0, 0, info.UNINITIALIZED, 0, false)
 	ref.HandleReferee()
