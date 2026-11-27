@@ -1,0 +1,18 @@
+syntax = "proto2";
+
+// Vendored from RoboCup-SSL/ssl-game-controller proto/ (master 0b8f752808,
+// 2026-11-23); only import paths and go_package changed.
+option go_package = "github.com/LiU-SeeGoals/proto_go/gc";
+
+// A vector with two dimensions
+message Vector2 {
+    required float x = 1;
+    required float y = 2;
+}
+
+// A vector with three dimensions
+message Vector3 {
+    required float x = 1;
+    required float y = 2;
+    required float z = 3;
+}

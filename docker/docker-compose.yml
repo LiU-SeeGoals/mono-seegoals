@@ -1,7 +1,11 @@
 services:
   ai:
     platform: linux/amd64
-    build: ../software/controller
+    build:
+      # software/ so the image can include proto-messages/proto_go, which
+      # controller/go.mod replaces github.com/LiU-SeeGoals/proto_go with.
+      context: ../software
+      dockerfile: controller/Dockerfile
     container_name: ${DOCKER_NAME_AI}
     restart: "no"
     volumes:
@@ -10,6 +14,7 @@ services:
       - ../environment.ini:/var/controller/.env
       - ../environment.ini:/var/controller/.env
       - ../software/controller/:/var/controller
+      - ../software/proto-messages/proto_go/:/var/proto-messages/proto_go:ro
     working_dir: /var/controller/cmd
     tty: true
     environment:

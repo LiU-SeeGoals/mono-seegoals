@@ -1,0 +1,18 @@
+# Used by BuildKit for controller/Dockerfile; the build context is software/,
+# so everything is excluded except what the image needs.
+*
+!controller
+!proto-messages/proto_go
+
+controller/.git
+controller/.github
+controller/Dockerfile
+controller/Dockerfile.dockerignore
+controller/.bash_history
+controller/cmd/cmd
+controller/cmd/Support
+controller/**/*.out
+controller/**/*.prof
+controller/**/*.trace
+controller/logs
+controller/**/logs

@@ -23,6 +23,9 @@ require (
 
 require golang.org/x/sys v0.20.0 // indirect
 
+// Generated from software/proto-messages; regenerate with its build_go.sh.
+replace github.com/LiU-SeeGoals/proto_go => ../proto-messages/proto_go
+
 require (
 	go.uber.org/zap v1.27.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1

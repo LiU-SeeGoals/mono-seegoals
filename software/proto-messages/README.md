@@ -2,7 +2,7 @@
 **IMPORTANT**: This directory contains protocol buffer definitions that are shared across multiple repositories in the project. Making changes to the files in this directory may **break the communication** between different modules of the project.
 
 ## Protocol Buffer Definitions
-The proto files for `ssl_vision` and `grsim` are external dependencies and should **not be altered**. These files are based on specifications provided by third-party modules that our project interfaces with. Modifying these proto files would lead to compatibility issues, as changes on our end would not be reflected in the external modules.
+The proto files for `ssl_vision`, `gc` (SSL game controller, vendored from RoboCup-SSL/ssl-game-controller), `simulation` and `grsim` are external dependencies and should **not be altered**. These files are based on specifications provided by third-party modules that our project interfaces with. Modifying these proto files would lead to compatibility issues, as changes on our end would not be reflected in the external modules.
 
 ## Generating Proto Code
 To generate the necessary code from the proto files, you should use the provided scripts.
@@ -13,6 +13,11 @@ To build the Go code, run the following script from the root of this directory:
 ```bash
 ./build_go.sh
 ```
+
+This needs `protoc` and `protoc-gen-go` v1.34.2 on your PATH. The output in
+`proto_go/` is committed, and the controller uses it directly through a
+`replace` directive in `software/controller/go.mod`, so rebuild the controller
+after regenerating.
 
 ### For C
 To build the C code, run the following script from the root of this directory:
@@ -44,5 +49,5 @@ The C code uses the [nanopb](https://github.com/nanopb/nanopb) implementation si
 To build the Python code, run the following script from the root of this directory:
 
 ```bash
-./build_python.sh
+./build_py.sh
 ```

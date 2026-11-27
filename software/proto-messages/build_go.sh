@@ -1,31 +1,22 @@
 #!/bin/bash
+# Regenerates proto_go/ (Go module github.com/LiU-SeeGoals/proto_go) from the
+# .proto files in this directory. Needs protoc and protoc-gen-go v1.34.2.
+set -euo pipefail
 
-# Define the root directory where the script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+OUT_DIR="${SCRIPT_DIR}/proto_go"
+DIRS=(gc grsim parsed_vision robot_action simulation ssl_vision)
 
-# Function to generate Go code from proto files in a directory
-generate_go_code() {
-	local dir_name="$1"
-	local dir_path="${SCRIPT_DIR}/${dir_name}" # Corrected to include subdirectory
-	local output_dir="${SCRIPT_DIR}/proto_go"  # Output in subdirectories
+cd "${SCRIPT_DIR}"
+for dir in "${DIRS[@]}"; do
+	rm -f "${OUT_DIR}/${dir}"/*.pb.go
+done
 
-	# Ensure the output directory exists
-	mkdir -p "${output_dir}"
+# One protoc call so imports across directories (e.g. ssl_vision -> gc) resolve.
+protos=()
+for dir in "${DIRS[@]}"; do
+	protos+=("${dir}"/*.proto)
+done
+protoc --proto_path="${SCRIPT_DIR}" --go_out="${OUT_DIR}" --go_opt=paths=source_relative "${protos[@]}"
 
-	# Check if the source directory exists
-	if [ -d "${dir_path}" ]; then
-		# Find all .proto files and generate Go code
-		find "${dir_path}" -name '*.proto' -exec protoc --proto_path="${SCRIPT_DIR}" --go_out="${output_dir}" --go_opt=paths=source_relative {} +
-	else
-		echo "Warning: Directory ${dir_path} does not exist."
-	fi
-}
-
-# Generate Go code for proto files in the grsim, robot_action, and ssl_vision directories
-generate_go_code "simulation"
-generate_go_code "robot_action"
-generate_go_code "parsed_vision"
-generate_go_code "ssl_vision"
-generate_go_code "grsim"
-
-echo "Proto files built in ${SCRIPT_DIR}/proto_go"
+echo "Proto files built in ${OUT_DIR}"

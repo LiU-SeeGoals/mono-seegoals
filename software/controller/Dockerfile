@@ -12,8 +12,11 @@ RUN apk add --no-cache \
 
 WORKDIR /var/controller
 
-COPY . .
-
+# Build context is software/ (see docker/docker-compose.yml). go.mod replaces
+# proto_go with ../proto-messages/proto_go, so mirror that layout.
+COPY proto-messages/proto_go /var/proto-messages/proto_go
+COPY controller/go.mod controller/go.sum ./
 RUN go mod download
+COPY controller/ .
 
 CMD ["go", "run", "cmd/main.go"]

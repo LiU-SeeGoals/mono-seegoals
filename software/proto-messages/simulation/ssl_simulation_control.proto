@@ -1,7 +1,7 @@
 syntax = "proto2";
 option go_package = "github.com/LiU-SeeGoals/proto_go/simulation";
 
-import "simulation/ssl_gc_common.proto";
+import "gc/ssl_gc_common.proto";
 import "simulation/ssl_simulation_config.proto";
 import "simulation/ssl_simulation_error.proto";
 

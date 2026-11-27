@@ -15,7 +15,8 @@ mkdir -p "${ACTION_DIR}"
 generate_py_code() {
 	local dir_path="$1"
 	for PROTO_FILE in "${dir_path}"/*.proto; do
-		protoc --python_out="${dir_path}" --proto_path="${dir_path}" "${PROTO_FILE}"
+		# Root proto_path so cross-directory imports (ssl_vision/...) resolve.
+		protoc --python_out="${ROOT_DIR}" --proto_path="${ROOT_DIR}" "${PROTO_FILE}"
 	done
 }
 
