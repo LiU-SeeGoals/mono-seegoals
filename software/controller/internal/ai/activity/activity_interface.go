@@ -1,4 +1,4 @@
-package ai
+package activity
 
 import (
 	"github.com/LiU-SeeGoals/controller/internal/action"

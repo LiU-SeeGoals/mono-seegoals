@@ -1,4 +1,4 @@
-package ai
+package plan
 
 import (
 	"math"
@@ -7,12 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/debugstate"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/referee"
 	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
@@ -20,7 +19,7 @@ import (
 type CombinedPlan struct {
 	plannerCore
 	ballTouchRestrictedRobot atomic.Uint32
-	tick                     func(GameInfo)
+	tick                     func(info.GameInfo)
 }
 
 type tacticalMode string
@@ -34,6 +33,12 @@ const (
 	activeRobotTimeoutMillis = int64(1000)
 
 	preferredGoalieID = info.ID(6)
+
+	// Opponents deeper than this (mm, along our defending axis) count as a
+	// threat to our goal. Moved here from the deleted plan_2bot_defence.go.
+	attackerThreatX = 2800.0
+	// Unsigned goal center for a 9 m field; defendedGoalCenter mirrors it.
+	defendedGoalCenterAbsX = 4500.0
 
 	goalWallDistanceFromGoal = 800.0
 	goalWallYClamp           = 1200.0
@@ -97,9 +102,9 @@ func (slot tacticalSlotKind) label() string {
 }
 
 type combinedRoleManager struct {
-	activityHandler *coreai.ActivityHandler
-	gi              *GameInfo
-	team            Team
+	activityHandler *ai.ActivityHandler
+	gi              *info.GameInfo
+	team            info.Team
 	attackers       map[info.ID]*roles.OffenseRole
 	defenders       map[info.ID]*roles.DefenseRole
 	roleByRobot     map[info.ID]roleKind
@@ -107,7 +112,7 @@ type combinedRoleManager struct {
 	lastChanged     map[info.ID]time.Time
 }
 
-func newCombinedRoleManager(activityHandler *coreai.ActivityHandler, gi *GameInfo, team Team) *combinedRoleManager {
+func newCombinedRoleManager(activityHandler *ai.ActivityHandler, gi *info.GameInfo, team info.Team) *combinedRoleManager {
 	return &combinedRoleManager{
 		activityHandler: activityHandler,
 		gi:              gi,
@@ -324,17 +329,16 @@ func (rm *combinedRoleManager) configureOffenseReceivers(receiverIDs []info.ID) 
 	}
 }
 
-func NewCombinedPlan(team Team) *CombinedPlan {
+func NewCombinedPlan(team info.Team) *CombinedPlan {
 	return &CombinedPlan{
 		plannerCore: plannerCore{team: team},
 	}
 }
 
 func (m *CombinedPlan) Init(
-	activities *[TEAM_SIZE]act.Activity,
+	activities *[info.TEAM_SIZE]activity.Activity,
 	lock *sync.Mutex,
-	team Team,
-) {
+	team info.Team) {
 	m.ActivityHandler.Activities = activities
 	m.ActivityHandler.Activity_lock = lock
 	m.team = team
@@ -342,7 +346,7 @@ func (m *CombinedPlan) Init(
 	m.tick = nil
 }
 
-func (m *CombinedPlan) Tick(gi *GameInfo) {
+func (m *CombinedPlan) Tick(gi *info.GameInfo) {
 	if !m.Active {
 		return
 	}
@@ -381,7 +385,7 @@ func (m *CombinedPlan) getRobotClosestToPosition(
 }
 
 func (m *CombinedPlan) getRobotForBall(gi *info.GameInfo, activeRobots []info.ID) info.ID {
-	targetPos := act.PredictedBallPos(gi, lookaheadSec)
+	targetPos := activity.PredictedBallPos(gi, lookaheadSec)
 	return m.getRobotClosestToPosition(gi, activeRobots, targetPos)
 }
 
@@ -402,7 +406,7 @@ func (m *CombinedPlan) ballTouchRestriction() (info.ID, bool) {
 	return info.ID(encoded - 1), true
 }
 
-func (m *CombinedPlan) activeRobots(gi *GameInfo) []info.ID {
+func (m *CombinedPlan) activeRobots(gi *info.GameInfo) []info.ID {
 	team := gi.State.GetTeam(m.team)
 	nowMillis := time.Now().UnixMilli()
 	recent := []info.ID{}
@@ -450,7 +454,7 @@ func withoutRobot(robots []info.ID, excluded info.ID) []info.ID {
 	return filtered
 }
 
-func (m *CombinedPlan) chooseGoalie(gi *GameInfo, activeRobots []info.ID) (info.ID, bool) {
+func (m *CombinedPlan) chooseGoalie(gi *info.GameInfo, activeRobots []info.ID) (info.ID, bool) {
 	if gi != nil && gi.Status != nil {
 		teamInfo := gi.Status.GetTeamInfo(m.team == info.Yellow)
 		if teamInfo != nil {
@@ -471,8 +475,7 @@ func (m *CombinedPlan) chooseGoalie(gi *GameInfo, activeRobots []info.ID) (info.
 }
 
 func (m *CombinedPlan) splitGoalieFromFieldRobots(
-	gi *GameInfo,
-	activeRobots []info.ID,
+	gi *info.GameInfo, activeRobots []info.ID,
 ) (info.ID, bool, []info.ID) {
 	goalieID, hasGoalie := m.chooseGoalie(gi, activeRobots)
 	if !hasGoalie {
@@ -482,7 +485,7 @@ func (m *CombinedPlan) splitGoalieFromFieldRobots(
 	return goalieID, true, withoutRobot(activeRobots, goalieID)
 }
 
-func (m *CombinedPlan) desiredMode(gi *GameInfo, fallback tacticalMode) tacticalMode {
+func (m *CombinedPlan) desiredMode(gi *info.GameInfo, fallback tacticalMode) tacticalMode {
 	possessor := gi.State.GetBall().GetPossessor()
 	if possessor == nil {
 		return fallback
@@ -493,7 +496,7 @@ func (m *CombinedPlan) desiredMode(gi *GameInfo, fallback tacticalMode) tactical
 	return tacticalModeDefend
 }
 
-func desiredModeForTrackedOwner(owner trackedBallOwner, ourTeam Team, fallback tacticalMode) tacticalMode {
+func desiredModeForTrackedOwner(owner trackedBallOwner, ourTeam info.Team, fallback tacticalMode) tacticalMode {
 	if !owner.valid {
 		return fallback
 	}
@@ -503,7 +506,7 @@ func desiredModeForTrackedOwner(owner trackedBallOwner, ourTeam Team, fallback t
 	return tacticalModeDefend
 }
 
-func stoppedRestartMode(gameEvent *info.GameEvent, ourTeam Team) (tacticalMode, bool) {
+func stoppedRestartMode(gameEvent *info.GameEvent, ourTeam info.Team) (tacticalMode, bool) {
 	if gameEvent == nil || gameEvent.GetCurrentState() != info.STATE_STOPPED {
 		return "", false
 	}
@@ -587,7 +590,7 @@ func clampFloat(value float64, minValue float64, maxValue float64) float64 {
 	return math.Max(minValue, math.Min(maxValue, value))
 }
 
-func (m *CombinedPlan) chooseBallChaser(gi *GameInfo, candidates []info.ID, owner trackedBallOwner) info.ID {
+func (m *CombinedPlan) chooseBallChaser(gi *info.GameInfo, candidates []info.ID, owner trackedBallOwner) info.ID {
 	if owner.valid && owner.team == m.team && containsRobot(candidates, owner.id) {
 		return owner.id
 	}
@@ -599,7 +602,7 @@ func (m *CombinedPlan) chooseBallChaser(gi *GameInfo, candidates []info.ID, owne
 	return m.getRobotForBall(gi, candidates)
 }
 
-func (m *CombinedPlan) chooseSupportShooter(gi *GameInfo, candidates []info.ID) info.ID {
+func (m *CombinedPlan) chooseSupportShooter(gi *info.GameInfo, candidates []info.ID) info.ID {
 	if len(candidates) == 0 {
 		return 0
 	}
@@ -627,12 +630,12 @@ func (m *CombinedPlan) chooseSupportShooter(gi *GameInfo, candidates []info.ID) 
 	return bestID
 }
 
-func (m *CombinedPlan) highDefenderTarget(gi *GameInfo, ballPos Position) Position {
+func (m *CombinedPlan) highDefenderTarget(gi *info.GameInfo, ballPos info.Position) info.Position {
 	goalPos := m.defendedGoalCenter(gi)
 	toGoal := goalPos.Sub(&ballPos)
 	dist := toGoal.Norm2d()
 	if dist < 1 {
-		target := Position{X: -m.defenseXSign(gi) * 1000, Y: 0, Z: 0, Angle: 0}
+		target := info.Position{X: -m.defenseXSign(gi) * 1000, Y: 0, Z: 0, Angle: 0}
 		target.Angle = target.AngleToPosition(ballPos)
 		return target
 	}
@@ -644,8 +647,8 @@ func (m *CombinedPlan) highDefenderTarget(gi *GameInfo, ballPos Position) Positi
 	return target
 }
 
-func (m *CombinedPlan) lowDefenderTarget(gi *GameInfo, ballPos Position) Position {
-	target := Position{
+func (m *CombinedPlan) lowDefenderTarget(gi *info.GameInfo, ballPos info.Position) info.Position {
+	target := info.Position{
 		X: m.defenseXSign(gi) * lowDefenderDepth,
 		Y: clampFloat(ballPos.Y, -goalWallYClamp, goalWallYClamp),
 		Z: 0,
@@ -654,7 +657,7 @@ func (m *CombinedPlan) lowDefenderTarget(gi *GameInfo, ballPos Position) Positio
 	return target
 }
 
-func (m *CombinedPlan) targetForTacticalSlot(gi *GameInfo, slot tacticalSlotKind) Position {
+func (m *CombinedPlan) targetForTacticalSlot(gi *info.GameInfo, slot tacticalSlotKind) info.Position {
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 
 	switch slot {
@@ -673,8 +676,7 @@ func (m *CombinedPlan) targetForTacticalSlot(gi *GameInfo, slot tacticalSlotKind
 }
 
 func (m *CombinedPlan) assignTacticalSlots(
-	gi *GameInfo,
-	robots []info.ID,
+	gi *info.GameInfo, robots []info.ID,
 	assignment roleAssignment,
 	owner trackedBallOwner,
 	restrictedRobot info.ID,
@@ -712,16 +714,16 @@ func (m *CombinedPlan) assignTacticalSlots(
 	return assignments
 }
 
-func (m *CombinedPlan) getAttackerPosition(gi *GameInfo) (Position, bool) {
+func (m *CombinedPlan) getAttackerPosition(gi *info.GameInfo) (info.Position, bool) {
 	opponents := gi.State.GetOtherTeam(m.team)
 	ballPos, _ := gi.State.GetBall().GetEstimatedPosition()
 
 	minDist := math.Inf(1)
-	var closestPos Position
+	var closestPos info.Position
 	found := false
 
-	var i ID
-	for i = 0; i < TEAM_SIZE; i++ {
+	var i info.ID
+	for i = 0; i < info.TEAM_SIZE; i++ {
 		robotPos, err := opponents[i].GetPosition()
 		if err != nil {
 			continue
@@ -736,30 +738,28 @@ func (m *CombinedPlan) getAttackerPosition(gi *GameInfo) (Position, bool) {
 	return closestPos, found
 }
 
-func (m *CombinedPlan) defendsPositiveHalf(gi *GameInfo) bool {
-	isBlueTeam := m.team == Blue
+func (m *CombinedPlan) defendsPositiveHalf(gi *info.GameInfo) bool {
+	isBlueTeam := m.team == info.Blue
 	isBlueOnPositiveHalf := gi.Status.GetBlueTeamOnPositiveHalf()
 	return (isBlueTeam && isBlueOnPositiveHalf) || (!isBlueTeam && !isBlueOnPositiveHalf)
 }
 
-func (m *CombinedPlan) defenseXSign(gi *GameInfo) float64 {
+func (m *CombinedPlan) defenseXSign(gi *info.GameInfo) float64 {
 	if m.defendsPositiveHalf(gi) {
 		return 1.0
 	}
 	return -1.0
 }
 
-func (m *CombinedPlan) defendedGoalCenter(gi *GameInfo) Position {
-	goalCenter := blueGoalCenter
-	goalCenter.X = m.defenseXSign(gi) * math.Abs(blueGoalCenter.X)
-	return goalCenter
+func (m *CombinedPlan) defendedGoalCenter(gi *info.GameInfo) info.Position {
+	return info.Position{X: m.defenseXSign(gi) * defendedGoalCenterAbsX}
 }
 
-func (m *CombinedPlan) attackerIsThreatening(gi *GameInfo, attackerPos Position) bool {
+func (m *CombinedPlan) attackerIsThreatening(gi *info.GameInfo, attackerPos info.Position) bool {
 	return m.defenseXSign(gi)*attackerPos.X > attackerThreatX
 }
 
-func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Position, count int) []Position {
+func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *info.GameInfo, threatPos info.Position, count int) []info.Position {
 	if count == 0 {
 		return nil
 	}
@@ -776,11 +776,11 @@ func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Po
 	}
 	wallY = clampFloat(wallY, -goalWallYClamp, goalWallYClamp)
 
-	positions := make([]Position, count)
+	positions := make([]info.Position, count)
 	centerOffset := float64(count-1) / 2.0
 	for i := 0; i < count; i++ {
 		y := wallY + (float64(i)-centerOffset)*goalWallSpacing
-		pos := Position{
+		pos := info.Position{
 			X: wallX,
 			Y: clampFloat(y, -goalWallYClamp, goalWallYClamp),
 			Z: 0,
@@ -793,8 +793,7 @@ func (m *CombinedPlan) calcGoalWallPositionsForRobots(gi *GameInfo, threatPos Po
 }
 
 func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
-	gi *GameInfo,
-	roleManager *combinedRoleManager,
+	gi *info.GameInfo, roleManager *combinedRoleManager,
 	goalieID info.ID,
 	goalieRole *roles.GoalieRole,
 	stopped bool,
@@ -844,8 +843,8 @@ func (m *CombinedPlan) updateDefenseAndGoaliePositioning(
 	goalieRole.Run()
 }
 
-func (m *CombinedPlan) newTick() func(GameInfo) {
-	var gi GameInfo
+func (m *CombinedPlan) newTick() func(info.GameInfo) {
+	var gi info.GameInfo
 	roleManager := newCombinedRoleManager(&m.ActivityHandler, &gi, m.team)
 	possessionTracker := &ballPossessionTracker{}
 	actorTracker := &offenseBallActorTracker{}
@@ -861,7 +860,7 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 	var activeReceiverStart time.Time
 	hasActiveReceiver := false
 
-	return func(frame GameInfo) {
+	return func(frame info.GameInfo) {
 		tickStart := time.Now()
 		gi = frame
 		frameMonitor.Observe(gi.VisionFrame())
@@ -936,7 +935,7 @@ func (m *CombinedPlan) newTick() func(GameInfo) {
 			}
 			for id, attacker := range roleManager.attackers {
 				attacker.TriggerEvent("BALL_LOST")
-				m.ActivityHandler.AddActivity(act.NewRefStop(m.team, id))
+				m.ActivityHandler.AddActivity(activity.NewRefStop(m.team, id))
 			}
 			m.updateDefenseAndGoaliePositioning(&gi, roleManager, goalieID, goalieRole, true)
 			referee.PrepareKickerForUpcomingFreeKick(

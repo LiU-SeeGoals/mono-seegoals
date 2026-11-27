@@ -6,7 +6,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/controller/internal/vision"
 	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
 	"google.golang.org/protobuf/proto"
@@ -63,14 +63,14 @@ func (r *SSLConnection) Receive(packetChan chan *ssl_vision.SSL_WrapperPacket) {
 	for {
 		sz, err := r.conn.Read(r.buff)
 		if err != nil {
-			Logger.Errorf("Unable to receive packet: %v", err)
+			logger.Logger.Errorf("Unable to receive packet: %v", err)
 			continue
 		}
 
 		packet := &ssl_vision.SSL_WrapperPacket{}
 		err = proto.Unmarshal(r.buff[:sz], packet)
 		if err != nil {
-			Logger.Errorf("Unable to unmarshal packet: %v", err)
+			logger.Logger.Errorf("Unable to unmarshal packet: %v", err)
 			continue
 		}
 		helper.NB_Send[ssl_vision.SSL_WrapperPacket](packetChan, packet)

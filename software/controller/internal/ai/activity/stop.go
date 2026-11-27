@@ -1,4 +1,4 @@
-package ai
+package activity
 
 import (
 	"fmt"
@@ -37,4 +37,3 @@ func (m *Stop) Achieved(gi *info.GameInfo) bool {
 func (m *Stop) GetID() info.ID {
 	return m.id
 }
-

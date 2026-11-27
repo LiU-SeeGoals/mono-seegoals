@@ -6,7 +6,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
 )
 
@@ -27,7 +27,7 @@ func loadVisionMask() {
 	for _, team := range []info.Team{info.Yellow, info.Blue} {
 		if strings.EqualFold(setting, team.String()) {
 			visionMaskTeam = team
-			Logger.Warnf("Ignoring vision detections on the %v half", team)
+			logger.Logger.Warnf("Ignoring vision detections on the %v half", team)
 		}
 	}
 }

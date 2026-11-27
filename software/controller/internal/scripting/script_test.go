@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -34,7 +34,7 @@ func (c *countdown) GetID() info.ID                         { return c.id }
 
 func TestScriptRunsInStepWithFramesAndStopsWhenDone(t *testing.T) {
 	gi := info.NewGameInfo(2)
-	activities := &[info.TEAM_SIZE]act.Activity{}
+	activities := &[info.TEAM_SIZE]activity.Activity{}
 	var steps []string
 	s := New(info.Blue, &fakeSim{gi}, func(s *Script) {
 		s.PlaceBall(info.Position{X: 500})
@@ -60,7 +60,7 @@ func TestScriptRunsInStepWithFramesAndStopsWhenDone(t *testing.T) {
 	if pos, ok := s.Robot(3); !ok || pos.Dist2d(info.Position{X: -1000}) > 1 {
 		t.Fatalf("robot 3 at %v (seen %v), want teleported to x=-1000", pos, ok)
 	}
-	if _, isStop := activities[3].(*act.Stop); !isStop {
+	if _, isStop := activities[3].(*activity.Stop); !isStop {
 		t.Fatalf("robot 3 activity after the script = %v, want Stop", activities[3])
 	}
 }
@@ -70,9 +70,9 @@ type countingPlanner struct {
 	killed bool
 }
 
-func (p *countingPlanner) Init(*[info.TEAM_SIZE]act.Activity, *sync.Mutex, info.Team) {}
-func (p *countingPlanner) Tick(*info.GameInfo)                                        { p.ticks++ }
-func (p *countingPlanner) Kill()                                                      { p.killed = true }
+func (p *countingPlanner) Init(*[info.TEAM_SIZE]activity.Activity, *sync.Mutex, info.Team) {}
+func (p *countingPlanner) Tick(*info.GameInfo)                                             { p.ticks++ }
+func (p *countingPlanner) Kill()                                                           { p.killed = true }
 
 func TestUsePlannerTicksUntilScriptEnds(t *testing.T) {
 	gi := info.NewGameInfo(2)
@@ -83,7 +83,7 @@ func TestUsePlannerTicksUntilScriptEnds(t *testing.T) {
 			s.NextFrame()
 		}
 	})
-	s.Init(&[info.TEAM_SIZE]act.Activity{}, &sync.Mutex{}, info.Blue)
+	s.Init(&[info.TEAM_SIZE]activity.Activity{}, &sync.Mutex{}, info.Blue)
 
 	for i := 0; i < 20 && !s.finished; i++ {
 		s.Tick(gi)

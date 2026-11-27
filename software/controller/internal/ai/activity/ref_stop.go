@@ -1,10 +1,10 @@
-package ai
+package activity
 
 import (
 	"fmt"
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 type RefStop struct {
@@ -30,14 +30,14 @@ func NewRefStop(team info.Team, id info.ID) *RefStop {
 func (m *RefStop) GetAction(gi *info.GameInfo) action.Action {
 	ballPos, err := gi.State.GetBall().GetPosition()
 	if err != nil {
-		Logger.Error("Ball position retrieval failed: %v", err)
+		logger.Logger.Error("Ball position retrieval failed: %v", err)
 		return NewStop(m.id).GetAction(gi)
 	}
 
 	robotPos, err := gi.State.GetRobot(m.id, m.team).GetPosition()
 
 	if err != nil {
-		Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
+		logger.Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
 		return NewStop(m.id).GetAction(gi)
 	}
 
@@ -64,13 +64,13 @@ func (m *RefStop) GetAction(gi *info.GameInfo) action.Action {
 func (m *RefStop) Achieved(gi *info.GameInfo) bool {
 	ballPos, err := gi.State.GetBall().GetPosition()
 	if err != nil {
-		Logger.Error("Ball position retrieval failed: %v", err)
+		logger.Logger.Error("Ball position retrieval failed: %v", err)
 	}
 
 	robotPos, err := gi.State.GetRobot(m.id, m.team).GetPosition()
 
 	if err != nil {
-		Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
+		logger.Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
 	}
 
 	ballDist := robotPos.Distance(ballPos)

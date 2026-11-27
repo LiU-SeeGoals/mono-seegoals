@@ -1,15 +1,12 @@
-package ai
+package activity
 
 import (
 	"fmt"
 	"math"
 	"time"
 
-	// "gonum.org/v1/plot"
-	// "gonum.org/v1/plot/plotter"
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	// "github.com/LiU-SeeGoals/controller/internal/plt"
 )
 
 type AlignConfig struct {

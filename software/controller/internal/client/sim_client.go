@@ -1,16 +1,16 @@
 package client
 
 import (
-    "fmt"
-    "net"
-    "sync"
+	"fmt"
+	"net"
+	"sync"
 
-    . "github.com/LiU-SeeGoals/controller/internal/logger"
-    "github.com/LiU-SeeGoals/controller/internal/action"
-    "github.com/LiU-SeeGoals/controller/internal/info"
-    "github.com/LiU-SeeGoals/proto_go/gc"
-    "github.com/LiU-SeeGoals/proto_go/simulation"
-    "google.golang.org/protobuf/proto"
+	"github.com/LiU-SeeGoals/controller/internal/action"
+	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/proto_go/gc"
+	"github.com/LiU-SeeGoals/proto_go/simulation"
+	"google.golang.org/protobuf/proto"
 )
 
 type SimClient struct {
@@ -28,10 +28,10 @@ type SimClient struct {
 // gameState is optionaly provided
 func NewSimClient(addr string, gameInfo ...*info.GameInfo) *SimClient {
 	fmt.Println("Creating new SimClient with address: ", addr)
-	Logger.Info("Creating new SimClient with address: ", addr)
+	logger.Logger.Info("Creating new SimClient with address: ", addr)
 	udpAddr, err := net.ResolveUDPAddr("udp", addr)
 	if err != nil {
-		Logger.Panicf("Unable to resolve UDP address: %v", err)
+		logger.Logger.Panicf("Unable to resolve UDP address: %v", err)
 	}
 
 	sim_client := &SimClient{
@@ -64,18 +64,18 @@ func (client *SimClient) CloseConnection() {
 func (client *SimClient) SendActions(actions []action.Action) {
 	if client.gameState == nil {
 		fmt.Println("Please provide gamestate in the sim_client constructor")
-		Logger.Panic("Please provide gamestate in the sim_client constructor")
+		logger.Logger.Panic("Please provide gamestate in the sim_client constructor")
 	}
-	
+
 	robotCommands := make([]*simulation.RobotCommand, 0, len(actions))
 	for _, action := range actions {
 		robotCommands = append(robotCommands, action.TranslateSim())
 	}
-	
+
 	robotControl := &simulation.RobotControl{
 		RobotCommands: robotCommands,
 	}
-	
+
 	client.Send(robotControl)
 }
 

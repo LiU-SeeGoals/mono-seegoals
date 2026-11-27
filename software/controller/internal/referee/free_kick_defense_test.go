@@ -5,8 +5,8 @@ import (
 	"sync"
 	"testing"
 
-	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/proto_go/ssl_vision"
 	"google.golang.org/protobuf/proto"
@@ -26,19 +26,19 @@ func TestFreeKickDefenseMirrorsAssignedHalfAndKeepsGoalie(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			gi := info.NewGameInfo(int(info.TEAM_SIZE))
 			gi.Status.SetGameStatus(0, 0, 0, 0, 0, tc.bluePositiveHalf, "")
-			activities := [info.TEAM_SIZE]act.Activity{}
-			handler := &coreai.ActivityHandler{
+			activities := [info.TEAM_SIZE]activity.Activity{}
+			handler := &ai.ActivityHandler{
 				Activities:    &activities,
 				Activity_lock: &sync.Mutex{},
 			}
 
 			moveRobotsToDefensePosition(gi, []info.ID{1, 2, 6}, info.Blue, handler)
 
-			if _, ok := activities[6].(*act.Goalie); !ok {
+			if _, ok := activities[6].(*activity.Goalie); !ok {
 				t.Fatalf("goalie activity = %T, want *activity.Goalie", activities[6])
 			}
 			for _, robotID := range []info.ID{1, 2} {
-				if _, ok := activities[robotID].(*act.MoveToPosition); !ok {
+				if _, ok := activities[robotID].(*activity.MoveToPosition); !ok {
 					t.Errorf("defender %d activity = %T, want *activity.MoveToPosition", robotID, activities[robotID])
 				}
 			}

@@ -4,10 +4,10 @@ import (
 	"math"
 	"time"
 
-	ai "github.com/LiU-SeeGoals/controller/internal/ai"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
-	sm "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
+	"github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -34,24 +34,24 @@ type AlignState struct {
 	Gi              *info.GameInfo
 	RobotId         info.ID
 	Team            info.Team
-	Name            sm.StateName
+	Name            state_machine.StateName
 	ActivityHandler *ai.ActivityHandler
 	Ctx             TargetContext
 	alignedSince    time.Time
 	// Keep obstacle-aware staging for restarts even when a defender is nearby.
 	PlanApproach bool
-	latch        *act.AlignLatch
+	latch        *activity.AlignLatch
 }
 
 func (s *AlignState) Initialize() {
 	s.alignedSince = time.Time{}
-	s.latch = &act.AlignLatch{}
+	s.latch = &activity.AlignLatch{}
 	if ctx, ok := s.Ctx.(FreezableTargetContext); ok {
 		ctx.FreezeTarget()
 	}
 }
 
-func (s *AlignState) GetName() sm.StateName {
+func (s *AlignState) GetName() state_machine.StateName {
 	return s.Name
 }
 func enemyCloseToBall(gi *info.GameInfo, team info.Team, ballPos info.Position, radius float64) bool {
@@ -71,15 +71,15 @@ func enemyCloseToBall(gi *info.GameInfo, team info.Team, ballPos info.Position, 
 
 	return false
 }
-func (s *AlignState) Update() sm.EventName {
+func (s *AlignState) Update() state_machine.EventName {
 
 	targetPos := s.Ctx.GetTargetPosition()
 	fromPos := s.Ctx.GetFromPosition()
 	if s.latch == nil {
-		s.latch = &act.AlignLatch{}
+		s.latch = &activity.AlignLatch{}
 	}
 
-	var activity *act.AlignBall
+	var act *activity.AlignBall
 
 	direct := !s.PlanApproach && s.latch.DirectApproach(
 		enemyCloseToBall(s.Gi, s.Team, fromPos, directAlignEnemyRadius),
@@ -87,14 +87,14 @@ func (s *AlignState) Update() sm.EventName {
 		time.Now(),
 	)
 	if direct {
-		activity = act.NewDirectAlign(s.Team, s.RobotId, targetPos, fromPos)
+		act = activity.NewDirectAlign(s.Team, s.RobotId, targetPos, fromPos)
 	} else {
-		activity = act.NewAlign(s.Team, s.RobotId, targetPos, fromPos)
+		act = activity.NewAlign(s.Team, s.RobotId, targetPos, fromPos)
 	}
-	activity.SetLatch(s.latch)
+	act.SetLatch(s.latch)
 	//activity := act.NewAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
-	s.ActivityHandler.AddActivity(activity)
-	if updateAlignConfirmation(&s.alignedSince, activity.Achieved(s.Gi), time.Now()) {
+	s.ActivityHandler.AddActivity(act)
+	if updateAlignConfirmation(&s.alignedSince, act.Achieved(s.Gi), time.Now()) {
 		return "ALIGNED"
 	}
 	return "NONE"
@@ -118,7 +118,7 @@ type SupportState struct {
 	gi              *info.GameInfo
 	robotId         info.ID
 	team            info.Team
-	name            sm.StateName
+	name            state_machine.StateName
 	activityHandler *ai.ActivityHandler
 	ctx             TargetContext
 }
@@ -129,15 +129,15 @@ func (s *SupportState) Initialize() {
 	}
 }
 
-func (s *SupportState) GetName() sm.StateName {
+func (s *SupportState) GetName() state_machine.StateName {
 	return s.name
 }
 
-func (s *SupportState) Update() sm.EventName {
+func (s *SupportState) Update() state_machine.EventName {
 
-	activity := act.NewMoveToPosition(s.team, s.robotId, s.ctx.GetFromPosition())
-	s.activityHandler.AddActivity(activity)
-	achieved := activity.Achieved(s.gi)
+	act := activity.NewMoveToPosition(s.team, s.robotId, s.ctx.GetFromPosition())
+	s.activityHandler.AddActivity(act)
+	achieved := act.Achieved(s.gi)
 	if achieved {
 		return "WAITING"
 	}
@@ -148,7 +148,7 @@ type ReceivePassState struct {
 	gi              *info.GameInfo
 	robotId         info.ID
 	team            info.Team
-	name            sm.StateName
+	name            state_machine.StateName
 	target          *info.Position
 	activityHandler *ai.ActivityHandler
 }
@@ -156,22 +156,22 @@ type ReceivePassState struct {
 func (s *ReceivePassState) Initialize() {
 }
 
-func (s *ReceivePassState) GetName() sm.StateName {
+func (s *ReceivePassState) GetName() state_machine.StateName {
 	return s.name
 }
 
-func (s *ReceivePassState) Update() sm.EventName {
+func (s *ReceivePassState) Update() state_machine.EventName {
 	target := *s.target
 	ballPos, err := s.gi.State.GetBall().GetEstimatedPosition()
 	if err == nil {
 		target.Angle = target.AngleToPosition(ballPos)
 	}
 
-	activity := act.NewMoveToPosition(s.team, s.robotId, target)
-	activity.SetUseRRT(false)
-	activity.AvoidBall(false)
-	activity.SetDribble(true)
-	s.activityHandler.AddActivity(activity)
+	act := activity.NewMoveToPosition(s.team, s.robotId, target)
+	act.SetUseRRT(false)
+	act.AvoidBall(false)
+	act.SetDribble(true)
+	s.activityHandler.AddActivity(act)
 
 	possessor := s.gi.State.GetBall().GetPossessor()
 	if possessor != nil && possessor.GetTeam() == s.team && possessor.GetID() == s.robotId {
@@ -185,7 +185,7 @@ type InterceptBallState struct {
 	gi              *info.GameInfo
 	robotId         info.ID
 	team            info.Team
-	name            sm.StateName
+	name            state_machine.StateName
 	activityHandler *ai.ActivityHandler
 	ctx             TargetContext
 }
@@ -193,11 +193,11 @@ type InterceptBallState struct {
 func (s *InterceptBallState) Initialize() {
 }
 
-func (s *InterceptBallState) GetName() sm.StateName {
+func (s *InterceptBallState) GetName() state_machine.StateName {
 	return s.name
 }
 
-func (s *InterceptBallState) Update() sm.EventName {
+func (s *InterceptBallState) Update() state_machine.EventName {
 
 	ballPos, posErr := s.gi.State.GetBall().GetEstimatedPosition()
 
@@ -213,17 +213,17 @@ func (s *InterceptBallState) Update() sm.EventName {
 	if ok || posErr == nil {
 		if waitPos, ok := interceptWaitPositionOutsideGoalNoGo(s.gi, ballPos); ok {
 			waitPos.Angle = waitPos.AngleToPosition(ballPos)
-			activity := act.NewMoveToPosition(s.team, s.robotId, waitPos)
-			s.activityHandler.AddActivity(activity)
+			act := activity.NewMoveToPosition(s.team, s.robotId, waitPos)
+			s.activityHandler.AddActivity(act)
 			return "NONE"
 		}
 	}
 
 	if ballMoving {
-		activity := act.NewMoveToBall(s.team, s.robotId)
-		s.activityHandler.AddActivity(activity)
+		act := activity.NewMoveToBall(s.team, s.robotId)
+		s.activityHandler.AddActivity(act)
 
-		if activity.Achieved(s.gi) {
+		if act.Achieved(s.gi) {
 			return "BALL_OWNER"
 		}
 
@@ -232,10 +232,10 @@ func (s *InterceptBallState) Update() sm.EventName {
 
 	targetPos := s.ctx.GetTargetPosition()
 	fromPos := s.ctx.GetFromPosition()
-	activity := act.NewAlign(s.team, s.robotId, targetPos, fromPos)
-	s.activityHandler.AddActivity(activity)
+	act := activity.NewAlign(s.team, s.robotId, targetPos, fromPos)
+	s.activityHandler.AddActivity(act)
 
-	if activity.Achieved(s.gi) {
+	if act.Achieved(s.gi) {
 		return "BALL_OWNER"
 	}
 
@@ -309,10 +309,10 @@ func (z interceptGoalNoGoZone) waitPosition(ballPos info.Position) info.Position
 }
 
 type KickState struct {
-	Name            sm.StateName
+	Name            state_machine.StateName
 	RobotId         info.ID
 	Team            info.Team
-	KickAct         *act.KickBall
+	KickAct         *activity.KickBall
 	Gi              *info.GameInfo
 	ActivityHandler *ai.ActivityHandler
 	Ctx             TargetContext
@@ -320,15 +320,15 @@ type KickState struct {
 
 func (s *KickState) Initialize() {
 
-	s.KickAct = act.NewKickBall(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
+	s.KickAct = activity.NewKickBall(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
 	s.ActivityHandler.AddActivity(s.KickAct)
 }
 
-func (s *KickState) GetName() sm.StateName {
+func (s *KickState) GetName() state_machine.StateName {
 	return s.Name
 }
 
-func (s *KickState) Update() sm.EventName {
+func (s *KickState) Update() state_machine.EventName {
 	if s.KickAct.Achieved(s.Gi) {
 		if ctx, ok := s.Ctx.(FreezableTargetContext); ok {
 			ctx.ResetTarget()

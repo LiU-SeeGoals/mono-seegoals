@@ -1,10 +1,10 @@
-package ai
+package plan
 
 import (
 	"sync"
 
-	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/referee"
 )
@@ -24,7 +24,7 @@ func NewCombinedPlanWithRef(team info.Team) *CombinedPlanWithRef {
 }
 
 func (m *CombinedPlanWithRef) Init(
-	activities *[info.TEAM_SIZE]act.Activity,
+	activities *[info.TEAM_SIZE]activity.Activity,
 	lock *sync.Mutex,
 	team info.Team,
 ) {
@@ -67,7 +67,7 @@ func (m *CombinedPlanWithRef) refereeHandlesFrame() bool {
 			&m.currentGameInfo,
 			activeRobots,
 			m.team,
-			&coreai.ActivityHandler{
+			&ai.ActivityHandler{
 				Activities:    m.ActivityHandler.Activities,
 				Activity_lock: m.ActivityHandler.Activity_lock,
 			},

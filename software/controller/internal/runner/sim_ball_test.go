@@ -1,4 +1,4 @@
-package demos
+package runner
 
 import (
 	"testing"

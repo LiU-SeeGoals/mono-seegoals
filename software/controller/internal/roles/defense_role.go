@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"math"
 
-	ai "github.com/LiU-SeeGoals/controller/internal/ai"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
-	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -52,18 +52,18 @@ type DefensePressState struct {
 	gi              *info.GameInfo
 	robotId         info.ID
 	team            info.Team
-	name            StateName
+	name            state_machine.StateName
 	activityHandler *ai.ActivityHandler
 	slot            DefenseSlot
 }
 
 func (s *DefensePressState) Initialize() {}
 
-func (s *DefensePressState) GetName() StateName {
+func (s *DefensePressState) GetName() state_machine.StateName {
 	return s.name
 }
 
-func (s *DefensePressState) Update() EventName {
+func (s *DefensePressState) Update() state_machine.EventName {
 	xSign := defenseXSign(s.gi, s.team)
 
 	ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
@@ -85,7 +85,7 @@ func (s *DefensePressState) Update() EventName {
 		target.Angle = target.AngleToPosition(ballPos)
 	}
 
-	s.activityHandler.AddActivity(act.NewMoveToPosition(s.team, s.robotId, target))
+	s.activityHandler.AddActivity(activity.NewMoveToPosition(s.team, s.robotId, target))
 	return "NONE"
 }
 
@@ -147,26 +147,26 @@ type DefenseWallState struct {
 	gi              *info.GameInfo
 	robotId         info.ID
 	team            info.Team
-	name            StateName
+	name            state_machine.StateName
 	activityHandler *ai.ActivityHandler
 	wallPos         *info.Position
 }
 
 func (s *DefenseWallState) Initialize() {}
 
-func (s *DefenseWallState) GetName() StateName {
+func (s *DefenseWallState) GetName() state_machine.StateName {
 	return s.name
 }
 
-func (s *DefenseWallState) Update() EventName {
-	activity := act.NewMoveToPosition(s.team, s.robotId, *s.wallPos)
-	s.activityHandler.AddActivity(activity)
+func (s *DefenseWallState) Update() state_machine.EventName {
+	act := activity.NewMoveToPosition(s.team, s.robotId, *s.wallPos)
+	s.activityHandler.AddActivity(act)
 	return "NONE"
 }
 
 type DefenseRole struct {
 	id              info.ID
-	sm              *StateMachine
+	sm              *state_machine.StateMachine
 	activityHandler *ai.ActivityHandler
 	gi              *info.GameInfo
 	team            info.Team
@@ -185,8 +185,8 @@ func NewDefenseRole(robotID info.ID, activityHandler ai.ActivityHandler, gi *inf
 }
 
 func (dr *DefenseRole) Init() {
-	pressName := StateName(fmt.Sprintf("DefensePress ID %d", dr.id))
-	wallName := StateName(fmt.Sprintf("DefenseWall ID %d", dr.id))
+	pressName := state_machine.StateName(fmt.Sprintf("DefensePress ID %d", dr.id))
+	wallName := state_machine.StateName(fmt.Sprintf("DefenseWall ID %d", dr.id))
 
 	pressState := &DefensePressState{
 		gi:              dr.gi,
@@ -206,7 +206,7 @@ func (dr *DefenseRole) Init() {
 		wallPos:         &dr.wallPosition,
 	}
 
-	sm := NewStateMachine(pressState)
+	sm := state_machine.NewStateMachine(pressState)
 	sm.AddTransition(pressName, "ATTACKER_NEAR", wallState)
 	sm.AddTransition(wallName, "ATTACKER_FAR", pressState)
 
@@ -218,7 +218,7 @@ func (dr *DefenseRole) Run() {
 	dr.sm.Update()
 }
 
-func (dr *DefenseRole) TriggerEvent(event EventName) {
+func (dr *DefenseRole) TriggerEvent(event state_machine.EventName) {
 	dr.sm.TriggerEvent(event)
 }
 

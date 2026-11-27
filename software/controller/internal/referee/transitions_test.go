@@ -4,29 +4,29 @@ import (
 	"sync"
 	"testing"
 
-	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
-	activity "github.com/LiU-SeeGoals/controller/internal/ai/activity"
-	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
 func TestRefereePreparationAndTimeoutTransitions(t *testing.T) {
 	tests := []struct {
 		name   string
-		events []EventName
-		want   StateName
+		events []state_machine.EventName
+		want   state_machine.StateName
 	}{
-		{"cancel kickoff", []EventName{STOP, PREPARE_KICKOFF, STOP}, "STOP"},
-		{"enter timeout", []EventName{STOP, TIMEOUT}, "TIMEOUT"},
-		{"exit timeout", []EventName{STOP, TIMEOUT, STOP}, "STOP"},
-		{"halt timeout", []EventName{STOP, TIMEOUT, HALT}, "HALT"},
-		{"start during timeout", []EventName{TIMEOUT}, "TIMEOUT"},
+		{"cancel kickoff", []state_machine.EventName{STOP, PREPARE_KICKOFF, STOP}, "STOP"},
+		{"enter timeout", []state_machine.EventName{STOP, TIMEOUT}, "TIMEOUT"},
+		{"exit timeout", []state_machine.EventName{STOP, TIMEOUT, STOP}, "STOP"},
+		{"halt timeout", []state_machine.EventName{STOP, TIMEOUT, HALT}, "HALT"},
+		{"start during timeout", []state_machine.EventName{TIMEOUT}, "TIMEOUT"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			gi := info.NewGameInfo(10)
 			var activities [info.TEAM_SIZE]activity.Activity
-			handler := &coreai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
+			handler := &ai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
 			ref := NewRefereeHandler(gi, nil, info.Blue, handler)
 			for _, event := range tt.events {
 				ref.refereeSM.TriggerEvent(event)
@@ -45,9 +45,9 @@ func TestPenaltyTimeoutReturnsToStop(t *testing.T) {
 	ge.CurrentActionTimeRemainingValid = true
 	ge.CurrentActionTimeRemaining = 0
 	var activities [info.TEAM_SIZE]activity.Activity
-	handler := &coreai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
+	handler := &ai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
 	ref := NewRefereeHandler(gi, nil, info.Blue, handler)
-	for _, event := range []EventName{STOP, PREPARE_PENALTY, NORMAL_START} {
+	for _, event := range []state_machine.EventName{STOP, PREPARE_PENALTY, NORMAL_START} {
 		ref.refereeSM.TriggerEvent(event)
 	}
 	ref.refereeSM.Update()
@@ -60,7 +60,7 @@ func TestFreeKickStartsWithoutStopAndRepeatedPacketDoesNotRestartIt(t *testing.T
 	gi := info.NewGameInfo(10)
 	gi.State.SetBall(0, 0, 0, 1)
 	var activities [info.TEAM_SIZE]activity.Activity
-	handler := &coreai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
+	handler := &ai.ActivityHandler{Activities: &activities, Activity_lock: &sync.Mutex{}}
 	ref := NewRefereeHandler(gi, nil, info.Blue, handler)
 	ge := gi.Status.GetGameEvent()
 	ge.UpdateFromRefCommand(info.FORCE_START, 100, 0, 0, info.UNINITIALIZED, 0, false)

@@ -4,19 +4,18 @@ import (
 	"fmt"
 	"math"
 
-	ai "github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
-	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
+	"github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/info"
 )
 
 type OffenseRole struct {
 	id              info.ID
-	sm              *StateMachine
+	sm              *state_machine.StateMachine
 	activityHandler *ai.ActivityHandler
-	gi              *GameInfo
-	team            Team
+	gi              *info.GameInfo
+	team            info.Team
 	intent          *AttemptGoalIntent
 	support         *SupportAttackIntent
 	receiveTarget   info.Position
@@ -48,7 +47,7 @@ type KickDecision struct {
 	IsPass     bool
 }
 
-func NewOffenseRole(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo, team Team) *OffenseRole {
+func NewOffenseRole(robotID info.ID, activityHandler ai.ActivityHandler, gi *info.GameInfo, team info.Team) *OffenseRole {
 	return &OffenseRole{
 		id:              robotID,
 		sm:              nil,
@@ -59,9 +58,9 @@ func NewOffenseRole(robotID ID, activityHandler ai.ActivityHandler, gi *GameInfo
 }
 
 type AttemptGoalIntent struct {
-	gi          *GameInfo
-	team        Team
-	id          ID
+	gi          *info.GameInfo
+	team        info.Team
+	id          info.ID
 	frozen      bool
 	decision    KickDecision
 	receiverIDs []info.ID
@@ -76,7 +75,7 @@ func goalShotBlockRadius() float64 {
 	return pathplanner.MotionRadius + info.BallRadius
 }
 
-func goalMouthTargets(team info.Team, gi *GameInfo) []info.Position {
+func goalMouthTargets(team info.Team, gi *info.GameInfo) []info.Position {
 	if gi == nil || !gi.HasField() {
 		return nil
 	}
@@ -126,7 +125,7 @@ func goalMouthTargets(team info.Team, gi *GameInfo) []info.Position {
 	return targets
 }
 
-func closestRobotDistanceToShot(team info.Team, shooterID info.ID, from, target info.Position, gi *GameInfo) float64 {
+func closestRobotDistanceToShot(team info.Team, shooterID info.ID, from, target info.Position, gi *info.GameInfo) float64 {
 	minDist := math.Inf(1)
 	checkRobots := func(robots *info.RobotTeam, skipShooter bool) {
 		if robots == nil {
@@ -158,7 +157,7 @@ func closestRobotDistanceToShot(team info.Team, shooterID info.ID, from, target 
 	return minDist
 }
 
-func openGoalShotTarget(team info.Team, shooterID info.ID, from info.Position, gi *GameInfo) (info.Position, bool) {
+func openGoalShotTarget(team info.Team, shooterID info.ID, from info.Position, gi *info.GameInfo) (info.Position, bool) {
 	targets := goalMouthTargets(team, gi)
 	if len(targets) == 0 {
 		return info.Position{}, false
@@ -173,7 +172,7 @@ func openGoalShotTarget(team info.Team, shooterID info.ID, from info.Position, g
 	return info.Position{}, false
 }
 
-func isGoalShotAvailable(team info.Team, shooterID info.ID, from info.Position, gi *GameInfo) bool {
+func isGoalShotAvailable(team info.Team, shooterID info.ID, from info.Position, gi *info.GameInfo) bool {
 	_, ok := openGoalShotTarget(team, shooterID, from, gi)
 	return ok
 }
@@ -321,11 +320,11 @@ func (kr *AttemptGoalIntent) GetFromPosition() info.Position {
 }
 
 func (kr *OffenseRole) Init() {
-	awaitName := StateName(fmt.Sprintf("Support ID %d", kr.id))
-	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kr.id))
-	kickName := StateName(fmt.Sprintf("Kick ID %d", kr.id))
-	receiveName := StateName(fmt.Sprintf("ReceivePass ID %d", kr.id))
-	interceptName := StateName(fmt.Sprintf("InterceptBall ID %d", kr.id))
+	awaitName := state_machine.StateName(fmt.Sprintf("Support ID %d", kr.id))
+	kickPrepareName := state_machine.StateName(fmt.Sprintf("KickPrepare ID %d", kr.id))
+	kickName := state_machine.StateName(fmt.Sprintf("Kick ID %d", kr.id))
+	receiveName := state_machine.StateName(fmt.Sprintf("ReceivePass ID %d", kr.id))
+	interceptName := state_machine.StateName(fmt.Sprintf("InterceptBall ID %d", kr.id))
 
 	offenseContext := &AttemptGoalIntent{gi: kr.gi, team: kr.team, id: kr.id}
 	supportContext := &SupportAttackIntent{gi: kr.gi, team: kr.team, id: kr.id}
@@ -352,7 +351,7 @@ func (kr *OffenseRole) Init() {
 		activityHandler: kr.activityHandler,
 	}
 
-	sm := NewStateMachine(awaitBall)
+	sm := state_machine.NewStateMachine(awaitBall)
 
 	sm.AddTransition(awaitName, "BALL_OWNER", prepareKick)
 	sm.AddTransition(awaitName, "BALL_APPROACHING", intercept)
@@ -379,7 +378,7 @@ func (kr *OffenseRole) Run() {
 	kr.sm.Update()
 }
 
-func (kr *OffenseRole) TriggerEvent(event EventName) {
+func (kr *OffenseRole) TriggerEvent(event state_machine.EventName) {
 	stateName := kr.sm.CurrentStateName()
 	transitions := kr.sm.StateTransitions[stateName]
 	nextState, canTransition := transitions[event]

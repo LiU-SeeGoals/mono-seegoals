@@ -1,9 +1,9 @@
 package action
 
 import (
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
 	"github.com/LiU-SeeGoals/proto_go/simulation"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 type Kick struct {
@@ -15,7 +15,7 @@ type Kick struct {
 func (k *Kick) TranslateSim() *simulation.RobotCommand {
 	id := uint32(k.Id)
 	kickSpeed := float32(k.KickSpeed) // in m/s
-	Logger.Debugf("Kicking with speed %f", kickSpeed)
+	logger.Logger.Debugf("Kicking with speed %f", kickSpeed)
 
 	return &simulation.RobotCommand{
 		Id:        &id,

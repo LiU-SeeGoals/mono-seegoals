@@ -1,4 +1,4 @@
-package ai
+package activity
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 type MoveToBall struct {
@@ -31,7 +31,7 @@ func (m *MoveToBall) GetAction(gi *info.GameInfo) action.Action {
 	robot := gi.State.GetRobot(m.id, m.team)
 	robotPos, err := robot.GetPosition()
 	if err != nil {
-		Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
+		logger.Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
 		return NewStop(m.id).GetAction(gi)
 	}
 

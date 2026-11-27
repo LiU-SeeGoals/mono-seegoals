@@ -7,7 +7,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/client"
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/LiU-SeeGoals/proto_go/gc"
 	"github.com/LiU-SeeGoals/proto_go/simulation"
 )
@@ -28,12 +28,12 @@ func NewSimControl() *SimControl {
 
 func (sc *SimControl) TurnOffCameraRealism() {
 	// fmt.Println("Not yet implemented")
-	Logger.Error("TurnOffCameraRealism not yet implemented")
+	logger.Logger.Error("TurnOffCameraRealism not yet implemented")
 }
 
 func (sc *SimControl) TurnOnCameraRealism() {
 	// fmt.Println("Not yet implemented")
-	Logger.Error("TurnOnCameraRealism not yet implemented")
+	logger.Logger.Error("TurnOnCameraRealism not yet implemented")
 }
 
 func Contains(slice []int, num int) bool {
@@ -147,7 +147,7 @@ func (sc *SimControl) SetPresentRobots(presentYellow []int, presentBlue []int) {
 
 func (sc *SimControl) SetRobotDimentions() {
 	// fmt.Println("Not yet implemented")
-	Logger.Error("SetRobotDimentions not yet implemented")
+	logger.Logger.Error("SetRobotDimentions not yet implemented")
 }
 
 func (sc *SimControl) RobotStartPositionConfig1(numberOfRobots int) {
@@ -180,14 +180,14 @@ func (sc *SimControl) RobotStartPositionConfig1(numberOfRobots int) {
 
 func (sc *SimControl) RobotStartPositionConfig2(numberOfRobots int) {
 	// fmt.Println("Not yet implemented")
-	Logger.Error("RobotStartPositionConfig2 not yet implemented")
+	logger.Logger.Error("RobotStartPositionConfig2 not yet implemented")
 }
 
 func (sc *SimControl) TeleportRobot(x float32, y float32, id uint32, team info.Team) {
 	// We take in x and y as milimeters in float64, simulator need float32 in meters
 
 	// fmt.Println(x, y)
-	Logger.Info("Teleporting robot to x: %f, y: %f, id: %d, team: %d", x, y, id, team)
+	logger.Logger.Info("Teleporting robot to x: %f, y: %f, id: %d, team: %d", x, y, id, team)
 	// Set default values for orientation and velocities
 	orientation := float32(0.0) // Approx. 45 degrees in radians
 	vx := float32(0.0)          // Velocity towards x-axis

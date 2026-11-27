@@ -1,9 +1,9 @@
-package ai
+package plan
 
 import (
 	"sync"
 
-	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/client"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
@@ -21,7 +21,7 @@ func NewPlannerManualMovement(team info.Team) *plannerManualMovement {
 }
 
 func (m *plannerManualMovement) Init(
-	activities *[info.TEAM_SIZE]ai.Activity,
+	activities *[info.TEAM_SIZE]activity.Activity,
 	lock *sync.Mutex,
 	team info.Team,
 ) {
@@ -42,7 +42,7 @@ func (m *plannerManualMovement) Tick(_ *info.GameInfo) {
 		return
 	}
 	pos := info.Position{X: float64(command.X), Y: float64(command.Y)}
-	m.ActivityHandler.AddActivity(ai.NewMoveToPosition(m.team, info.ID(command.Id), pos))
+	m.ActivityHandler.AddActivity(activity.NewMoveToPosition(m.team, info.ID(command.Id), pos))
 }
 
 func (m *plannerManualMovement) Kill() {

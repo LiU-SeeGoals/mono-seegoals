@@ -6,22 +6,24 @@ import (
 	"sync"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
-	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
-type planner interface {
-	Init(activities *[info.TEAM_SIZE]ai.Activity, lock *sync.Mutex, team info.Team)
+// Planner decides what each robot of a team should do. Tick runs once per
+// frame and writes the team's activities into the shared array given to Init.
+type Planner interface {
+	Init(activities *[info.TEAM_SIZE]activity.Activity, lock *sync.Mutex, team info.Team)
 	Tick(gi *info.GameInfo)
 	Kill()
 }
 
 type executor interface {
 	Init(incoming <-chan info.GameInfo,
-		activities *[info.TEAM_SIZE]ai.Activity,
+		activities *[info.TEAM_SIZE]activity.Activity,
 		lock *sync.Mutex,
 		outgoing chan<- []action.Action,
 		team info.Team,
@@ -30,16 +32,16 @@ type executor interface {
 
 type Ai struct {
 	team               info.Team
-	planner            planner
+	planner            Planner
 	executor           executor
 	gameInfoSenderFB   chan<- info.GameInfo
 	gameInfoRecieverFB <-chan info.GameInfo // Save game reciever to pass it to hotswapped ais
 	actionReceiver     chan []action.Action
-	activities         *[info.TEAM_SIZE]ai.Activity // Shared slice of Activity
-	activity_lock      *sync.Mutex                  // Shared mutex for synchronization
+	activities         *[info.TEAM_SIZE]activity.Activity // Shared slice of Activity
+	activity_lock      *sync.Mutex                        // Shared mutex for synchronization
 }
 
-func (m *Ai) HotswapPlanner(team info.Team, planner planner) {
+func (m *Ai) HotswapPlanner(team info.Team, planner Planner) {
 
 	m.activity_lock.Lock()
 	defer m.activity_lock.Unlock()
@@ -49,8 +51,8 @@ func (m *Ai) HotswapPlanner(team info.Team, planner planner) {
 	m.planner = planner
 }
 
-func NewAi(team info.Team, planner planner, executor executor) *Ai {
-	activities := &[info.TEAM_SIZE]ai.Activity{}
+func NewAi(team info.Team, planner Planner, executor executor) *Ai {
+	activities := &[info.TEAM_SIZE]activity.Activity{}
 	lock := &sync.Mutex{}
 
 	gameInfoSenderFB, gameInfoReceiverFB := helper.NB_KeepLatestChan[info.GameInfo]()
@@ -60,7 +62,7 @@ func NewAi(team info.Team, planner planner, executor executor) *Ai {
 	planner.Init(activities, lock, team)
 	executor.Init(gameInfoReceiverFB, activities, lock, actionReceiver, team)
 
-	ai.SetPathService(team, pathplanner.New())
+	activity.SetPathService(team, pathplanner.New())
 
 	// Construct the AI object
 	ai := &Ai{
@@ -89,14 +91,14 @@ func (ai *Ai) GetActions(gi *info.GameInfo) []action.Action {
 }
 
 type ActivityHandler struct {
-	Activities    *[info.TEAM_SIZE]ai.Activity // <-- pointer to the slice
-	Activity_lock *sync.Mutex                  // shared mutex for synchronization
+	Activities    *[info.TEAM_SIZE]activity.Activity // <-- pointer to the slice
+	Activity_lock *sync.Mutex                        // shared mutex for synchronization
 }
 
 func (m *ActivityHandler) ClearActivities() {
 	m.Activity_lock.Lock()
 	defer m.Activity_lock.Unlock()
-	*m.Activities = [info.TEAM_SIZE]ai.Activity{}
+	*m.Activities = [info.TEAM_SIZE]activity.Activity{}
 }
 
 func (m *ActivityHandler) ClearActivity(id info.ID) {
@@ -105,40 +107,40 @@ func (m *ActivityHandler) ClearActivity(id info.ID) {
 	m.Activities[id] = nil
 }
 
-func (m *ActivityHandler) AddActivity(activity ai.Activity) {
+func (m *ActivityHandler) AddActivity(act activity.Activity) {
 	m.Activity_lock.Lock()
-	idx := activity.GetID()
+	idx := act.GetID()
 	previous := m.Activities[idx]
-	m.Activities[idx] = activity
+	m.Activities[idx] = act
 	m.Activity_lock.Unlock()
 
-	previousName, name := m.GetActionTypeName(previous), m.GetActionTypeName(activity)
+	previousName, name := m.GetActionTypeName(previous), m.GetActionTypeName(act)
 	if previousName != name {
 		if previousName == "" {
 			previousName = "none"
 		}
-		Logger.Infof("Robot %d activity %s -> %v", idx, previousName, activity)
+		logger.Logger.Infof("Robot %d activity %s -> %v", idx, previousName, act)
 	}
 }
 
-func (m *ActivityHandler) GetActivity(id info.ID) ai.Activity {
+func (m *ActivityHandler) GetActivity(id info.ID) activity.Activity {
 	return m.Activities[id]
 }
 
-func (m *ActivityHandler) ReplaceActivities(activities *[info.TEAM_SIZE]ai.Activity) {
+func (m *ActivityHandler) ReplaceActivities(activities *[info.TEAM_SIZE]activity.Activity) {
 	m.Activity_lock.Lock()
 	defer m.Activity_lock.Unlock()
 	m.Activities = activities
 }
 
-func (m *ActivityHandler) GetActionTypeName(activity ai.Activity) string {
+func (m *ActivityHandler) GetActionTypeName(act activity.Activity) string {
 	// Check if activity is nil
-	if activity == nil {
+	if act == nil {
 		return ""
 	}
 
 	// Get the type using reflection
-	t := reflect.TypeOf(activity)
+	t := reflect.TypeOf(act)
 
 	if t.Kind() == reflect.Ptr {
 		t = t.Elem()

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/scripting"
 )
@@ -23,11 +23,11 @@ func DriveSquare(s *scripting.Script) {
 		{X: start.X, Y: start.Y + side},
 	}
 	// teleport ball out of the way
-	s.TeleportBall(info.Position{X:10000, Y:10000})
+	s.TeleportBall(info.Position{X: 10000, Y: 10000})
 	for lap := 1; lap <= 3; lap++ {
 		for _, corner := range corners {
 			legStart := time.Now()
-			s.Do(act.NewMoveToPosition(s.Team(), id, corner))
+			s.Do(activity.NewMoveToPosition(s.Team(), id, corner))
 			arrived := s.WaitUntil(func(*info.GameInfo) bool {
 				pos, ok := s.Robot(id)
 				return ok && pos.Dist2d(corner) < reached

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"math"
 
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 type Team int8
@@ -57,7 +57,7 @@ func NewRobot(id ID, team Team, history_capasity int) *Robot {
 func (r *Robot) At(pos Position, threshold float64) bool {
 	robotPos, err := r.GetPosition()
 	if err != nil {
-		Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
+		logger.Logger.Errorf("Position retrieval failed - Robot: %v\n", err)
 		return false
 	}
 

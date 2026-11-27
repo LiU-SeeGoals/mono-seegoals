@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
-	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 const (
@@ -25,18 +25,12 @@ type Teleporter interface {
 	TeleportBall(x, y float32)
 }
 
-type Planner interface {
-	Init(activities *[info.TEAM_SIZE]act.Activity, lock *sync.Mutex, team info.Team)
-	Tick(gi *info.GameInfo)
-	Kill()
-}
-
 type Script struct {
 	team        info.Team
 	gi          *info.GameInfo
-	handler     coreai.ActivityHandler
+	handler     ai.ActivityHandler
 	sim         Teleporter
-	planner     Planner
+	planner     ai.Planner
 	fn          func(*Script)
 	frame       chan struct{}
 	yield       chan struct{}
@@ -58,7 +52,7 @@ func New(team info.Team, sim Teleporter, fn func(*Script)) *Script {
 	}
 }
 
-func (s *Script) Init(activities *[info.TEAM_SIZE]act.Activity, lock *sync.Mutex, team info.Team) {
+func (s *Script) Init(activities *[info.TEAM_SIZE]activity.Activity, lock *sync.Mutex, team info.Team) {
 	s.handler.Activities = activities
 	s.handler.Activity_lock = lock
 	s.team = team
@@ -114,7 +108,7 @@ func (s *Script) run() {
 	defer func() {
 		if r := recover(); r != nil {
 			fmt.Printf("script panicked: %v\n%s", r, debug.Stack())
-			Logger.Errorf("script panicked: %v", r)
+			logger.Logger.Errorf("script panicked: %v", r)
 		} else {
 			fmt.Println("script finished")
 		}
@@ -159,7 +153,7 @@ func (s *Script) WaitUntil(cond func(*info.GameInfo) bool, timeout time.Duration
 	}
 }
 
-func (s *Script) UsePlanner(p Planner) {
+func (s *Script) UsePlanner(p ai.Planner) {
 	if s.planner != nil {
 		s.planner.Kill()
 	}
@@ -169,11 +163,11 @@ func (s *Script) UsePlanner(p Planner) {
 	}
 }
 
-func (s *Script) Do(a act.Activity) {
+func (s *Script) Do(a activity.Activity) {
 	s.handler.AddActivity(a)
 }
 
-func (s *Script) Run(a act.Activity, timeout time.Duration) bool {
+func (s *Script) Run(a activity.Activity, timeout time.Duration) bool {
 	s.Do(a)
 	if s.WaitUntil(a.Achieved, timeout) {
 		return true
@@ -183,7 +177,7 @@ func (s *Script) Run(a act.Activity, timeout time.Duration) bool {
 }
 
 func (s *Script) Stop(id info.ID) {
-	s.Do(act.NewStop(id))
+	s.Do(activity.NewStop(id))
 }
 
 func (s *Script) StopAll() {

@@ -3,8 +3,8 @@ package roles
 import (
 	"fmt"
 
-	ai "github.com/LiU-SeeGoals/controller/internal/ai"
-	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -12,16 +12,16 @@ const GoalieBallControlRadius = 300.0
 
 type GoalieRole struct {
 	id              info.ID
-	sm              *StateMachine
+	sm              *state_machine.StateMachine
 	activityHandler *ai.ActivityHandler
 	gi              *info.GameInfo
 	team            info.Team
 	clearFallback   info.Position
 	deadBall        deadBallTracker
 	safeClear       *GoalieSafeClearIntent
-	collectName     StateName
-	alignName       StateName
-	kickName        StateName
+	collectName     state_machine.StateName
+	alignName       state_machine.StateName
+	kickName        state_machine.StateName
 }
 
 func NewGoalieRole(robotID info.ID, activityHandler ai.ActivityHandler, team info.Team, clearTarget info.Position) *GoalieRole {
@@ -68,10 +68,10 @@ func (gr *GoalieRole) ShouldClearBall(radius float64, minDefendedX float64) bool
 }
 
 func (gr *GoalieRole) Init() {
-	defendName := StateName(fmt.Sprintf("GoalieDefend ID %d", gr.id))
-	collectName := StateName(fmt.Sprintf("GoalieCollectDeadBall ID %d", gr.id))
-	alignName := StateName(fmt.Sprintf("GoalieAlignClear ID %d", gr.id))
-	kickName := StateName(fmt.Sprintf("GoalieKickClear ID %d", gr.id))
+	defendName := state_machine.StateName(fmt.Sprintf("GoalieDefend ID %d", gr.id))
+	collectName := state_machine.StateName(fmt.Sprintf("GoalieCollectDeadBall ID %d", gr.id))
+	alignName := state_machine.StateName(fmt.Sprintf("GoalieAlignClear ID %d", gr.id))
+	kickName := state_machine.StateName(fmt.Sprintf("GoalieKickClear ID %d", gr.id))
 	gr.collectName = collectName
 	gr.alignName = alignName
 	gr.kickName = kickName
@@ -115,7 +115,7 @@ func (gr *GoalieRole) Init() {
 		ActivityHandler: gr.activityHandler,
 	}
 
-	sm := NewStateMachine(defend)
+	sm := state_machine.NewStateMachine(defend)
 	sm.AddTransition(defendName, "DEAD_BALL_TRAPPED", collect)
 	sm.AddTransition(defendName, "BALL_OWNER", align)
 	sm.AddTransition(collectName, "BALL_OWNER", align)
@@ -141,7 +141,7 @@ func (gr *GoalieRole) IsDeadBallRescueActive() bool {
 	return stateName == gr.collectName || stateName == gr.alignName || stateName == gr.kickName
 }
 
-func (gr *GoalieRole) TriggerEvent(event EventName) {
+func (gr *GoalieRole) TriggerEvent(event state_machine.EventName) {
 	if event == "BALL_LOST" && gr.safeClear != nil {
 		gr.safeClear.ResetTarget()
 	}

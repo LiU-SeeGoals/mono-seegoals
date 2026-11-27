@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"math"
 
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 const TEAM_SIZE ID = 16
@@ -181,7 +181,7 @@ func robotSeenSince(robot *Robot, since int64) bool {
 func (gs *GameState) FindBallPossessor() *Robot {
 	ballPos, err := gs.Ball.GetPosition()
 	if err != nil {
-		Logger.Errorf("Ball position retrieval failed: %v", err)
+		logger.Logger.Errorf("Ball position retrieval failed: %v", err)
 		return nil
 	}
 
@@ -201,13 +201,13 @@ func (gs *GameState) FindBallPossessor() *Robot {
 
 func (gs *GameState) LostBall(robot *Robot) bool {
 	if robot == nil {
-		Logger.Errorf("No robot")
+		logger.Logger.Errorf("No robot")
 		return true
 	}
 
 	ballPos, err := gs.Ball.GetPosition()
 	if err != nil {
-		Logger.Errorf("Ball position retrieval failed: %v", err)
+		logger.Logger.Errorf("Ball position retrieval failed: %v", err)
 		return true
 	}
 
@@ -401,7 +401,7 @@ func (gs GameState) ToDTO() *GameStateDTO {
 func (gs GameState) ToJson() []byte {
 	gameStateJson, err := json.Marshal(gs.ToDTO())
 	if err != nil {
-		Logger.Error("The gamestate packet could not be marshalled to JSON.")
+		logger.Logger.Error("The gamestate packet could not be marshalled to JSON.")
 	}
 	return gameStateJson
 }

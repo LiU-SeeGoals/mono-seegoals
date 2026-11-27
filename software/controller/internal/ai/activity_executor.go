@@ -7,12 +7,12 @@ import (
 	"sync"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
-	ai "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/helper"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 )
 
 const (
@@ -44,8 +44,8 @@ type activityExecutor struct {
 	team              info.Team
 	incomingGameInfo  <-chan info.GameInfo
 	outgoingActions   chan<- []action.Action
-	activities        *[info.TEAM_SIZE]ai.Activity // <-- pointer to a slice
-	activity_lock     *sync.Mutex                  // shared mutex for synchronization
+	activities        *[info.TEAM_SIZE]activity.Activity // <-- pointer to a slice
+	activity_lock     *sync.Mutex                        // shared mutex for synchronization
 	defenseAreaEscape defenseAreaEscapeState
 
 	restrictToOpponentHalf bool
@@ -67,7 +67,7 @@ func NewActivityExecutor() *activityExecutor {
 
 func (fb *activityExecutor) Init(
 	incoming <-chan info.GameInfo,
-	activities *[info.TEAM_SIZE]ai.Activity,
+	activities *[info.TEAM_SIZE]activity.Activity,
 	lock *sync.Mutex,
 	outgoing chan<- []action.Action,
 	team info.Team,
@@ -78,7 +78,7 @@ func (fb *activityExecutor) Init(
 	fb.activity_lock = lock
 	fb.restrictToOpponentHalf = restrictsTeamToOpponentHalf(config.RestrictToOpponentHalfTeam(), team)
 	if fb.restrictToOpponentHalf {
-		Logger.Warnf("%v robots are restricted to the opponent half", team)
+		logger.Logger.Warnf("%v robots are restricted to the opponent half", team)
 	}
 
 	// Store the pointer directly
@@ -107,7 +107,7 @@ func (fb *activityExecutor) Run() {
 
 		// Make a snapshot of current activities under lock
 		fb.activity_lock.Lock()
-		var activitiesCopy [info.TEAM_SIZE]ai.Activity
+		var activitiesCopy [info.TEAM_SIZE]activity.Activity
 		copy(activitiesCopy[:], (*fb.activities)[:])
 		fb.activity_lock.Unlock()
 
@@ -117,21 +117,21 @@ func (fb *activityExecutor) Run() {
 
 		var i info.ID
 		for i = 0; i < info.TEAM_SIZE; i++ { // Loop through all activities
-			activity := activitiesCopy[i]
-			if activity == nil {
+			act := activitiesCopy[i]
+			if act == nil {
 				continue
 			} // Skip nil activities
 
 			wg.Add(1)
-			go func(index int, activity ai.Activity) {
+			go func(index int, act activity.Activity) {
 				defer wg.Done()
 
-				_ = activity.Achieved(&gameInfo)
+				_ = act.Achieved(&gameInfo)
 				resultCh <- activityResult{
 					index:  index,
-					action: activity.GetAction(&gameInfo),
+					action: act.GetAction(&gameInfo),
 				}
-			}(int(i), activity)
+			}(int(i), act)
 		}
 
 		wg.Wait()

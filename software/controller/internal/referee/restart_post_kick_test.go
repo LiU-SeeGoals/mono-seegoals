@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
-	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
-	activity "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -46,7 +46,7 @@ func TestHoldRestartKickerHeadingUsesStoredKickHeading(t *testing.T) {
 
 	var activities [info.TEAM_SIZE]activity.Activity
 	var lock sync.Mutex
-	handler := &coreai.ActivityHandler{Activities: &activities, Activity_lock: &lock}
+	handler := &ai.ActivityHandler{Activities: &activities, Activity_lock: &lock}
 
 	holdRestartKickerHeading(gi, info.Blue, 1, 0.75, true, handler)
 	held := handler.GetActivity(1)

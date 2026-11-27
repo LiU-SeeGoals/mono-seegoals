@@ -1,17 +1,10 @@
-package demos
+package runner
 
 import (
-	"fmt"
 	"math"
 	"time"
 
-	"github.com/LiU-SeeGoals/controller/internal/action"
-	"github.com/LiU-SeeGoals/controller/internal/ai"
-	plan "github.com/LiU-SeeGoals/controller/internal/ai/plan"
-	"github.com/LiU-SeeGoals/controller/internal/client"
-	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	"github.com/LiU-SeeGoals/controller/internal/simulator"
 )
 
 const (
@@ -26,6 +19,9 @@ const (
 	mmToM                              = 1.0 / 1000.0
 )
 
+// simulatedBallHandler stands in for a human ball placer in simulation: it
+// teleports the ball for placements, kickoffs and penalties, and recentres a
+// ball that has not been seen for 5 s.
 type simulatedBallHandler struct {
 	target   info.Position
 	pending  bool
@@ -218,148 +214,4 @@ func penaltyMarkPosition(gameInfo *info.GameInfo, attackingTeam info.Team) (info
 
 func teleportBallMillimeters(simController ballTeleporter, pos info.Position) {
 	simController.TeleportBall(float32(pos.X*mmToM), float32(pos.Y*mmToM))
-}
-
-type gameTeamController struct {
-	team           info.Team
-	ai             *ai.Ai
-	simClient      *client.SimClient
-	activateGame   func()
-	activateManual func()
-}
-
-func newGameTeamController(team info.Team) *gameTeamController {
-	slowBrain := plan.NewCombinedPlanWithRef(team)
-	manualMovement := plan.NewPlannerManualMovement(team)
-	teamAI := ai.NewAi(team, slowBrain, ai.NewActivityExecutor())
-
-	return &gameTeamController{
-		team: team,
-		ai:   teamAI,
-		activateGame: func() {
-			teamAI.HotswapPlanner(team, slowBrain)
-		},
-		activateManual: func() {
-			teamAI.HotswapPlanner(team, manualMovement)
-		},
-	}
-}
-
-func simAddressForTeam(team info.Team) string {
-	switch team {
-	case info.Blue:
-		return config.GetSimBlueTeamAddress()
-	case info.Yellow:
-		return config.GetSimYellowTeamAddress()
-	default:
-		panic(fmt.Sprintf("unsupported team: %s", team))
-	}
-}
-
-func GameScenario() {
-	gameScenarioForTeams(info.Yellow, info.Blue)
-}
-
-// GameScenarioVsTigers runs SeeGoals for one simulated team. The opposing
-// team's command port is intentionally left untouched for the TIGERs AI.
-func GameScenarioVsTigers(team info.Team) {
-	if !config.IsSimulated() {
-		panic("vs-TIGERs scenarios require ENVIRONMENT=simulation")
-	}
-	gameScenarioForTeams(team)
-}
-
-func gameScenarioForTeams(teams ...info.Team) {
-	ballHandler := simulatedBallHandler{}
-	gameInfo := info.NewGameInfo(10)
-	client.StartGameViewerServer()
-
-	var sslClientTracked *client.SSLTrackedClient
-	var sslClientRaw *client.SSLClient
-	var basestationClient *client.BaseStationClient
-	var simController *simulator.SimControl
-	teamControllers := make([]*gameTeamController, 0, len(teams))
-	for _, team := range teams {
-		teamControllers = append(teamControllers, newGameTeamController(team))
-	}
-
-	if config.IsSimulated() {
-		teamYellow := []int{1, 2, 3, 4, 5, 6}
-		teamBlue := []int{1, 2, 3, 4, 5, 6}
-
-		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
-		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddress())
-
-		for _, teamController := range teamControllers {
-			teamController.simClient = client.NewSimClient(simAddressForTeam(teamController.team), gameInfo)
-		}
-
-		simController = simulator.NewSimControl()
-		teleportBallMillimeters(simController, info.Position{Y: 0})
-		simController.SetPresentRobots(teamYellow, teamBlue)
-
-	} else {
-		sslClientTracked = client.NewSSLTrackedClient(config.GetSSLTrackedClientAddressReal())
-		sslClientRaw = client.NewSSLClient(config.GetSSLClientAddressReal())
-
-		basestationClient = client.NewBaseStationClient(config.GetBasestationAddress())
-		basestationClient.Init()
-	}
-	for {
-		// Pace the control loop from raw vision frames.
-		if !sslClientRaw.WaitForVision(gameInfo) {
-			for _, teamController := range teamControllers {
-				if config.IsSimulated() {
-					teamController.simClient.SendActions(stopAllRobots())
-				} else {
-					basestationClient.SendActions(stopAllRobots())
-				}
-			}
-			continue
-		}
-
-		playTime := time.Now().UnixMilli()
-
-		sslClientTracked.UpdateState(gameInfo, playTime)
-
-		command := client.GetCommand(client.CHANGE_SCENARIO)
-
-		if command != nil {
-			for _, teamController := range teamControllers {
-				if command.Type == "Manual" {
-					teamController.activateManual()
-				} else if command.Type == "Game" {
-					teamController.activateGame()
-				}
-			}
-		}
-
-		if !gameInfo.HasField() || !gameInfo.State.IsValid() {
-			continue
-		}
-
-		for _, teamController := range teamControllers {
-			actions := teamController.ai.GetActions(gameInfo)
-			client.BroadcastActions(actions)
-
-			if config.IsSimulated() {
-				teamController.simClient.SendActions(actions)
-			} else {
-				basestationClient.SendActions(actions)
-			}
-		}
-
-		if config.IsSimulated() {
-			ballHandler.handle(gameInfo, simController)
-		}
-	}
-}
-
-// Stop every ID, including robots absent from the last vision frame.
-func stopAllRobots() []action.Action {
-	actions := make([]action.Action, 0, info.TEAM_SIZE)
-	for id := info.ID(0); id < info.TEAM_SIZE; id++ {
-		actions = append(actions, &action.Stop{Id: int(id)})
-	}
-	return actions
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	plan "github.com/LiU-SeeGoals/controller/internal/ai/plan"
+	"github.com/LiU-SeeGoals/controller/internal/ai/plan"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/referee"
 	"github.com/LiU-SeeGoals/controller/internal/scripting"

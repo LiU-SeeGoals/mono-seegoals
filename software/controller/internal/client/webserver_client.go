@@ -12,7 +12,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/debugstate"
 	"github.com/LiU-SeeGoals/controller/internal/info"
-	. "github.com/LiU-SeeGoals/controller/internal/logger"
+	"github.com/LiU-SeeGoals/controller/internal/logger"
 	"github.com/gorilla/websocket"
 )
 
@@ -58,12 +58,12 @@ func startWebServer() {
 	http.HandleFunc("/ws", webserverInstance.handleGameStateRequest)
 	go func() {
 		if err := http.ListenAndServe(config.GetGameViewerPort(), nil); err != nil {
-			Logger.Errorw("Webserver stopped", "error", err)
+			logger.Logger.Errorw("Webserver stopped", "error", err)
 		}
 	}()
 	go webserverInstance.sendGameState()
 	fmt.Println("Gameviewer socket online at", config.GetGameViewerPort())
-	Logger.Info("Webserver online at", config.GetGameViewerPort())
+	logger.Logger.Info("Webserver online at", config.GetGameViewerPort())
 }
 
 func (server *WebServer) getUpgrader() *websocket.Upgrader {
@@ -185,7 +185,7 @@ func actionsToJson(actions []action.Action) []byte {
 		VisionMask: currentVisionMask(),
 	})
 	if err != nil {
-		Logger.Error("The action packet could not be marshalled to JSON.")
+		logger.Logger.Error("The action packet could not be marshalled to JSON.")
 	}
 	return output
 }

@@ -11,8 +11,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/LiU-SeeGoals/controller/internal/demos"
+	"github.com/LiU-SeeGoals/controller/internal/config"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/runner"
 	"github.com/LiU-SeeGoals/controller/internal/scripts"
 )
 
@@ -62,19 +63,33 @@ func main() {
 		fmt.Println("Running scenario... Press Ctrl+C to stop.")
 	}
 
-	switch selectedScenario() {
+	runner.Run(scenarioConfig(selectedScenario()))
+}
+
+func scenarioConfig(name string) runner.Config {
+	sim := config.IsSimulated()
+	switch name {
 	case "vs-tigers-blue", "vs-tigers-as-blue":
-		demos.GameScenarioVsTigers(info.Blue)
+		requireSim(sim)
+		return runner.Match(true, info.Blue)
 	case "vs-tigers-yellow", "vs-tigers-as-yellow":
-		demos.GameScenarioVsTigers(info.Yellow)
+		requireSim(sim)
+		return runner.Match(true, info.Yellow)
 	case "real-blue", "blue":
-		demos.GameScenarioRealBlue()
+		return runner.Match(false, info.Blue)
 	case "real-yellow", "yellow":
-		demos.GameScenarioRealYellow()
+		return runner.Match(false, info.Yellow)
 	case "script":
-		demos.RunScript(info.Blue, scripts.DriveSquare)
+		return runner.Script(sim, info.Blue, scripts.DriveSquare)
 	default:
-		demos.GameScenario()
+		return runner.Match(sim, info.Yellow, info.Blue)
+	}
+}
+
+// vs-TIGERs leaves the other team's command port to the TIGERs AI.
+func requireSim(sim bool) {
+	if !sim {
+		panic("vs-TIGERs scenarios require ENVIRONMENT=simulation")
 	}
 }
 

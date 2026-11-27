@@ -6,10 +6,10 @@ import (
 	"sort"
 	"time"
 
-	ai "github.com/LiU-SeeGoals/controller/internal/ai"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/ai/pathplanner"
-	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
+	"github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 	"github.com/LiU-SeeGoals/controller/internal/roles"
 )
@@ -76,11 +76,11 @@ type RefereeInfo struct {
 	activeRobots      []info.ID
 	team              info.Team
 	activityHandler   *ai.ActivityHandler
-	name              StateName
+	name              state_machine.StateName
 	teamWithPossesion info.Team
 }
 
-func (s *RefereeInfo) GetName() StateName {
+func (s *RefereeInfo) GetName() state_machine.StateName {
 	return s.name
 }
 
@@ -96,7 +96,7 @@ type Timeout struct {
 
 type FreeKick struct {
 	RefereeInfo
-	freeKick          *StateMachine
+	freeKick          *state_machine.StateMachine
 	kickerID          info.ID
 	freeKickStart     time.Time
 	originalBallPos   info.Position
@@ -125,7 +125,7 @@ type PreparePenalty struct {
 
 type Penalty struct {
 	RefereeInfo
-	penaltyKick       *StateMachine
+	penaltyKick       *state_machine.StateMachine
 	kickerID          info.ID
 	ballInPlay        bool
 	penaltyStart      time.Time
@@ -136,7 +136,7 @@ type Penalty struct {
 
 type Kickoff struct {
 	RefereeInfo
-	kickOff           *StateMachine
+	kickOff           *state_machine.StateMachine
 	kickOffID         info.ID
 	receiverID        info.ID
 	originalBallPos   info.Position
@@ -153,11 +153,11 @@ type Running struct {
 func (s *Halt) Initialize() {
 }
 
-func (s *Halt) Update() EventName {
+func (s *Halt) Update() state_machine.EventName {
 
 	for _, id := range s.activeRobots {
-		activity := act.NewStop(id)
-		s.activityHandler.AddActivity(activity)
+		act := activity.NewStop(id)
+		s.activityHandler.AddActivity(act)
 	}
 
 	return "NONE"
@@ -166,7 +166,7 @@ func (s *Halt) Update() EventName {
 func (s *Stop) Initialize() {
 }
 
-func (s *Stop) Update() EventName {
+func (s *Stop) Update() state_machine.EventName {
 	if s.positioningDelegated {
 		return "NONE"
 	}
@@ -186,8 +186,8 @@ func (s *Stop) Update() EventName {
 		if preparingFreeKick && id == preparedKickerID {
 			continue
 		}
-		activity := act.NewRefStop(s.team, id)
-		s.activityHandler.AddActivity(activity)
+		act := activity.NewRefStop(s.team, id)
+		s.activityHandler.AddActivity(act)
 	}
 
 	return "NONE"
@@ -201,7 +201,7 @@ func (s *PreparePenalty) Initialize() {
 	}
 }
 
-func (s *PreparePenalty) Update() EventName {
+func (s *PreparePenalty) Update() state_machine.EventName {
 	if s.gi.Status.GetGameEvent().TeamWithPossession != s.team {
 		s.kickerID = 0
 		s.hasKicker = false
@@ -221,7 +221,7 @@ func (s *PreparePenalty) Update() EventName {
 		false,
 	)
 	if s.hasKicker {
-		move := act.NewMoveToPosition(s.team, s.kickerID, penaltyKickerPreparePosition(s.gi, s.team))
+		move := activity.NewMoveToPosition(s.team, s.kickerID, penaltyKickerPreparePosition(s.gi, s.team))
 		move.AllowOutsideField(true)
 		s.activityHandler.AddActivity(move)
 	}
@@ -252,8 +252,8 @@ func (s *Penalty) initializeKick() {
 	}
 	s.kickerID = kickerID
 
-	kickPrepareName := StateName(fmt.Sprintf("PenaltyKickPrepare ID %d", kickerID))
-	kickName := StateName(fmt.Sprintf("PenaltyKick ID %d", kickerID))
+	kickPrepareName := state_machine.StateName(fmt.Sprintf("PenaltyKickPrepare ID %d", kickerID))
+	kickName := state_machine.StateName(fmt.Sprintf("PenaltyKick ID %d", kickerID))
 	intent := &PenaltyIntent{
 		gi:     s.gi,
 		target: penaltyKickTargetPosition(s.gi, s.team),
@@ -270,12 +270,12 @@ func (s *Penalty) initializeKick() {
 	// AlignBall can orbit around the ball when the attacker starts on the wrong
 	// side. KickBall assumes that alignment has already happened and otherwise
 	// drives directly at a point behind the ball, where it can stall.
-	s.penaltyKick = NewStateMachine(prepareKick)
+	s.penaltyKick = state_machine.NewStateMachine(prepareKick)
 	s.penaltyKick.AddTransition(kickPrepareName, "ALIGNED", kick)
 	s.penaltyKick.AddTransition(kickName, "MISALIGNED", prepareKick)
 }
 
-func (s *Penalty) Update() EventName {
+func (s *Penalty) Update() state_machine.EventName {
 	trackedBall := s.gi.State.GetTrackedBall()
 	pos, ok := trackedBall.GetTrackedPosition()
 	ballMoved := ok && restartBallMovedIntoPlay(s.originalBallPos, pos)
@@ -385,13 +385,13 @@ func (s *FreeKick) Initialize() {
 	kickerID, ok := selectFreeKickKicker(s.gi, s.team, s.activeRobots, ballPos)
 	if ok {
 		s.kickerID = kickerID
-		kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kickerID))
-		kickName := StateName(fmt.Sprintf("Kick ID %d", kickerID))
+		kickPrepareName := state_machine.StateName(fmt.Sprintf("KickPrepare ID %d", kickerID))
+		kickName := state_machine.StateName(fmt.Sprintf("Kick ID %d", kickerID))
 		freeKick := FreeKickIntent{gi: s.gi, team: s.team, id: kickerID}
 		prepareKick := &roles.AlignState{Ctx: &freeKick, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickPrepareName, ActivityHandler: s.activityHandler, PlanApproach: true}
 		kick := &roles.KickState{Ctx: &freeKick, Gi: s.gi, Team: s.team, RobotId: kickerID, Name: kickName, ActivityHandler: s.activityHandler}
 
-		s.freeKick = NewStateMachine(prepareKick)
+		s.freeKick = state_machine.NewStateMachine(prepareKick)
 		s.freeKick.AddTransition(kickPrepareName, "ALIGNED", kick)
 		s.freeKick.AddTransition(kickName, "MISALIGNED", prepareKick)
 	}
@@ -403,7 +403,7 @@ func (s *FreeKick) Initialize() {
 	s.originalBallPos = originalBallPos
 }
 
-func (s *FreeKick) Update() EventName {
+func (s *FreeKick) Update() state_machine.EventName {
 
 	trackedBall := s.gi.State.GetTrackedBall()
 	pos, ok := trackedBall.GetTrackedPosition()
@@ -458,7 +458,7 @@ func (s *PrepareKickoff) Initialize() {
 
 }
 
-func (s *PrepareKickoff) Update() EventName {
+func (s *PrepareKickoff) Update() state_machine.EventName {
 
 	goalieID, hasGoalie := moveGoalieToPosition(s.activeRobots, s.team, s.gi, s.activityHandler)
 	if s.gi.Status.GetGameEvent().TeamWithPossession == s.team {
@@ -498,8 +498,8 @@ func (s *Kickoff) Initialize() {
 	s.kickOffID = kickOffID
 	s.receiverID = receiverID
 
-	kickPrepareName := StateName(fmt.Sprintf("KickPrepare ID %d", kickOffID))
-	kickName := StateName(fmt.Sprintf("Kick ID %d", kickOffID))
+	kickPrepareName := state_machine.StateName(fmt.Sprintf("KickPrepare ID %d", kickOffID))
+	kickName := state_machine.StateName(fmt.Sprintf("Kick ID %d", kickOffID))
 
 	originalBallPos, ok := s.gi.State.GetTrackedBall().GetTrackedPosition()
 	s.kickStart = time.Now()
@@ -514,14 +514,14 @@ func (s *Kickoff) Initialize() {
 	prepareKick := &roles.AlignState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickPrepareName, ActivityHandler: s.activityHandler}
 	kick := &roles.KickState{Ctx: &kickoff, Gi: s.gi, Team: s.team, RobotId: kickOffID, Name: kickName, ActivityHandler: s.activityHandler}
 
-	s.kickOff = NewStateMachine(prepareKick)
+	s.kickOff = state_machine.NewStateMachine(prepareKick)
 	s.kickOff.AddTransition(kickPrepareName, "ALIGNED", kick)
 	s.kickOff.AddTransition(kickName, "MISALIGNED", prepareKick)
 
 	// If we dont have possession we take good defense position
 }
 
-func (s *Kickoff) Update() EventName {
+func (s *Kickoff) Update() state_machine.EventName {
 
 	trackedBall := s.gi.State.GetTrackedBall()
 	pos, ok := trackedBall.GetTrackedPosition()
@@ -586,11 +586,11 @@ func (s *Kickoff) Update() EventName {
 func (s *Running) Initialize() {
 }
 
-func (s *Running) GetName() StateName {
+func (s *Running) GetName() state_machine.StateName {
 	return "RUNNING"
 }
 
-func (s *Running) Update() EventName {
+func (s *Running) Update() state_machine.EventName {
 	return "NONE"
 }
 
@@ -600,17 +600,17 @@ type UninitializedRef struct {
 func (s *UninitializedRef) Initialize() {
 }
 
-func (s *UninitializedRef) GetName() StateName {
+func (s *UninitializedRef) GetName() state_machine.StateName {
 	return "UNINITIALIZED"
 }
 
-func (s *UninitializedRef) Update() EventName {
+func (s *UninitializedRef) Update() state_machine.EventName {
 	return "NONE"
 }
 
 type RefereeHandler struct {
 	gi                            *info.GameInfo
-	refereeSM                     *StateMachine
+	refereeSM                     *state_machine.StateMachine
 	activeRobots                  []info.ID
 	nextCommandAfterBallPlacement info.RefCommand
 	kickOff                       *Kickoff
@@ -715,7 +715,7 @@ func holdRestartKickerHeading(
 	// which the restart was taken. Disabling RRT prevents a zero-distance hold
 	// from acquiring a path waypoint with an unrelated orientation.
 	pos.Angle = heading
-	move := act.NewMoveToPosition(team, id, pos)
+	move := activity.NewMoveToPosition(team, id, pos)
 	move.SetUseRRT(false)
 	move.AvoidBall(false)
 	activityHandler.AddActivity(move)
@@ -777,7 +777,7 @@ func moveRobotsToDefensePosition(
 ) {
 	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
 	if hasGoalie {
-		activityHandler.AddActivity(act.NewGoalie(team, goalieID))
+		activityHandler.AddActivity(activity.NewGoalie(team, goalieID))
 	}
 
 	defenders := fieldRobots(activeRobots, goalieID, hasGoalie)
@@ -785,12 +785,12 @@ func moveRobotsToDefensePosition(
 	wallSlots := freeKickDefenseSlots(gi, team, ballPos, len(defenders))
 	wallRobots, reserveRobots := assignFreeKickWallRobots(gi, team, defenders, wallSlots)
 	for i, robotID := range wallRobots {
-		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, wallSlots[i]))
+		activityHandler.AddActivity(activity.NewMoveToPosition(team, robotID, wallSlots[i]))
 	}
 
 	reserveSlots := freeKickReserveSlots(gi, team, ballPos, len(reserveRobots))
 	for i, robotID := range reserveRobots {
-		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, reserveSlots[i]))
+		activityHandler.AddActivity(activity.NewMoveToPosition(team, robotID, reserveSlots[i]))
 	}
 }
 
@@ -810,7 +810,7 @@ func positionPenaltyNonParticipants(
 		goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
 		if hasGoalie {
 			if goalieFree {
-				activityHandler.AddActivity(act.NewGoalie(team, goalieID))
+				activityHandler.AddActivity(activity.NewGoalie(team, goalieID))
 			} else {
 				movePenaltyGoalieToGoalLine(gi, team, goalieID, activityHandler)
 			}
@@ -829,7 +829,7 @@ func stopPenaltyRobots(
 	activityHandler *ai.ActivityHandler,
 ) {
 	for _, robotID := range activeRobots {
-		activityHandler.AddActivity(act.NewStop(robotID))
+		activityHandler.AddActivity(activity.NewStop(robotID))
 	}
 }
 
@@ -839,7 +839,7 @@ func movePenaltyGoalieToGoalLine(
 	goalieID info.ID,
 	activityHandler *ai.ActivityHandler,
 ) {
-	move := act.NewMoveToPosition(team, goalieID, penaltyGoalieHomePosition(gi, team))
+	move := activity.NewMoveToPosition(team, goalieID, penaltyGoalieHomePosition(gi, team))
 	move.AvoidGoallines(false)
 	activityHandler.AddActivity(move)
 }
@@ -854,7 +854,7 @@ func movePenaltyWaitingRobots(
 ) {
 	slots := penaltyWaitingSlots(gi, team, attackingTeam, penaltyMark, len(robotIDs))
 	for i, robotID := range robotIDs {
-		move := act.NewMoveToPosition(team, robotID, slots[i])
+		move := activity.NewMoveToPosition(team, robotID, slots[i])
 		move.AllowOutsideField(true)
 		move.AllowBehindGoalLine(true)
 		activityHandler.AddActivity(move)
@@ -1300,7 +1300,7 @@ func PrepareKickerForUpcomingFreeKick(
 		return 0, false
 	}
 
-	move := act.NewMoveToPosition(team, kickerID, freeKickPreparePosition(gi, team, ballPos))
+	move := activity.NewMoveToPosition(team, kickerID, freeKickPreparePosition(gi, team, ballPos))
 	move.AllowOutsideField(true)
 	activityHandler.AddActivity(move)
 	return kickerID, true
@@ -1534,7 +1534,7 @@ func moveGoalieToPosition(
 ) (info.ID, bool) {
 	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
 	if hasGoalie {
-		activityHandler.AddActivity(act.NewGoalie(team, goalieID))
+		activityHandler.AddActivity(activity.NewGoalie(team, goalieID))
 	}
 	return goalieID, hasGoalie
 }
@@ -1552,7 +1552,7 @@ func moveKickerToKickoffPreparePosition(
 	activityHandler *ai.ActivityHandler,
 	kickOffID info.ID,
 ) {
-	activityHandler.AddActivity(act.NewMoveToPosition(team, kickOffID, kickoffPreparePosition(gi, team)))
+	activityHandler.AddActivity(activity.NewMoveToPosition(team, kickOffID, kickoffPreparePosition(gi, team)))
 }
 
 func kickoffPreparePosition(gi *info.GameInfo, team info.Team) info.Position {
@@ -1586,7 +1586,7 @@ func moveRobotsToKickoffSupportPositions(
 
 	slots := kickoffSupportSlots(gi, team, len(supportRobots))
 	for i, robotID := range supportRobots {
-		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, slots[i]))
+		activityHandler.AddActivity(activity.NewMoveToPosition(team, robotID, slots[i]))
 	}
 }
 
@@ -1605,7 +1605,7 @@ func moveRobotsToKickoffDefensePositions(
 
 	slots := kickoffDefenseSlots(gi, team, len(defenders))
 	for i, robotID := range defenders {
-		activityHandler.AddActivity(act.NewMoveToPosition(team, robotID, slots[i]))
+		activityHandler.AddActivity(activity.NewMoveToPosition(team, robotID, slots[i]))
 	}
 }
 
@@ -1772,14 +1772,14 @@ func clampFloat(value, minValue, maxValue float64) float64 {
 
 func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team, activityHandler *ai.ActivityHandler) *RefereeHandler {
 
-	freeKickName := StateName("FREEKICK")
-	stopName := StateName("STOP")
-	haltName := StateName("HALT")
-	prepareKickoffName := StateName("PREPAREKICKOFF")
-	kickOffName := StateName("KICKOFF")
-	ballPlacementName := StateName("BALLPLACEMENT")
-	preparePenaltyName := StateName("PREPAREPENALTY")
-	penaltyName := StateName("PENALTY")
+	freeKickName := state_machine.StateName("FREEKICK")
+	stopName := state_machine.StateName("STOP")
+	haltName := state_machine.StateName("HALT")
+	prepareKickoffName := state_machine.StateName("PREPAREKICKOFF")
+	kickOffName := state_machine.StateName("KICKOFF")
+	ballPlacementName := state_machine.StateName("BALLPLACEMENT")
+	preparePenaltyName := state_machine.StateName("PREPAREPENALTY")
+	penaltyName := state_machine.StateName("PENALTY")
 
 	freeKick := &FreeKick{
 		RefereeInfo: RefereeInfo{
@@ -1862,7 +1862,7 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 		name: "TIMEOUT", activityHandler: activityHandler,
 	}}}
 
-	refereeSM := NewStateMachine(uninitialized)
+	refereeSM := state_machine.NewStateMachine(uninitialized)
 
 	refereeSM.AddTransition("HALT", STOP, stop)
 	refereeSM.AddTransition("STOP", TIMEOUT, timeout)
@@ -1921,7 +1921,7 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 
 	// A multicast receiver can miss an intermediate STOP. Honor explicit new
 	// commands from every state; HandleReferee deduplicates repeated packets.
-	for _, from := range []StateName{"UNINITIALIZED", "HALT", "STOP", "TIMEOUT", "BALLPLACEMENT",
+	for _, from := range []state_machine.StateName{"UNINITIALIZED", "HALT", "STOP", "TIMEOUT", "BALLPLACEMENT",
 		"PREPAREKICKOFF", "PREPAREPENALTY", "KICKOFF", "PENALTY", "FREEKICK", "RUNNING"} {
 		refereeSM.AddTransition(from, STOP, stop)
 		refereeSM.AddTransition(from, HALT, halt)
@@ -1996,7 +1996,7 @@ func (s *RefereeHandler) HandleReferee() bool {
 	if !s.commandSeen || s.lastCommand != gameEvent.RefCommand ||
 		s.lastCommandTimestamp != gameEvent.CommandTimestamp {
 		refEvent := s.refEventForGameEvent(gameEvent)
-		s.refereeSM.TriggerEvent(EventName(refEvent))
+		s.refereeSM.TriggerEvent(state_machine.EventName(refEvent))
 		s.lastCommand = gameEvent.RefCommand
 		s.lastCommandTimestamp = gameEvent.CommandTimestamp
 		s.commandSeen = true

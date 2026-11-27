@@ -1,4 +1,4 @@
-package ai
+package activity
 
 import (
 	"fmt"
@@ -189,8 +189,8 @@ func (m *Goalie) GetID() info.ID {
 	return m.id
 }
 
-//Predict the opponent while oppponent is close enough to the ball
-//Returns the opponent that should be treated as the ball possessor
+// Predict the opponent while oppponent is close enough to the ball
+// Returns the opponent that should be treated as the ball possessor
 func threateningOpponent(gi *info.GameInfo, team info.Team, ballPos info.Position) *info.Robot {
 	ball := gi.State.GetBall()
 	if poss := ball.GetPossessor(); poss != nil && poss.GetTeam() != team {

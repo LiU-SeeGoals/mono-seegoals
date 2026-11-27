@@ -4,9 +4,9 @@ import (
 	"math"
 	"time"
 
-	coreai "github.com/LiU-SeeGoals/controller/internal/ai"
-	act "github.com/LiU-SeeGoals/controller/internal/ai/activity"
-	. "github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
+	"github.com/LiU-SeeGoals/controller/internal/ai"
+	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
+	"github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
 )
 
@@ -32,27 +32,27 @@ type GoalieCollectDeadBallState struct {
 	gi              *info.GameInfo
 	robotId         info.ID
 	team            info.Team
-	name            StateName
-	activityHandler *coreai.ActivityHandler
+	name            state_machine.StateName
+	activityHandler *ai.ActivityHandler
 }
 
 type GoalieSafeAlignState struct {
 	Gi              *info.GameInfo
 	RobotId         info.ID
 	Team            info.Team
-	Name            StateName
-	ActivityHandler *coreai.ActivityHandler
+	Name            state_machine.StateName
+	ActivityHandler *ai.ActivityHandler
 	Ctx             *GoalieSafeClearIntent
-	latch           *act.AlignLatch
+	latch           *activity.AlignLatch
 }
 
 type GoalieSafeKickState struct {
-	Name            StateName
+	Name            state_machine.StateName
 	RobotId         info.ID
 	Team            info.Team
-	KickAct         *act.KickBall
+	KickAct         *activity.KickBall
 	Gi              *info.GameInfo
-	ActivityHandler *coreai.ActivityHandler
+	ActivityHandler *ai.ActivityHandler
 	Ctx             *GoalieSafeClearIntent
 }
 
@@ -112,11 +112,11 @@ func (gr *GoalieRole) ShouldCollectDeadBall() bool {
 
 func (s *GoalieCollectDeadBallState) Initialize() {}
 
-func (s *GoalieCollectDeadBallState) GetName() StateName {
+func (s *GoalieCollectDeadBallState) GetName() state_machine.StateName {
 	return s.name
 }
 
-func (s *GoalieCollectDeadBallState) Update() EventName {
+func (s *GoalieCollectDeadBallState) Update() state_machine.EventName {
 	if goalieHasBallControl(s.gi, s.team, s.robotId, goalieRescueControlRadius) {
 		return "BALL_OWNER"
 	}
@@ -126,37 +126,37 @@ func (s *GoalieCollectDeadBallState) Update() EventName {
 		return "BALL_LOST"
 	}
 
-	s.activityHandler.AddActivity(act.NewGoalieCollectDeadBall(s.team, s.robotId))
+	s.activityHandler.AddActivity(activity.NewGoalieCollectDeadBall(s.team, s.robotId))
 	return "NONE"
 }
 
 func (s *GoalieSafeAlignState) Initialize() {
-	s.latch = &act.AlignLatch{}
+	s.latch = &activity.AlignLatch{}
 	s.Ctx.FreezeTarget()
 }
 
-func (s *GoalieSafeAlignState) GetName() StateName {
+func (s *GoalieSafeAlignState) GetName() state_machine.StateName {
 	return s.Name
 }
 
-func (s *GoalieSafeAlignState) Update() EventName {
+func (s *GoalieSafeAlignState) Update() state_machine.EventName {
 	if !goalieHasBallControl(s.Gi, s.Team, s.RobotId, goalieRescueControlRadius) {
 		s.Ctx.ResetTarget()
 		return "BALL_LOST"
 	}
 
 	if !s.Ctx.HasSafeTarget() {
-		s.ActivityHandler.AddActivity(act.NewGoalieCollectDeadBall(s.Team, s.RobotId))
+		s.ActivityHandler.AddActivity(activity.NewGoalieCollectDeadBall(s.Team, s.RobotId))
 		return "NONE"
 	}
 
-	activity := act.NewDirectAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
-	activity.SetLatch(s.latch)
-	activity.AllowGoalArea(true)
-	activity.AllowOutsideField(true)
-	activity.AllowBehindGoalLine(true)
-	s.ActivityHandler.AddActivity(activity)
-	if activity.Achieved(s.Gi) {
+	act := activity.NewDirectAlign(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
+	act.SetLatch(s.latch)
+	act.AllowGoalArea(true)
+	act.AllowOutsideField(true)
+	act.AllowBehindGoalLine(true)
+	s.ActivityHandler.AddActivity(act)
+	if act.Achieved(s.Gi) {
 		return "ALIGNED"
 	}
 	return "NONE"
@@ -167,7 +167,7 @@ func (s *GoalieSafeKickState) Initialize() {
 		s.KickAct = nil
 		return
 	}
-	s.KickAct = act.NewKickBall(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
+	s.KickAct = activity.NewKickBall(s.Team, s.RobotId, s.Ctx.GetTargetPosition(), s.Ctx.GetFromPosition())
 	s.KickAct.AllowGoalArea(true)
 	s.KickAct.AllowOutsideField(true)
 	s.KickAct.AllowBehindGoalLine(true)
@@ -177,11 +177,11 @@ func (s *GoalieSafeKickState) Initialize() {
 	s.ActivityHandler.AddActivity(s.KickAct)
 }
 
-func (s *GoalieSafeKickState) GetName() StateName {
+func (s *GoalieSafeKickState) GetName() state_machine.StateName {
 	return s.Name
 }
 
-func (s *GoalieSafeKickState) Update() EventName {
+func (s *GoalieSafeKickState) Update() state_machine.EventName {
 	if s.KickAct == nil {
 		s.Ctx.ResetTarget()
 		return "BALL_LOST"
