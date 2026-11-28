@@ -22,9 +22,29 @@ type BaseStationClient struct {
 	connections   []Connection
 	address       string
 	queueMutex    sync.Mutex
-	queue         []baseStationCommand
+	queue         []BaseStationCommand
 	wake          chan struct{}
 	hasBeenInited bool
+}
+
+// NewBaseStationClientWithConnections constructs a client bound to explicit
+// transports without opening multicast sockets or starting the background sender.
+func NewBaseStationClientWithConnections(connections ...Connection) *BaseStationClient {
+	return &BaseStationClient{
+		connections:   connections,
+		queue:         make([]BaseStationCommand, 0),
+		wake:          make(chan struct{}, 1),
+		hasBeenInited: true,
+	}
+}
+
+// DrainQueue returns and clears the currently queued commands without sending them.
+func (b *BaseStationClient) DrainQueue() []BaseStationCommand {
+	b.queueMutex.Lock()
+	defer b.queueMutex.Unlock()
+	out := append([]BaseStationCommand(nil), b.queue...)
+	b.queue = b.queue[:0]
+	return out
 }
 
 // NewBaseStationClient sends robot commands to address ("<group>:<port>", see
@@ -84,7 +104,7 @@ func NewBaseStationClient(address string) *BaseStationClient {
 	return &BaseStationClient{
 		connections:   connections,
 		address:       address,
-		queue:         make([]baseStationCommand, 0),
+		queue:         make([]BaseStationCommand, 0),
 		wake:          make(chan struct{}, 1),
 		hasBeenInited: false,
 	}
@@ -111,9 +131,9 @@ func (b *BaseStationClient) sendCommands() {
 		cmd := b.queue[0]
 		b.queue = b.queue[1:]
 		b.queueMutex.Unlock()
-		encoded, err := cmd.encode()
+		encoded, err := cmd.Encode()
 		if err != nil {
-			fmt.Printf("Failed to encode command for robot %d: %v\n", cmd.robotID, err)
+			fmt.Printf("Failed to encode command for robot %d: %v\n", cmd.RobotID, err)
 			continue
 		}
 		if err := b.sendMessage(encoded); err != nil {
@@ -131,17 +151,17 @@ func (b *BaseStationClient) SendActions(actions []action.Action) {
 	}
 
 	for _, robotAction := range actions {
-		command, ok := baseStationCommandFor(robotAction)
+		command, ok := BaseStationCommandFor(robotAction)
 		if !ok {
 			fmt.Printf("Base station: unsupported action %T for robot %d\n", robotAction, robotAction.RobotID())
 			continue
 		}
-		if command.kind == robot_action.ActionType_STOP_ACTION {
+		if command.Kind == robot_action.ActionType_STOP_ACTION {
 			// A stop supersedes every command that has not yet been sent for this
 			// robot. In particular, do not leave a pre-HALT kick ahead of it.
 			queue := b.queue[:0]
 			for _, queuedCommand := range b.queue {
-				if queuedCommand.robotID != command.robotID {
+				if queuedCommand.RobotID != command.RobotID {
 					queue = append(queue, queuedCommand)
 				}
 			}
@@ -151,7 +171,7 @@ func (b *BaseStationClient) SendActions(actions []action.Action) {
 			// the same robot. Keep kicks, init, and stops in their original order.
 			queue := b.queue[:0]
 			for _, queuedCommand := range b.queue {
-				if queuedCommand.robotID != command.robotID || !queuedCommand.isMotion() {
+				if queuedCommand.RobotID != command.RobotID || !queuedCommand.isMotion() {
 					queue = append(queue, queuedCommand)
 				}
 			}

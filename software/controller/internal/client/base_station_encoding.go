@@ -43,81 +43,81 @@ const (
 	offsetMaxSpeed   = 22
 )
 
-// baseStationCommand is one decoded wire frame. Values keep the integer and
+// BaseStationCommand is one decoded wire frame. Values keep the integer and
 // float32 precision of the original protobuf-based path so frames are
 // byte-identical to what the firmware has always received.
-type baseStationCommand struct {
-	kind         robot_action.ActionType
-	robotID      int32
-	kickSpeed    int32
-	posX, posY   int32
-	posW         float32 // rad
-	destX, destY int32
-	destW        float32 // rad
-	dirX, dirY   int32
-	aux          int32
-	maxSpeed     int32 // mm/s, 0 = no limit
+type BaseStationCommand struct {
+	Kind         robot_action.ActionType
+	RobotID      int32
+	KickSpeed    int32
+	PosX, PosY   int32
+	PosW         float32 // rad
+	DestX, DestY int32
+	DestW        float32 // rad
+	DirX, DirY   int32
+	Aux          int32
+	MaxSpeed     int32 // mm/s, 0 = no limit
 }
 
-// baseStationCommandFor translates an action. ok is false for actions the
+// BaseStationCommandFor translates an action. ok is false for actions the
 // real robots do not support.
-func baseStationCommandFor(a action.Action) (baseStationCommand, bool) {
+func BaseStationCommandFor(a action.Action) (BaseStationCommand, bool) {
 	switch a := a.(type) {
 	case *action.Stop:
-		return baseStationCommand{kind: robot_action.ActionType_STOP_ACTION, robotID: int32(a.Id)}, true
+		return BaseStationCommand{Kind: robot_action.ActionType_STOP_ACTION, RobotID: int32(a.Id)}, true
 	case *action.Kick:
-		return baseStationCommand{kind: robot_action.ActionType_KICK_ACTION, robotID: int32(a.Id), kickSpeed: int32(a.KickSpeed)}, true
+		return BaseStationCommand{Kind: robot_action.ActionType_KICK_ACTION, RobotID: int32(a.Id), KickSpeed: int32(a.KickSpeed)}, true
 	case *action.Init:
-		return baseStationCommand{kind: robot_action.ActionType_INIT_ACTION, robotID: int32(a.Id)}, true
+		return BaseStationCommand{Kind: robot_action.ActionType_INIT_ACTION, RobotID: int32(a.Id)}, true
 	case *action.MoveTo:
-		cmd := baseStationCommand{
-			kind:    robot_action.ActionType_MOVE_TO_ACTION,
-			robotID: int32(a.Id),
-			posX:    int32(a.Pos.X), posY: int32(a.Pos.Y), posW: float32(a.Pos.Angle),
-			destX: int32(a.Dest.X), destY: int32(a.Dest.Y), destW: float32(a.Dest.Angle),
+		cmd := BaseStationCommand{
+			Kind:    robot_action.ActionType_MOVE_TO_ACTION,
+			RobotID: int32(a.Id),
+			PosX:    int32(a.Pos.X), PosY: int32(a.Pos.Y), PosW: float32(a.Pos.Angle),
+			DestX: int32(a.Dest.X), DestY: int32(a.Dest.Y), DestW: float32(a.Dest.Angle),
 		}
 		if a.MaxLinearSpeed > 0 {
-			cmd.maxSpeed = int32(math.Min(a.MaxLinearSpeed*1000, math.MaxInt16))
+			cmd.MaxSpeed = int32(math.Min(a.MaxLinearSpeed*1000, math.MaxInt16))
 		}
 		if a.KickSpeed != 0 {
 			// The firmware's kick action keeps position control while it
-			// charges and always runs the dribbler, so aux stays zero.
-			cmd.kind = robot_action.ActionType_KICK_ACTION
-			cmd.kickSpeed = int32(a.KickSpeed)
+			// charges and always runs the dribbler, so Aux stays zero.
+			cmd.Kind = robot_action.ActionType_KICK_ACTION
+			cmd.KickSpeed = int32(a.KickSpeed)
 		} else if a.Dribble {
-			cmd.aux = 1
+			cmd.Aux = 1
 		}
 		return cmd, true
 	case *action.Move:
-		return baseStationCommand{
-			kind:    robot_action.ActionType_MOVE_ACTION,
-			robotID: int32(a.Id),
-			dirX:    int32(a.Direction.AtVec(0)),
-			dirY:    int32(a.Direction.AtVec(1)),
+		return BaseStationCommand{
+			Kind:    robot_action.ActionType_MOVE_ACTION,
+			RobotID: int32(a.Id),
+			DirX:    int32(a.Direction.AtVec(0)),
+			DirY:    int32(a.Direction.AtVec(1)),
 		}, true
 	case *action.Rotate:
-		return baseStationCommand{kind: robot_action.ActionType_ROTATE_ACTION, robotID: int32(a.Id), aux: int32(a.AngularVel)}, true
+		return BaseStationCommand{Kind: robot_action.ActionType_ROTATE_ACTION, RobotID: int32(a.Id), Aux: int32(a.AngularVel)}, true
 	case *action.MoveRemote:
-		cmd := baseStationCommand{
-			kind:    robot_action.ActionType_MOVE_ACTION,
-			robotID: int32(a.Id),
-			posW:    float32(a.Dest.Z),
+		cmd := BaseStationCommand{
+			Kind:    robot_action.ActionType_MOVE_ACTION,
+			RobotID: int32(a.Id),
+			PosW:    float32(a.Dest.Z),
 			// The remote-control firmware path expects X/Y swapped.
-			dirX: int32(a.Direction.AtVec(1)), dirY: int32(a.Direction.AtVec(0)),
-			destX: int32(a.Dest.Y), destY: int32(a.Dest.X), destW: float32(a.Dest.Z),
-			kickSpeed: int32(a.Speed),
+			DirX: int32(a.Direction.AtVec(1)), DirY: int32(a.Direction.AtVec(0)),
+			DestX: int32(a.Dest.Y), DestY: int32(a.Dest.X), DestW: float32(a.Dest.Z),
+			KickSpeed: int32(a.Speed),
 		}
 		if a.Dribble {
-			cmd.aux = 1
+			cmd.Aux = 1
 		}
 		return cmd, true
 	default:
-		return baseStationCommand{}, false
+		return BaseStationCommand{}, false
 	}
 }
 
-func (c baseStationCommand) isMotion() bool {
-	switch c.kind {
+func (c BaseStationCommand) isMotion() bool {
+	switch c.Kind {
 	case robot_action.ActionType_MOVE_TO_ACTION, robot_action.ActionType_MOVE_ACTION, robot_action.ActionType_ROTATE_ACTION:
 		return true
 	default:
@@ -125,50 +125,50 @@ func (c baseStationCommand) isMotion() bool {
 	}
 }
 
-func (c baseStationCommand) encode() ([]byte, error) {
-	if c.kind < 0 || c.kind > 5 {
-		return nil, fmt.Errorf("invalid action type: %d", c.kind)
+func (c BaseStationCommand) Encode() ([]byte, error) {
+	if c.Kind < 0 || c.Kind > 5 {
+		return nil, fmt.Errorf("invalid action type: %d", c.Kind)
 	}
-	if c.robotID < 0 || c.robotID > 255 {
-		return nil, fmt.Errorf("invalid robot id: %d", c.robotID)
+	if c.RobotID < 0 || c.RobotID > 255 {
+		return nil, fmt.Errorf("invalid robot id: %d", c.RobotID)
 	}
 	buf := make([]byte, CommandEncodedSize)
 	put := func(offset int, v int16) { binary.LittleEndian.PutUint16(buf[offset:], uint16(v)) }
 
-	buf[offsetActionType] = uint8(c.kind)
-	buf[offsetRobotID] = uint8(c.robotID)
-	put(offsetKickSpeed, int16(c.kickSpeed))
-	put(offsetPosX, int16(c.posX))
-	put(offsetPosY, int16(c.posY))
-	put(offsetDestX, int16(c.destX))
-	put(offsetDestY, int16(c.destY))
-	put(offsetDirectionX, int16(c.dirX))
-	put(offsetDirectionY, int16(c.dirY))
-	put(offsetAux, int16(c.aux))
-	put(offsetPosW, int16(c.posW*1000.0))
-	put(offsetDestW, int16(c.destW*1000.0))
-	put(offsetMaxSpeed, int16(c.maxSpeed))
+	buf[offsetActionType] = uint8(c.Kind)
+	buf[offsetRobotID] = uint8(c.RobotID)
+	put(offsetKickSpeed, int16(c.KickSpeed))
+	put(offsetPosX, int16(c.PosX))
+	put(offsetPosY, int16(c.PosY))
+	put(offsetDestX, int16(c.DestX))
+	put(offsetDestY, int16(c.DestY))
+	put(offsetDirectionX, int16(c.DirX))
+	put(offsetDirectionY, int16(c.DirY))
+	put(offsetAux, int16(c.Aux))
+	put(offsetPosW, int16(c.PosW*1000.0))
+	put(offsetDestW, int16(c.DestW*1000.0))
+	put(offsetMaxSpeed, int16(c.MaxSpeed))
 	return buf, nil
 }
 
-func decodeBaseStationCommand(buf []byte) (baseStationCommand, error) {
+func DecodeBaseStationCommand(buf []byte) (BaseStationCommand, error) {
 	if len(buf) != CommandEncodedSize {
-		return baseStationCommand{}, fmt.Errorf("invalid buffer size: expected %d, got %d", CommandEncodedSize, len(buf))
+		return BaseStationCommand{}, fmt.Errorf("invalid buffer size: expected %d, got %d", CommandEncodedSize, len(buf))
 	}
 	get := func(offset int) int16 { return int16(binary.LittleEndian.Uint16(buf[offset:])) }
-	return baseStationCommand{
-		kind:      robot_action.ActionType(buf[offsetActionType]),
-		robotID:   int32(buf[offsetRobotID]),
-		kickSpeed: int32(get(offsetKickSpeed)),
-		posX:      int32(get(offsetPosX)),
-		posY:      int32(get(offsetPosY)),
-		posW:      float32(get(offsetPosW)) / 1000.0,
-		destX:     int32(get(offsetDestX)),
-		destY:     int32(get(offsetDestY)),
-		destW:     float32(get(offsetDestW)) / 1000.0,
-		dirX:      int32(get(offsetDirectionX)),
-		dirY:      int32(get(offsetDirectionY)),
-		aux:       int32(get(offsetAux)),
-		maxSpeed:  int32(get(offsetMaxSpeed)),
+	return BaseStationCommand{
+		Kind:      robot_action.ActionType(buf[offsetActionType]),
+		RobotID:   int32(buf[offsetRobotID]),
+		KickSpeed: int32(get(offsetKickSpeed)),
+		PosX:      int32(get(offsetPosX)),
+		PosY:      int32(get(offsetPosY)),
+		PosW:      float32(get(offsetPosW)) / 1000.0,
+		DestX:     int32(get(offsetDestX)),
+		DestY:     int32(get(offsetDestY)),
+		DestW:     float32(get(offsetDestW)) / 1000.0,
+		DirX:      int32(get(offsetDirectionX)),
+		DirY:      int32(get(offsetDirectionY)),
+		Aux:       int32(get(offsetAux)),
+		MaxSpeed:  int32(get(offsetMaxSpeed)),
 	}, nil
 }

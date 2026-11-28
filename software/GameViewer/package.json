@@ -8,7 +8,7 @@
     "server": "node server/visionServer.cjs",
     "build": "tsc && vite build",
     "typecheck": "tsc --noEmit",
-    "test": "node --test server/",
+    "test": "node --test tests/",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },

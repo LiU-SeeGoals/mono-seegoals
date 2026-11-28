@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const {
   decodeTrackedFrame, decodeReferee, geometryPacket,
   TrackerWrapperPacket, SSLWrapperPacket, Referee,
-} = require('./decode.cjs');
+} = require('../server/decode.cjs');
 const encode = frame => TrackerWrapperPacket.encode(TrackerWrapperPacket.create({
   uuid: 'test', trackedFrame: { frameNumber: 1, timestamp: 1, ...frame },
 })).finish();

@@ -117,7 +117,7 @@ func Load() (*Config, error) {
 		return instance, nil
 	}
 
-	path, err := findEnvFile()
+	path, err := FindEnvFile()
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,9 @@ func EnvFile() string {
 	return envFile
 }
 
-func findEnvFile() (string, error) {
+// FindEnvFile resolves the optional .env file path from SEEGOALS_ENV_FILE or
+// by walking parent directories from the working directory.
+func FindEnvFile() (string, error) {
 	if explicit := os.Getenv(EnvFileVar); explicit != "" {
 		if _, err := os.Stat(explicit); err != nil {
 			return "", fmt.Errorf("config: %s=%s: %w", EnvFileVar, explicit, err)
