@@ -2,7 +2,6 @@ services:
   ai:
     environment:
       - SEEGOALS_SCENARIO=vs-tigers-blue
-    command: bash -c "go run main.go"
 
   tiger-ai:
     platform: linux/amd64

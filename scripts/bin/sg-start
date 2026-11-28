@@ -156,7 +156,7 @@ choices = [
         "container_to_enter": GW
     },
     {
-        "choice-text": "Run SeeGoals Blue vs TIGERs AI Yellow.",
+        "choice-text": f"Run SeeGoals Blue vs TIGERs AI Yellow (enter '{AI}' to run main.go).",
         "sumatra": True,
         "pull_images": [],
         "docker_cmd": [
@@ -166,10 +166,10 @@ choices = [
             "-f", f"{docker_dir}/docker-compose.vs-tigers-blue.yml",
             "-p", project_name, "up", "-d"
         ],
-        "container_to_enter": None
+        "container_to_enter": AI
     },
     {
-        "choice-text": "Run SeeGoals Yellow vs TIGERs AI Blue.",
+        "choice-text": f"Run SeeGoals Yellow vs TIGERs AI Blue (enter '{AI}' to run main.go).",
         "sumatra": True,
         "pull_images": [],
         "docker_cmd": [
@@ -179,7 +179,7 @@ choices = [
             "-f", f"{docker_dir}/docker-compose.vs-tigers-yellow.yml",
             "-p", project_name, "up", "-d"
         ],
-        "container_to_enter": None
+        "container_to_enter": AI
     }
 ]
 
