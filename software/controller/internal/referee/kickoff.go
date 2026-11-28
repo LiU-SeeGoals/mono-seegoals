@@ -48,7 +48,7 @@ func (s *KickOffIntent) GetFromPosition() info.Position {
 
 func (s *PrepareKickoff) Initialize() {
 
-	goalieID, hasGoalie := selectGoalieID(s.gi, s.team, s.activeRobots)
+	goalieID, hasGoalie := SelectGoalieID(s.gi, s.team, s.activeRobots)
 	kickOffID, receiverID := selectKickoffRobots(fieldRobots(s.activeRobots, goalieID, hasGoalie))
 	s.kickOffID = kickOffID
 	s.receiverID = receiverID
@@ -90,7 +90,7 @@ func (s *Kickoff) Initialize() {
 	s.postKickHeading = 0
 	s.postKickHeadingOK = false
 
-	goalieID, hasGoalie := selectGoalieID(s.gi, s.team, s.activeRobots)
+	goalieID, hasGoalie := SelectGoalieID(s.gi, s.team, s.activeRobots)
 	kickOffID, receiverID := selectKickoffRobots(fieldRobots(s.activeRobots, goalieID, hasGoalie))
 	s.kickOffID = kickOffID
 	s.receiverID = receiverID
@@ -239,14 +239,19 @@ func moveKickerToKickoffPreparePosition(
 	activityHandler *ai.ActivityHandler,
 	kickOffID info.ID,
 ) {
-	activityHandler.AddActivity(activity.NewMoveToPosition(team, kickOffID, kickoffPreparePosition(gi, team)))
+	distance := kickoffPrepareDistanceMM
+	if rules.For(gi, team).Stopped {
+		// Still in STOP: stay outside the STOP keep-out.
+		distance = rules.FreeKickPrepareDistance
+	}
+	activityHandler.AddActivity(activity.NewMoveToPosition(team, kickOffID, kickoffPreparePosition(gi, team, distance)))
 }
 
-func kickoffPreparePosition(gi *info.GameInfo, team info.Team) info.Position {
+func kickoffPreparePosition(gi *info.GameInfo, team info.Team, distance float64) info.Position {
 	ballPos := kickoffBallPosition(gi)
 	targetPos := (&KickOffIntent{gi: gi, team: team}).GetTargetPosition()
 	pos := ballPos
-	pos.X += ownHalfXSign(gi, team) * kickoffPrepareDistanceMM
+	pos.X += ownHalfXSign(gi, team) * distance
 	pos.Z = 0
 	pos.Angle = pos.AngleToPosition(targetPos)
 	if gi != nil {
@@ -394,10 +399,12 @@ func kickoffFormationSlots(
 			Z: 0,
 		}
 		pos = keepOutsideKickoffCenterCircle(pos, xSign)
-		pos.Angle = pos.AngleToPosition(ballPos)
 		if gi != nil {
 			pos = gi.ClampToField(pos, kickoffFieldMarginMM)
 		}
+		// Deep slots would otherwise fall inside our own defense area.
+		pos = clampRestartSlot(gi, pos)
+		pos.Angle = pos.AngleToPosition(ballPos)
 		slots = append(slots, pos)
 	}
 

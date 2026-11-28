@@ -35,6 +35,15 @@ func NewGoalieRole(robotID info.ID, activityHandler ai.ActivityHandler, team inf
 	}
 }
 
+// SetClearFallback updates where the goalie clears to when no safe pass
+// target exists (it flips with the field side at half time).
+func (gr *GoalieRole) SetClearFallback(pos info.Position) {
+	gr.clearFallback = pos
+	if gr.safeClear != nil {
+		gr.safeClear.fallback = pos
+	}
+}
+
 func (gr *GoalieRole) SetGameInfo(gi info.GameInfo) {
 	*gr.gi = gi
 	gr.deadBall.Observe(gr.gi, gr.team)

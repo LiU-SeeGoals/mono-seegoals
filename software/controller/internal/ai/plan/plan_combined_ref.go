@@ -84,6 +84,14 @@ func (m *CombinedPlanWithRef) refereeHandlesFrame() bool {
 	return handled
 }
 
+// RestartKicker implements ai.RestartKickerReporter.
+func (m *CombinedPlanWithRef) RestartKicker() (info.ID, bool) {
+	if m.refereeHandler == nil {
+		return 0, false
+	}
+	return m.refereeHandler.RestartKicker()
+}
+
 func isStoppedFrame(gi *info.GameInfo) bool {
 	return gi != nil && gi.Status != nil && gi.Status.GetGameEvent() != nil &&
 		gi.Status.GetGameEvent().GetCurrentState() == info.STATE_STOPPED

@@ -325,6 +325,9 @@ func (s *KickState) GetName() state_machine.StateName {
 }
 
 func (s *KickState) Update() state_machine.EventName {
+	// Republish every frame: a referee command may have replaced this robot's
+	// activity (e.g. HALT -> Stop) while the state machine stayed in KickState.
+	s.ActivityHandler.AddActivity(s.KickAct)
 	if s.KickAct.Achieved(s.Gi) {
 		if ctx, ok := s.Ctx.(FreezableTargetContext); ok {
 			ctx.ResetTarget()

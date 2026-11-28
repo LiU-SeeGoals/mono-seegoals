@@ -163,3 +163,15 @@ func TestDefenseEscapeHoldsInitialHeadingAcrossFrames(t *testing.T) {
 		t.Fatalf("escape heading drifted to %f", got.Dest.Angle)
 	}
 }
+
+func TestStopCapsSpeedBelowRuleLimit(t *testing.T) {
+	gi := newStoppedDefenseAreaTestGameInfo()
+	gi.State.SetBall(0, 0, 0, 1)
+	gi.State.SetBlueRobot(1, -2000, 1000, 0, time.Now().UnixMilli())
+	c := &motionConstraints{team: info.Blue}
+	move := &action.MoveTo{Id: 1, Team: info.Blue, Pos: info.Position{X: -2000, Y: 1000}, Dest: info.Position{X: -2500, Y: 1000}}
+	got, ok := c.apply(move, gi).(*action.MoveTo)
+	if !ok || got.MaxLinearSpeed <= 0 || got.MaxLinearSpeed >= 1.5 {
+		t.Fatalf("STOP move not capped below 1.5 m/s: %+v", got)
+	}
+}

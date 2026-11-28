@@ -20,6 +20,13 @@ type Planner interface {
 	Kill()
 }
 
+// RestartKickerReporter is implemented by planners that name the robot taking
+// our pending restart. The executor then lets only that robot touch the ball
+// until it is in play (rules.MatchRules.ForRobot).
+type RestartKickerReporter interface {
+	RestartKicker() (info.ID, bool)
+}
+
 // Ai runs one team's decision pipeline synchronously on the caller's
 // goroutine: planner -> activities -> safety -> actions. Nothing runs in the
 // background, so GetActions returns once every action for the frame is ready.
@@ -60,6 +67,11 @@ func (m *Ai) HotswapPlanner(team info.Team, planner Planner) {
 // GetActions plans and executes one frame.
 func (m *Ai) GetActions(gi *info.GameInfo) []action.Action {
 	m.planner.Tick(gi)
+	c := &m.executor.constraints
+	c.restartKicker, c.hasRestartKicker = 0, false
+	if reporter, ok := m.planner.(RestartKickerReporter); ok {
+		c.restartKicker, c.hasRestartKicker = reporter.RestartKicker()
+	}
 	return m.executor.execute(gi)
 }
 

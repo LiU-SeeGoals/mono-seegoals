@@ -99,6 +99,9 @@ func (m *SimMotion) moveTo(mv *action.MoveTo) *simulation.RobotCommand {
 	vyWorld := simLinearKp * (mv.Dest.Y - mv.Pos.Y)
 
 	maxLinear := m.limits.MaxLinearMPS
+	if mv.MaxLinearSpeed > 0 {
+		maxLinear = math.Min(maxLinear, mv.MaxLinearSpeed)
+	}
 	speed := math.Hypot(vxWorld, vyWorld)
 	minLinear := math.Min(maxLinear, mv.MinLinearSpeed)
 	if speed > maxLinear {

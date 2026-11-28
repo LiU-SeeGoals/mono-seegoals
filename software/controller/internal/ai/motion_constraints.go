@@ -21,11 +21,16 @@ import (
 //  3. optional opponent-half restriction (config);
 //  4. field, goal-line and defense-area clamping;
 //  5. during STOP, a final check that the straight move is legal, otherwise a
-//     legal waypoint on the keep-out circle (or a stop).
+//     legal waypoint on the keep-out circle (or a stop);
+//  6. the rules' speed limit (STOP, ball placement) on every MoveTo.
 type motionConstraints struct {
 	team                   info.Team
 	escape                 defenseAreaEscapeState
 	restrictToOpponentHalf bool
+	// restartKicker is our robot taking the pending restart, as reported by
+	// the planner (RestartKickerReporter); only it may touch the ball.
+	restartKicker    info.ID
+	hasRestartKicker bool
 }
 
 // beginFrame resets per-frame state and, while halted, returns the stop
@@ -39,13 +44,17 @@ func (c *motionConstraints) beginFrame(gi *info.GameInfo) ([]action.Action, bool
 
 // apply makes one action legal.
 func (c *motionConstraints) apply(act action.Action, gi *info.GameInfo) action.Action {
-	act = stoppedPlaySafetyAction(act, c.team, gi)
+	act = ballRulesAction(act, c.rulesFor(act, gi), gi)
 	act = c.escape.apply(act, c.team, gi)
 	if c.restrictToOpponentHalf {
 		act = clampActionToOpponentHalf(act, gi, c.team)
 	}
 	act = clampMoveActionToField(act, gi)
-	return finalStoppedPlayAction(act, gi)
+	act = finalStoppedPlayAction(act, gi)
+	if move, ok := act.(*action.MoveTo); ok {
+		applySpeedLimit(move, rules.For(gi, c.team))
+	}
+	return act
 }
 
 type goalAreaBounds struct {
@@ -60,12 +69,35 @@ type defenseAreaEscapeState struct {
 	headingSet [info.TEAM_SIZE]bool
 }
 
+// rulesFor is the team's rules narrowed to the robot act drives.
+func (c *motionConstraints) rulesFor(act action.Action, gi *info.GameInfo) rules.MatchRules {
+	r := rules.For(gi, c.team)
+	if id, ok := ballActionRobotID(act); ok {
+		r = r.ForRobot(info.ID(id), c.restartKicker, c.hasRestartKicker)
+	}
+	return r
+}
+
+func ballActionRobotID(act action.Action) (int, bool) {
+	switch typed := act.(type) {
+	case *action.MoveTo:
+		return typed.Id, true
+	case *action.Kick:
+		return typed.Id, true
+	default:
+		return 0, false
+	}
+}
+
 // stoppedPlaySafetyAction enforces the ball rules: while the team may not
 // touch the ball a stale attack activity must not kick or dribble, and every
 // movement target is projected out of the ball keep-out (STOP for both teams,
 // kickoffs and free kicks for the defending team).
 func stoppedPlaySafetyAction(act action.Action, team info.Team, gi *info.GameInfo) action.Action {
-	r := rules.For(gi, team)
+	return ballRulesAction(act, rules.For(gi, team), gi)
+}
+
+func ballRulesAction(act action.Action, r rules.MatchRules, gi *info.GameInfo) action.Action {
 	if r.MayTouchBall && r.BallKeepout == 0 {
 		return act
 	}
@@ -81,7 +113,7 @@ func stoppedPlaySafetyAction(act action.Action, team info.Team, gi *info.GameInf
 		if r.Stopped {
 			typed.MinLinearSpeed = 0
 		}
-		typed.Dest = pathplanner.ClampBallKeepoutDestination(team, typed.Pos, typed.Dest, gi)
+		typed.Dest = pathplanner.ClampDestinationOutsideBall(typed.Pos, typed.Dest, gi, r.BallKeepout)
 		return typed
 	case *action.Kick:
 		if r.MayTouchBall {
@@ -90,6 +122,17 @@ func stoppedPlaySafetyAction(act action.Action, team info.Team, gi *info.GameInf
 		return &action.Stop{Id: typed.Id}
 	default:
 		return act
+	}
+}
+
+// applySpeedLimit caps move at the rules' speed limit, less SpeedLimitMargin.
+func applySpeedLimit(move *action.MoveTo, r rules.MatchRules) {
+	if r.MaxSpeed <= 0 || math.IsInf(r.MaxSpeed, 1) {
+		return
+	}
+	limit := math.Max(0.1, r.MaxSpeed-rules.SpeedLimitMargin)
+	if move.MaxLinearSpeed == 0 || move.MaxLinearSpeed > limit {
+		move.MaxLinearSpeed = limit
 	}
 }
 
@@ -144,6 +187,7 @@ func finalStoppedPlayAction(act action.Action, gi *info.GameInfo) action.Action 
 			AllowOutsideField:   move.AllowOutsideField,
 			AllowBehindGoalLine: move.AllowBehindGoalLine,
 			AllowGoalArea:       move.AllowGoalArea,
+			MaxLinearSpeed:      move.MaxLinearSpeed,
 		}
 		candidate.Dest.X = ball.X + (radius+1)*math.Cos(angle)
 		candidate.Dest.Y = ball.Y + (radius+1)*math.Sin(angle)

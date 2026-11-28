@@ -11,9 +11,11 @@ const { decodeTrackedFrame, decodeReferee, geometryPacket } = require('./decode.
 
 const env = process.env;
 const visionAddr = env.SSL_VISION_MULTICAST_ADDR || '224.5.23.2';
-const visionPort = Number(env.ENVIRONMENT === 'simulation'
+// Docker Compose sets SSL_VISION_MULTICAST_PORT to the sim or real port;
+// otherwise pick it from ENVIRONMENT.
+const visionPort = Number(env.SSL_VISION_MULTICAST_PORT || (env.ENVIRONMENT === 'simulation'
   ? env.SSL_VISION_SIM_MAIN_PORT || 10020
-  : env.SSL_VISION_REAL_MAIN_PORT || 10006);
+  : env.SSL_VISION_REAL_MAIN_PORT || 10006));
 const trackerAddr = env.SSL_TRACKER_ADDR || '224.5.23.2';
 const trackerPort = Number(env.SSL_TRACKER_PORT || 10010);
 const refereeAddr = env.SSL_GAME_CONTROLLER_PUBLISH_ADDR || '224.5.23.1';
@@ -21,6 +23,8 @@ const refereePort = Number(env.SSL_GAME_CONTROLLER_PUBLISH_PORT || 10003);
 // VITE_SSL_VISION_WS_ADDR is where the browser connects; listen on all
 // interfaces so Docker port mappings work.
 const wsPort = Number(env.VITE_SSL_VISION_WS_PORT || 3000);
+
+const MEMBERSHIP_REFRESH_MS = 5000;
 
 const log = (...args) => console.log('[visionServer]', ...args);
 
@@ -37,14 +41,30 @@ function subscribe(name, addr, port, onMessage) {
     catch (error) { console.error(`[visionServer] invalid ${name} packet: ${error.message}`); }
   });
   socket.on('error', (error) => console.error(`[visionServer] ${name} socket error:`, error));
-  socket.bind(port, '0.0.0.0', () => {
-    const interfaces = ipv4Interfaces();
-    for (const ip of interfaces) {
-      try { socket.addMembership(addr, ip); }
-      catch (error) { console.error(`[visionServer] ${name} membership on ${ip}: ${error.message}`); }
+  // Interfaces whose multicast membership succeeded ('' = default interface).
+  const joined = new Set();
+  const join = (ip) => {
+    if (joined.has(ip)) return;
+    try {
+      if (ip) socket.addMembership(addr, ip);
+      else socket.addMembership(addr);
+      joined.add(ip);
+      log(`${name} joined ${addr} on ${ip || 'default interface'}`);
+    } catch (error) {
+      console.error(`[visionServer] ${name} membership on ${ip || 'default interface'}: ${error.message}`);
     }
-    if (interfaces.length === 0) socket.addMembership(addr);
+  };
+  // Join every IPv4 interface; also retried periodically so a network that
+  // comes up after start (or a machine started offline) is picked up.
+  const refreshMemberships = () => {
+    const interfaces = ipv4Interfaces();
+    if (interfaces.length === 0) join('');
+    else interfaces.forEach(join);
+  };
+  socket.bind(port, '0.0.0.0', () => {
     log(`${name} listening on ${addr}:${port}`);
+    refreshMemberships();
+    setInterval(refreshMemberships, MEMBERSHIP_REFRESH_MS).unref();
   });
   return socket;
 }

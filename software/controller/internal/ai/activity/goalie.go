@@ -63,8 +63,12 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	// Current ball position
 	ballPos, err := ball.GetEstimatedPosition()
 	if err != nil {
-		fmt.Println("Error getting ball position:", err)
-		return NewMoveToPosition(g.team, g.id, info.Position{X: 0, Y: 0}).GetAction(gi)
+		// No ball yet: hold in front of our goal, never at midfield.
+		hold := gi.OwnGoalCenter(g.team)
+		hold.X -= gi.OwnHalfXSign(g.team) * goalieNoBallHoldInset
+		move := NewMoveToPosition(g.team, g.id, hold)
+		move.AvoidGoallines(false)
+		return move.GetAction(gi)
 	}
 
 	// Cover the angle between the ball and both posts. This is the normal
@@ -99,6 +103,10 @@ func (g *Goalie) GetAction(gi *info.GameInfo) action.Action {
 	move.SetUseRRT(goalieShouldUseRRT(gi))
 	return move.GetAction(gi)
 }
+
+// goalieNoBallHoldInset is how far in front of the goal line the keeper
+// waits before any ball has been seen.
+const goalieNoBallHoldInset = 300.0
 
 func newGoalieMovementBounds(gi *info.GameInfo, team info.Team) (goalieMovementBounds, bool) {
 	if gi == nil {

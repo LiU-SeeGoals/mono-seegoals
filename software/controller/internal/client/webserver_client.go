@@ -207,6 +207,20 @@ func GetAllIncoming() []GameViewerCommand {
 }
 
 // Returns a list of all new incoming actions
+// TakeCommandFor returns and consumes the pending command for team. A
+// command addressed to the other team stays queued for that team's planner.
+func TakeCommandFor(commandName string, team int) *GameViewerCommand {
+	webserver := getInstance()
+	webserver.receivedDataMutex.Lock()
+	defer webserver.receivedDataMutex.Unlock()
+	command, ok := webserver.dataLookup[commandName]
+	if !ok || (command.Team != 0 && command.Team != team) {
+		return nil
+	}
+	delete(webserver.dataLookup, commandName)
+	return command
+}
+
 func GetCommand(commandName string) *GameViewerCommand {
 	webserver := getInstance()
 	webserver.receivedDataMutex.Lock()
@@ -239,7 +253,9 @@ type GameViewerCommand struct {
 	X           int32  `json:"x"`
 	Y           int32  `json:"y"`
 	Id          int    `json:"Id"`
-	Type        string `json:"Type"`
+	// Team is the robot's team (1 yellow, 2 blue); 0 means any team.
+	Team int    `json:"Team,omitempty"`
+	Type string `json:"Type"`
 }
 
 type GameViewerActionPacket struct {

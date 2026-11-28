@@ -21,14 +21,15 @@ func NewTrackedRobot(id uint32, team Team) *TrackedRobot {
 	}
 }
 
-func (tr *TrackedRobot) SetTracked(pos Position, vel Position, orientation float64, velAngular float64, ts float64) {
+// SetTracked stores a tracker sample received at now (GameInfo.Now).
+func (tr *TrackedRobot) SetTracked(pos Position, vel Position, orientation float64, velAngular float64, ts float64, now time.Time) {
 	tr.Pos = pos
 	tr.Vel = vel
 	tr.Orientation = orientation
 	tr.VelAngular = velAngular
 	tr.Timestamp = ts
 	tr.Valid = true
-	tr.updatedAt = time.Now().UnixMilli()
+	tr.updatedAt = now.UnixMilli()
 }
 
 func (tr *TrackedRobot) GetTrackedPosition() (Position, bool) {
@@ -47,7 +48,8 @@ func (tr *TrackedRobot) GetTrackedVelocity() (Position, bool) {
 
 
 func (tr *TrackedRobot) GetFreshTrackedVelocity(now time.Time, maxAge time.Duration) (Position, bool) {
-	if !tr.Valid || now.UnixMilli()-tr.updatedAt > maxAge.Milliseconds() {
+	age := now.UnixMilli() - tr.updatedAt
+	if !tr.Valid || age < 0 || age > maxAge.Milliseconds() {
 		return Position{}, false
 	}
 	return tr.Vel, true

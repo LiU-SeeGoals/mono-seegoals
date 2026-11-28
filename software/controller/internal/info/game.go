@@ -54,6 +54,9 @@ func (gi *GameInfo) SetClock(c Clock) {
 		c = SystemClock{}
 	}
 	gi.clock = c
+	if gi.State != nil {
+		gi.State.clock = c
+	}
 }
 
 func (gi GameInfo) PrintField() {
@@ -67,7 +70,7 @@ func (gi *GameInfo) ObserveRestart() {
 	if gi.Status == nil || gi.State == nil {
 		return
 	}
-	ball, ok := gi.State.GetTrackedBall().GetTrackedPosition()
+	ball, ok := gi.State.GetTrackedBall().GetFreshTrackedPosition(gi.Now(), TrackedStaleAfter)
 	if !ok {
 		raw, err := gi.State.GetBall().GetPosition()
 		ball, ok = raw, err == nil
@@ -197,12 +200,44 @@ func (gi GameInfo) ClampToFieldWithMargins(pos Position, marginX, marginY float6
 	return pos
 }
 
+// Division B dimensions, used until SSL-Vision has published geometry.
+const (
+	defaultFieldLength      = 9000.0
+	defaultGoalWidth        = 1000.0
+	defaultPenaltyAreaDepth = 1000.0
+)
+
+// PenaltyAreaDepth is the defense area's depth from the goal line, falling
+// back to Division B until geometry arrives.
+func (gi GameInfo) PenaltyAreaDepth() float64 {
+	if geometry, ok := gi.FieldGeometry(); ok && geometry.PenaltyAreaDepth > 0 {
+		return geometry.PenaltyAreaDepth
+	}
+	return defaultPenaltyAreaDepth
+}
+
+// FieldHalfLength is half the field length (goal line X), falling back to
+// the Division B field when no geometry has arrived yet.
+func (gi GameInfo) FieldHalfLength() float64 {
+	if geometry, ok := gi.FieldGeometry(); ok {
+		return geometry.Length / 2
+	}
+	return defaultFieldLength / 2
+}
+
+// OwnGoalCenter is the center of the goal team defends, on its goal line.
+func (gi GameInfo) OwnGoalCenter(team Team) Position {
+	return Position{X: gi.OwnHalfXSign(team) * gi.FieldHalfLength()}
+}
+
+// HomeGoalDefPos is the defensive anchor in front of team's goal, one goal
+// width in from the goal line.
 func (gi GameInfo) HomeGoalDefPos(team Team) Position {
-	x := gi.OwnHalfXSign(team) * float64(gi.field.GetFieldLength()/2-gi.field.GetGoalWidth())
-
-	pos := Position{X: x, Y: 0, Z: 0, Angle: 0}
-
-	return pos
+	goalWidth := defaultGoalWidth
+	if geometry, ok := gi.FieldGeometry(); ok && geometry.GoalWidth > 0 {
+		goalWidth = geometry.GoalWidth
+	}
+	return Position{X: gi.OwnHalfXSign(team) * (gi.FieldHalfLength() - goalWidth)}
 }
 
 // OwnHalfXSign returns the X-axis sign of the half assigned to team by the

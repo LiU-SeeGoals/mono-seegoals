@@ -8,6 +8,8 @@
 // name says otherwise.
 package rules
 
+import "github.com/LiU-SeeGoals/controller/internal/info"
+
 // Geometry.
 const (
 	// RobotRadius is the SSL robot radius (rules: max 180 mm diameter). The
@@ -42,6 +44,10 @@ const (
 	// the restart is still in STOP: outside StopBallKeepout.
 	FreeKickPrepareDistance = StopBallKeepout + 50.0
 )
+
+// SpeedLimitMargin is how far below a rule speed limit (m/s) the executor
+// caps the robots, for velocity overshoot and vision noise.
+const SpeedLimitMargin = 0.2
 
 // Defense-area clearances (robot centre to the area's edge).
 const (
@@ -79,3 +85,18 @@ const (
 	// FreeKickFieldClearance keeps free-kick formation slots inside the field lines.
 	FreeKickFieldClearance = 200.0
 )
+
+// DefenseLineDepth is the unsigned X (from the center line) of the deepest
+// line in front of a defense area that keeps DefenseAreaStoppedClearance, so
+// it is legal in every game state: 3100 mm on a 9 m field. Defensive
+// formations stand on or in front of it.
+func DefenseLineDepth(gi *info.GameInfo) float64 {
+	if gi == nil {
+		return 4500 - 1000 - DefenseAreaStoppedClearance - defenseLineEpsilon
+	}
+	return gi.FieldHalfLength() - gi.PenaltyAreaDepth() - DefenseAreaStoppedClearance - defenseLineEpsilon
+}
+
+// defenseLineEpsilon keeps the defense line strictly outside the clearance
+// (the executor treats the boundary itself as inside).
+const defenseLineEpsilon = 10.0

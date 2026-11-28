@@ -75,7 +75,7 @@ func contactBallPosition(gi *info.GameInfo) (info.Position, bool) {
 	if gi == nil || gi.State == nil {
 		return info.Position{}, false
 	}
-	if pos, ok := gi.State.GetTrackedBall().GetTrackedPosition(); ok {
+	if pos, ok := gi.State.GetTrackedBall().GetFreshTrackedPosition(gi.Now(), info.TrackedStaleAfter); ok {
 		return pos, true
 	}
 	pos, err := gi.State.GetBall().GetEstimatedPosition()

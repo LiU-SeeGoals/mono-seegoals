@@ -88,6 +88,9 @@ type RefereeHandler struct {
 	nextCommandAfterBallPlacement info.RefCommand
 	kickOff                       *Kickoff
 	freeKick                      *FreeKick
+	prepareKickoff                *PrepareKickoff
+	preparePenalty                *PreparePenalty
+	penalty                       *Penalty
 	kickoffTouchRestriction       kickoffTouchRestriction
 	lastCommand                   info.RefCommand
 	lastCommandTimestamp          uint64
@@ -179,10 +182,13 @@ func NewRefereeHandler(gi *info.GameInfo, activeRobots []info.ID, team info.Team
 	sm.AddTransition(StateFreeKick, GAME_RUNNING_DETECTED, running)
 
 	return &RefereeHandler{
-		ctx:       ctx,
-		refereeSM: sm,
-		kickOff:   kickOff,
-		freeKick:  freeKick,
+		ctx:            ctx,
+		refereeSM:      sm,
+		kickOff:        kickOff,
+		freeKick:       freeKick,
+		prepareKickoff: prepareKickoff,
+		preparePenalty: preparePenalty,
+		penalty:        penalty,
 	}
 }
 
@@ -242,6 +248,28 @@ func (s *RefereeHandler) HandleReferee() bool {
 // again until another robot has touched it. It applies to kickoffs and free kicks.
 func (s *RefereeHandler) KickoffRestrictedRobot() (info.ID, bool) {
 	return s.kickoffTouchRestriction.robot()
+}
+
+// RestartKicker returns the robot taking our pending kickoff, free kick or
+// penalty. Until the ball is in play no other robot of ours may touch it.
+func (s *RefereeHandler) RestartKicker() (info.ID, bool) {
+	gameEvent := s.ctx.gi.Status.GetGameEvent()
+	if gameEvent == nil || gameEvent.BallInPlay || gameEvent.TeamWithPossession != s.ctx.team {
+		return 0, false
+	}
+	switch s.refereeSM.CurrentStateName() {
+	case StatePrepareKickoff:
+		return s.prepareKickoff.kickOffID, true
+	case StateKickoff:
+		return s.kickOff.kickOffID, s.kickOff.kickOff != nil
+	case StateFreeKick:
+		return s.freeKick.kickerID, s.freeKick.freeKick != nil
+	case StatePreparePenalty:
+		return s.preparePenalty.kickerID, s.preparePenalty.hasKicker
+	case StatePenalty:
+		return s.penalty.kickerID, s.penalty.penaltyKick != nil
+	}
+	return 0, false
 }
 
 func (s *RefereeHandler) refEventForGameEvent(gameEvent *info.GameEvent) state_machine.EventName {

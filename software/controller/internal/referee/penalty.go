@@ -181,7 +181,7 @@ func positionPenaltyNonParticipants(
 	attackingTeam := gi.Status.GetGameEvent().TeamWithPossession
 	waitingRobots := append([]info.ID(nil), activeRobots...)
 	if team != attackingTeam {
-		goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
+		goalieID, hasGoalie := SelectGoalieID(gi, team, activeRobots)
 		if hasGoalie {
 			if goalieFree {
 				activityHandler.AddActivity(activity.NewGoalie(team, goalieID))

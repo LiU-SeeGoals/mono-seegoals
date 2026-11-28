@@ -92,6 +92,7 @@ func (s *FreeKick) Update() state_machine.EventName {
 		if s.freeKick != nil {
 			s.freeKick.Update()
 		}
+		moveRobotsToFreeKickSupportPositions(s.gi, s.activeRobots, s.team, s.activityHandler, s.kickerID, s.freeKick != nil)
 	} else {
 		moveRobotsToDefensePosition(s.gi, s.activeRobots, s.team, s.activityHandler)
 	}
@@ -105,7 +106,7 @@ func moveRobotsToDefensePosition(
 	team info.Team,
 	activityHandler *ai.ActivityHandler,
 ) {
-	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
+	goalieID, hasGoalie := SelectGoalieID(gi, team, activeRobots)
 	if hasGoalie {
 		activityHandler.AddActivity(activity.NewGoalie(team, goalieID))
 	}
@@ -122,6 +123,101 @@ func moveRobotsToDefensePosition(
 	for i, robotID := range reserveRobots {
 		activityHandler.AddActivity(activity.NewMoveToPosition(team, robotID, reserveSlots[i]))
 	}
+}
+
+// moveRobotsToFreeKickSupportPositions places the goalie and every field
+// robot except the kicker during our free kick: support slots in the
+// opponent half, outside RestartBallKeepout of the ball.
+func moveRobotsToFreeKickSupportPositions(
+	gi *info.GameInfo,
+	activeRobots []info.ID,
+	team info.Team,
+	activityHandler *ai.ActivityHandler,
+	kickerID info.ID,
+	hasKicker bool,
+) {
+	goalieID, hasGoalie := SelectGoalieID(gi, team, activeRobots)
+	if hasGoalie && (!hasKicker || goalieID != kickerID) {
+		activityHandler.AddActivity(activity.NewGoalie(team, goalieID))
+	}
+
+	supporters := fieldRobots(activeRobots, goalieID, hasGoalie)
+	if hasKicker {
+		supporters = sortedRobotIDsExcluding(supporters, kickerID)
+	}
+	ballPos := kickoffBallPosition(gi)
+	slots := freeKickSupportSlots(gi, team, ballPos, len(supporters))
+	for i, robotID := range assignRobotsToSlots(gi, team, supporters, slots) {
+		move := activity.NewMoveToPosition(team, robotID, slots[i])
+		activityHandler.AddActivity(move)
+	}
+}
+
+// freeKickSupportSlots spreads count pass options across the opponent half,
+// keeping each at least freeKickSupportBallClearanceMM from the ball.
+func freeKickSupportSlots(gi *info.GameInfo, team info.Team, ballPos info.Position, count int) []info.Position {
+	if count <= 0 {
+		return nil
+	}
+	halfLength, halfWidth := 4500.0, 3000.0
+	if gi != nil {
+		if geometry, ok := gi.FieldGeometry(); ok {
+			halfLength, halfWidth = geometry.Length/2, geometry.Width/2
+		}
+	}
+	attackSign := -ownHalfXSign(gi, team)
+	templates := []struct{ depth, lane float64 }{
+		{depth: 0.45, lane: -0.55},
+		{depth: 0.45, lane: 0.55},
+		{depth: 0.15, lane: 0.0},
+		{depth: 0.20, lane: -0.80},
+		{depth: 0.20, lane: 0.80},
+		{depth: -0.20, lane: -0.40},
+		{depth: -0.20, lane: 0.40},
+	}
+	slots := make([]info.Position, count)
+	for i := range slots {
+		template := templates[i%len(templates)]
+		slot := info.Position{
+			X: attackSign * halfLength * template.depth,
+			Y: halfWidth * template.lane,
+		}
+		if offset := slot.Dist2d(ballPos); offset < freeKickSupportBallClearanceMM {
+			// Push the slot straight away from the ball (sideways if on it).
+			dx, dy := slot.X-ballPos.X, slot.Y-ballPos.Y
+			if offset < 1 {
+				dx, dy, offset = 0, -math.Copysign(1, ballPos.Y), 1
+			}
+			slot.X = ballPos.X + dx/offset*freeKickSupportBallClearanceMM
+			slot.Y = ballPos.Y + dy/offset*freeKickSupportBallClearanceMM
+		}
+		slot = clampRestartSlot(gi, slot)
+		slot.Angle = slot.AngleToPosition(ballPos)
+		slots[i] = slot
+	}
+	return slots
+}
+
+// assignRobotsToSlots greedily gives each slot (in order) the closest
+// remaining robot; result[i] drives to slots[i].
+func assignRobotsToSlots(gi *info.GameInfo, team info.Team, robots []info.ID, slots []info.Position) []info.ID {
+	remaining := append([]info.ID(nil), robots...)
+	assigned := make([]info.ID, 0, len(slots))
+	for _, slot := range slots {
+		if len(remaining) == 0 {
+			break
+		}
+		best := 0
+		bestDist := math.Inf(1)
+		for i, robotID := range remaining {
+			if dist := robotDistanceToClosestSlot(gi, team, robotID, []info.Position{slot}); dist < bestDist {
+				best, bestDist = i, dist
+			}
+		}
+		assigned = append(assigned, remaining[best])
+		remaining = append(remaining[:best], remaining[best+1:]...)
+	}
+	return assigned
 }
 
 func freeKickDefenseSlots(
@@ -167,7 +263,7 @@ func freeKickDefenseSlots(
 	// obstacles while the robots travel to these clamped destinations.
 	slots := wallSlotsAtDistance(ballPos, directionX, directionY, freeKickWallDistanceMM, count)
 	for i := range slots {
-		slots[i] = clampFreeKickSlot(gi, slots[i])
+		slots[i] = clampRestartSlot(gi, slots[i])
 		slots[i].Angle = slots[i].AngleToPosition(ballPos)
 	}
 	return slots
@@ -246,7 +342,7 @@ func insideInflatedDefenseArea(slot info.Position, geometry info.FieldGeometry, 
 	return slot.X >= minX && slot.X <= maxX && slot.Y >= minY && slot.Y <= maxY
 }
 
-func clampFreeKickSlot(gi *info.GameInfo, slot info.Position) info.Position {
+func clampRestartSlot(gi *info.GameInfo, slot info.Position) info.Position {
 	if gi == nil || !gi.HasField() {
 		return slot
 	}
@@ -261,7 +357,8 @@ func clampFreeKickSlot(gi *info.GameInfo, slot info.Position) info.Position {
 			continue
 		}
 		frontX := goalSign * (geometry.Length/2 - geometry.PenaltyAreaDepth)
-		slot.X = frontX - goalSign*rules.DefenseAreaStoppedClearance
+		// 1 mm beyond the clearance: the boundary itself counts as inside.
+		slot.X = frontX - goalSign*(rules.DefenseAreaStoppedClearance+1)
 	}
 	return slot
 }
@@ -379,7 +476,7 @@ func freeKickReserveSlots(
 			X: ownHalfXSign(gi, team) * halfLength * template.depth,
 			Y: halfWidth * template.lane,
 		}
-		slots[i] = clampFreeKickSlot(gi, slots[i])
+		slots[i] = clampRestartSlot(gi, slots[i])
 		slots[i].Angle = slots[i].AngleToPosition(ballPos)
 	}
 	return slots
@@ -428,7 +525,7 @@ func selectFreeKickKicker(
 		return 0, false
 	}
 
-	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
+	goalieID, hasGoalie := SelectGoalieID(gi, team, activeRobots)
 	candidates := fieldRobots(activeRobots, goalieID, hasGoalie)
 	if len(candidates) == 0 {
 		candidates = activeRobots

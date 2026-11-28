@@ -1,6 +1,8 @@
 package info
 
 import (
+	"time"
+
 	"encoding/json"
 	"math"
 
@@ -38,6 +40,16 @@ type GameState struct {
 	Timestamp       float64
 	rawCapture      captureOrder
 	trackedCapture  captureOrder
+	// clock stamps tracker updates; GameInfo.SetClock keeps it in sync with
+	// GameInfo.Now. Nil means the wall clock.
+	clock Clock
+}
+
+func (gs *GameState) now() time.Time {
+	if gs.clock == nil {
+		return time.Now()
+	}
+	return gs.clock.Now()
 }
 
 type captureOrder struct {
@@ -281,14 +293,14 @@ func (gs *GameState) SetTrackedRobot(team Team, id uint32, pos Position, vel Pos
 
 	switch team {
 	case Yellow:
-		gs.TrackedYellow[id].SetTracked(pos, vel, angle, velAngular, ts)
+		gs.TrackedYellow[id].SetTracked(pos, vel, angle, velAngular, ts, gs.now())
 	case Blue:
-		gs.TrackedBlue[id].SetTracked(pos, vel, angle, velAngular, ts)
+		gs.TrackedBlue[id].SetTracked(pos, vel, angle, velAngular, ts, gs.now())
 	}
 }
 
 func (gs *GameState) SetTrackedBall(pos Position, vel Position, ts float64) {
-	gs.TrackedBall.SetTracked(pos, vel, ts)
+	gs.TrackedBall.SetTracked(pos, vel, ts, gs.now())
 }
 
 func (gs *GameState) GetTrackedRobot(team Team, id uint32) *TrackedRobot {

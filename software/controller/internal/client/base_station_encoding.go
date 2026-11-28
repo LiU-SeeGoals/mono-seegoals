@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/LiU-SeeGoals/controller/internal/action"
 	"github.com/LiU-SeeGoals/proto_go/robot_action"
@@ -21,7 +22,9 @@ import (
 //	        velocity for ROTATE
 //	[18-19] current heading (int16, mrad)
 //	[20-21] destination heading (int16, mrad)
-//	[22-31] zero
+//	[22-23] max linear speed for MOVE_TO (int16, mm/s; 0 = no limit).
+//	        Firmware that predates this field ignores it.
+//	[24-31] zero
 const (
 	CommandEncodedSize = 32
 
@@ -37,6 +40,7 @@ const (
 	offsetAux        = 16
 	offsetPosW       = 18
 	offsetDestW      = 20
+	offsetMaxSpeed   = 22
 )
 
 // baseStationCommand is one decoded wire frame. Values keep the integer and
@@ -52,6 +56,7 @@ type baseStationCommand struct {
 	destW        float32 // rad
 	dirX, dirY   int32
 	aux          int32
+	maxSpeed     int32 // mm/s, 0 = no limit
 }
 
 // baseStationCommandFor translates an action. ok is false for actions the
@@ -70,6 +75,9 @@ func baseStationCommandFor(a action.Action) (baseStationCommand, bool) {
 			robotID: int32(a.Id),
 			posX:    int32(a.Pos.X), posY: int32(a.Pos.Y), posW: float32(a.Pos.Angle),
 			destX: int32(a.Dest.X), destY: int32(a.Dest.Y), destW: float32(a.Dest.Angle),
+		}
+		if a.MaxLinearSpeed > 0 {
+			cmd.maxSpeed = int32(math.Min(a.MaxLinearSpeed*1000, math.MaxInt16))
 		}
 		if a.KickSpeed != 0 {
 			// The firmware's kick action keeps position control while it
@@ -139,6 +147,7 @@ func (c baseStationCommand) encode() ([]byte, error) {
 	put(offsetAux, int16(c.aux))
 	put(offsetPosW, int16(c.posW*1000.0))
 	put(offsetDestW, int16(c.destW*1000.0))
+	put(offsetMaxSpeed, int16(c.maxSpeed))
 	return buf, nil
 }
 
@@ -160,5 +169,6 @@ func decodeBaseStationCommand(buf []byte) (baseStationCommand, error) {
 		dirX:      int32(get(offsetDirectionX)),
 		dirY:      int32(get(offsetDirectionY)),
 		aux:       int32(get(offsetAux)),
+		maxSpeed:  int32(get(offsetMaxSpeed)),
 	}, nil
 }

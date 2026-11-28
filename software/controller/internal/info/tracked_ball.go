@@ -21,19 +21,34 @@ func NewTrackedBall() *TrackedBall {
 	return &TrackedBall{}
 }
 
-func (tb *TrackedBall) SetTracked(pos Position, vel Position, ts float64) {
+// TrackedStaleAfter is how long a tracker sample stays usable when the
+// tracker stops sending.
+const TrackedStaleAfter = 500 * time.Millisecond
+
+// SetTracked stores a tracker sample received at now (GameInfo.Now, so
+// ManualClock tests and replays age samples correctly).
+func (tb *TrackedBall) SetTracked(pos Position, vel Position, ts float64, now time.Time) {
 	tb.Pos = pos
 	tb.Vel = vel
 	tb.Timestamp = ts
 	tb.Valid = true
-	tb.updatedAt = time.Now().UnixMilli()
+	tb.updatedAt = now.UnixMilli()
 }
 
+// GetTrackedPosition returns the last tracked position however old it is.
+// Prefer GetFreshTrackedPosition.
 func (tb *TrackedBall) GetTrackedPosition() (Position, bool) {
 	if !tb.Valid {
 		return Position{}, false
 	}
 	return tb.Pos, true
+}
+
+// GetFreshTrackedPosition returns the tracked position if it is at most
+// maxAge old at now.
+func (tb *TrackedBall) GetFreshTrackedPosition(now time.Time, maxAge time.Duration) (Position, bool) {
+	state, ok := tb.GetFreshBallState(now, maxAge)
+	return state.Position, ok
 }
 
 func (tb *TrackedBall) GetFreshTrackedVelocity(now time.Time, maxAge time.Duration) (Position, bool) {

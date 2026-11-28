@@ -30,8 +30,11 @@ const (
 	freeKickWallDistanceMM      = 700.0
 	freeKickWallSpacingMM       = 300.0
 	freeKickWallRobotCount      = 3
-	penaltyPrepareDistanceMM    = 700.0
-	penaltyBehindBallDistanceMM = 1200.0
+	// freeKickSupportBallClearanceMM keeps our non-kickers clear of the ball
+	// during our free kick (outside rules.RestartBallKeepout).
+	freeKickSupportBallClearanceMM = 800.0
+	penaltyPrepareDistanceMM       = 700.0
+	penaltyBehindBallDistanceMM    = 1200.0
 )
 
 // postKickHoldComplete reports whether the kicker may stop holding its kick
@@ -112,13 +115,10 @@ func holdRestartKickerHeading(
 }
 
 func ownGoalCenter(gi *info.GameInfo, team info.Team) info.Position {
-	halfLength := 4500.0
-	if gi != nil && gi.HasField() {
-		if field := gi.FieldSize(); field.X > 0 {
-			halfLength = field.X / 2
-		}
+	if gi == nil {
+		return info.Position{X: ownHalfXSign(gi, team) * 4500}
 	}
-	return info.Position{X: ownHalfXSign(gi, team) * halfLength}
+	return gi.OwnGoalCenter(team)
 }
 
 func robotIDInList(robotIDs []info.ID, target info.ID) bool {
@@ -130,7 +130,10 @@ func robotIDInList(robotIDs []info.ID, target info.ID) bool {
 	return false
 }
 
-func selectGoalieID(gi *info.GameInfo, team info.Team, activeRobots []info.ID) (info.ID, bool) {
+// SelectGoalieID elects the goalie: the referee-configured keeper if active,
+// else defaultGoalieID, else the robot closest to the home goal. Restarts and
+// the open-play planner share it so the goalie does not change hands.
+func SelectGoalieID(gi *info.GameInfo, team info.Team, activeRobots []info.ID) (info.ID, bool) {
 	if len(activeRobots) == 0 {
 		return 0, false
 	}
@@ -198,7 +201,7 @@ func moveGoalieToPosition(
 	gi *info.GameInfo,
 	activityHandler *ai.ActivityHandler,
 ) (info.ID, bool) {
-	goalieID, hasGoalie := selectGoalieID(gi, team, activeRobots)
+	goalieID, hasGoalie := SelectGoalieID(gi, team, activeRobots)
 	if hasGoalie {
 		activityHandler.AddActivity(activity.NewGoalie(team, goalieID))
 	}
@@ -242,7 +245,7 @@ func kickoffBallPosition(gi *info.GameInfo) info.Position {
 		return info.Position{}
 	}
 
-	if pos, ok := gi.State.GetTrackedBall().GetTrackedPosition(); ok {
+	if pos, ok := gi.State.GetTrackedBall().GetFreshTrackedPosition(gi.Now(), info.TrackedStaleAfter); ok {
 		return pos
 	}
 	if pos, err := gi.State.GetBall().GetPosition(); err == nil {

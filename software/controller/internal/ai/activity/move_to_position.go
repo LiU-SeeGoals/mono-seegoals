@@ -286,7 +286,7 @@ func (m *MoveToPosition) pickLookAheadTarget(myPos info.Position, obstacles []pa
 	path := m.path
 	last := path[len(path)-1]
 	if pathplanner.DistanceBetween(myPos, last) < m.rrtConfig.WaypointThreshold &&
-		pathplanner.IsPathClear(myPos, last, obstacles, pathplanner.MotionRadius) {
+		pathplanner.IsPathClear(myPos, last, obstacles, pathplanner.PathClearanceMargin) {
 		out := last
 		out.Z = myPos.Z
 		out.Angle = myPos.Angle

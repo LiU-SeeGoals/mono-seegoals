@@ -36,6 +36,9 @@ type MoveTo struct {
 	// MinLinearSpeed raises the simulator controller's speed floor (m/s) for
 	// motions such as close ball orbits. Zero keeps the default.
 	MinLinearSpeed float64
+	// MaxLinearSpeed caps the drive speed (m/s), e.g. 1.5 m/s rule limit
+	// during STOP. Zero means no limit beyond the robot's own.
+	MaxLinearSpeed float64
 }
 
 func (m *MoveTo) RobotID() int { return m.Id }

@@ -2,6 +2,7 @@ package info
 
 import (
 	"container/list"
+	"errors"
 	// "fmt"
 
 )
@@ -12,6 +13,8 @@ type Ball struct {
 	estimatedPosition Position
 	estimateKind      BallEstimateKind
 	holder            *Robot
+	// estimated is false until a first estimate exists.
+	estimated bool
 }
 
 type BallEstimateKind int8
@@ -38,10 +41,19 @@ func NewBall(historyCapacity int) *Ball {
 	}
 }
 
-// get position
+// ErrBallNeverSeen is returned by GetEstimatedPosition before the first ball
+// observation, when there is no position to estimate from.
+var ErrBallNeverSeen = errors.New("ball has not been seen yet")
+
+// GetEstimatedPosition returns the best ball estimate: the observed ball, the
+// dribbler of the robot hiding it, or its last seen position (see
+// GetEstimateKind). It fails only while no ball has ever been seen.
 func (b *Ball) GetEstimatedPosition() (Position, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if !b.estimated {
+		return Position{}, ErrBallNeverSeen
+	}
 	return b.estimatedPosition, nil
 }
 
@@ -54,6 +66,7 @@ func (b *Ball) setEstimate(pos Position, kind BallEstimateKind, holder *Robot) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.estimatedPosition = pos
+	b.estimated = true
 	b.estimateKind = kind
 	b.holder = holder
 }

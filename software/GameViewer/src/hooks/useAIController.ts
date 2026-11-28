@@ -22,14 +22,17 @@ const MAX_RETRY_MS = 5000;
 // Each team's controller sends its own packets (both teams in two-team
 // simulation). A team that has not sent for this long is dropped.
 const TEAM_TIMEOUT_MS = 1000;
+const DEFAULT_AI_PORT = 5174;
 
 export const useAIController = () => {
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    const ai_address = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_ADDR;
-    const ai_port = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_PORT;
+    // Unset address: the controller runs on the host serving this page, so
+    // browsers elsewhere on the LAN reach it too.
+    const ai_address = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_ADDR || window.location.hostname;
+    const ai_port = import.meta.env.VITE_AI_GAME_VIEWER_SOCKET_PORT || DEFAULT_AI_PORT;
     let retryTimeout: ReturnType<typeof setTimeout> | null = null;
     let retryDelay = MIN_RETRY_MS;
     let isMounted = true;
@@ -43,6 +46,19 @@ export const useAIController = () => {
       visionMaskStore.set(null);
     };
 
+    // Drop teams that stopped sending; true if any was dropped.
+    const expireTeams = (now: number) => {
+      let expired = false;
+      for (const [team, entry] of teams) {
+        if (now - entry.receivedAt > TEAM_TIMEOUT_MS) {
+          teams.delete(team);
+          expired = true;
+        }
+      }
+      return expired;
+    };
+    const flushActions = () => actionsStore.set([...teams.values()].flatMap((entry) => entry.actions));
+
     const onPacket = (packet: AIControllerPacket) => {
       const now = performance.now();
       const byTeam = new Map<number, Action[]>();
@@ -51,10 +67,8 @@ export const useAIController = () => {
         byTeam.set(team, [...(byTeam.get(team) ?? []), action]);
       }
       for (const [team, actions] of byTeam) teams.set(team, { actions, receivedAt: now });
-      for (const [team, entry] of teams) {
-        if (now - entry.receivedAt > TEAM_TIMEOUT_MS) teams.delete(team);
-      }
-      actionsStore.set([...teams.values()].flatMap((entry) => entry.actions));
+      expireTeams(now);
+      flushActions();
 
       if (packet.RobotRoles) {
         const roles: Record<string, string> = {};
@@ -114,9 +128,16 @@ export const useAIController = () => {
       };
     };
 
+    // Expire overlays even when the controller goes silent without closing
+    // the socket (no packet would otherwise trigger the timeout check).
+    const sweep = setInterval(() => {
+      if (expireTeams(performance.now())) flushActions();
+    }, TEAM_TIMEOUT_MS / 2);
+
     connect();
     return () => {
       isMounted = false;
+      clearInterval(sweep);
       wsRef.current?.close();
       if (retryTimeout) clearTimeout(retryTimeout);
       reset();

@@ -37,7 +37,7 @@ func (m *plannerManualMovement) Tick(_ *info.GameInfo) {
 	if !m.Active {
 		return
 	}
-	command := client.GetCommand(client.MOVE_ROBOT)
+	command := client.TakeCommandFor(client.MOVE_ROBOT, int(m.team))
 	if command == nil || command.Id < 0 || command.Id >= int(info.TEAM_SIZE) {
 		return
 	}

@@ -13,7 +13,8 @@ const TEAM_IDS = Object.freeze({
   BLUE: 2,
 });
 
-const REAL_WIDTH_FIELD = 9600;
+// Drawn extent (mm, field plus boundary) until geometry arrives: Division B.
+const DEFAULT_EXTENT = Object.freeze({ x: 9600, y: 6600 });
 const ROBOT_RADIUS = 90;
 const FONT_SIZE = 120;
 const ROLE_FONT_SIZE = 85;
@@ -43,8 +44,12 @@ const FootballField: React.FC<FootballFieldProps> = ({ width, height, fieldGeome
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const geometryRef = useRef(fieldGeometry);
   const frameRef = useRef<number | null>(null);
-  const selectedRobotRef = useRef(0);
+  const selectedRobotRef = useRef<{ id: number; team: number }>({ id: 0, team: TEAM_IDS.YELLOW });
   const rotation = width <= MIN_WIDTH_FOR_HORIZONTAL ? 90 : 0;
+  // Rotated, the canvas is drawn height x width and turned to fill the
+  // width x height box.
+  const canvasWidth = rotation ? height : width;
+  const canvasHeight = rotation ? width : height;
 
   const requestDraw = useCallback(() => {
     if (frameRef.current !== null) return;
@@ -69,10 +74,10 @@ const FootballField: React.FC<FootballFieldProps> = ({ width, height, fieldGeome
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    if (canvas.width !== width) canvas.width = width;
-    if (canvas.height !== height) canvas.height = height;
+    if (canvas.width !== canvasWidth) canvas.width = canvasWidth;
+    if (canvas.height !== canvasHeight) canvas.height = canvasHeight;
     requestDraw();
-  }, [width, height, requestDraw]);
+  }, [canvasWidth, canvasHeight, requestDraw]);
 
   useEffect(() => {
     geometryRef.current = fieldGeometry;
@@ -82,27 +87,47 @@ const FootballField: React.FC<FootballFieldProps> = ({ width, height, fieldGeome
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const world = getWorldFromMouseEvent(e, canvas, rotation);
+    const world = getWorldFromMouseEvent(e, canvas, rotation, geometryRef.current);
     const field = visibleField();
-    const robot = findClosestRobot(field.robotsYellow, world, CLICK_SELECT_RADIUS);
-    if (robot?.robotId !== undefined) selectedRobotRef.current = robot.robotId;
+    const picked = findClosestRobot(
+      [
+        ...field.robotsYellow.map((robot) => ({ robot, team: TEAM_IDS.YELLOW })),
+        ...field.robotsBlue.map((robot) => ({ robot, team: TEAM_IDS.BLUE })),
+      ],
+      world,
+      CLICK_SELECT_RADIUS,
+    );
+    if (picked?.robot.robotId !== undefined) {
+      selectedRobotRef.current = { id: picked.robot.robotId, team: picked.team };
+    }
     controllerSend({
       Command: 'MOVE_ROBOT',
       x: Math.round(world.x),
       y: Math.round(world.y),
-      Id: selectedRobotRef.current,
+      Id: selectedRobotRef.current.id,
+      Team: selectedRobotRef.current.team,
     });
   };
 
   return (
     <div
       className="football-field-container"
-      style={{ height, width, transform: rotation ? `rotate(${rotation}deg)` : undefined }}
+      style={
+        rotation
+          ? {
+            width: canvasWidth,
+            height: canvasHeight,
+            margin: 0,
+            transformOrigin: 'top left',
+            transform: `rotate(${rotation}deg) translateY(-100%)`,
+          }
+          : { height, width }
+      }
     >
       <canvas
         className="football-field-canvas"
         ref={canvasRef}
-        style={{ height, width }}
+        style={{ height: canvasHeight, width: canvasWidth }}
         tabIndex={0}
         onMouseDown={onMouseDown}
       />
@@ -115,6 +140,7 @@ function visibleField(): SSLFieldUpdate {
 }
 
 function drawScene(context: CanvasRenderingContext2D, geometry: SSLGeometryFieldSize | null) {
+  extent = fieldExtent(geometry);
   const field = visibleField();
   context.clearRect(0, 0, context.canvas.width, context.canvas.height);
   if (geometry) drawField(context, geometry);
@@ -284,14 +310,16 @@ function drawRobot(
   }
 }
 
-function findClosestRobot(robots: SSLRobot[], target: Point, threshold: number): SSLRobot | null {
-  let closest: SSLRobot | null = null;
+type TeamRobot = { robot: SSLRobot; team: number };
+
+function findClosestRobot(robots: TeamRobot[], target: Point, threshold: number): TeamRobot | null {
+  let closest: TeamRobot | null = null;
   let minDist = threshold;
-  for (const robot of robots) {
-    const dist = Math.hypot(robot.x - target.x, robot.y - target.y);
+  for (const entry of robots) {
+    const dist = Math.hypot(entry.robot.x - target.x, entry.robot.y - target.y);
     if (dist < minDist) {
       minDist = dist;
-      closest = robot;
+      closest = entry;
     }
   }
   return closest;
@@ -305,7 +333,13 @@ function toCanvas(x: number, y: number, context: CanvasRenderingContext2D): Poin
   };
 }
 
-function getWorldFromMouseEvent(e: React.MouseEvent, canvas: HTMLCanvasElement, rotationDeg: number): Point {
+function getWorldFromMouseEvent(
+  e: React.MouseEvent,
+  canvas: HTMLCanvasElement,
+  rotationDeg: number,
+  geometry: SSLGeometryFieldSize | null,
+): Point {
+  extent = fieldExtent(geometry);
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
@@ -319,8 +353,18 @@ function getWorldFromMouseEvent(e: React.MouseEvent, canvas: HTMLCanvasElement, 
   };
 }
 
+// Drawn extent of the current field; drawScene and the mouse handler set it
+// from the geometry before converting coordinates.
+let extent: { x: number; y: number } = DEFAULT_EXTENT;
+
+function fieldExtent(geometry: SSLGeometryFieldSize | null): { x: number; y: number } {
+  if (!geometry?.fieldLength || !geometry?.fieldWidth) return DEFAULT_EXTENT;
+  const boundary = geometry.boundaryWidth ?? 0;
+  return { x: geometry.fieldLength + 2 * boundary, y: geometry.fieldWidth + 2 * boundary };
+}
+
 function getScaler(width: number, height: number) {
-  return Math.min(width / REAL_WIDTH_FIELD, height / REAL_WIDTH_FIELD);
+  return Math.min(width / extent.x, height / extent.y);
 }
 
 export default FootballField;

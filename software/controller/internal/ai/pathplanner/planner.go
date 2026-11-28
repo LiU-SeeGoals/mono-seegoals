@@ -16,8 +16,11 @@ import (
 const (
 	RobotSafetyRadius = 240.0
 	BallSafetyRadius  = 150.0
-	PlanningRadius    = 400.0
 	MotionRadius      = 100.0
+	// PathClearanceMargin is the extra distance path segments keep beyond an
+	// obstacle's (already robot-inflated) size, so planned paths do not graze
+	// obstacles.
+	PathClearanceMargin = 30.0
 )
 
 const noGoZoneEscapeClearance = MotionRadius
@@ -204,7 +207,7 @@ func (p *Planner) PlanPath(
 	for cur := goalNode; cur != nil; cur = cur.parent {
 		path = append([]info.Position{cur.position}, path...)
 	}
-	path = shortcutPath(path, obstacles, PlanningRadius)
+	path = shortcutPath(path, obstacles, PathClearanceMargin)
 	path = clampPathToPlanningBounds(path, cfg)
 	p.commit(id, path, finalDestination, gi.Now())
 	return p.copyPath(id)
@@ -283,11 +286,11 @@ func isStoredPathValid(
 	if distanceSquared(st.goal, goal) > goalMatchEpsilon*goalMatchEpsilon {
 		return false
 	}
-	if !IsPathClear(myPos, st.path[0], obstacles, PlanningRadius) {
+	if !IsPathClear(myPos, st.path[0], obstacles, PathClearanceMargin) {
 		return false
 	}
 	for i := 0; i < len(st.path)-1; i++ {
-		if !IsPathClear(st.path[i], st.path[i+1], obstacles, PlanningRadius) {
+		if !IsPathClear(st.path[i], st.path[i+1], obstacles, PathClearanceMargin) {
 			return false
 		}
 	}
@@ -383,7 +386,7 @@ func planningObstacles(
 		ballPos, _ := gi.State.Ball.GetPosition()
 		obstacles := []Obstacle{{Position: ballPos, Size: BallSafetyRadius}}
 		if avoidGoallines {
-			obstacles = append(obstacles, goalLineObstacles(gi)...)
+			obstacles = append(obstacles, goalLineObstacles(team, gi)...)
 		}
 		return obstacles
 	}
@@ -426,8 +429,19 @@ func ClampBallKeepoutDestination(
 	destination info.Position,
 	gi *info.GameInfo,
 ) info.Position {
-	radius, active := requiredBallKeepoutRadius(team, gi)
-	if !active || gi == nil || gi.State == nil || gi.State.Ball == nil {
+	radius, _ := requiredBallKeepoutRadius(team, gi)
+	return ClampDestinationOutsideBall(myPos, destination, gi, radius)
+}
+
+// ClampDestinationOutsideBall projects destination just outside a keep-out
+// circle of radius around the ball (no-op for radius <= 0).
+func ClampDestinationOutsideBall(
+	myPos info.Position,
+	destination info.Position,
+	gi *info.GameInfo,
+	radius float64,
+) info.Position {
+	if radius <= 0 || gi == nil || gi.State == nil || gi.State.Ball == nil {
 		return destination
 	}
 	ballPos, err := gi.State.Ball.GetPosition()
@@ -607,7 +621,7 @@ func runRRT(
 		if !isNodeValid(newNode.position, obstacles, false) {
 			continue
 		}
-		if !IsPathClear(nearestNode.position, newNode.position, obstacles, PlanningRadius) {
+		if !IsPathClear(nearestNode.position, newNode.position, obstacles, PathClearanceMargin) {
 			continue
 		}
 
@@ -641,7 +655,7 @@ func connectToGoalIfClear(from *RRTNode, finalDestination info.Position, obstacl
 	if !isNodeValid(finalDestination, obstacles, false) {
 		return nil
 	}
-	if !IsPathClear(from.position, finalDestination, obstacles, PlanningRadius) {
+	if !IsPathClear(from.position, finalDestination, obstacles, PathClearanceMargin) {
 		return nil
 	}
 	return &RRTNode{
@@ -717,7 +731,9 @@ func isNodeValid(position info.Position, obstacles []Obstacle, isStartPosition b
 	return true
 }
 
-// IsPathClear checks if the path between two positions is clear of obstacles.
+// IsPathClear checks if the path between two positions keeps extraMargin
+// beyond every obstacle's size. A segment that starts inside an obstacle is
+// clear when it leads away from it (circles) or stays inside (rects).
 func IsPathClear(start, end info.Position, obstacles []Obstacle, extraMargin float64) bool {
 	for _, obstacle := range obstacles {
 		if segmentIntersectsObstacle(start, end, obstacle, extraMargin) {
@@ -735,8 +751,7 @@ func segmentIntersectsObstacle(start, end info.Position, obstacle Obstacle, extr
 }
 
 func segmentIntersectsCircleObstacle(start, end info.Position, obstacle Obstacle, extraMargin float64) bool {
-	_ = extraMargin
-	radius := obstacle.Size
+	radius := obstacle.Size + math.Max(0, extraMargin)
 
 	abX := end.X - start.X
 	abY := end.Y - start.Y
@@ -765,8 +780,9 @@ func segmentIntersectsCircleObstacle(start, end info.Position, obstacle Obstacle
 }
 
 func segmentIntersectsRectObstacle(start, end info.Position, obstacle Obstacle, extraMargin float64) bool {
-	_ = extraMargin
 	minX, maxX, minY, maxY := expandedRect(obstacle)
+	margin := math.Max(0, extraMargin)
+	minX, maxX, minY, maxY = minX-margin, maxX+margin, minY-margin, maxY+margin
 	startInside := pointInRect(start, minX, maxX, minY, maxY)
 	endInside := pointInRect(end, minX, maxX, minY, maxY)
 	if startInside {
@@ -863,7 +879,7 @@ func ObstaclesForRobot(team info.Team, id info.ID, avoidBall bool, avoidGoalline
 	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Blue), team, id, gi.Now().UnixMilli())
 	obstacles = appendRobotObstacles(obstacles, gi.State.GetTeam(info.Yellow), team, id, gi.Now().UnixMilli())
 	if avoidGoallines {
-		obstacles = append(obstacles, goalLineObstacles(gi)...)
+		obstacles = append(obstacles, goalLineObstacles(team, gi)...)
 	}
 	return obstacles
 }
@@ -898,13 +914,16 @@ func appendRobotObstacles(obstacles []Obstacle, robots *info.RobotTeam, ownTeam 
 	return obstacles
 }
 
-func goalLineObstacles(gi *info.GameInfo) []Obstacle {
+// goalLineObstacles inflates both defense areas by the motion clearance, or
+// by the rules' larger clearance while the ball is out of play.
+func goalLineObstacles(team info.Team, gi *info.GameInfo) []Obstacle {
 	if gi == nil {
 		return nil
 	}
+	clearance := math.Max(rules.DefenseAreaMotionClearance, rules.For(gi, team).DefenseAreaClearance)
 	zones := make([]Obstacle, 0, 2)
 	for _, area := range gi.DefenseAreas() {
-		zones = append(zones, rectObstacle(area.FrontX, area.BackX, area.MinY, area.MaxY, rules.DefenseAreaMotionClearance))
+		zones = append(zones, rectObstacle(area.FrontX, area.BackX, area.MinY, area.MaxY, clearance))
 	}
 	return zones
 }

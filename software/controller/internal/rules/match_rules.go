@@ -99,3 +99,18 @@ func FromEvent(ge *info.GameEvent, team info.Team) MatchRules {
 	}
 	return r
 }
+
+// ForRobot narrows the team rules to robot id. Before our restart is in play
+// only the designated kicker may touch the ball; teammates keep
+// RestartBallKeepout from it so they cannot touch it by accident. With no
+// known kicker the team-wide rules stand.
+func (r MatchRules) ForRobot(id, kicker info.ID, hasKicker bool) MatchRules {
+	if !r.OurRestart || r.BallInPlay || !hasKicker || id == kicker {
+		return r
+	}
+	r.MayTouchBall = false
+	if r.BallKeepout < RestartBallKeepout {
+		r.BallKeepout = RestartBallKeepout
+	}
+	return r
+}

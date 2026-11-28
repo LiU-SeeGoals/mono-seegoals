@@ -186,6 +186,8 @@ func (s *GoalieSafeKickState) Update() state_machine.EventName {
 		s.Ctx.ResetTarget()
 		return EventBallLost
 	}
+	// Republish every frame, as KickState does.
+	s.ActivityHandler.AddActivity(s.KickAct)
 	if s.KickAct.Achieved(s.Gi) {
 		s.Ctx.ResetTarget()
 		return EventKicked

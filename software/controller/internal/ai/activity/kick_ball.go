@@ -78,6 +78,32 @@ func NewKickBall(team info.Team, id info.ID, to, ballPos info.Position) *KickBal
 	}
 }
 
+// kickContinueTolerance: a new KickBall continues a previous one only when it
+// is the same kick (target and starting ball position within this distance).
+const kickContinueTolerance = 100.0
+
+// ContinueFrom carries the dribble-settle timer, ball hold and realign timer
+// over from the same kick, so republishing the kick does not restart them.
+func (m *KickBall) ContinueFrom(previous Activity) {
+	prev, ok := previous.(*KickBall)
+	if !ok || prev == nil || prev == m || prev.team != m.team || prev.id != m.id {
+		return
+	}
+	if prev.to.Dist2d(m.to) > kickContinueTolerance ||
+		prev.orignalBallPos.Dist2d(m.orignalBallPos) > kickContinueTolerance {
+		return
+	}
+	m.orignalBallPos = prev.orignalBallPos
+	m.dribbleSince = prev.dribbleSince
+	m.misalignedSince = prev.misalignedSince
+	prev.holdMu.Lock()
+	hold := prev.hold
+	prev.holdMu.Unlock()
+	m.holdMu.Lock()
+	m.hold = hold
+	m.holdMu.Unlock()
+}
+
 func (m *KickBall) AllowGoalArea(allow bool) {
 	m.allowGoalArea = allow
 }

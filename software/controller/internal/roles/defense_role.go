@@ -8,6 +8,7 @@ import (
 	"github.com/LiU-SeeGoals/controller/internal/ai/activity"
 	"github.com/LiU-SeeGoals/controller/internal/frameworks/state_machine"
 	"github.com/LiU-SeeGoals/controller/internal/info"
+	"github.com/LiU-SeeGoals/controller/internal/rules"
 )
 
 const coverYClamp = 1500.0
@@ -17,7 +18,6 @@ const (
 	middleDefenderBallOffset  = 1700.0
 	backwardDefenderDepth     = 3200.0
 	highDefenderBallOffset    = 900.0
-	lowDefenderDepth          = 3600.0
 )
 
 var neutralHoldPos = info.Position{X: 1000, Y: 0, Z: 0, Angle: 0}
@@ -40,12 +40,7 @@ type DefenseSlot struct {
 }
 
 func defenseXSign(gi *info.GameInfo, team info.Team) float64 {
-	isBlueTeam := team == info.Blue
-	isBlueOnPositiveHalf := gi.Status.GetBlueTeamOnPositiveHalf()
-	if (isBlueTeam && isBlueOnPositiveHalf) || (!isBlueTeam && !isBlueOnPositiveHalf) {
-		return 1.0
-	}
-	return -1.0
+	return gi.OwnHalfXSign(team)
 }
 
 type DefensePressState struct {
@@ -64,39 +59,43 @@ func (s *DefensePressState) GetName() state_machine.StateName {
 }
 
 func (s *DefensePressState) Update() state_machine.EventName {
-	xSign := defenseXSign(s.gi, s.team)
-
 	ballPos, _ := s.gi.State.GetBall().GetEstimatedPosition()
-	var target info.Position
-	switch s.slot.Kind {
-	case DefenseRoleHigh:
-		target = s.ballGoalLineTarget(ballPos, highDefenderBallOffset, s.slot.LateralOffset)
-	case DefenseRoleLow:
-		target = s.lowDefenderTarget(ballPos, s.slot.LateralOffset)
-	case DefenseRoleForward:
-		target = s.ballGoalLineTarget(ballPos, forwardDefenderBallOffset, s.slot.LateralOffset)
-	case DefenseRoleMiddle:
-		target = s.ballGoalLineTarget(ballPos, middleDefenderBallOffset, s.slot.LateralOffset)
-	case DefenseRoleBackward:
-		target = s.backwardDefenderTarget(ballPos, s.slot.LateralOffset)
-	default:
-		target = info.Position{X: xSign * backwardDefenderDepth, Y: ballPos.Y, Z: 0, Angle: 0}
-		target = clampCoverTarget(target)
-		target.Angle = target.AngleToPosition(ballPos)
-	}
-
+	target := DefenderTarget(s.gi, s.team, s.slot, ballPos)
 	s.activityHandler.AddActivity(activity.NewMoveToPosition(s.team, s.robotId, target))
 	return state_machine.NoEvent
 }
 
-func (s *DefensePressState) ballGoalLineTarget(ballPos info.Position, ballOffset float64, lateralOffset float64) info.Position {
-	goalPos := s.gi.HomeGoalDefPos(s.team)
+// DefenderTarget is where a press-state defender in slot drives for ballPos.
+// The planner uses the same function to assign robots to defender slots, so
+// the robot picked for a slot is the one closest to where the slot will go.
+func DefenderTarget(gi *info.GameInfo, team info.Team, slot DefenseSlot, ballPos info.Position) info.Position {
+	switch slot.Kind {
+	case DefenseRoleHigh:
+		return ballGoalLineTarget(gi, team, ballPos, highDefenderBallOffset, slot.LateralOffset)
+	case DefenseRoleLow:
+		// The low defender holds the defense line, just outside our defense area.
+		return depthTarget(gi, team, ballPos, rules.DefenseLineDepth(gi), slot.LateralOffset)
+	case DefenseRoleForward:
+		return ballGoalLineTarget(gi, team, ballPos, forwardDefenderBallOffset, slot.LateralOffset)
+	case DefenseRoleMiddle:
+		return ballGoalLineTarget(gi, team, ballPos, middleDefenderBallOffset, slot.LateralOffset)
+	case DefenseRoleBackward:
+		return depthTarget(gi, team, ballPos, backwardDefenderDepth, slot.LateralOffset)
+	default:
+		return depthTarget(gi, team, ballPos, backwardDefenderDepth, 0)
+	}
+}
+
+// ballGoalLineTarget stands ballOffset from the ball on the ball-goal line,
+// shifted lateralOffset perpendicular to it.
+func ballGoalLineTarget(gi *info.GameInfo, team info.Team, ballPos info.Position, ballOffset float64, lateralOffset float64) info.Position {
+	goalPos := gi.HomeGoalDefPos(team)
 	toGoalX := goalPos.X - ballPos.X
 	toGoalY := goalPos.Y - ballPos.Y
 	dist := math.Sqrt(toGoalX*toGoalX + toGoalY*toGoalY)
 	if dist < 1 {
 		hold := neutralHoldPos
-		hold.X *= defenseXSign(s.gi, s.team)
+		hold.X *= defenseXSign(gi, team)
 		hold.Angle = hold.AngleToPosition(ballPos)
 		return hold
 	}
@@ -111,20 +110,11 @@ func (s *DefensePressState) ballGoalLineTarget(ballPos info.Position, ballOffset
 	return target
 }
 
-func (s *DefensePressState) backwardDefenderTarget(ballPos info.Position, lateralOffset float64) info.Position {
+// depthTarget holds a fixed depth (mm from the center line toward our goal),
+// tracking the ball's Y.
+func depthTarget(gi *info.GameInfo, team info.Team, ballPos info.Position, depth float64, lateralOffset float64) info.Position {
 	target := info.Position{
-		X: defenseXSign(s.gi, s.team) * backwardDefenderDepth,
-		Y: ballPos.Y + lateralOffset,
-		Z: 0,
-	}
-	target = clampCoverTarget(target)
-	target.Angle = target.AngleToPosition(ballPos)
-	return target
-}
-
-func (s *DefensePressState) lowDefenderTarget(ballPos info.Position, lateralOffset float64) info.Position {
-	target := info.Position{
-		X: defenseXSign(s.gi, s.team) * lowDefenderDepth,
+		X: defenseXSign(gi, team) * depth,
 		Y: ballPos.Y + lateralOffset,
 		Z: 0,
 	}
