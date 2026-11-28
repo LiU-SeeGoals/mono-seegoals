@@ -97,6 +97,17 @@ class StartupIntegrationTests(unittest.TestCase):
     def setUp(self):
         sg.network = False
 
+    def test_every_choice_uses_existing_compose_files(self):
+        for index, config in enumerate(sg.choices):
+            files = [arg for arg in config["docker_cmd"] if arg.endswith(".yml")]
+            for path in files:
+                self.assertTrue(os.path.isfile(path), f"choice {index}: missing {path}")
+
+    def test_sumatra_choices_are_the_tigers_matches(self):
+        sumatra = [config["choice-text"] for config in sg.choices if config.get("sumatra")]
+        self.assertEqual(len(sumatra), 2)
+        self.assertTrue(all("TIGERs AI" in text for text in sumatra))
+
     def test_new_option_starts_service_then_lab_containers(self):
         with mock.patch.object(sg.subprocess, "run") as run, \
                 mock.patch.object(sg.subprocess, "Popen") as popen:
@@ -108,7 +119,7 @@ class StartupIntegrationTests(unittest.TestCase):
         self.assertIn(f"{sg.docker_dir}/docker-compose.fetdatorn.yml", calls[1])
         self.assertNotIn(f"{sg.docker_dir}/docker-compose.autoref.yml", calls[1])
         self.assertEqual(calls[2][:2], ["docker", "exec"])
-        popen.assert_not_called()  # In particular, never start legacy ssl-vision.
+        popen.assert_not_called()
 
     def test_compose_failure_stops_vision_and_does_not_enter_ai(self):
         def run(argv, **kwargs):

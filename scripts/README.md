@@ -3,7 +3,7 @@
 Add `scripts/bin` to your PATH as described in the [main README](../README.md).
 Run `sg-start --help` to list startup options, or `sg-start` for the menu.
 
-## New vision processor on the lab field
+## Vision processor on the lab field
 
 One-time setup on the camera-connected Linux machine:
 
@@ -21,7 +21,7 @@ Start everything with:
 
 ```bash
 sg-start --vision-processor
-# Equivalent: sg-start 10, or select the new vision processor in the menu.
+# Equivalent: sg-start 4, or select the fetdatorn configuration in the menu.
 ```
 
 This starts the geometry publisher with `geometry-seagoals.yml` and one
@@ -40,9 +40,9 @@ The processes run in the transient user service
 `seegoals-vision-processor.service`. Leaving the AI shell keeps vision running.
 If any vision process exits, the service stops its remaining processes.
 `sg-kill` or starting another `sg-start` configuration stops the entire service.
-The existing startup choices keep their menu numbers and still use the old
-vision program. Stop any old vision instance before switching to the new one;
-the launcher refuses to start while a process named `vision` is running.
+The legacy `ssl-vision` program has been removed from the repository. If an old
+build is still running, stop it first: the launcher refuses to start while a
+process named `vision` is running.
 
 ```bash
 journalctl --user -u seegoals-vision-processor.service -f  # logs

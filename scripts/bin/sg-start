@@ -14,7 +14,6 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 env_path = os.path.join(script_dir, "..", "..", "environment.ini")
 docker_dir = os.path.join(script_dir, "..", "..", "docker")
 software_dir = os.path.join(script_dir, "..", "..", "software")
-ssl_vision_dir = os.path.join(software_dir, "ssl-vision")
 sumatra_repo = "https://github.com/TIGERs-Mannheim/Sumatra.git"
 vision_processor_dir = os.path.abspath(os.path.join(software_dir, "ssl-vision-processor"))
 vision_processor_unit = "seegoals-vision-processor.service"
@@ -82,7 +81,6 @@ choices = [
     {
         "choice-text": "Rebuild local images.",
         "pull_images": [],
-        "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
@@ -93,7 +91,6 @@ choices = [
     {
         "choice-text": f"Develop on '{AI}' files, (auto-start '{GW}' program)",
         "pull_images": [],
-        "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
@@ -106,7 +103,6 @@ choices = [
     {
         "choice-text": f"Develop on '{GW}' files (auto-start '{AI}' program).",
         "pull_images": [],
-        "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
@@ -118,7 +114,6 @@ choices = [
     {
         "choice-text": f"Develop on `{AI}` and '{GW}' files (auto-start nothing).",
         "pull_images": [],
-        "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
@@ -127,27 +122,12 @@ choices = [
         "container_to_enter": None
     },
     {
-        "choice-text": f"Fetdatorn configuration",
+        "choice-text": "Fetdatorn configuration (vision processor + autoref)",
+        "vision_processor": True,
         "pull_images": [],
-        "pre_cmd": [ f"{ssl_vision_dir}/start.sh" ],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
-            "-p", project_name, "up", "-d"
-        ],
-        "container_to_enter": AI
-    },
-    {
-        "choice-text": f"Fetdatorn configuration (+ autoref)",
-        "pull_images": [],
-        "pre_cmd": [ f"{ssl_vision_dir}/start.sh" ],
-        "docker_cmd": [
-            "docker", "compose",
-            "-f", f"{docker_dir}/docker-compose.yml",
-            # autoref.yml must come before fetdatorn.yml: both define the
-            # auto-referee command and the last file wins (real camera port).
-            "-f", f"{docker_dir}/docker-compose.autoref.yml",
             "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
             "-p", project_name, "up", "-d"
         ],
@@ -156,7 +136,6 @@ choices = [
     {
         "choice-text": "Start for competition.",
         "pull_images": [],
-        "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
@@ -168,7 +147,6 @@ choices = [
     {
         "choice-text": f"Develop on '{GW}' files, enter on startup.",
         "pull_images": [],
-        "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
@@ -179,8 +157,8 @@ choices = [
     },
     {
         "choice-text": "Run SeeGoals Blue vs TIGERs AI Yellow.",
+        "sumatra": True,
         "pull_images": [],
-        "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
@@ -192,8 +170,8 @@ choices = [
     },
     {
         "choice-text": "Run SeeGoals Yellow vs TIGERs AI Blue.",
+        "sumatra": True,
         "pull_images": [],
-        "pre_cmd": [],
         "docker_cmd": [
             "docker", "compose",
             "-f", f"{docker_dir}/docker-compose.yml",
@@ -202,19 +180,6 @@ choices = [
             "-p", project_name, "up", "-d"
         ],
         "container_to_enter": None
-    },
-    {
-        "choice-text": "Fetdatorn configuration (new vision processor + autoref)",
-        "vision_processor": True,
-        "pull_images": [],
-        "pre_cmd": [],
-        "docker_cmd": [
-            "docker", "compose",
-            "-f", f"{docker_dir}/docker-compose.yml",
-            "-f", f"{docker_dir}/docker-compose.fetdatorn.yml",
-            "-p", project_name, "up", "-d"
-        ],
-        "container_to_enter": AI
     }
 ]
 
@@ -226,7 +191,7 @@ def check_vision_processor():
     subprocess.run(["systemctl", "--user", "show-environment"],
                    stdout=subprocess.DEVNULL, check=True)
     if subprocess.run(["pgrep", "-x", "vision"], stdout=subprocess.DEVNULL).returncode == 0:
-        raise RuntimeError("Stop the old ssl-vision program before starting the new processor.")
+        raise RuntimeError("A legacy ssl-vision process ('vision') is running; stop it first.")
     subprocess.run([sys.executable, f"{vision_processor_dir}/start.py", "--check"], check=True)
 
 
@@ -273,7 +238,6 @@ def execute_choice(choice, rebuild):
     container_to_enter = None
     docker_cmd = choices[choice]["docker_cmd"].copy()
     docker_cmd[2:2] = ["--env-file", env_path]
-    pre_cmd = choices[choice]["pre_cmd"]
     container_to_enter = choices[choice]["container_to_enter"]
 
     if rebuild and "up" in docker_cmd:
@@ -282,11 +246,6 @@ def execute_choice(choice, rebuild):
     if network:
         for image in choices[choice]["pull_images"]:
             subprocess.run(["docker", "pull", image])
-
-    if pre_cmd:
-        if VERBOSE:
-            print(f"Pre CMD: {' '.join(pre_cmd)}")
-        subprocess.Popen(pre_cmd)
 
     if VERBOSE:
         print(f"Docker CMD: {' '.join(docker_cmd)}")
@@ -371,7 +330,7 @@ if __name__ == "__main__":
         print(f"Invalid choice {choice}...")
         sys.exit(1)
 
-    if choice in (8, 9):
+    if choices[choice].get("sumatra"):
         ensure_sumatra_checkout()
     # Check before sg-kill so missing dependencies leave the existing stack running.
     if choices[choice].get("vision_processor"):
@@ -390,7 +349,7 @@ if __name__ == "__main__":
         print("All submodules are already initialized.")
     else:
         print("Submodules are not initialized. Initializing now...")
-        subprocess.run(["git", "submodule", "update", "--init", "--recursive", "--no-fetch", "--remote"])
+        subprocess.run(["git", "submodule", "update", "--init", "--recursive"])
         subprocess.run(["git", "status", "--ignore-submodules=all"])
         print("Submodules initialized and updated.")
 

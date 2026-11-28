@@ -18,16 +18,13 @@ jobs:
         with:
           go-version-file: software/controller/go.mod
           cache-dependency-path: software/controller/go.sum
-      # config.go loads software/controller/.env and requires every key;
-      # the tracked file is empty, so use the repo's default environment.
-      - name: Provide .env
-        run: cp ../../environment.ini .env
+      # Config has defaults for every key, so no .env is needed.
       - run: go build ./...
       - run: go vet ./...
       - run: go test -race -count=1 ./...
 
   gameviewer:
-    name: GameViewer (node tests)
+    name: GameViewer (server tests, lint, build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -43,8 +40,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: software/GameViewer/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
-      - run: node --test src/backend/
-      # TODO: add `pnpm exec tsc --noEmit` once the existing type errors are fixed.
+      - run: pnpm test
+      - run: pnpm run lint
+      - run: pnpm run build
 
   scripts:
     name: Scripts (Python unittest)

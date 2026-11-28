@@ -14,7 +14,7 @@ Here follows a short description of the systems:
 ./software/GameViewer/      - A website that displays the current gamestate.
 ./software/controller/      - The software that plans/execute plans for the robots.
 ./sotware/proto-messages/   - The definition of our protbuf messages.
-./software/ssl-vision/      - Forked software from the SSL league, it parses camera data which our controller uses to plan.
+./software/ssl-vision-processor/ - Camera vision (TIGERs vision processor + our launcher), runs on the host.
 ```
 
 ## Quickstart Guide
@@ -73,13 +73,12 @@ Please see the `README.md` files in the different system folders for more inform
 If you want to try out the project on the field in the lab, then:
 
 1. Make sure the basestation is powered up and connected to the switch that fetdatorn is connected to.
-2. From fetdatorn, run the fetdatorn configuration available on `sg-start`, press up arrow and run the controller program.
+2. From fetdatorn, run `sg-start --vision-processor` (the fetdatorn configuration in the menu), press up arrow and run the controller program.
 3. Go to our [GameViewer](http://localhost:5173) from fetdatorn to see that everything seems to work.
 
-To use the new `ssl-vision-processor`, follow the one-time build instructions in
-the [scripts startup guide](scripts/README.md), then run
-`sg-start --vision-processor` (menu option 10). `sg-kill` stops both the processor
-service and the containers.
+Vision comes from `software/ssl-vision-processor`, which runs on the host. Build
+it once as described in the [scripts startup guide](scripts/README.md).
+`sg-kill` stops both the processor service and the containers.
 
 Debugging:
 - Check that the `BASESTATION_ADDR` within `./environment.ini` is the same as the address the basesation reports `sg-fw serial /dev/serial/by-id/BASESATION_ID`.

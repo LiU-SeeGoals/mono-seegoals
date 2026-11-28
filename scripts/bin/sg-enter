@@ -1,5 +1,10 @@
 #!/bin/bash
 
+RED="\033[1;31m"
+GREEN="\033[1;32m"
+ORANGE="\033[0;33m"
+NC="\033[0m"
+
 CONTAINERS=($(docker compose -p seegoals ps --format "{{.Names}}"))
 
 if [ -z "$CONTAINERS" ]; then
@@ -8,7 +13,7 @@ if [ -z "$CONTAINERS" ]; then
 fi
 
 if [ -n "$1" ]; then
-    if [[ -n "${CONTAINERS[$1]}" ]]; then
+    if [[ "$1" =~ ^[0-9]+$ && -n "${CONTAINERS[$1]}" ]]; then
         docker exec -it "${CONTAINERS[$1]}" /bin/bash
     else
         echo -e "${RED}Invalid container index: $1${NC}"
@@ -26,10 +31,11 @@ done
 echo -e "${ORANGE}Enter the number of the container you want to access:${NC}"
 read -r INDEX
 
-if [[ -n "${CONTAINERS[$INDEX]}" ]]; then
+if [[ "$INDEX" =~ ^[0-9]+$ && -n "${CONTAINERS[$INDEX]}" ]]; then
     SELECTED="${CONTAINERS[$INDEX]}"
     echo -e "${GREEN}Attaching to container '$SELECTED'...${NC}"
     docker exec -it "$SELECTED" /bin/bash
 else
     echo -e "${RED}Invalid selection...${NC}"
+    exit 1
 fi

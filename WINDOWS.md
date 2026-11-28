@@ -117,10 +117,12 @@ To run the AI, enter the container with `sg-enter`, choose `ai`, press the **up 
 | 1 Develop AI | Yes | |
 | 2 Develop GameViewer | Yes | |
 | 3 Develop AI and GameViewer | Yes | |
-| 8, 9 vs TIGERs AI | Yes | |
-| 4, 5, 10 Fetdatorn | No | Lab machine only, host networking |
-| 6 Competition | No | Lab machine only, host networking |
-| 7 GameViewer, enter on startup | No | Uses host networking |
+| 7, 8 vs TIGERs AI | Yes | |
+| 4 Fetdatorn (vision processor + autoref) | No | Lab machine only, host networking |
+| 5 Competition | No | Lab machine only, host networking |
+| 6 GameViewer, enter on startup | No | Uses host networking |
+
+Run `sg-start --help` to list the options with their current numbers.
 
 ## 9. Edit the code with VS Code
 VS Code runs on Windows, but with the **WSL extension** it opens the files and runs its terminal inside Ubuntu. That way it is fast and the `sg-*` scripts work in its terminal.
@@ -154,7 +156,6 @@ Docker Desktop forwards every port in a service's `ports:` list to Windows. Afte
 |---|---|
 | 5173 | GameViewer page |
 | 3000 | SSL-Vision websocket (game-viewer) |
-| 3001 | Game controller websocket (game-viewer) |
 | 5174 | AI → GameViewer socket (ai) |
 | 8081 | SSL Game Controller UI |
 | 8082 | SSL Vision client |
@@ -184,4 +185,4 @@ docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 ### Not supported on Windows
 - **Live field / fetdatorn:** multicast from the lab network does not reach the WSL VM.
 - **Firmware flashing and serial (`sg-fw`):** USB devices are not visible in WSL by default. [usbipd-win](https://github.com/dorssel/usbipd-win) can pass them through, but this is untested.
-- **Vision processor (option 10):** needs systemd and OpenCL. Use a Linux machine.
+- **Vision processor (option 4, `sg-start --vision-processor`):** needs systemd and OpenCL. Use a Linux machine.

@@ -33,6 +33,4 @@ software/controller/tests/**
 *.out
 *.trace
 .bash_history
-/software/ssl-vision/camera*.tmp
-/software/ssl-vision/camera*.base64
 /software/ssl-vision-processor/temo
